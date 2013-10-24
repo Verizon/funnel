@@ -5,7 +5,7 @@ object Build extends Build {
 
   val projectId = "commons-monitoring"
 
-  lazy val buildSettings = 
+  lazy val buildSettings =
     Defaults.defaultSettings ++
     seq(ScctPlugin.instrumentSettings : _*)
 
@@ -13,9 +13,12 @@ object Build extends Build {
     .settings(buildSettings:_*)
     .settings(
       name := projectId,
-      organization := "intelmedia.ws.commons",  
+      organization := "intelmedia.ws.commons",
       scalaVersion := "2.10.3")
     .settings(libraryDependencies ++=
       compile(scalaz) ++
+      compile(scalazstream) ++
+      compile(algebird) ++
+      test(scalacheck) ++
       test(scalatest))
 }
