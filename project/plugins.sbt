@@ -12,7 +12,7 @@ resolvers ++= Seq(
   Resolver.url("Sonatype Nexus Artifactoryonline Scalasbt Repository", url("http://nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/repositories/artifactoryonline-scalasbt/"))(Resolver.ivyStylePatterns)
 )
 
-addSbtPlugin("com.intel.media" %% "mediabuild" % "1.1.6")
+addSbtPlugin("com.intel.media" %% "mediabuild" % "1.1.9")
 
 addSbtPlugin("com.typesafe.sbteclipse" % "sbteclipse-plugin" % "2.1.0")
 
