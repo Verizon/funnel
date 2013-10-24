@@ -1,1 +1,3 @@
-Generic-streaming-monitoring-system-for-Scala
+## Commons Monitoring
+
+Generic streaming monitoring system for Scala
