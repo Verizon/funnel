@@ -17,3 +17,6 @@ bin
 .class
 .project
 .ivy2
+.lib
+*.swp
+sbt
