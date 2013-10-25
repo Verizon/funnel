@@ -55,7 +55,6 @@ object Buffers {
     flush(p, d0)
   }
 
-  // todo: testme
   /** Compute the smallest multiple of step which exceeds `d`. */
   def roundDuration(d: Duration, step: Duration): Duration = {
     val f = d / step
