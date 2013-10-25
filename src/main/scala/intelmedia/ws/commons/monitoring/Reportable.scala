@@ -15,12 +15,12 @@ object Reportable {
   case class Stats(get: monitoring.Stats) extends Reportable[monitoring.Stats]
   case class Histogram(get: monitoring.Histogram[String]) extends Reportable[monitoring.Histogram[String]]
 
-  implicit def int(a: Int): Reportable[Int] = I(a)
-  implicit def boolean(a: Boolean): Reportable[Boolean] = B(a)
-  implicit def double(a: Double): Reportable[Double] = D(a)
-  implicit def string(a: String): Reportable[String] = S(a)
-  implicit def stats(a: monitoring.Stats): Reportable[monitoring.Stats] = Stats(a)
-  implicit def histogram(a: monitoring.Histogram[String]): Reportable[monitoring.Histogram[String]] = Histogram(a)
+  implicit def reportableInt(a: Int): Reportable[Int] = I(a)
+  implicit def reportableBoolean(a: Boolean): Reportable[Boolean] = B(a)
+  implicit def reportableDouble(a: Double): Reportable[Double] = D(a)
+  implicit def reportableString(a: String): Reportable[String] = S(a)
+  implicit def reportableStats(a: monitoring.Stats): Reportable[monitoring.Stats] = Stats(a)
+  implicit def reportableHistogram(a: monitoring.Histogram[String]): Reportable[monitoring.Histogram[String]] = Histogram(a)
 
   def apply[A](a: A)(implicit toReportable: A => Reportable[A]): Reportable[A] =
     toReportable(a)
