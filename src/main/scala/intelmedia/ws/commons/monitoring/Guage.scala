@@ -1,5 +1,6 @@
 package intelmedia.ws.commons.monitoring
 
-case class Guage[A](modify: (A => A) => Unit) {
+trait Guage[A] extends Instrument[A] {
+  def modify(f: A => A): Unit
   def set(a: A): Unit = modify(_ => a)
 }

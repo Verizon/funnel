@@ -1,6 +1,6 @@
 package intelmedia.ws.commons.monitoring
 
-trait Counter {
+trait Counter extends Instrument[Int] {
   def incrementBy(by: Int): Unit
   def increment: Unit = incrementBy(1)
   def decrement: Unit = incrementBy(-1)
