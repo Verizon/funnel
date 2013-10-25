@@ -8,7 +8,7 @@ import scalaz.concurrent.Task
 import scalaz.Nondeterminism
 import scalaz.stream.{process1, Process}
 
-object MonitronSpec extends Properties("monitron") {
+object MonitoringSpec extends Properties("monitoring") {
 
   val B = Buffers
 
@@ -103,23 +103,44 @@ object MonitronSpec extends Properties("monitron") {
     true
   }
 
+  /*
+   * Feed a counter concurrently from two different threads, making sure
+   * the final count is the same as if we summed sequentially.
+   */
   property("concurrent-counters-integration-test") = forAll {
     (h: Int, t: List[Int]) =>
       val ab = h :: t
       val (a,b) = ab.splitAt(ab.length / 2)
-      import Instruments.default._
+      val M = Monitoring.instance
+      val I = Instruments.instance(5 minutes, M)
+      import I._
       val aN = counter("a")
       val bN = counter("b")
       val abN = counter("ab")
-      // println("subscribing to latest")
-      val latest = Monitoring.snapshot(Monitoring.default)
+      val latest = Monitoring.snapshot(M)
       Nondeterminism[Task].both(
         Task { a.foreach { a => aN.incrementBy(a); abN.incrementBy(a) } },
         Task { b.foreach { b => bN.incrementBy(b); abN.incrementBy(b) } }
       ).run
+      val expectedA = a.sum
+      val expectedB = b.sum
+      val expectedAB = ab.sum
+      @annotation.tailrec
+      def go: Unit = {
+        val gotA = M.latest(aN.key).run
+        val gotB = M.latest(bN.key).run
+        val gotAB = M.latest(abN.key).run
+        if (gotA != expectedA || gotB != expectedB || gotAB != expectedAB) {
+          // println(s"a: $gotA, b: $gotB, ab: $gotAB")
+          Thread.sleep(10)
+          go
+        }
+      }
+      go
       val m = latest.run
-      // println(m)
-      true
+      m(aN.key).get == expectedA &&
+      m(bN.key).get == expectedB &&
+      m(abN.key).get == expectedAB
   }
 }
 
