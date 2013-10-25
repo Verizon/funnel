@@ -9,25 +9,7 @@ import scalaz.stream._
 import scalaz.stream.async
 
 /**
- * Events have an input type, `I`, an output type `O`,
- * and are created with a label and a stream transducer
- * from `I` to `O`. The transducer can be an arbitrary stateful
- * transformation from a stream of `I` to `O` values, common
- * cases are counters, guages, and histograms.
- *
- * We can obtain different metrics just by substituting
- * different transducers, and we can assemble more complex
- * metrics using the usual stream combinators.
- *
- * The public API may provide specialized interfaces so
- * users of this API don't need to know about scalaz-stream.
- * See the `counter`, `guage` and `resettingGuage` functions
- * as examples.
- *
- * Producers get back a simple `I => Unit` to use for publishing
- * events. Consumers (like a consumer which exposed all metrics
- * over some HTTP interface) can ask for the set of active
- * keys, and can obtain a `Signal` for a given key.
+ * TODO: document me
  */
 trait Monitoring {
   import Monitoring._
@@ -37,8 +19,16 @@ trait Monitoring {
     label: String)(
     buf: Process1[(I,Duration),O]): (Key[O], I => Unit)
 
+  // todo: docs, mention topic vs signal semantics
   def get[O](k: Key[O]): async.immutable.Signal[Reportable[O]]
-  // def topic[O](k: Key[O]): async.Topic[O]
+
+  // def publish[O <% Reportable[O]](label: String)(k: Key[O]): Key[O]
+
+  /**
+   * Return the most recent value for a given key.
+   */
+  def latest[O](k: Key[O]): Task[O] =
+    get(k).continuous.once.runLast.map(_.get.get)
 
   /** The time-varying set of keys. */
   def keys: async.immutable.Signal[List[Key[Any]]]
