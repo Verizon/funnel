@@ -1,6 +1,6 @@
 package intelmedia.ws.commons.monitoring
 
-import com.twitter.algebird.Moments
+import com.twitter.algebird.{Group, Moments, MomentsGroup}
 
 /** Monoidally track count/mean/variance/skewness/kurtosis. */
 class Stats(moments: Moments) {
@@ -27,4 +27,10 @@ object Stats {
 
   def reduce(s: Seq[Double]): Stats =
     new Stats(s.view.map(d => Moments(d)).reduce(Moments.group.plus))
+
+  implicit def statsGroup: Group[Stats] = new Group[Stats] {
+    def zero = new Stats(MomentsGroup.zero)
+    override def negate(s: Stats) = new Stats(MomentsGroup.negate(s.get))
+    def plus(s1: Stats, s2: Stats): Stats = s1 ++ s2
+  }
 }

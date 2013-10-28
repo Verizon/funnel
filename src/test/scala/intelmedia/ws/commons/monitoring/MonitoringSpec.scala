@@ -135,40 +135,43 @@ object MonitoringSpec extends Properties("monitoring") {
    * Feed a counter concurrently from two different threads, making sure
    * the final count is the same as if we summed sequentially.
    */
-  property("concurrent-counters-integration-test") = forAll {
-    (h: Int, t: List[Int]) =>
-      val ab = h :: t
-      val (a,b) = ab.splitAt(ab.length / 2)
-      val M = Monitoring.instance
-      val I = Instruments.instance(5 minutes, M)
-      import I._
-      val aN = counter("a")
-      val bN = counter("b")
-      val abN = counter("ab")
-      val latest = Monitoring.snapshot(M)
-      Nondeterminism[Task].both(
-        Task { a.foreach { a => aN.incrementBy(a); abN.incrementBy(a) } },
-        Task { b.foreach { b => bN.incrementBy(b); abN.incrementBy(b) } }
-      ).run
-      val expectedA = a.sum
-      val expectedB = b.sum
-      val expectedAB = ab.sum
-      @annotation.tailrec
-      def go: Unit = {
-        val gotA = M.latest(aN.keys.now).run
-        val gotB = M.latest(bN.keys.now).run
-        val gotAB = M.latest(abN.keys.now).run
-        if (gotA != expectedA || gotB != expectedB || gotAB != expectedAB) {
-          // println(s"a: $gotA, b: $gotB, ab: $gotAB")
-          Thread.sleep(10)
-          go
-        }
+  property("concurrent-counters-integration-test") = forAll(Gen.listOf1(Gen.choose(-10,10))) { ab =>
+    // this test takes about 45 seconds
+    val (a,b) = ab.splitAt(ab.length / 2)
+    val M = Monitoring.instance
+    val I = Instruments.instance(5 minutes, M)
+    import I._
+    val aN = counter("a")
+    val bN = counter("b")
+    val abN = counter("ab")
+    val latest = Monitoring.snapshot(M)
+    Nondeterminism[Task].both(
+      Task { a.foreach { a => aN.incrementBy(a); abN.incrementBy(a) } },
+      Task { b.foreach { b => bN.incrementBy(b); abN.incrementBy(b) } }
+    ).run
+    val expectedA = a.sum
+    val expectedB = b.sum
+    val expectedAB = ab.sum
+    @annotation.tailrec
+    def go: Unit = {
+      val gotA = M.latest(aN.keys.now).run
+      val gotB = M.latest(bN.keys.now).run
+      val gotAB = M.latest(abN.keys.now).run
+      if (gotA != expectedA || gotB != expectedB || gotAB != expectedAB) {
+        println("sleeping")
+        // println(s"a: $gotA, b: $gotB, ab: $gotAB")
+        Thread.sleep(10)
+        go
       }
-      go
-      val m = latest.run
-      m(aN.keys.now).get == expectedA &&
-      m(bN.keys.now).get == expectedB &&
-      m(abN.keys.now).get == expectedAB
+    }
+    go
+    val t0 = System.currentTimeMillis
+    val m = latest.run // NB: this takes too long
+    val millis = System.currentTimeMillis - t0
+    // println(s"snapshot took: $millis")
+    m(aN.keys.now).get == expectedA &&
+    m(bN.keys.now).get == expectedB &&
+    m(abN.keys.now).get == expectedAB
   }
 }
 
