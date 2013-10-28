@@ -75,8 +75,8 @@ object Buffers {
     flush(None, false, p, d0)
   }
 
-  /** Produce a rolling output from all inputs in the last `d0` duration. */
-  def window[I,O](d0: Duration)(to: I => O)(G: Group[O]): Process1[(I,Duration), O] = {
+  /** Produce a sliding window output from all inputs in the last `d0` duration. */
+  def sliding[I,O](d0: Duration)(to: I => O)(G: Group[O]): Process1[(I,Duration), O] = {
     def go(window: Vector[(O, Duration)], cur: O): Process1[(I,Duration), O] =
       P.await1[(I,Duration)].flatMap { case (i,d) =>
         val (out, in) = window.span(d - _._2 > d0)

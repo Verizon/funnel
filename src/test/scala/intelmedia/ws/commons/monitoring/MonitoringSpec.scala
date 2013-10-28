@@ -64,19 +64,19 @@ object MonitoringSpec extends Properties("monitoring") {
     ok && out2.length == 2 && out2(0) == xs.sum && out2(1) == xs.sum
   }
 
-  property("window-id") = forAll(Gen.listOf1(Gen.choose(1,10))) { xs =>
-    val c = B.window(5 minutes)(identity[Int])(Group.intGroup)
+  property("sliding-id") = forAll(Gen.listOf1(Gen.choose(1,10))) { xs =>
+    val c = B.sliding(5 minutes)(identity[Int])(Group.intGroup)
     val input: Process[Task,(Int,Duration)] =
       Process.emitAll(xs.map((_, 1 minutes)))
     val output = input.pipe(c).runLog.run
     output == xs.scanLeft(0)(_ + _)
   }
 
-  property("window-example") = secure {
+  property("sliding-example") = secure {
     val i1: Process[Task, (Int,Duration)] =
       Process(1 -> (0 minutes), 1 -> (1 minutes), 2 -> (3 minutes), 2 -> (4 minutes))
 
-    val c = B.window(2 minutes)(identity[Int])(Group.intGroup)
+    val c = B.sliding(2 minutes)(identity[Int])(Group.intGroup)
     val output = i1.pipe(c).runLog.run
     output == List(0, 1, 2, 3, 4)
   }
