@@ -3,6 +3,7 @@ package intelmedia.ws.commons.monitoring
 import scala.concurrent.duration._
 import scalaz.stream._
 import scalaz.stream.{Process => P}
+import com.twitter.algebird.Group
 
 /**
  * Various stream transducers and combinators used for
@@ -72,6 +73,19 @@ object Buffers {
           flush(last, false, process1.feed1(i -> d)(cur), expiration)
       }
     flush(None, false, p, d0)
+  }
+
+  /** Produce a rolling output from all inputs in the last `d0` duration. */
+  def window[I,O](d0: Duration)(to: I => O)(G: Group[O]): Process1[(I,Duration), O] = {
+    def go(window: Vector[(O, Duration)], cur: O): Process1[(I,Duration), O] =
+      P.await1[(I,Duration)].flatMap { case (i,d) =>
+        val (out, in) = window.span(d - _._2 > d0)
+        val io = to(i)
+        val neg = out.foldLeft(G.zero)((a,b) => G.plus(a, G.negate(b._1)))
+        val cur2 = G.plus(G.plus(neg, cur), io)
+        P.emit(cur2) ++ go(in :+ (io -> d), cur2)
+      }
+    P.emit(G.zero) ++ go(Vector(), G.zero)
   }
 
   /** Compute the smallest multiple of step which exceeds `d`. */
