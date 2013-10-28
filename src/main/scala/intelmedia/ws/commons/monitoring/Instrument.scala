@@ -1,5 +1,5 @@
 package intelmedia.ws.commons.monitoring
 
-trait Instrument[A] {
-  def key: Key[A]
+trait Instrument[K] {
+  def keys: K
 }

@@ -9,18 +9,21 @@ import scala.concurrent.duration._
  */
 class Instruments(window: Duration, monitoring: Monitoring) {
 
-  def counter(label: String, init: Int = 0): Counter = new Counter {
+  def counter(label: String, init: Int = 0): Counter[Now[Int]] = new Counter[Now[Int]] {
     val (key, snk) = monitoring.topic(label)(B.resetEvery(window)(B.counter(init)))
     def incrementBy(n: Int): Unit = snk(n)
+    def keys = Now(key)
   }
 
-  def guage[A <% Reportable[A]](label: String, init: A): Guage[A] = new Guage[A] {
+  def guage[A <% Reportable[A]](label: String, init: A): Guage[Now[A],A] = new Guage[Now[A],A] {
     val (key, snk) = monitoring.topic(label)(B.resetEvery(window)(B.variable(init)))
     def modify(f: A => A): Unit = snk(f)
+    def keys = Now(key)
   }
 
-  def timer(label: String): Timer = new Timer {
+  def timer(label: String): Timer[Now[Stats]] = new Timer[Now[Stats]] {
     val (key, snk) = monitoring.topic(label)(B.resetEvery(window)(B.stats))
+    def keys = Now(key)
     def start: () => Unit = {
       val t0 = System.nanoTime
       () => { val elapsed = System.nanoTime - t0; snk(elapsed.toDouble) }

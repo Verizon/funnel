@@ -3,7 +3,7 @@ package intelmedia.ws.commons.monitoring
 import scala.concurrent.{ExecutionContext,Future}
 import scalaz.concurrent.Task
 
-trait Timer extends Instrument[Stats] {
+trait Timer[K] extends Instrument[K] {
 
   /**
    * Return a newly running stopwatch. To record

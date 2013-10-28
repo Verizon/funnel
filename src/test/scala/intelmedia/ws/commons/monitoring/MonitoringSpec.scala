@@ -127,9 +127,9 @@ object MonitoringSpec extends Properties("monitoring") {
       val expectedAB = ab.sum
       @annotation.tailrec
       def go: Unit = {
-        val gotA = M.latest(aN.key).run
-        val gotB = M.latest(bN.key).run
-        val gotAB = M.latest(abN.key).run
+        val gotA = M.latest(aN.keys.now).run
+        val gotB = M.latest(bN.keys.now).run
+        val gotAB = M.latest(abN.keys.now).run
         if (gotA != expectedA || gotB != expectedB || gotAB != expectedAB) {
           // println(s"a: $gotA, b: $gotB, ab: $gotAB")
           Thread.sleep(10)
@@ -138,9 +138,9 @@ object MonitoringSpec extends Properties("monitoring") {
       }
       go
       val m = latest.run
-      m(aN.key).get == expectedA &&
-      m(bN.key).get == expectedB &&
-      m(abN.key).get == expectedAB
+      m(aN.keys.now).get == expectedA &&
+      m(bN.keys.now).get == expectedB &&
+      m(abN.keys.now).get == expectedAB
   }
 }
 
