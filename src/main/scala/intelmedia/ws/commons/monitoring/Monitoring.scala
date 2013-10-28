@@ -54,7 +54,7 @@ object Monitoring {
   }
 
   val defaultPool: ExecutorService =
-    Executors.newCachedThreadPool(daemonThreads("monitoring-thread"))
+    Executors.newFixedThreadPool(8, daemonThreads("monitoring-thread"))
 
   val default: Monitoring = instance(defaultPool)
 
@@ -72,17 +72,7 @@ object Monitoring {
     )
     var topics = new collection.concurrent.TrieMap[Key[Any], Topic[Any,Any]]()
 
-    case class M(key: Key[Any], v: Any)
-
-    def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] =
-      t.asInstanceOf[Topic[Any,Any]]
-
-    val hub = Actor.actor[M] { case M(key, v) =>
-      if (!topics.contains(key)) sys.error("unknown monitoring key: " + key)
-      val elapsed = Duration.fromNanos(System.nanoTime - t0)
-      val topic = topics(key)
-      topic.publish(v -> elapsed, o => {})
-    } (S)
+    def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
     new Monitoring {
       def keys = keys_
@@ -94,7 +84,10 @@ object Monitoring {
         val k = Key[O](label)
         topics += (k -> eraseTopic(Topic(pub, v)))
         keys_.value.modify(k :: _)
-        (k, (i: I) => hub ! M(k, i))
+        (k, (i: I) => {
+          val elapsed = Duration.fromNanos(System.nanoTime - t0)
+          pub(i -> elapsed, _ => {})
+        })
       }
 
       def get[O](k: Key[O]): Signal[Reportable[O]] =
@@ -115,7 +108,7 @@ object Monitoring {
       t <- Nondeterminism[Task].gatherUnordered {
         ks.map(k => M.get(k).continuous.once.runLast.map(
           _.map((k, _))
-        ).timed(500L).attempt.map(_.toOption))
+        ).timed(100L).attempt.map(_.toOption))
       }
       _ <- Task { t.flatten.flatten.foreach(m += _) }
     } yield m
@@ -149,7 +142,7 @@ object Monitoring {
         case Process.Halt(e) => signal.value.fail(e)
         case _ => ()
       }
-    } (Strategy.Executor(ES))
+    } (Strategy.Sequential)
     ((i: I, done: Option[O] => Unit) => hub ! (i -> done), signal)
   }
 
