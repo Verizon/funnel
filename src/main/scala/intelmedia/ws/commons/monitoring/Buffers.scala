@@ -38,7 +38,7 @@ object Buffers {
     go(Set())
   }
 
-  /** Reset the buffer `p` after `d0, 2*d0, 3*d0, ...` duration. */
+  /** Reset the buffer `p` after `d0, 2*d0, 3*d0, ...` elapsed duration. */
   def resetEvery[I,O](d0: Duration)(p: Process1[I,O]): Process1[(I,Duration),O] = {
     def flush(cur: Process1[I,O], expiration: Duration):
         Process1[(I,Duration),O] = {
@@ -53,6 +53,25 @@ object Buffers {
           flush(process1.feed1(i)(cur), expiration)
       }
     flush(p, d0)
+  }
+
+  /** Only emit a value after `d0, 2*d0, 3*d0, ...` elapsed duration. */
+  def emitEvery[I,O](d0: Duration)(p: Process1[(I,Duration),O]): Process1[(I,Duration),O] = {
+    def flush(last: Option[O], unmask: Boolean, cur: Process1[(I,Duration),O], expiration: Duration):
+        Process1[(I,Duration),O] = {
+      val (h, t) = cur.unemit
+      val last2 = h.lastOption orElse last
+      if (unmask) Process.emitAll(last.toSeq) ++ go(last2, t, expiration)
+      else go(last2, t, expiration)
+    }
+    def go(last: Option[O], cur: Process1[(I,Duration),O], expiration: Duration): Process1[(I,Duration),O] =
+      P.await1[(I,Duration)].flatMap { case (i,d) =>
+        if (d >= expiration)
+          flush(last, true, process1.feed1(i -> d)(p), roundDuration(d, d0))
+        else
+          flush(last, false, process1.feed1(i -> d)(cur), expiration)
+      }
+    flush(None, false, p, d0)
   }
 
   /** Compute the smallest multiple of step which exceeds `d`. */

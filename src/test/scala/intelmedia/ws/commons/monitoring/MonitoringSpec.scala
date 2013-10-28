@@ -39,10 +39,13 @@ object MonitoringSpec extends Properties("monitoring") {
 
   /*
    * Check that `resetEvery` properly resets the stream
-   * transducer after the elapsed time.
+   * transducer after the elapsed time. Check that `emitEvery`
+   * only emits a value at period boundaries.
    */
-  property("resetEvery") = forAll { (h: Int, t: List[Int]) =>
+  property("reset/emitEvery") = forAll { (h: Int, t: List[Int]) =>
     val xs = h :: t
+    // resetEvery -- we feed the same input twice, fast forwarding
+    // the time; this should give the same output, duplicated
     val c = B.resetEvery(5 minutes)(B.counter(0))
     val input: Process[Task,(Int,Duration)] =
       Process.emitAll(xs.map((_, 0 minutes))) ++
@@ -50,7 +53,14 @@ object MonitoringSpec extends Properties("monitoring") {
     val out = input.pipe(c).runLog.run
     require(out.length % 2 == 0, "length of output should be even")
     val (now, later) = out.splitAt(out.length / 2)
-    (now == later) && (now == xs.scanLeft(0)(_ + _))
+    val ok = (now == later) && (now == xs.scanLeft(0)(_ + _))
+
+    // emitEvery -- we should only emit two values, one at the
+    // end of the first period, and one at the end of the second
+    val c2 = B.emitEvery(5 minutes)(c)
+    val input2 = input ++ Process(1 -> (11 minutes))
+    val out2 = input2.pipe(c2).runLog.run
+    ok && out2.length == 2 && out2(0) == xs.sum && out2(1) == xs.sum
   }
 
   /*
