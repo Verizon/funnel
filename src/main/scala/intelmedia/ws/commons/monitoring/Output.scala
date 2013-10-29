@@ -1,11 +1,28 @@
 package intelmedia.ws.commons.monitoring
 
+import java.util.concurrent.ExecutorService
+import scala.concurrent.duration._
+import scalaz.concurrent.{Strategy,Task}
+import scalaz.stream._
 import Pru._
 import Writer._
 
 object Output {
 
   import Reportable._
+
+  def toJSON(k: Key[Any]): Action =
+    JSON.obj("label" -> literal(k.label), "id" -> literal(k.id.toString))
+
+  def toJSON(ks: Seq[Key[Any]]): Action =
+    JSON.list(ks.map(toJSON): _*)
+
+  def toJSON(d: Double): Action =
+    if (d.isNaN ||
+        d == Double.PositiveInfinity ||
+        d == Double.NegativeInfinity)
+      k("null")
+    else k(d.toString)
 
   def toJSON[A](r: Reportable[A]): Action = r match {
     case I(a) => k(a.toString)
@@ -15,10 +32,10 @@ object Output {
     case Stats(a) => JSON.obj(
       "kind" -> literal("Stats"),
       "count" -> k(a.count.toString),
-      "mean" -> k(a.mean.toString),
-      "variance" -> k(a.variance.toString),
-      "skewness" -> k(a.skewness.toString),
-      "kurtosis" -> k(a.kurtosis.toString))
+      "mean" -> toJSON(a.mean),
+      "variance" -> toJSON(a.variance),
+      "skewness" -> toJSON(a.skewness),
+      "kurtosis" -> toJSON(a.kurtosis))
     case _ => sys.error("unrecognized reportable: " + r)
   }
 
@@ -29,6 +46,41 @@ object Output {
           "value" -> toJSON(v))
     }: _*}
 
+  /** Format a duration like `62 seconds` as `0hr 1m 02s` */
+  def hoursMinutesSeconds(d: Duration): String = {
+    val hours = d.toHours
+    val minutes = ((d.toMinutes minutes)- (hours hours)).toMinutes
+    val seconds = ((d.toSeconds seconds) - (hours hours) - (minutes minutes)).toSeconds
+    s"${hours}hr ${minutes}m ${seconds}s"
+  }
+
+  /**
+   * Write a server-side event stream (http://www.w3.org/TR/eventsource/)
+   * to the given `Writer`. This will block the calling thread
+   * indefinitely.
+   */
+  def toSSE(events: Process[Task, (Key[Any], Reportable[Any])],
+            sink: java.io.Writer)(implicit ES: ExecutorService = Monitoring.serverPool):
+            Unit = {
+    val heartbeat: Process[Task,String] =
+      Process.awakeEvery(10 seconds).map { d =>
+        s"event: elapsed\ndata: ${hoursMinutesSeconds(d)}\n"
+      }
+    events.map { case (k,v) =>
+      s"event: ${toJSON(k)}\ndata: ${toJSON(v)}\n"
+    }.merge(heartbeat).intersperse("\n").map { line =>
+      try {
+        sink.write(line)
+        sink.flush // this is a line-oriented protocol,
+                   // so we flush after each line, otherwise
+                   // consumer may get delayed messages
+      }
+      catch { case e: java.io.IOException =>
+        println("completing stream due to: " + e)
+        throw Process.End
+      }
+    }.run.run
+  }
 }
 
 // todo - properly publish this

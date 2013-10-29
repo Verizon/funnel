@@ -5,6 +5,8 @@ class Key[+A] private[monitoring](val label: String, val id: java.util.UUID) {
     a.asInstanceOf[Key[Any]].id == id
   override def hashCode = id.hashCode
   override def toString = s"Key($label)"
+  def matches(prefix: String): Boolean =
+    label.startsWith(prefix) || id.toString.startsWith(prefix)
 }
 
 object Key {

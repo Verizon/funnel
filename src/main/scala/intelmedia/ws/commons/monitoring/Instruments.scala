@@ -44,7 +44,8 @@ class Instruments(window: Duration, monitoring: Monitoring) {
     def start: () => Unit = {
       val t0 = System.nanoTime
       () => {
-        val elapsed = (System.nanoTime - t0).toDouble
+        // record time in milliseconds
+        val elapsed = (System.nanoTime - t0).toDouble / 1e6
         nowSnk(elapsed); prevSnk(elapsed); slidingSnk(elapsed)
       }
     }
@@ -58,15 +59,4 @@ object Instruments {
 
   def instance(d: Duration, m: Monitoring = Monitoring.default): Instruments =
     new Instruments(d, m)
-
-  val reqs = fiveMinute.counter("n:requests")
-  val timer = fiveMinute.timer("t:query")
-
-  reqs.increment
-  reqs.incrementBy(10)
-  reqs.decrement
-  timer.time {
-    1 + 1 // do some stuff
-  }
-
 }

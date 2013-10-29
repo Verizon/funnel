@@ -33,6 +33,10 @@ trait Monitoring {
   /** The time-varying set of keys. */
   def keys: async.immutable.Signal[List[Key[Any]]]
 
+  /** The infinite discrete stream of unique keys, as they are added. */
+  def distinctKeys: Process[Task, Key[Any]] =
+    keys.discrete.flatMap(Process.emitAll).pipe(Buffers.distinct)
+
   /** Create a new topic with the given label and discard the key. */
   def topic_[I, O <% Reportable[O]](
     label: String)(
@@ -98,6 +102,39 @@ object Monitoring {
                      .getOrElse(sys.error("key not found: " + k))
     }
   }
+
+  /**
+   * Return a discrete stream of updates to all keys
+   * matching the given prefix. Note that:
+   *
+   *   a) There is no queueing of producer updates,
+   *      so a 'slow' consumer can miss updates.
+   *   b) The returned stream is 'use-once' and will
+   *      halt the producer when completed. Just
+   *      resubscribe if you need a fresh stream.
+   */
+  def subscribe(M: Monitoring)(prefix: String)(implicit ES: ExecutorService = serverPool):
+      Process[Task, (Key[Any], Reportable[Any])] =
+    Process.suspend { // don't actually do anything until we have a consumer
+      val S = Strategy.Executor(ES)
+      val out = scalaz.stream.async.signal[(Key[Any], Reportable[Any])](S)
+      val alive = scalaz.stream.async.signal[Boolean](S)
+      alive.value.set(true)
+      S { // in the background, populate the 'out' `Signal`
+        M.distinctKeys.filter(_.matches(prefix)).when(alive.continuous).map { k =>
+          // asynchronously set the output
+          S { M.get(k).discrete.when(alive.continuous)
+               .map(v => out.value.set(k -> v)).run.run }
+        }.run.run
+      }
+      // kill the producers when the consumer completes
+      out.discrete onComplete {
+        Process.eval_ { Task.delay {
+          println("killing producers for prefix: " + prefix)
+          alive.value.set(false)
+        }}
+      }
+    }
 
   /**
    * Obtain the latest values for all active metrics.

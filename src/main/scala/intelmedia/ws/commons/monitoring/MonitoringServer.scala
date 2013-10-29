@@ -3,7 +3,7 @@ package intelmedia.ws.commons.monitoring
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
-import java.io.{IOException, OutputStream}
+import java.io.{BufferedWriter, IOException, OutputStream, OutputStreamWriter}
 import java.net.InetSocketAddress
 import scala.concurrent.duration._
 import scalaz.stream._
@@ -14,7 +14,7 @@ object Main extends App {
   import Instruments.default._
   val c = counter("requests")
   val t = timer("response-time")
-  val g = Process.awakeEvery(3 seconds).map { _ =>
+  val g = Process.awakeEvery(2 seconds).map { _ =>
     c.increment
     t.time(Thread.sleep(100))
   }.run.run
@@ -26,10 +26,11 @@ object MonitoringServer {
 
   /**
    * `/`: self-describing list of available resources
+   * `/keys`: stream of changing list of keys
    * `/now`: snapshot of all metrics whose labels begin with 'now'
    * `/previous`: snapshot of all metrics whose labels begin with 'previous'
    * `/sliding`: snapshot of all metrics whose labels begin with 'sliding'
-   * `/<prefix>`: snapshot of all metrics whose labels begin with 'prefix' (except for 'stream', which is reserved)
+   * `/<prefix>`: snapshot of all metrics whose labels begin with 'prefix' (except for 'stream' and 'keys', which are reserved)
    * `/stream`: stream of all metrics
    * `/stream/keys`: stream of changing list of keys
    * `/stream/<keyid>`: stream of metrics for the given key
@@ -53,27 +54,39 @@ object MonitoringServer {
       log("split path: " + path)
       path match {
         case Nil => handleRoot(req)
-        case "stream" :: Nil => handleRoot(req)
-        case "stream" :: tl => handleRoot(req)
+        case "keys" :: Nil => handleKeys(M, req, log)
+        case "stream" :: tl => handleStream(M, tl.mkString("/"), req, log)
         case now => handleNow(M, now.mkString("/"), req, log)
       }
     }
     catch {
       case e: Exception => log("fatal error: " + e)
     }
-    finally {
-      req.close
+    finally req.close
+
+    def handleKeys(M: Monitoring, req: HttpExchange, log: Log): Unit = {
+      val ks = M.keys.continuous.once.runLastOr(List()).run
+      val respBytes = Output.toJSON(ks).toString.getBytes
+      req.getResponseHeaders.set("Content-Type", "application/json")
+      req.sendResponseHeaders(200, respBytes.length)
+      req.getResponseBody.write(respBytes)
+    }
+
+    def handleStream(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
+      req.getResponseHeaders.set("Content-Type", "text/event-stream")
+      req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
+      log(s"GET stream for $prefix")
+      val events = Monitoring.subscribe(M)(prefix)
+      val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
+      Output.toSSE(events, sink)
     }
 
     def handleNow(M: Monitoring, label: String, req: HttpExchange, log: Log): Unit = {
       val m = Monitoring.snapshot(M).run
-      def f(k: Key[Any]): Boolean =
-        k.label.startsWith(label) || k.id.toString.startsWith(label)
-      val resp = Output.toJSON(m.filterKeys(f)).toString
+      val resp = Output.toJSON(m.filterKeys(_.matches(label))).toString
       val respBytes = resp.getBytes
       log("response: " + resp)
       req.getResponseHeaders.set("Content-Type", "application/json")
-      // req.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0)
       req.sendResponseHeaders(200, respBytes.length)
       req.getResponseBody.write(respBytes)
     }
