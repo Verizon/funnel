@@ -56,6 +56,9 @@ object Monitoring {
   val defaultPool: ExecutorService =
     Executors.newFixedThreadPool(8, daemonThreads("monitoring-thread"))
 
+  val serverPool: ExecutorService =
+    Executors.newCachedThreadPool(daemonThreads("monitoring-http-server"))
+
   val default: Monitoring = instance(defaultPool)
 
   def instance(implicit ES: ExecutorService = defaultPool): Monitoring = {

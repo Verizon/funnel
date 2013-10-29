@@ -14,9 +14,9 @@ class Instruments(window: Duration, monitoring: Monitoring) {
     val count = B.resetEvery(window)(B.counter(init))
     val previousCount = B.emitEvery(window)(count)
     val slidingCount = B.sliding(window)(identity[Int])(Group.intGroup)
-    val (nowK, incrNow) = monitoring.topic(s"$label/now")(count)
-    val (prevK, incrPrev) = monitoring.topic(s"$label/previous")(previousCount)
-    val (slidingK, incrSliding) = monitoring.topic(s"$label/sliding")(slidingCount)
+    val (nowK, incrNow) = monitoring.topic(s"now/$label")(count)
+    val (prevK, incrPrev) = monitoring.topic(s"previous/$label")(previousCount)
+    val (slidingK, incrSliding) = monitoring.topic(s"sliding/$label")(slidingCount)
     def incrementBy(n: Int): Unit = {
       incrNow(n); incrPrev(n); incrSliding(n)
     }
@@ -37,9 +37,9 @@ class Instruments(window: Duration, monitoring: Monitoring) {
     val timer = B.resetEvery(window)(B.stats)
     val previousTimer = B.emitEvery(window)(timer)
     val slidingTimer = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
-    val (nowK, nowSnk) = monitoring.topic(s"$label/now")(timer)
-    val (prevK, prevSnk) = monitoring.topic(s"$label/previous")(previousTimer)
-    val (slidingK, slidingSnk) = monitoring.topic(s"$label/sliding")(slidingTimer)
+    val (nowK, nowSnk) = monitoring.topic(s"now/$label")(timer)
+    val (prevK, prevSnk) = monitoring.topic(s"previous/$label")(previousTimer)
+    val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label")(slidingTimer)
     def keys = Periodic(nowK, prevK, slidingK)
     def start: () => Unit = {
       val t0 = System.nanoTime
