@@ -56,31 +56,40 @@ object Output {
 
   /**
    * Write a server-side event stream (http://www.w3.org/TR/eventsource/)
-   * to the given `Writer`. This will block the calling thread
-   * indefinitely.
+   * of the given metrics to the `Writer`. This will block the calling
+   * thread indefinitely.
    */
-  def toSSE(events: Process[Task, (Key[Any], Reportable[Any])],
-            sink: java.io.Writer)(implicit ES: ExecutorService = Monitoring.serverPool):
-            Unit = {
-    val heartbeat: Process[Task,String] =
-      Process.awakeEvery(10 seconds).map { d =>
-        s"event: elapsed\ndata: ${hoursMinutesSeconds(d)}\n"
-      }
-    events.map { case (k,v) =>
-      s"event: ${toJSON(k)}\ndata: ${toJSON(v)}\n"
-    }.merge(heartbeat).intersperse("\n").map { line =>
-      try {
-        sink.write(line)
-        sink.flush // this is a line-oriented protocol,
-                   // so we flush after each line, otherwise
-                   // consumer may get delayed messages
-      }
-      catch { case e: java.io.IOException =>
-        println("completing stream due to: " + e)
-        throw Process.End
-      }
-    }.run.run
-  }
+  def eventsToSSE(events: Process[Task, (Key[Any], Reportable[Any])],
+                  sink: java.io.Writer): Unit =
+    events.map(kv => s"event: ${toJSON(kv._1)}\ndata: ${toJSON(kv._2)}\n")
+          .intersperse("\n")
+          .map(writeTo(sink))
+          .run.run
+
+  /**
+   * Write a server-side event stream (http://www.w3.org/TR/eventsource/)
+   * of the given keys to the given `Writer`. This will block the calling
+   * thread indefinitely.
+   */
+  def keysToSSE(events: Process[Task, Key[Any]], sink: java.io.Writer): Unit =
+    events.map(k => s"event: key\ndata: ${toJSON(k)}\n")
+          .intersperse("\n")
+          .map(writeTo(sink))
+          .run.run
+
+  private def writeTo(sink: java.io.Writer): String => Unit =
+    line => try {
+      sink.write(line)
+      sink.flush // this is a line-oriented protocol,
+                 // so we flush after each line, otherwise
+                 // consumer may get delayed messages
+    }
+    catch { case e: java.io.IOException =>
+      // when client disconnects we'll get a broken pipe
+      // IOException from the above `sink.write`. This
+      // gets translated to normal termination
+      throw Process.End
+    }
 }
 
 // todo - properly publish this

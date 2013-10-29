@@ -113,7 +113,8 @@ object Monitoring {
    *      halt the producer when completed. Just
    *      resubscribe if you need a fresh stream.
    */
-  def subscribe(M: Monitoring)(prefix: String)(implicit ES: ExecutorService = serverPool):
+  def subscribe(M: Monitoring)(prefix: String, log: String => Unit = println)(
+  implicit ES: ExecutorService = serverPool):
       Process[Task, (Key[Any], Reportable[Any])] =
     Process.suspend { // don't actually do anything until we have a consumer
       val S = Strategy.Executor(ES)
@@ -130,7 +131,7 @@ object Monitoring {
       // kill the producers when the consumer completes
       out.discrete onComplete {
         Process.eval_ { Task.delay {
-          println("killing producers for prefix: " + prefix)
+          log("killing producers for prefix: " + prefix)
           alive.value.set(false)
         }}
       }

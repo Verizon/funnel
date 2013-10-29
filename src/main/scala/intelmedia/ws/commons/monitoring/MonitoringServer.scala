@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpServer
 import java.io.{BufferedWriter, IOException, OutputStream, OutputStreamWriter}
 import java.net.InetSocketAddress
 import scala.concurrent.duration._
+import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
 
 object Main extends App {
@@ -55,6 +56,7 @@ object MonitoringServer {
       path match {
         case Nil => handleRoot(req)
         case "keys" :: Nil => handleKeys(M, req, log)
+        case "stream" :: "keys" :: Nil => handleKeysStream(M, req, log)
         case "stream" :: tl => handleStream(M, tl.mkString("/"), req, log)
         case now => handleNow(M, now.mkString("/"), req, log)
       }
@@ -72,13 +74,19 @@ object MonitoringServer {
       req.getResponseBody.write(respBytes)
     }
 
+    def handleKeysStream(M: Monitoring, req: HttpExchange, log: Log): Unit = {
+      req.getResponseHeaders.set("Content-Type", "text/event-stream")
+      req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
+      val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
+      Output.keysToSSE(M.distinctKeys, sink)
+    }
+
     def handleStream(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
       req.getResponseHeaders.set("Content-Type", "text/event-stream")
       req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
-      log(s"GET stream for $prefix")
-      val events = Monitoring.subscribe(M)(prefix)
+      val events = Monitoring.subscribe(M)(prefix, log)
       val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
-      Output.toSSE(events, sink)
+      Output.eventsToSSE(events, sink)
     }
 
     def handleNow(M: Monitoring, label: String, req: HttpExchange, log: Log): Unit = {
