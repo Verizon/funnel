@@ -120,12 +120,19 @@ object Monitoring {
       val S = Strategy.Executor(ES)
       val out = scalaz.stream.async.signal[(Key[Any], Reportable[Any])](S)
       val alive = scalaz.stream.async.signal[Boolean](S)
+      val heartbeat = alive.continuous.takeWhile(identity)
       alive.value.set(true)
       S { // in the background, populate the 'out' `Signal`
-        M.distinctKeys.filter(_.matches(prefix)).when(alive.continuous).map { k =>
+        alive.discrete.map(!_).wye(M.distinctKeys)(wye.interrupt)
+        .filter(_.matches(prefix))
+        .map { k =>
           // asynchronously set the output
-          S { M.get(k).discrete.when(alive.continuous)
-               .map(v => out.value.set(k -> v)).run.run }
+          S { M.get(k).discrete
+               .map(v => out.value.set(k -> v))
+               .zip(heartbeat)
+               .onComplete { Process.eval_{ Task.delay(log("unsubscribing: " + k))} }
+               .run.run
+            }
         }.run.run
         log("killed producer for prefix: " + prefix)
       }
