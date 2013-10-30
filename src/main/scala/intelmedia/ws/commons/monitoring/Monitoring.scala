@@ -127,11 +127,13 @@ object Monitoring {
           S { M.get(k).discrete.when(alive.continuous)
                .map(v => out.value.set(k -> v)).run.run }
         }.run.run
+        log("killed producer for prefix: " + prefix)
       }
       // kill the producers when the consumer completes
       out.discrete onComplete {
         Process.eval_ { Task.delay {
           log("killing producers for prefix: " + prefix)
+          out.close
           alive.value.set(false)
         }}
       }
