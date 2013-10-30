@@ -10,6 +10,12 @@ import scala.concurrent.duration._
  */
 class Instruments(window: Duration, monitoring: Monitoring) {
 
+  /**
+   * Return a `Counter` with the given starting count.
+   * Keys updated by this `Counter` are `now/label`,
+   * `previous/label` and `sliding/label`.
+   * See [[intelmedia.ws.commons.monitoring.Periodic]].
+   */
   def counter(label: String, init: Int = 0): Counter[Periodic[Int]] = new Counter[Periodic[Int]] {
     val count = B.resetEvery(window)(B.counter(init))
     val previousCount = B.emitEvery(window)(count)
@@ -25,6 +31,16 @@ class Instruments(window: Duration, monitoring: Monitoring) {
     incrementBy(0)
   }
 
+  // todo: histogramGuage, histogramCount, histogramTimer
+  // or maybe we just modify the existing combinators to
+  // update some additional values
+
+  /**
+   * Return a `Guage` with the given starting value.
+   * This guage only updates the key `now/$label`.
+   * For a historical guage that summarizes an entire
+   * window of values as well, see `numericGuage`.
+   */
   def guage[A <% Reportable[A]](label: String, init: A): Guage[Continuous[A],A] = new Guage[Continuous[A],A] {
     val (key, snk) = monitoring.topic(s"now/$label")(B.resetEvery(window)(B.variable(init)))
     def set(a: A) = snk(_ => a)
@@ -33,6 +49,12 @@ class Instruments(window: Duration, monitoring: Monitoring) {
     set(init)
   }
 
+  /**
+   * Return a `Guage` with the given starting value.
+   * Unlike `guage`, keys updated by this `Counter` are
+   * `now/label`, `previous/label` and `sliding/label`.
+   * See [[intelmedia.ws.commons.monitoring.Periodic]].
+   */
   def numericGuage(label: String, init: Double): Guage[Periodic[Stats],Double] = new Guage[Periodic[Stats],Double] {
     val now = B.resetEvery(window)(B.stats)
     val prev = B.emitEvery(window)(now)
@@ -47,6 +69,11 @@ class Instruments(window: Duration, monitoring: Monitoring) {
     set(init)
   }
 
+  /**
+   * Return a `Timer` which updates the following keys:
+   * `now/label`, `previous/label`, and `sliding/label`.
+   * See [[intelmedia.ws.commons.monitoring.Periodic]].
+   */
   def timer(label: String): Timer[Periodic[Stats]] = new Timer[Periodic[Stats]] {
     val timer = B.resetEvery(window)(B.stats)
     val previousTimer = B.emitEvery(window)(timer)
