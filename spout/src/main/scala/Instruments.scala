@@ -1,7 +1,7 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 
 import com.twitter.algebird.Group
-import intelmedia.ws.commons.monitoring.{Buffers => B}
+import intelmedia.ws.monitoring.{Buffers => B}
 import scala.concurrent.duration._
 
 /**
@@ -14,7 +14,7 @@ class Instruments(window: Duration, monitoring: Monitoring) {
    * Return a `Counter` with the given starting count.
    * Keys updated by this `Counter` are `now/label`,
    * `previous/label` and `sliding/label`.
-   * See [[intelmedia.ws.commons.monitoring.Periodic]].
+   * See [[intelmedia.ws.monitoring.Periodic]].
    */
   def counter(label: String, init: Int = 0): Counter[Periodic[Int]] = new Counter[Periodic[Int]] {
     val count = B.resetEvery(window)(B.counter(init))
@@ -53,7 +53,7 @@ class Instruments(window: Duration, monitoring: Monitoring) {
    * Return a `Guage` with the given starting value.
    * Unlike `guage`, keys updated by this `Counter` are
    * `now/label`, `previous/label` and `sliding/label`.
-   * See [[intelmedia.ws.commons.monitoring.Periodic]].
+   * See [[intelmedia.ws.monitoring.Periodic]].
    */
   def numericGuage(label: String, init: Double): Guage[Periodic[Stats],Double] = new Guage[Periodic[Stats],Double] {
     val now = B.resetEvery(window)(B.stats)
@@ -72,7 +72,7 @@ class Instruments(window: Duration, monitoring: Monitoring) {
   /**
    * Return a `Timer` which updates the following keys:
    * `now/label`, `previous/label`, and `sliding/label`.
-   * See [[intelmedia.ws.commons.monitoring.Periodic]].
+   * See [[intelmedia.ws.monitoring.Periodic]].
    */
   def timer(label: String): Timer[Periodic[Stats]] = new Timer[Periodic[Stats]] {
     val timer = B.resetEvery(window)(B.stats)

@@ -1,4 +1,4 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 
 /**
  * A key set for a periodic metric. Periodic metrics

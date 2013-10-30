@@ -1,4 +1,4 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 
 import com.twitter.algebird.Group
 import org.scalacheck._

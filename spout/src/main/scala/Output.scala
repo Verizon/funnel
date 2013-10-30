@@ -1,4 +1,4 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 
 import java.util.concurrent.ExecutorService
 import scala.concurrent.duration._

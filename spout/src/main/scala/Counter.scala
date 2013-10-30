@@ -1,4 +1,4 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 
 trait Counter[K] extends Instrument[K] {
   def incrementBy(by: Int): Unit

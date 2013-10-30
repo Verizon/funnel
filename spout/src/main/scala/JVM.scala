@@ -1,4 +1,4 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 
 import java.lang.management.GarbageCollectorMXBean
 import java.lang.management.ManagementFactory

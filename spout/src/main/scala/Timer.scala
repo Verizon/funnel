@@ -1,4 +1,4 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 
 import scala.concurrent.{ExecutionContext,Future}
 import scalaz.concurrent.Task

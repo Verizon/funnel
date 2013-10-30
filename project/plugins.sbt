@@ -12,6 +12,6 @@ resolvers ++= Seq(
   Resolver.url("Sonatype Nexus Artifactoryonline Scalasbt Repository", url("http://nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/repositories/artifactoryonline-scalasbt/"))(Resolver.ivyStylePatterns)
 )
 
-addSbtPlugin("reaktor" %% "sbt-scct" % "0.2.8")
+addSbtPlugin("intelmedia.build" %% "sbt-imbuild" % "2.0.4")
 
 credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
