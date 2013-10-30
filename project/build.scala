@@ -11,6 +11,8 @@ object Build extends Build {
 
   lazy val root = Project(projectId, file("."))
     .settings(buildSettings:_*)
+    .settings(resolvers +=
+      "pchiusano/Bintray" at "http://dl.bintray.com/pchiusano/maven")
     .settings(
       name := projectId,
       organization := "intelmedia.ws.commons",
@@ -19,6 +21,7 @@ object Build extends Build {
       compile(scalaz) ++
       compile(scalazstream) ++
       compile(algebird) ++
+      compile("pru" %% "pru" % "0.3") ++
       test(scalacheck) ++
       test(scalatest))
 }

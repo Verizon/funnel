@@ -4,18 +4,19 @@ import java.util.concurrent.ExecutorService
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy,Task}
 import scalaz.stream._
-import Pru._
-import Writer._
+import pru.write.Writer._
+import pru.write.{Action,JSON}
 
 object Output {
 
   import Reportable._
+  import JSON.literal
 
   def toJSON(k: Key[Any]): Action =
-    JSON.obj("label" -> literal(k.label), "id" -> literal(k.id.toString))
+    JSON.Obj("label" -> literal(k.label), "id" -> literal(k.id.toString))
 
   def toJSON(ks: Seq[Key[Any]]): Action =
-    JSON.list(ks.map(toJSON): _*)
+    JSON.list(ks.map(toJSON))
 
   def toJSON(d: Double): Action =
     if (d.isNaN ||
@@ -29,7 +30,7 @@ object Output {
     case B(a) => k(a.toString)
     case D(a) => k(a.toString)
     case S(s) => literal(s)
-    case Stats(a) => JSON.obj(
+    case Stats(a) => JSON.Obj(
       "kind" -> literal("Stats"),
       "count" -> k(a.count.toString),
       "mean" -> toJSON(a.mean),
@@ -41,10 +42,10 @@ object Output {
 
   def toJSON(m: Traversable[(Key[Any],Reportable[Any])]): Action =
     JSON.list { m.toList.map { case (key, v) =>
-      JSON.obj("label" -> literal(key.label),
+      JSON.Obj("label" -> literal(key.label),
           "id" -> literal(key.id.toString),
           "value" -> toJSON(v))
-    }: _*}
+    }}
 
   /** Format a duration like `62 seconds` as `0hr 1m 02s` */
   def hoursMinutesSeconds(d: Duration): String = {
@@ -90,69 +91,4 @@ object Output {
       // gets translated to normal termination
       throw Process.End
     }
-}
-
-// todo - properly publish this
-object Pru {
-  import scala.xml.Utility.{escape => esc}
-
-  case class Action(f: StringBuilder => Unit) extends (StringBuilder => Unit) {
-    def ++(other: Action): Action =
-      Action(sb => { apply(sb); other(sb) })
-    def apply(sb: StringBuilder): Unit = f(sb)
-
-    override def toString: String =
-      { val sb = new StringBuilder; apply(sb); sb.toString }
-  }
-
-  object Writer {
-    type Writer[A] = A => Action
-
-    implicit def toAction(f: StringBuilder => Unit): Action = Action(f)
-
-    def any(a: Any): Action = Action(sb => sb append a.toString)
-    def k(s: String): Action = Action(sb => sb append s)
-    def escape(s: String): Action = Action(sb => sb append esc(s))
-    def literal(s: String): Action = k("\"") ++ escape(s) ++ k("\"")
-    def id: Action = Action(sb => ())
-    def rep[A](f: Writer[A]): Writer[Traversable[A]] = as => Action(sb => as.foreach(x => f(x)(sb)))
-    def rep[A](t: Traversable[A])(f: Writer[A]): Action = rep(f)(t)
-    def concat(as: Traversable[Action]): Action = Action(sb => as.foreach(f => f(sb)))
-    def concat(a: Action, as: Action*): Action = concat(a +: as)
-    def intersperse(a: Action)(as: Action*) = Action { sb =>
-      if (as.isEmpty) ()
-      else if (as.tail.isEmpty) as.head(sb)
-      else { as.head(sb); as.tail.foreach { e => a(sb); e(sb) }}
-    }
-  }
-
-  object XML {
-    import Writer._
-
-    def attributes(attrs: (String, String)*): Action =
-      Action(sb => attrs.foreach { case (x, y) => sb append (" " + x + "=\"" + escape(y) + "\"") })
-
-    def openTag(tag: String, attrs: (String, String)*): Action =
-      k("<") ++ k(tag) ++ attributes(attrs: _*) ++ k(">")
-
-    def closeTag(tag: String): Action = k ("</" + tag + ">")
-
-    def leafTag(tag: String, attrs: (String, String)*): Action =
-      k("<") ++ k(tag) ++ attributes(attrs: _*) ++ k("/>")
-
-    def nest[A](tag: String, attributes: (String, String)*)(inner: Action*): Action =
-      openTag(tag, attributes: _*) ++ concat(inner) ++ closeTag(tag)
-
-    def nest[A](tag: String)(inner: Action*): Action = nest(tag, Seq(): _*)(inner: _*)
-  }
-
-  object JSON {
-    def entry(key: String, value: Action): Action =
-      literal(key) ++ k(" : ") ++ value
-    def obj(entries: (String, Action)*): Action =
-      k("{ ") ++ intersperse(k(", "))(entries.view.map(p => entry(p._1, p._2)): _*) ++ k(" }")
-    def list(values: Action*): Action =
-      k("[") ++ intersperse(k(",\n"))(values: _*) ++ k("]")
-  }
-
 }
