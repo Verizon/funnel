@@ -3,7 +3,7 @@ package intelmedia.ws.commons.monitoring
 import com.twitter.algebird.{Group, Moments, MomentsGroup}
 
 /** Monoidally track count/mean/variance/skewness/kurtosis. */
-class Stats(moments: Moments) {
+class Stats(moments: Moments, val last: Option[Double]) {
   private[monitoring] def get = moments
   def count = moments.count
   def mean = moments.mean
@@ -12,10 +12,10 @@ class Stats(moments: Moments) {
   def kurtosis = moments.kurtosis
 
   def ++(d: Double): Stats =
-    new Stats(Moments.group.plus(moments, Moments(d)))
+    new Stats(Moments.group.plus(moments, Moments(d)), Some(d))
 
   def ++(s: Stats): Stats =
-    new Stats(Moments.group.plus(moments, s.get))
+    new Stats(Moments.group.plus(moments, s.get), s.last orElse last)
 
   def ++(ds: Seq[Double]): Stats =
     this ++ Stats.reduce(ds)
@@ -23,14 +23,15 @@ class Stats(moments: Moments) {
 
 object Stats {
   def apply(d: Double): Stats =
-    new Stats(Moments(d))
+    new Stats(Moments(d), Some(d))
 
   def reduce(s: Seq[Double]): Stats =
-    new Stats(s.view.map(d => Moments(d)).reduce(Moments.group.plus))
+    new Stats(s.view.map(d => Moments(d)).reduce(Moments.group.plus),
+              s.lastOption)
 
   implicit def statsGroup: Group[Stats] = new Group[Stats] {
-    def zero = new Stats(MomentsGroup.zero)
-    override def negate(s: Stats) = new Stats(MomentsGroup.negate(s.get))
+    def zero = new Stats(MomentsGroup.zero, None)
+    override def negate(s: Stats) = new Stats(MomentsGroup.negate(s.get), None)
     def plus(s1: Stats, s2: Stats): Stats = s1 ++ s2
   }
 }

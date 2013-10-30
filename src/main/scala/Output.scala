@@ -33,6 +33,7 @@ object Output {
     case Stats(a) => JSON.Obj(
       "kind" -> literal("Stats"),
       "count" -> k(a.count.toString),
+      "last" -> a.last.map(any).getOrElse(k("null")),
       "mean" -> toJSON(a.mean),
       "variance" -> toJSON(a.variance),
       "skewness" -> toJSON(a.skewness),

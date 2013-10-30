@@ -26,10 +26,24 @@ class Instruments(window: Duration, monitoring: Monitoring) {
   }
 
   def guage[A <% Reportable[A]](label: String, init: A): Guage[Continuous[A],A] = new Guage[Continuous[A],A] {
-    val (key, snk) = monitoring.topic(s"$label/now")(B.resetEvery(window)(B.variable(init)))
-    def modify(f: A => A): Unit = snk(f)
+    val (key, snk) = monitoring.topic(s"now/$label")(B.resetEvery(window)(B.variable(init)))
+    def set(a: A) = snk(_ => a)
     def keys = Continuous(key)
 
+    set(init)
+  }
+
+  def numericGuage(label: String, init: Double): Guage[Periodic[Stats],Double] = new Guage[Periodic[Stats],Double] {
+    val now = B.resetEvery(window)(B.stats)
+    val prev = B.emitEvery(window)(now)
+    val sliding = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
+    val (nowK, nowSnk) = monitoring.topic(s"now/$label")(now)
+    val (prevK, prevSnk) = monitoring.topic(s"previous/$label")(prev)
+    val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label")(sliding)
+    def keys = Periodic(nowK, prevK, slidingK)
+    def set(d: Double): Unit = {
+      nowSnk(d); prevSnk(d); slidingSnk(d)
+    }
     set(init)
   }
 
@@ -55,7 +69,11 @@ class Instruments(window: Duration, monitoring: Monitoring) {
 object Instruments {
   val fiveMinute: Instruments = instance(5 minutes)
   val oneMinute: Instruments = instance(1 minutes)
-  val default = fiveMinute
+  val default = {
+    val r = fiveMinute
+    JVM.instrument(fiveMinute)
+    r
+  }
 
   def instance(d: Duration, m: Monitoring = Monitoring.default): Instruments =
     new Instruments(d, m)
