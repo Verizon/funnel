@@ -6,26 +6,26 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
 import scalaz.concurrent.Strategy
 
-trait Guage[K,A] extends Instrument[K] { self =>
+trait Gauge[K,A] extends Instrument[K] { self =>
 
   def set(a: A): Unit
 
   /**
-   * Delay publishing updates to this guage for the
+   * Delay publishing updates to this gauge for the
    * given duration after a call to `set`. If multiple
    * values are `set` within the timing window, only the
    * most recent value is published.
    */
   def buffer(d: Duration)(
              implicit S: ScheduledExecutorService = Monitoring.schedulingPool,
-             S2: ExecutorService = Monitoring.defaultPool): Guage[K,A] = {
+             S2: ExecutorService = Monitoring.defaultPool): Gauge[K,A] = {
     if (d < (100 microseconds))
       sys.error("buffer size be at least 100 microseconds, was: " + d)
     val cur = new AtomicReference[A]
     val scheduled = new AtomicBoolean(false)
     val nanos = d.toNanos
     val later = Strategy.Executor(S2)
-    new Guage[K,A] {
+    new Gauge[K,A] {
       def set(a: A): Unit = {
         cur.set(a)
         if (scheduled.compareAndSet(false,true)) {
@@ -45,10 +45,10 @@ trait Guage[K,A] extends Instrument[K] { self =>
   }
 }
 
-object Guage {
+object Gauge {
 
-  def scale[K](k: Double)(g: Guage[K,Double]): Guage[K,Double] =
-    new Guage[K,Double] {
+  def scale[K](k: Double)(g: Gauge[K,Double]): Gauge[K,Double] =
+    new Gauge[K,Double] {
       def set(d: Double): Unit =
         g.set(d * k)
       def keys = g.keys

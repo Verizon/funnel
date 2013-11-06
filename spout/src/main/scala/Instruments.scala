@@ -5,7 +5,7 @@ import intelmedia.ws.monitoring.{Buffers => B}
 import scala.concurrent.duration._
 
 /**
- * Provider of counters, guages, and timers, tied to some
+ * Provider of counters, gauges, and timers, tied to some
  * `Monitoring` server instance.
  */
 class Instruments(window: Duration, monitoring: Monitoring) {
@@ -34,18 +34,18 @@ class Instruments(window: Duration, monitoring: Monitoring) {
     c.buffer(50 milliseconds) // only publish updates this often
   }
 
-  // todo: histogramGuage, histogramCount, histogramTimer
+  // todo: histogramgauge, histogramCount, histogramTimer
   // or maybe we just modify the existing combinators to
   // update some additional values
 
   /**
-   * Return a `Guage` with the given starting value.
-   * This guage only updates the key `now/$label`.
-   * For a historical guage that summarizes an entire
-   * window of values as well, see `numericGuage`.
+   * Return a `Gauge` with the given starting value.
+   * This gauge only updates the key `now/$label`.
+   * For a historical gauge that summarizes an entire
+   * window of values as well, see `numericGauge`.
    */
-  def guage[A <% Reportable[A]](label: String, init: A): Guage[Continuous[A],A] = {
-    val g = new Guage[Continuous[A],A] {
+  def gauge[A <% Reportable[A]](label: String, init: A): Gauge[Continuous[A],A] = {
+    val g = new Gauge[Continuous[A],A] {
       val (key, snk) = monitoring.topic(s"now/$label")(B.resetEvery(window)(B.variable(init)))
       def set(a: A) = snk(_ => a)
       def keys = Continuous(key)
@@ -56,13 +56,13 @@ class Instruments(window: Duration, monitoring: Monitoring) {
   }
 
   /**
-   * Return a `Guage` with the given starting value.
-   * Unlike `guage`, keys updated by this `Counter` are
+   * Return a `Gauge` with the given starting value.
+   * Unlike `gauge`, keys updated by this `Counter` are
    * `now/label`, `previous/label` and `sliding/label`.
    * See [[intelmedia.ws.monitoring.Periodic]].
    */
-  def numericGuage(label: String, init: Double): Guage[Periodic[Stats],Double] = {
-    val g = new Guage[Periodic[Stats],Double] {
+  def numericGauge(label: String, init: Double): Gauge[Periodic[Stats],Double] = {
+    val g = new Gauge[Periodic[Stats],Double] {
       val now = B.resetEvery(window)(B.stats)
       val prev = B.emitEvery(window)(now)
       val sliding = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
