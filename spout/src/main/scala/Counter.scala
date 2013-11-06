@@ -12,9 +12,15 @@ trait Counter[K] extends Instrument[K] { self =>
   def decrement: Unit = incrementBy(-1)
   def decrementBy(by: Int): Unit = incrementBy(-by)
 
+  /**
+   * Delay publishing updates to this `Counter` for the
+   * given duration after modification.
+   */
   def buffer(d: Duration)(
              implicit S: ScheduledExecutorService = Monitoring.schedulingPool,
              S2: ExecutorService = Monitoring.defaultPool): Counter[K] = {
+    if (d < (100 microseconds))
+      sys.error("buffer size be at least 100 microseconds, was: " + d)
     val delta = new AtomicInteger(0)
     val scheduled = new AtomicBoolean(false)
     val nanos = d.toNanos
@@ -24,15 +30,13 @@ trait Counter[K] extends Instrument[K] { self =>
         delta.addAndGet(by)
         if (scheduled.compareAndSet(false,true)) {
           val task = new Runnable { def run = {
-            try {
-              val d = delta.get
-              delta.addAndGet(-d)
-              // we don't want to hold up the scheduling thread,
-              // as that could cause delays for other metrics,
-              // so callback is run on `S2`
-              later { self.incrementBy(d) }
-            }
-            finally scheduled.set(false)
+            scheduled.set(false)
+            val d = delta.get
+            delta.addAndGet(-d)
+            // we don't want to hold up the scheduling thread,
+            // as that could cause delays for other metrics,
+            // so callback is run on `S2`
+            later { self.incrementBy(d) }
           }}
           S.schedule(task, nanos, TimeUnit.NANOSECONDS)
         }

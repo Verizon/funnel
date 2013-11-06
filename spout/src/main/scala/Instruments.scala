@@ -31,7 +31,7 @@ class Instruments(window: Duration, monitoring: Monitoring) {
 
       incrementBy(0)
     }
-    c.buffer(100 milliseconds) // only publish updates this often
+    c.buffer(50 milliseconds) // only publish updates this often
   }
 
   // todo: histogramGuage, histogramCount, histogramTimer
@@ -44,12 +44,15 @@ class Instruments(window: Duration, monitoring: Monitoring) {
    * For a historical guage that summarizes an entire
    * window of values as well, see `numericGuage`.
    */
-  def guage[A <% Reportable[A]](label: String, init: A): Guage[Continuous[A],A] = new Guage[Continuous[A],A] {
-    val (key, snk) = monitoring.topic(s"now/$label")(B.resetEvery(window)(B.variable(init)))
-    def set(a: A) = snk(_ => a)
-    def keys = Continuous(key)
+  def guage[A <% Reportable[A]](label: String, init: A): Guage[Continuous[A],A] = {
+    val g = new Guage[Continuous[A],A] {
+      val (key, snk) = monitoring.topic(s"now/$label")(B.resetEvery(window)(B.variable(init)))
+      def set(a: A) = snk(_ => a)
+      def keys = Continuous(key)
 
-    set(init)
+      set(init)
+    }
+    g.buffer(50 milliseconds)
   }
 
   /**
@@ -58,18 +61,21 @@ class Instruments(window: Duration, monitoring: Monitoring) {
    * `now/label`, `previous/label` and `sliding/label`.
    * See [[intelmedia.ws.monitoring.Periodic]].
    */
-  def numericGuage(label: String, init: Double): Guage[Periodic[Stats],Double] = new Guage[Periodic[Stats],Double] {
-    val now = B.resetEvery(window)(B.stats)
-    val prev = B.emitEvery(window)(now)
-    val sliding = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
-    val (nowK, nowSnk) = monitoring.topic(s"now/$label")(now)
-    val (prevK, prevSnk) = monitoring.topic(s"previous/$label")(prev)
-    val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label")(sliding)
-    def keys = Periodic(nowK, prevK, slidingK)
-    def set(d: Double): Unit = {
-      nowSnk(d); prevSnk(d); slidingSnk(d)
+  def numericGuage(label: String, init: Double): Guage[Periodic[Stats],Double] = {
+    val g = new Guage[Periodic[Stats],Double] {
+      val now = B.resetEvery(window)(B.stats)
+      val prev = B.emitEvery(window)(now)
+      val sliding = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
+      val (nowK, nowSnk) = monitoring.topic(s"now/$label")(now)
+      val (prevK, prevSnk) = monitoring.topic(s"previous/$label")(prev)
+      val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label")(sliding)
+      def keys = Periodic(nowK, prevK, slidingK)
+      def set(d: Double): Unit = {
+        nowSnk(d); prevSnk(d); slidingSnk(d)
+      }
+      set(init)
     }
-    set(init)
+    g.buffer(50 milliseconds)
   }
 
   /**
@@ -77,22 +83,22 @@ class Instruments(window: Duration, monitoring: Monitoring) {
    * `now/label`, `previous/label`, and `sliding/label`.
    * See [[intelmedia.ws.monitoring.Periodic]].
    */
-  def timer(label: String): Timer[Periodic[Stats]] = new Timer[Periodic[Stats]] {
-    val timer = B.resetEvery(window)(B.stats)
-    val previousTimer = B.emitEvery(window)(timer)
-    val slidingTimer = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
-    val (nowK, nowSnk) = monitoring.topic(s"now/$label")(timer)
-    val (prevK, prevSnk) = monitoring.topic(s"previous/$label")(previousTimer)
-    val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label")(slidingTimer)
-    def keys = Periodic(nowK, prevK, slidingK)
-    def start: () => Unit = {
-      val t0 = System.nanoTime
-      () => {
+  def timer(label: String): Timer[Periodic[Stats]] = {
+    val t = new Timer[Periodic[Stats]] {
+      val timer = B.resetEvery(window)(B.stats)
+      val previousTimer = B.emitEvery(window)(timer)
+      val slidingTimer = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
+      val (nowK, nowSnk) = monitoring.topic(s"now/$label")(timer)
+      val (prevK, prevSnk) = monitoring.topic(s"previous/$label")(previousTimer)
+      val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label")(slidingTimer)
+      def keys = Periodic(nowK, prevK, slidingK)
+      def recordNanos(nanos: Long): Unit = {
         // record time in milliseconds
-        val elapsed = (System.nanoTime - t0).toDouble / 1e6
-        nowSnk(elapsed); prevSnk(elapsed); slidingSnk(elapsed)
+        val millis = nanos.toDouble / 1e6
+        nowSnk(millis); prevSnk(millis); slidingSnk(millis)
       }
     }
+    t.buffer(50 milliseconds)
   }
 }
 
