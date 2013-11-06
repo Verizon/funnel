@@ -1,6 +1,6 @@
 package intelmedia.ws.monitoring
 
-import java.util.concurrent.{Executors, ExecutorService, ThreadFactory}
+import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration._
 import scalaz.concurrent.{Actor,Strategy,Task}
@@ -62,6 +62,9 @@ object Monitoring {
 
   val serverPool: ExecutorService =
     Executors.newCachedThreadPool(daemonThreads("monitoring-http-server"))
+
+  val schedulingPool: ScheduledExecutorService =
+    Executors.newScheduledThreadPool(4, daemonThreads("monitoring-scheduled-tasks"))
 
   val default: Monitoring = instance(defaultPool)
 

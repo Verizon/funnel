@@ -120,14 +120,24 @@ object MonitoringSpec extends Properties("monitoring") {
   property("profiling") = secure {
     import instruments._
     val c = counter("uno")
-    val N = 10000
+    val N = 1000000
     val t0 = System.nanoTime
-    (0 to N).foreach { _ =>
+    (0 until N).foreach { _ =>
       c.increment
     }
-    val d = Duration.fromNanos(System.nanoTime - t0) / N.toDouble
-    println("microseconds: " + d.toMicros)
-    true
+    val updateTime = Duration.fromNanos(System.nanoTime - t0) / N.toDouble
+    var get: Task[Int] = Monitoring.default.latest(c.keys.now)
+    while (get.run != N) {
+      // println("current count: " + get.run)
+      Thread.sleep(10)
+    }
+    val publishTime = Duration.fromNanos(System.nanoTime - t0) / N.toDouble
+
+    // println("update time: " + updateTime.toNanos)
+    // println("publishTime: " + publishTime.toNanos)
+    // I am seeing about 40 nanoseconds for update times,
+    // 100 nanos for publishing
+    updateTime.toNanos < 500 && publishTime.toNanos < 1000
   }
 
   property("pub/sub") = forAll(Gen.listOf1(Gen.choose(1,10))) { a =>
@@ -171,7 +181,7 @@ object MonitoringSpec extends Properties("monitoring") {
       val gotB = M.latest(bN.keys.now).run
       val gotAB = M.latest(abN.keys.now).run
       if (gotA != expectedA || gotB != expectedB || gotAB != expectedAB) {
-        println("sleeping")
+        // println("sleeping")
         // println(s"a: $gotA, b: $gotB, ab: $gotAB")
         Thread.sleep(10)
         go
