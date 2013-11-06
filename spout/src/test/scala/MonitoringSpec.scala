@@ -121,13 +121,13 @@ object MonitoringSpec extends Properties("monitoring") {
   }
 
   /*
-   * Counter and Guage updates should be 'fast', and should work
+   * Counter and Gauge updates should be 'fast', and should work
    * with concurrent producers.
    */
   property("profiling") = secure {
     import instruments._
     val c = counter("uno")
-    val ok = guage("tres", false)
+    val ok = gauge("tres", false)
     val N = 1000000
     val t0 = System.nanoTime
     val S = scalaz.concurrent.Strategy.DefaultStrategy

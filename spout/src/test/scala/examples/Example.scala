@@ -9,7 +9,7 @@ object Example extends Properties("example") {
   object metrics {
     val M = Instruments.default // resets every 5 minutes
     val reqs = M.counter("requests#")
-    val dbOk = M.guage("db-up?", true)
+    val dbOk = M.gauge("db-up?", true)
     val query = M.timer("query-speed")
   }
 
