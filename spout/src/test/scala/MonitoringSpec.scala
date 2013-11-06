@@ -64,6 +64,7 @@ object MonitoringSpec extends Properties("monitoring") {
     ok && out2.length == 2 && out2(0) == xs.sum && out2(1) == xs.sum
   }
 
+  /* Check that if all events occur at same moment, `sliding` has no effect. */
   property("sliding-id") = forAll(Gen.listOf1(Gen.choose(1,10))) { xs =>
     val c = B.sliding(5 minutes)(identity[Int])(Group.intGroup)
     val input: Process[Task,(Int,Duration)] =
@@ -72,6 +73,7 @@ object MonitoringSpec extends Properties("monitoring") {
     output == xs.scanLeft(0)(_ + _)
   }
 
+  /* Example of sliding count. */
   property("sliding-example") = secure {
     val i1: Process[Task, (Int,Duration)] =
       Process(1 -> (0 minutes), 1 -> (1 minutes), 2 -> (3 minutes), 2 -> (4 minutes))
@@ -96,7 +98,8 @@ object MonitoringSpec extends Properties("monitoring") {
     true
   }
 
-  property("distinct") = forAll { (xs: List[Int]) =>
+  /* Check that `distinct` combinator works. */
+  property("distinct") = forAll(Gen.listOf1(Gen.choose(-10,10))) { xs =>
     val input: Process[Task,Int] = Process.emitAll(xs)
     input.pipe(B.distinct).runLog.run.toList == xs.distinct
   }
@@ -115,6 +118,96 @@ object MonitoringSpec extends Properties("monitoring") {
     // println("Number of microseconds per event: " + d.toMicros)
     // I am seeing around 25 microseconds on avg
     d.toMicros < 500
+  }
+
+  /*
+   * Counter and Guage updates should be 'fast', and should work
+   * with concurrent producers.
+   */
+  property("profiling") = secure {
+    import instruments._
+    val c = counter("uno")
+    val ok = guage("tres", false)
+    val N = 1000000
+    val t0 = System.nanoTime
+    val S = scalaz.concurrent.Strategy.DefaultStrategy
+    val f1 = S { (0 until N).foreach { _ =>
+      c.increment
+      ok.set(true)
+    }}
+    val f2 = S { (0 until N).foreach { _ =>
+      c.increment
+      ok.set(true)
+    }}
+    f1(); f2()
+    val updateTime = Duration.fromNanos(System.nanoTime - t0) / N.toDouble
+    val get: Task[Int] = Monitoring.default.latest(c.keys.now)
+    while (get.run != N*2) {
+      // println("current count: " + get.run)
+      Thread.sleep(10)
+    }
+    val publishTime = Duration.fromNanos(System.nanoTime - t0) / N.toDouble
+    val okResult = Monitoring.default.latest(ok.keys.now).run
+
+    // println("update time: " + updateTime.toNanos)
+    // println("publishTime: " + publishTime.toNanos)
+    // I am seeing about 40 nanoseconds for update times,
+    // 100 nanos for publishing
+    updateTime.toNanos < 500 &&
+    publishTime.toNanos < 1000 &&
+    okResult
+  }
+
+  /* Simple sanity check of a timer. */
+  property("timer-ex") = secure {
+    import instruments._
+    val t = timer("uno")
+    t.time { Thread.sleep(50) }
+    val r = Monitoring.default.latest(t.keys.now).run.mean
+    // println("Sleeping for 50ms took: " + r)
+    (r - 50).abs < 500
+  }
+
+  /* Make sure timer updates are 'fast'. */
+  property("timer-profiling") = secure {
+    import instruments._
+    val t = timer("uno")
+    val N = 1000000
+    val t0 = System.nanoTime
+    val d = (50 milliseconds)
+    (0 until N).foreach { _ =>
+      t.record(d)
+    }
+    val delta = System.nanoTime - t0
+    val updateTime = (delta nanoseconds) / N.toDouble
+    Thread.sleep(100)
+    val m = Monitoring.default.latest(t.keys.now).run.mean
+    // println("timer:updateTime: " + updateTime)
+    updateTime.toNanos < 500 && m == 50
+  }
+
+  /* Make sure timers allow concurrent updates. */
+  property("concurrent-timing") = secure {
+    import instruments._
+    val t = timer("uno")
+    val N = 100000
+    val S = scalaz.concurrent.Strategy.DefaultStrategy
+    val t0 = System.nanoTime
+    val d1 = (1 milliseconds); val d2 = (3 milliseconds)
+    val f1 = S { (0 until N).foreach { _ =>
+      t.record(d1)
+    }}
+    val f2 = S { (0 until N).foreach { _ =>
+      t.record(d2)
+    }}
+    f1(); f2()
+    val updateTime = Duration.fromNanos(System.nanoTime - t0) / N.toDouble
+    Thread.sleep(200)
+    // average time should be 2 millis
+    val m = Monitoring.default.latest(t.keys.now).run.mean
+    // println("average time: " + m)
+    // println("timer:updateTime: " + updateTime)
+    m == 2.0 && updateTime.toNanos < 1000
   }
 
   property("pub/sub") = forAll(Gen.listOf1(Gen.choose(1,10))) { a =>
@@ -158,7 +251,7 @@ object MonitoringSpec extends Properties("monitoring") {
       val gotB = M.latest(bN.keys.now).run
       val gotAB = M.latest(abN.keys.now).run
       if (gotA != expectedA || gotB != expectedB || gotAB != expectedAB) {
-        println("sleeping")
+        // println("sleeping")
         // println(s"a: $gotA, b: $gotB, ab: $gotAB")
         Thread.sleep(10)
         go

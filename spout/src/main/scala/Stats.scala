@@ -8,6 +8,7 @@ class Stats(moments: Moments, val last: Option[Double]) {
   def count = moments.count
   def mean = moments.mean
   def variance = moments.variance
+  def standardDeviation = math.sqrt(variance)
   def skewness = moments.skewness
   def kurtosis = moments.kurtosis
 
@@ -19,6 +20,8 @@ class Stats(moments: Moments, val last: Option[Double]) {
 
   def ++(ds: Seq[Double]): Stats =
     this ++ Stats.reduce(ds)
+
+  override def toString = Output.toJSON(this).toString
 }
 
 object Stats {

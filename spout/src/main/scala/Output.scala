@@ -25,19 +25,22 @@ object Output {
       k("null")
     else k(d.toString)
 
+  def toJSON(a: intelmedia.ws.monitoring.Stats): Action = JSON.Obj(
+      "kind" -> literal("Stats"),
+      "last" -> a.last.map(any).getOrElse(k("null")),
+      "mean" -> toJSON(a.mean),
+      "variance" -> toJSON(a.variance),
+      "standardDeviation" -> toJSON(a.standardDeviation),
+      "count" -> k(a.count.toString),
+      "skewness" -> toJSON(a.skewness),
+      "kurtosis" -> toJSON(a.kurtosis))
+
   def toJSON[A](r: Reportable[A]): Action = r match {
     case I(a) => k(a.toString)
     case B(a) => k(a.toString)
     case D(a) => k(a.toString)
     case S(s) => literal(s)
-    case Stats(a) => JSON.Obj(
-      "kind" -> literal("Stats"),
-      "count" -> k(a.count.toString),
-      "last" -> a.last.map(any).getOrElse(k("null")),
-      "mean" -> toJSON(a.mean),
-      "variance" -> toJSON(a.variance),
-      "skewness" -> toJSON(a.skewness),
-      "kurtosis" -> toJSON(a.kurtosis))
+    case Stats(a) => toJSON(a)
     case _ => sys.error("unrecognized reportable: " + r)
   }
 
