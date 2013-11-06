@@ -1,4 +1,4 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler

@@ -1,3 +1,3 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 
 case class Histogram[K](frequencies: Map[K,Int])

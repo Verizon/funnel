@@ -1,4 +1,4 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 package examples
 
 import org.scalacheck._

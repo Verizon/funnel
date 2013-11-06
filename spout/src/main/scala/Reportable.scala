@@ -1,4 +1,4 @@
-package intelmedia.ws.commons
+package intelmedia.ws
 package monitoring
 
 /**

@@ -1,4 +1,4 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 
 class Key[+A] private[monitoring](val label: String, val id: java.util.UUID) {
   override def equals(a: Any): Boolean =

@@ -1,4 +1,4 @@
-package intelmedia.ws.commons.monitoring
+package intelmedia.ws.monitoring
 
 trait Guage[K,A] extends Instrument[K] {
   def set(a: A): Unit
