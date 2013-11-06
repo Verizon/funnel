@@ -117,6 +117,19 @@ object MonitoringSpec extends Properties("monitoring") {
     d.toMicros < 500
   }
 
+  property("profiling") = secure {
+    import instruments._
+    val c = counter("uno")
+    val N = 10000
+    val t0 = System.nanoTime
+    (0 to N).foreach { _ =>
+      c.increment
+    }
+    val d = Duration.fromNanos(System.nanoTime - t0) / N.toDouble
+    println("microseconds: " + d.toMicros)
+    true
+  }
+
   property("pub/sub") = forAll(Gen.listOf1(Gen.choose(1,10))) { a =>
     val M = Monitoring.default
     val (k, snk) = M.topic("count")(B.ignoreTime(B.counter(0)))
