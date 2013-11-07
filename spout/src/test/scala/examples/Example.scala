@@ -18,10 +18,12 @@ object Example extends Properties("example") {
     // is under 20 millis
 
     val healthy: Metric[Boolean] = for {
-      n <- reqs.keys.now
-      db <- dbOk.keys.now
-      t <- query.keys.now
-    } yield (n < 20000 && db && t.mean < 20)
+      n <- reqs.key
+      db <- dbOk.key
+      t <- query.key
+    } yield n < 20000 &&
+            db &&
+            t.mean < 20
 
     healthy.publishEvery(5 seconds)("status")
   }
