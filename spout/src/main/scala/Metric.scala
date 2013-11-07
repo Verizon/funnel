@@ -54,7 +54,7 @@ object Metric extends scalaz.Monad[Metric] {
       publish(Events.or(Events.changed(k), Events.changed(k2)))(label)
   }
 
-  implicit def key[A](k: Key[A]): Metric[A] =
+  def key[A](k: Key[A]): Metric[A] =
     Bind(k, (a: A) => Pure(a))
 
   def point[A](a: => A): Metric[A] = Pure(a)
