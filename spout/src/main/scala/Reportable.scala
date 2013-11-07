@@ -21,6 +21,7 @@ object Reportable {
   implicit def reportableString(a: String): Reportable[String] = S(a)
   implicit def reportableStats(a: monitoring.Stats): Reportable[monitoring.Stats] = Stats(a)
   implicit def reportableHistogram(a: monitoring.Histogram[String]): Reportable[monitoring.Histogram[String]] = Histogram(a)
+  implicit def reportableReportable[A](r: Reportable[A]): Reportable[A] = r
 
   def apply[A](a: A)(implicit toReportable: A => Reportable[A]): Reportable[A] =
     toReportable(a)
