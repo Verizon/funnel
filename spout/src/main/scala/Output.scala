@@ -26,14 +26,14 @@ object Output {
     else k(d.toString)
 
   def toJSON(a: intelmedia.ws.monitoring.Stats): Action = JSON.Obj(
-      "kind" -> literal("Stats"),
-      "last" -> a.last.map(any).getOrElse(k("null")),
-      "mean" -> toJSON(a.mean),
-      "variance" -> toJSON(a.variance),
+      "kind"              -> literal("Stats"),
+      "last"              -> a.last.map(any).getOrElse(k("null")),
+      "mean"              -> toJSON(a.mean),
+      "variance"          -> toJSON(a.variance),
       "standardDeviation" -> toJSON(a.standardDeviation),
-      "count" -> k(a.count.toString),
-      "skewness" -> toJSON(a.skewness),
-      "kurtosis" -> toJSON(a.kurtosis))
+      "count"             -> k(a.count.toString),
+      "skewness"          -> toJSON(a.skewness),
+      "kurtosis"          -> toJSON(a.kurtosis))
 
   def toJSON[A](r: Reportable[A]): Action = r match {
     case I(a) => k(a.toString)
@@ -51,6 +51,12 @@ object Output {
           "value" -> toJSON(v))
     }}
 
+  def toJSON(tuple: (Key[Any], Reportable[Any])): Action = 
+    JSON.Obj(
+      "label"      -> literal(tuple._1.label), 
+      "id"         -> literal(tuple._1.id.toString),
+      "reportable" -> toJSON(tuple._2))
+
   /** Format a duration like `62 seconds` as `0hr 1m 02s` */
   def hoursMinutesSeconds(d: Duration): String = {
     val hours = d.toHours
@@ -65,8 +71,8 @@ object Output {
    * thread indefinitely.
    */
   def eventsToSSE(events: Process[Task, (Key[Any], Reportable[Any])],
-                  sink: java.io.Writer): Unit =
-    events.map(kv => s"event: ${toJSON(kv._1)}\ndata: ${toJSON(kv._2)}\n")
+                  sink: java.io.Writer): Unit = 
+    events.map(kv => s"event: reportable\ndata: ${toJSON(kv)}\n")
           .intersperse("\n")
           .map(writeTo(sink))
           .run.run
