@@ -23,6 +23,25 @@ object Metric extends scalaz.Monad[Metric] {
   case class Pure[A](get: A) extends Metric[A]
   case class Bind[A,B](key: Key[A], f: A => Metric[B]) extends Metric[B]
 
+  def key[A](k: Key[A]): Metric[A] =
+    Bind(k, (a: A) => Pure(a))
+
+  def point[A](a: => A): Metric[A] = Pure(a)
+
+  def bind[A,B](m: Metric[A])(f: A => Metric[B]): Metric[B] =
+    m flatMap f
+
+  /**
+   * The interpreter for `Metric`. We can convert `Metric[A]` to any
+   * `F[A]`, given an 'interpreter' for keys, the natural transformation
+   * `Key ~> F` (which is the Scala encoding of `forall A . Key[A] => F[A]`).
+   */
+  def run[F[_],A](m: Metric[A])(f: Key ~> F)(implicit F: Monad[F]): F[A] =
+    m match {
+      case Pure(a) => F.point(a)
+      case Bind(k, g) => F.bind(f(k))(e => run(g(e))(f))
+    }
+
   /** Infix syntax for `Metric`. */
   implicit class MetricSyntax[A](self: Metric[A]) {
     import Events.Event
@@ -54,17 +73,4 @@ object Metric extends scalaz.Monad[Metric] {
       publish(Events.or(Events.changed(k), Events.changed(k2)))(label)
   }
 
-  def key[A](k: Key[A]): Metric[A] =
-    Bind(k, (a: A) => Pure(a))
-
-  def point[A](a: => A): Metric[A] = Pure(a)
-
-  def bind[A,B](m: Metric[A])(f: A => Metric[B]): Metric[B] =
-    m flatMap f
-
-  def run[F[_],A](m: Metric[A])(f: Key ~> F)(implicit F: Monad[F]): F[A] =
-    m match {
-      case Pure(a) => F.point(a)
-      case Bind(k, g) => F.bind(f(k))(e => run(g(e))(f))
-    }
 }

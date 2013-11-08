@@ -31,16 +31,24 @@ trait Monitoring {
 
   /**
    * Publish a metric with the given label on every tick of `events`.
+   * See `Events` for various combinators for building up possible
+   * arguments to pass here (periodically, when one or more keys
+   * change, etc).
    */
   def publish[O <% Reportable[O]](
       label: String)(events: Process[Task,Unit])(f: Metric[O]): Key[O] = {
+    // `trans` is a polymorphic fn from `Key` to `Task`, picks out
+    // latest value for that `Key`
     val trans = new (Key ~> Task) {
       def apply[A](k: Key[A]): Task[A] = latest(k)
     }
+    // Invoke Metric interpreter, giving it function from Key to Task
     val refresh: Task[O] = f.run(trans)
+    // Whenever `event` generates a new value, refresh the signal
     val proc: Process[Task, O] = events.flatMap(_ => Process.eval(refresh))
+    // And finally republish these values to a new topic
     val (k, snk) = topic[O,O](label)(Buffers.ignoreTime(process1.id))
-    proc.map(snk).run.runAsync(_ => ())
+    proc.map(snk).run.runAsync(_ => ()) // nonblocking
     k
   }
 
