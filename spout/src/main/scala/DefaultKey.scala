@@ -1,5 +1,26 @@
 package intelmedia.ws.monitoring
 
+
+/**
+ * This type is just used for syntax, to pick out a default `Key`
+ * from a `Historical`, `Continuous`, or `Periodic`.
+ * See the instances in [[intelmedia.ws.monitoring.DefaultKeys]].
+ * For example, given: {{{
+ *   val healthy: Metric[Boolean] = for {
+ *     n <- reqs.key
+ *     db <- dbOk.key
+ *     t <- query.key
+ *   } yield n < 20000 &&
+ *           db &&
+ *           t.mean < 20
+ * }}}
+ *
+ * The call to `key` has the signature:
+ *
+ * `def key[K2](implicit d: DefaultKey[K,K2]): K2`
+ *
+ * And picks out the default key.
+ */
 trait DefaultKey[-A,+B] {
   def apply(a: A): B
 }
