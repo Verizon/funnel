@@ -8,7 +8,7 @@ import scala.concurrent.duration._
  * Provider of counters, gauges, and timers, tied to some
  * `Monitoring` server instance.
  */
-class Instruments(window: Duration, monitoring: Monitoring) {
+class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default) {
 
   /**
    * Return a `Counter` with the given starting count.
@@ -100,17 +100,4 @@ class Instruments(window: Duration, monitoring: Monitoring) {
     }
     t.buffer(50 milliseconds)
   }
-}
-
-object Instruments {
-  val fiveMinute: Instruments = instance(5 minutes)
-  val oneMinute: Instruments = instance(1 minutes)
-  val default = {
-    val r = fiveMinute
-    JVM.instrument(fiveMinute)
-    r
-  }
-
-  def instance(d: Duration, m: Monitoring = Monitoring.default): Instruments =
-    new Instruments(d, m)
 }

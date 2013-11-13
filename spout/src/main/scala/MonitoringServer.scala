@@ -12,7 +12,7 @@ import scalaz.stream._
 object Main extends App {
   MonitoringServer.start(Monitoring.default, 8081)
 
-  import Instruments.default._
+  import instruments._
   val c = counter("requests")
   val t = timer("response-time")
   val g = Process.awakeEvery(2 seconds).map { _ =>
