@@ -1,12 +1,14 @@
 package intelmedia.ws.monitoring
 
-import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 import scala.concurrent.duration._
+import scala.language.higherKinds
 import scalaz.concurrent.{Actor,Strategy,Task}
 import scalaz.Nondeterminism
 import scalaz.stream._
 import scalaz.stream.async
+import scalaz.{~>, Monad}
 
 /**
  * TODO: document me
@@ -19,10 +21,36 @@ trait Monitoring {
     label: String)(
     buf: Process1[(I,Duration),O]): (Key[O], I => Unit)
 
-  // todo: docs, mention topic vs signal semantics
+  /**
+   * Return the continuously updated signal of the current value
+   * for the given `Key`. Use `get(k).discrete` to get the
+   * discrete stream of values for this key, updated only
+   * when new values are produced.
+   */
   def get[O](k: Key[O]): async.immutable.Signal[Reportable[O]]
 
-  // def publish[O <% Reportable[O]](label: String)(k: Key[O]): Key[O]
+  /**
+   * Publish a metric with the given label on every tick of `events`.
+   * See `Events` for various combinators for building up possible
+   * arguments to pass here (periodically, when one or more keys
+   * change, etc).
+   */
+  def publish[O <% Reportable[O]](
+      label: String)(events: Process[Task,Unit])(f: Metric[O]): Key[O] = {
+    // `trans` is a polymorphic fn from `Key` to `Task`, picks out
+    // latest value for that `Key`
+    val trans = new (Key ~> Task) {
+      def apply[A](k: Key[A]): Task[A] = latest(k)
+    }
+    // Invoke Metric interpreter, giving it function from Key to Task
+    val refresh: Task[O] = f.run(trans)
+    // Whenever `event` generates a new value, refresh the signal
+    val proc: Process[Task, O] = events.flatMap(_ => Process.eval(refresh))
+    // And finally republish these values to a new topic
+    val (k, snk) = topic[O,O](label)(Buffers.ignoreTime(process1.id))
+    proc.map(snk).run.runAsync(_ => ()) // nonblocking
+    k
+  }
 
   /**
    * Return the most recent value for a given key.

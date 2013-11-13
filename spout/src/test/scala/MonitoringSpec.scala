@@ -1,11 +1,12 @@
-package intelmedia.ws.monitoring
+package intelmedia.ws
+package monitoring
 
 import com.twitter.algebird.Group
 import org.scalacheck._
 import Prop._
 import Arbitrary._
 import scala.concurrent.duration._
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Strategy, Task}
 import scalaz.Nondeterminism
 import scalaz.stream.{process1, Process}
 
@@ -265,6 +266,44 @@ object MonitoringSpec extends Properties("monitoring") {
     m(aN.keys.now).get == expectedA &&
     m(bN.keys.now).get == expectedB &&
     m(abN.keys.now).get == expectedAB
+  }
+
+  property("derived-metrics") = forAll(Gen.listOf1(Gen.choose(-10,10))) { ls0 =>
+    val ls = ls0.take(50)
+    import instruments._
+    val a = counter("a")
+    val b = counter("b")
+
+    val ab = Metric.apply2(a.key, b.key)(_ + _)
+    val kab1 = ab.publishEvery(30 milliseconds)("sum:ab-1")
+    val kab2 = ab.publishOnChange(a.key)("sum:ab-2")
+    val kab3 = ab.publishOnChanges(a.key, b.key)("sum:ab-2")
+
+    Strategy.Executor(Monitoring.defaultPool) {
+      ls.foreach(a.incrementBy)
+    }
+    Strategy.Executor(Monitoring.defaultPool) {
+      ls.foreach(b.incrementBy)
+    }
+
+    val expected = ls.sum * 2
+
+    def go(rounds: Int): Prop = {
+      Thread.sleep(30)
+      val ab1r = Monitoring.default.latest(kab1).run
+      val ab2r = Monitoring.default.latest(kab2).run
+      val ab3r = Monitoring.default.latest(kab3).run
+      // since ab2r is only refreshed when `a` changes, we
+      // artifically refresh `a`, otherwise this test would
+      // have a race condition if `a` completed before `b`
+      if (ab2r != expected) a.incrementBy(0)
+      // println((ab1r, ab2r, ab3r))
+      ab1r == ab2r && ab2r == ab3r && ab3r == expected || {
+        if (rounds == 0) "results: " + (ab1r, ab2r, ab3r).toString |: false
+        else go(rounds - 1)
+      }
+    }
+    go(15)
   }
 }
 
