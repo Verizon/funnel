@@ -233,7 +233,7 @@ object MonitoringSpec extends Properties("monitoring") {
     // this test takes about 45 seconds
     val (a,b) = ab.splitAt(ab.length / 2)
     val M = Monitoring.instance
-    val I = Instruments.instance(5 minutes, M)
+    val I = new Instruments(5 minutes, M)
     import I._
     val aN = counter("a")
     val bN = counter("b")
