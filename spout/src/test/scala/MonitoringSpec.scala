@@ -246,7 +246,7 @@ object MonitoringSpec extends Properties("monitoring") {
   /** Check that when publishing, we get the count that was published. */
   property("pub/sub") = forAll(Gen.listOf1(Gen.choose(1,10))) { a =>
     val M = Monitoring.default
-    val (k, snk) = M.topic("count")(B.ignoreTime(B.counter(0)))
+    val (k, snk) = M.topic[Long,Double]("count", Units.Count)(B.ignoreTime(B.counter(0)))
     val count = M.get(k)
     a.foreach { a => snk(a) }
     val expected = a.sum
@@ -308,9 +308,9 @@ object MonitoringSpec extends Properties("monitoring") {
     val b = counter("b")
 
     val ab = Metric.apply2(a.key, b.key)(_ + _)
-    val kab1 = ab.publishEvery(30 milliseconds)("sum:ab-1")
-    val kab2 = ab.publishOnChange(a.key)("sum:ab-2")
-    val kab3 = ab.publishOnChanges(a.key, b.key)("sum:ab-2")
+    val kab1 = ab.publishEvery(30 milliseconds)("sum:ab-1", Units.Count)
+    val kab2 = ab.publishOnChange(a.key)("sum:ab-2", Units.Count)
+    val kab3 = ab.publishOnChanges(a.key, b.key)("sum:ab-2", Units.Count)
 
     Strategy.Executor(Monitoring.defaultPool) {
       ls.foreach(a.incrementBy)

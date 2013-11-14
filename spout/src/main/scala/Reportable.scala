@@ -1,25 +1,11 @@
 package intelmedia.ws
 package monitoring
 
-import java.util.concurrent.TimeUnit
-
 /**
  * A value of type `A`, constained to be either
  * an `Int`, `Double`, or `String`.
  */
 sealed trait Reportable[+A] { def get: A }
-
-trait Units[+A]
-
-object Units {
-  case class Duration(granularity: TimeUnit) extends Units[Double with monitoring.Stats]
-  case class Memory(bytes: Long) extends Units[Double with monitoring.Stats]
-  case object Count extends Units[Double with monitoring.Stats]
-  case object Ratio extends Units[Double with monitoring.Stats]
-  case object Dimensionless extends Units[Nothing]
-  case object Stoplight extends Units[String] // "red", "yellow", "green"
-  case object Load extends Units[String] // "idle", "busy", "overloaded"
-}
 
 object Reportable {
   case class B(get: Boolean) extends Reportable[Boolean]

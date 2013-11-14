@@ -11,14 +11,18 @@ import scalaz.stream.async
 import scalaz.{~>, Monad}
 
 /**
- * TODO: document me
+ * A hub for publishing and subscribing to streams
+ * of values.
  */
 trait Monitoring {
   import Monitoring._
 
-  /** Create a new topic with the given label. */
+  /**
+   * Create a new topic with the given label and units,
+   * using a stream transducer to
+   */
   def topic[I, O <% Reportable[O]](
-    label: String)(
+    label: String, units: Units[O])(
     buf: Process1[(I,Duration),O]): (Key[O], I => Unit)
 
   /**
@@ -36,7 +40,7 @@ trait Monitoring {
    * change, etc).
    */
   def publish[O <% Reportable[O]](
-      label: String)(events: Process[Task,Unit])(f: Metric[O]): Key[O] = {
+      label: String, units: Units[O])(events: Process[Task,Unit])(f: Metric[O]): Key[O] = {
     // `trans` is a polymorphic fn from `Key` to `Task`, picks out
     // latest value for that `Key`
     val trans = new (Key ~> Task) {
@@ -47,7 +51,7 @@ trait Monitoring {
     // Whenever `event` generates a new value, refresh the signal
     val proc: Process[Task, O] = events.flatMap(_ => Process.eval(refresh))
     // And finally republish these values to a new topic
-    val (k, snk) = topic[O,O](label)(Buffers.ignoreTime(process1.id))
+    val (k, snk) = topic[O,O](label, units)(Buffers.ignoreTime(process1.id))
     proc.map(snk).run.runAsync(_ => ()) // nonblocking
     k
   }
@@ -67,8 +71,8 @@ trait Monitoring {
 
   /** Create a new topic with the given label and discard the key. */
   def topic_[I, O <% Reportable[O]](
-    label: String)(
-    buf: Process1[(I,Duration),O]): I => Unit = topic(label)(buf)._2
+    label: String, units: Units[O])(
+    buf: Process1[(I,Duration),O]): I => Unit = topic(label, units)(buf)._2
 
   def keysByLabel(label: String): Process[Task, List[Key[Any]]] =
     keys.continuous.map(_.filter(_.label == label))
@@ -116,7 +120,7 @@ object Monitoring {
       def keys = keys_
 
       def topic[I, O <% Reportable[O]](
-          label: String)(
+          label: String, units: Units[O])(
           buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
         val (pub, v) = bufferedSignal(buf.map(Reportable.apply(_)))(ES)
         val k = Key[O](label)

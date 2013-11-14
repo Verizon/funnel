@@ -2,6 +2,7 @@ package intelmedia.ws.monitoring
 
 import com.twitter.algebird.Group
 import intelmedia.ws.monitoring.{Buffers => B}
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
 
 /**
@@ -21,9 +22,10 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
       val count = B.resetEvery(window)(B.counter(init))
       val previousCount = B.emitEvery(window)(count)
       val slidingCount = B.sliding(window)(identity[Double])(Group.doubleGroup)
-      val (nowK, incrNow) = monitoring.topic(s"now/$label")(count)
-      val (prevK, incrPrev) = monitoring.topic(s"previous/$label")(previousCount)
-      val (slidingK, incrSliding) = monitoring.topic(s"sliding/$label")(slidingCount)
+      val u: Units[Double] = Units.Count
+      val (nowK, incrNow) = monitoring.topic(s"now/$label", u)(count)
+      val (prevK, incrPrev) = monitoring.topic(s"previous/$label", u)(previousCount)
+      val (slidingK, incrSliding) = monitoring.topic(s"sliding/$label", u)(slidingCount)
       def incrementBy(n: Int): Unit = {
         incrNow(n); incrPrev(n); incrSliding(n)
       }
@@ -44,9 +46,10 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * For a historical gauge that summarizes an entire
    * window of values as well, see `numericGauge`.
    */
-  def gauge[A <% Reportable[A]](label: String, init: A): Gauge[Continuous[A],A] = {
+  def gauge[A <% Reportable[A]](label: String, init: A,
+                                units: Units[A] = Units.Dimensionless): Gauge[Continuous[A],A] = {
     val g = new Gauge[Continuous[A],A] {
-      val (key, snk) = monitoring.topic(s"now/$label")(B.resetEvery(window)(B.variable(init)))
+      val (key, snk) = monitoring.topic(s"now/$label", units)(B.resetEvery(window)(B.variable(init)))
       def set(a: A) = snk(_ => a)
       def keys = Continuous(key)
 
@@ -61,14 +64,15 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * `now/label`, `previous/label` and `sliding/label`.
    * See [[intelmedia.ws.monitoring.Periodic]].
    */
-  def numericGauge(label: String, init: Double): Gauge[Periodic[Stats],Double] = {
+  def numericGauge(label: String, init: Double,
+                   units: Units[Stats] = Units.Dimensionless): Gauge[Periodic[Stats],Double] = {
     val g = new Gauge[Periodic[Stats],Double] {
       val now = B.resetEvery(window)(B.stats)
       val prev = B.emitEvery(window)(now)
       val sliding = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
-      val (nowK, nowSnk) = monitoring.topic(s"now/$label")(now)
-      val (prevK, prevSnk) = monitoring.topic(s"previous/$label")(prev)
-      val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label")(sliding)
+      val (nowK, nowSnk) = monitoring.topic(s"now/$label", units)(now)
+      val (prevK, prevSnk) = monitoring.topic(s"previous/$label", units)(prev)
+      val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label", units)(sliding)
       def keys = Periodic(nowK, prevK, slidingK)
       def set(d: Double): Unit = {
         nowSnk(d); prevSnk(d); slidingSnk(d)
@@ -88,9 +92,10 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
       val timer = B.resetEvery(window)(B.stats)
       val previousTimer = B.emitEvery(window)(timer)
       val slidingTimer = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
-      val (nowK, nowSnk) = monitoring.topic(s"now/$label")(timer)
-      val (prevK, prevSnk) = monitoring.topic(s"previous/$label")(previousTimer)
-      val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label")(slidingTimer)
+      val u: Units[Stats] = Units.Duration(TimeUnit.MILLISECONDS)
+      val (nowK, nowSnk) = monitoring.topic(s"now/$label", u)(timer)
+      val (prevK, prevSnk) = monitoring.topic(s"previous/$label", u)(previousTimer)
+      val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label", u)(slidingTimer)
       def keys = Periodic(nowK, prevK, slidingK)
       def recordNanos(nanos: Long): Unit = {
         // record time in milliseconds
