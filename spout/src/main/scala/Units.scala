@@ -3,7 +3,7 @@ package monitoring
 
 import java.util.concurrent.TimeUnit
 
-trait Units[+A]
+sealed trait Units[+A]
 
 object Units {
   case class Duration(granularity: TimeUnit) extends Units[Double with monitoring.Stats]

@@ -34,6 +34,11 @@ trait Monitoring {
   def get[O](k: Key[O]): async.immutable.Signal[Reportable[O]]
 
   /**
+   * Return the type associated with the given key.
+   */
+  def units[O](k: Key[O]): Units[O]
+
+  /**
    * Publish a metric with the given label on every tick of `events`.
    * See `Events` for various combinators for building up possible
    * arguments to pass here (periodically, when one or more keys
@@ -112,7 +117,8 @@ object Monitoring {
       publish: ((I,Duration), Option[Reportable[O]] => Unit) => Unit,
       current: async.immutable.Signal[Reportable[O]]
     )
-    var topics = new collection.concurrent.TrieMap[Key[Any], Topic[Any,Any]]()
+    val topics = new collection.concurrent.TrieMap[Key[Any], Topic[Any,Any]]()
+    val us = new collection.concurrent.TrieMap[Key[Any], Units[Any]]()
 
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
@@ -125,6 +131,7 @@ object Monitoring {
         val (pub, v) = bufferedSignal(buf.map(Reportable.apply(_)))(ES)
         val k = Key[O](label)
         topics += (k -> eraseTopic(Topic(pub, v)))
+        us += (k -> units.asInstanceOf[Units[Any]])
         keys_.value.modify(k :: _)
         (k, (i: I) => {
           val elapsed = Duration.fromNanos(System.nanoTime - t0)
@@ -135,6 +142,10 @@ object Monitoring {
       def get[O](k: Key[O]): Signal[Reportable[O]] =
         topics.get(k).map(_.current.asInstanceOf[Signal[Reportable[O]]])
                      .getOrElse(sys.error("key not found: " + k))
+
+      def units[O](k: Key[O]): Units[O] =
+        us.get(k).map(_.asInstanceOf[Units[O]])
+                 .getOrElse(sys.error("key not found: " + k))
     }
   }
 

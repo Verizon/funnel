@@ -12,6 +12,9 @@ object Output {
   import Reportable._
   import JSON.literal
 
+  def toJSON(u: Units[Any]): Action =
+    literal(u.toString)
+
   def toJSON(k: Key[Any]): Action =
     JSON.Obj("label" -> literal(k.label), "id" -> literal(k.id.toString))
 
@@ -48,6 +51,13 @@ object Output {
       JSON.Obj("label" -> literal(key.label),
           "id" -> literal(key.id.toString),
           "value" -> toJSON(v))
+    }}
+
+  def unitsToJSON(m: Traversable[(Key[Any], Units[Any])]): Action =
+    JSON.list { m.toList.map { case (key, u) =>
+      JSON.Obj("label" -> literal(key.label),
+          "id" -> literal(key.id.toString),
+          "value" -> toJSON(u))
     }}
 
   def toJSON(tuple: (Key[Any], Reportable[Any])): Action =
