@@ -15,7 +15,7 @@ Current transitive dependencies this will introduce on your classpath:
 
 - [Scalaz](https://github.com/scalaz/scalaz) 7.0.4
 - [Scalaz Stream](https://github.com/scalaz/scalaz-stream) 0.1
-- [Alebird Core](https://github.com/twitter/algebird) 0.3.0
+- [Algebird Core](https://github.com/twitter/algebird) 0.3.0
 
 With the dependency setup complete, you can now start instrumenting your code. The first thing you need to do is create a `metrics.scala` file, which should look like this:
 
