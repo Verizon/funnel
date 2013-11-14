@@ -12,7 +12,7 @@ import scalaz.stream._
 object Main extends App {
   MonitoringServer.start(Monitoring.default, 8081)
 
-  import Instruments.default._
+  import instruments._
   val c = counter("requests")
   val t = timer("response-time")
   val g = Process.awakeEvery(2 seconds).map { _ =>
@@ -56,6 +56,7 @@ object MonitoringServer {
       path match {
         case Nil => handleRoot(req)
         case "keys" :: Nil => handleKeys(M, req, log)
+        case "units" :: tl => handleUnits(M, tl.mkString("/"), req, log)
         case "stream" :: "keys" :: Nil => handleKeysStream(M, req, log)
         case "stream" :: tl => handleStream(M, tl.mkString("/"), req, log)
         case now => handleNow(M, now.mkString("/"), req, log)
@@ -66,16 +67,27 @@ object MonitoringServer {
     }
     finally req.close
 
+    def handleUnits(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
+      val ks = M.keys.continuous.once.runLastOr(List()).run.filter(_.matches(prefix))
+      val respBytes = Output.unitsToJSON(ks.map(k => (k, M.units(k)))).toString.getBytes
+      req.getResponseHeaders.set("Content-Type", "application/json")
+      req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
+      req.sendResponseHeaders(200, respBytes.length)
+      req.getResponseBody.write(respBytes)
+    }
+
     def handleKeys(M: Monitoring, req: HttpExchange, log: Log): Unit = {
       val ks = M.keys.continuous.once.runLastOr(List()).run
       val respBytes = Output.toJSON(ks).toString.getBytes
       req.getResponseHeaders.set("Content-Type", "application/json")
+      req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, respBytes.length)
       req.getResponseBody.write(respBytes)
     }
 
     def handleKeysStream(M: Monitoring, req: HttpExchange, log: Log): Unit = {
       req.getResponseHeaders.set("Content-Type", "text/event-stream")
+      req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
       val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
       Output.keysToSSE(M.distinctKeys, sink)
@@ -83,6 +95,7 @@ object MonitoringServer {
 
     def handleStream(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
       req.getResponseHeaders.set("Content-Type", "text/event-stream")
+      req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
       val events = Monitoring.subscribe(M)(prefix, log)
       val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
@@ -95,6 +108,7 @@ object MonitoringServer {
       val respBytes = resp.getBytes
       log("response: " + resp)
       req.getResponseHeaders.set("Content-Type", "application/json")
+      req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, respBytes.length)
       req.getResponseBody.write(respBytes)
     }
@@ -110,12 +124,15 @@ object MonitoringServer {
   |<body>
   |<p>Monitoring resources:</p>
   |<ul>
-  |<li><a href="/now">/now</a>: Current snapshot of all metrics with labels prefixed by 'now'. </li>
-  |<li><a href="/previous">/previous</a>: Current snapshot of all metrics with labels prefixed by 'previous'.</li>
-  |<li><a href="/sliding">/sliding</a>: Current snapshot of all metrics with labels prefixed by 'previous'.</li>
+  |<li><a href="/keys">/keys</a>: Current snapshot of all metric keys. </li>
+  |<li><a href="/units">/units</a>: The units (milliseconds, megabytes, ratio) for all metrics.</li>
+  |<li><a href="/units/id">/units/id</a>: The units for all metrics prefixed by 'id'.</li>
+  |<li><a href="/now">/now</a>: Current values for all metrics prefixed by 'now'. </li>
+  |<li><a href="/previous">/previous</a>: Current values for all metrics prefixed by 'previous'.</li>
+  |<li><a href="/sliding">/sliding</a>: Current values for all metrics prefixed by 'sliding'.</li>
+  |<li><a href="/stream/keys">/stream/keys</a>: Full stream of all metric keys.</li>
+  |<li><a href="/stream/keys/id">/keys/id</a>: Full stream of metric keys prefixed by 'id'.</li>
   |<li><a href="/stream">/stream</a>: Full stream of all metrics.</li>
-  |<li><a href="/stream/keys">/keys</a>: Full stream of all metric keys.</li>
-  |<li><a href="/stream/id">/keys/id</a>: Full stream of metrics with the given key.</li>
   |</ul>
   |</body>
   |</html>

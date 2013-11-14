@@ -2,13 +2,16 @@ package intelmedia.ws.monitoring
 
 import com.twitter.algebird.Group
 import intelmedia.ws.monitoring.{Buffers => B}
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
 
 /**
  * Provider of counters, gauges, and timers, tied to some
- * `Monitoring` server instance.
+ * `Monitoring` instance. Instruments returned by this class
+ * may update multiple metrics, see `counter`, `gauge` and
+ * `timer` methods for more information.
  */
-class Instruments(window: Duration, monitoring: Monitoring) {
+class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default) {
 
   /**
    * Return a `Counter` with the given starting count.
@@ -16,14 +19,15 @@ class Instruments(window: Duration, monitoring: Monitoring) {
    * `previous/label` and `sliding/label`.
    * See [[intelmedia.ws.monitoring.Periodic]].
    */
-  def counter(label: String, init: Int = 0): Counter[Periodic[Int]] = {
-    val c = new Counter[Periodic[Int]] {
+  def counter(label: String, init: Int = 0): Counter[Periodic[Double]] = {
+    val c = new Counter[Periodic[Double]] {
       val count = B.resetEvery(window)(B.counter(init))
       val previousCount = B.emitEvery(window)(count)
-      val slidingCount = B.sliding(window)(identity[Int])(Group.intGroup)
-      val (nowK, incrNow) = monitoring.topic(s"now/$label")(count)
-      val (prevK, incrPrev) = monitoring.topic(s"previous/$label")(previousCount)
-      val (slidingK, incrSliding) = monitoring.topic(s"sliding/$label")(slidingCount)
+      val slidingCount = B.sliding(window)(identity[Double])(Group.doubleGroup)
+      val u: Units[Double] = Units.Count
+      val (nowK, incrNow) = monitoring.topic(s"now/$label", u)(count)
+      val (prevK, incrPrev) = monitoring.topic(s"previous/$label", u)(previousCount)
+      val (slidingK, incrSliding) = monitoring.topic(s"sliding/$label", u)(slidingCount)
       def incrementBy(n: Int): Unit = {
         incrNow(n); incrPrev(n); incrSliding(n)
       }
@@ -39,14 +43,60 @@ class Instruments(window: Duration, monitoring: Monitoring) {
   // update some additional values
 
   /**
+   * Records the elapsed time in the current period whenever the
+   * returned `Gauge` is set. See `Elapsed.scala`.
+   */
+  private[monitoring] def currentElapsed(label: String): Gauge[Continuous[Double], Unit] = {
+    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds)(
+      B.currentElapsed(window).map(_.toSeconds.toDouble))
+    val g = new Gauge[Continuous[Double], Unit] {
+      def set(u: Unit) = snk(u)
+      def keys = Continuous(k)
+    }
+    g.set(())
+    g
+
+  }
+  /**
+   * Records the elapsed time in the current period whenever the
+   * returned `Gauge` is set. See `Elapsed.scala`.
+   */
+  private[monitoring] def currentRemaining(label: String): Gauge[Continuous[Double], Unit] = {
+    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds)(
+      B.currentRemaining(window).map(_.toSeconds.toDouble))
+    val g = new Gauge[Continuous[Double], Unit] {
+      def set(u: Unit) = snk(u)
+      def keys = Continuous(k)
+    }
+    g.set(())
+    g
+  }
+
+  /**
+   * Records the elapsed time that the `Monitoring` instance has
+   * been running whenver the returned `Gauge` is set. See `Elapsed.scala`.
+   */
+  private[monitoring] def uptime(label: String): Gauge[Continuous[Double], Unit] = {
+    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Minutes)(
+      B.elapsed.map(_.toSeconds.toDouble / 60))
+    val g = new Gauge[Continuous[Double], Unit] {
+      def set(u: Unit) = snk(u)
+      def keys = Continuous(k)
+    }
+    g.set(())
+    g
+  }
+
+  /**
    * Return a `Gauge` with the given starting value.
    * This gauge only updates the key `now/$label`.
    * For a historical gauge that summarizes an entire
    * window of values as well, see `numericGauge`.
    */
-  def gauge[A <% Reportable[A]](label: String, init: A): Gauge[Continuous[A],A] = {
+  def gauge[A <% Reportable[A]](label: String, init: A,
+                                units: Units[A] = Units.None): Gauge[Continuous[A],A] = {
     val g = new Gauge[Continuous[A],A] {
-      val (key, snk) = monitoring.topic(s"now/$label")(B.resetEvery(window)(B.variable(init)))
+      val (key, snk) = monitoring.topic(s"now/$label", units)(B.resetEvery(window)(B.variable(init)))
       def set(a: A) = snk(_ => a)
       def keys = Continuous(key)
 
@@ -61,14 +111,15 @@ class Instruments(window: Duration, monitoring: Monitoring) {
    * `now/label`, `previous/label` and `sliding/label`.
    * See [[intelmedia.ws.monitoring.Periodic]].
    */
-  def numericGauge(label: String, init: Double): Gauge[Periodic[Stats],Double] = {
+  def numericGauge(label: String, init: Double,
+                   units: Units[Stats] = Units.None): Gauge[Periodic[Stats],Double] = {
     val g = new Gauge[Periodic[Stats],Double] {
       val now = B.resetEvery(window)(B.stats)
       val prev = B.emitEvery(window)(now)
       val sliding = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
-      val (nowK, nowSnk) = monitoring.topic(s"now/$label")(now)
-      val (prevK, prevSnk) = monitoring.topic(s"previous/$label")(prev)
-      val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label")(sliding)
+      val (nowK, nowSnk) = monitoring.topic(s"now/$label", units)(now)
+      val (prevK, prevSnk) = monitoring.topic(s"previous/$label", units)(prev)
+      val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label", units)(sliding)
       def keys = Periodic(nowK, prevK, slidingK)
       def set(d: Double): Unit = {
         nowSnk(d); prevSnk(d); slidingSnk(d)
@@ -88,9 +139,10 @@ class Instruments(window: Duration, monitoring: Monitoring) {
       val timer = B.resetEvery(window)(B.stats)
       val previousTimer = B.emitEvery(window)(timer)
       val slidingTimer = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
-      val (nowK, nowSnk) = monitoring.topic(s"now/$label")(timer)
-      val (prevK, prevSnk) = monitoring.topic(s"previous/$label")(previousTimer)
-      val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label")(slidingTimer)
+      val u: Units[Stats] = Units.Duration(TimeUnit.MILLISECONDS)
+      val (nowK, nowSnk) = monitoring.topic(s"now/$label", u)(timer)
+      val (prevK, prevSnk) = monitoring.topic(s"previous/$label", u)(previousTimer)
+      val (slidingK, slidingSnk) = monitoring.topic(s"sliding/$label", u)(slidingTimer)
       def keys = Periodic(nowK, prevK, slidingK)
       def recordNanos(nanos: Long): Unit = {
         // record time in milliseconds
@@ -100,17 +152,4 @@ class Instruments(window: Duration, monitoring: Monitoring) {
     }
     t.buffer(50 milliseconds)
   }
-}
-
-object Instruments {
-  val fiveMinute: Instruments = instance(5 minutes)
-  val oneMinute: Instruments = instance(1 minutes)
-  val default = {
-    val r = fiveMinute
-    JVM.instrument(fiveMinute)
-    r
-  }
-
-  def instance(d: Duration, m: Monitoring = Monitoring.default): Instruments =
-    new Instruments(d, m)
 }
