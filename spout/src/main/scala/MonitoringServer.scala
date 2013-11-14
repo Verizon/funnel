@@ -56,6 +56,7 @@ object MonitoringServer {
       path match {
         case Nil => handleRoot(req)
         case "keys" :: Nil => handleKeys(M, req, log)
+        case "units" :: tl => handleUnits(M, tl.mkString("/"), req, log)
         case "stream" :: "keys" :: Nil => handleKeysStream(M, req, log)
         case "stream" :: tl => handleStream(M, tl.mkString("/"), req, log)
         case now => handleNow(M, now.mkString("/"), req, log)
@@ -65,6 +66,15 @@ object MonitoringServer {
       case e: Exception => log("fatal error: " + e)
     }
     finally req.close
+
+    def handleUnits(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
+      val ks = M.keys.continuous.once.runLastOr(List()).run.filter(_.matches(prefix))
+      val respBytes = Output.unitsToJSON(ks.map(k => (k, M.units(k)))).toString.getBytes
+      req.getResponseHeaders.set("Content-Type", "application/json")
+      req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
+      req.sendResponseHeaders(200, respBytes.length)
+      req.getResponseBody.write(respBytes)
+    }
 
     def handleKeys(M: Monitoring, req: HttpExchange, log: Log): Unit = {
       val ks = M.keys.continuous.once.runLastOr(List()).run
@@ -114,12 +124,15 @@ object MonitoringServer {
   |<body>
   |<p>Monitoring resources:</p>
   |<ul>
-  |<li><a href="/now">/now</a>: Current snapshot of all metrics with labels prefixed by 'now'. </li>
-  |<li><a href="/previous">/previous</a>: Current snapshot of all metrics with labels prefixed by 'previous'.</li>
-  |<li><a href="/sliding">/sliding</a>: Current snapshot of all metrics with labels prefixed by 'previous'.</li>
+  |<li><a href="/keys">/keys</a>: Current snapshot of all metric keys. </li>
+  |<li><a href="/units">/units</a>: The units (milliseconds, megabytes, ratio) for all metrics.</li>
+  |<li><a href="/units/id">/units/id</a>: The units for all metrics prefixed by 'id'.</li>
+  |<li><a href="/now">/now</a>: Current values for all metrics prefixed by 'now'. </li>
+  |<li><a href="/previous">/previous</a>: Current values for all metrics prefixed by 'previous'.</li>
+  |<li><a href="/sliding">/sliding</a>: Current values for all metrics prefixed by 'sliding'.</li>
+  |<li><a href="/stream/keys">/stream/keys</a>: Full stream of all metric keys.</li>
+  |<li><a href="/stream/keys/id">/keys/id</a>: Full stream of metric keys prefixed by 'id'.</li>
   |<li><a href="/stream">/stream</a>: Full stream of all metrics.</li>
-  |<li><a href="/stream/keys">/keys</a>: Full stream of all metric keys.</li>
-  |<li><a href="/stream/id">/keys/id</a>: Full stream of metrics with the given key.</li>
   |</ul>
   |</body>
   |</html>
