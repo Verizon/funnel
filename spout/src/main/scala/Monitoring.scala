@@ -61,9 +61,10 @@ trait Monitoring {
     k
   }
 
-  /**
-   * Return the most recent value for a given key.
-   */
+  /** Return the elapsed time since this instance was started. */
+  def elapsed: Duration
+
+  /** Return the most recent value for a given key. */
   def latest[O](k: Key[O]): Task[O] =
     get(k).continuous.once.runLast.map(_.get.get)
 
@@ -146,6 +147,8 @@ object Monitoring {
       def units[O](k: Key[O]): Units[O] =
         us.get(k).map(_.asInstanceOf[Units[O]])
                  .getOrElse(sys.error("key not found: " + k))
+
+      def elapsed: Duration = Duration.fromNanos(System.nanoTime - t0)
     }
   }
 

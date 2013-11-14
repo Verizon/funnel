@@ -7,7 +7,7 @@ import com.twitter.algebird.Group
 
 /**
  * Various stream transducers and combinators used for
- * building arguments to pass to `Monitoring.get`.
+ * building arguments to pass to `Monitoring.topic`.
  * See `Monitoring` companion object for examples of how
  * these can be used.
  */
@@ -16,6 +16,20 @@ object Buffers {
   /** Promote a `Process1[A,B]` to one that ignores time. */
   def ignoreTime[A,B](p: Process1[A,B]): Process1[(A,Any), B] =
     process1.id[(A,Any)].map(_._1).pipe(p)
+
+  /** Emit the input duration. */
+  def elapsed: Process1[(Any,Duration), Duration] =
+    process1.id[(Any,Duration)].map(_._2)
+
+  /**
+   * Emit the elapsed time in the current period, where periods are
+   * of `step` duration.
+   */
+  def currentElapsed(step: Duration): Process1[(Any,Duration), Duration] =
+    process1.id[(Any,Duration)].map { case (_, d) =>
+      val d0 = floorDuration(d, step)
+      d - d0
+    }
 
   /**
    * Emits the current value, which may be modified by the
@@ -49,7 +63,7 @@ object Buffers {
     def go(cur: Process1[I,O], expiration: Duration): Process1[(I,Duration),O] =
       P.await1[(I,Duration)].flatMap { case (i,d) =>
         if (d >= expiration)
-          flush(process1.feed1(i)(p), roundDuration(d, d0))
+          flush(process1.feed1(i)(p), ceilingDuration(d, d0))
         else
           flush(process1.feed1(i)(cur), expiration)
       }
@@ -68,7 +82,7 @@ object Buffers {
     def go(last: Option[O], cur: Process1[(I,Duration),O], expiration: Duration): Process1[(I,Duration),O] =
       P.await1[(I,Duration)].flatMap { case (i,d) =>
         if (d >= expiration)
-          flush(last, true, process1.feed1(i -> d)(p), roundDuration(d, d0))
+          flush(last, true, process1.feed1(i -> d)(p), ceilingDuration(d, d0))
         else
           flush(last, false, process1.feed1(i -> d)(cur), expiration)
       }
@@ -88,13 +102,17 @@ object Buffers {
     P.emit(G.zero) ++ go(Vector(), G.zero)
   }
 
-  /** Compute the smallest multiple of step which exceeds `d`. */
-  def roundDuration(d: Duration, step: Duration): Duration = {
+  /** Compute the smallest multiple of `step` which is `> d`. */
+  def ceilingDuration(d: Duration, step: Duration): Duration = {
     val f = d / step
     val d2 = step * math.ceil(f).toInt
     if (math.ceil(f) == f) d2 + step
     else d2
   }
+
+  /** Compute the smallest multiple of `step` which is `<= d` `*/
+  def floorDuration(d: Duration, step: Duration): Duration =
+    ceilingDuration(d, step) - step
 
   def resettingRate(d: Duration): Process1[(Long,Duration),Double] =
     resetEvery(d)(counter(0))

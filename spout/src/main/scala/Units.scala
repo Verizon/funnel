@@ -16,6 +16,7 @@ object Units {
   case object None extends Units[Nothing]
 
   val Milliseconds = Duration(TimeUnit.MILLISECONDS)
+  val Seconds = Duration(TimeUnit.SECONDS)
   val Megabytes = Bytes(Base.Mega)
 
   trait Base
