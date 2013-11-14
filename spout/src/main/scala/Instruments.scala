@@ -55,6 +55,21 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
     }
     g.set(())
     g
+
+  }
+  /**
+   * Records the elapsed time in the current period whenever the
+   * returned `Gauge` is set. See `Elapsed.scala`.
+   */
+  private[monitoring] def currentRemaining(label: String): Gauge[Continuous[Double], Unit] = {
+    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds)(
+      B.currentRemaining(window).map(_.toSeconds.toDouble))
+    val g = new Gauge[Continuous[Double], Unit] {
+      def set(u: Unit) = snk(u)
+      def keys = Continuous(k)
+    }
+    g.set(())
+    g
   }
 
   /**

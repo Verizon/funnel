@@ -32,6 +32,17 @@ object Buffers {
     }
 
   /**
+   * Emit the remaining time in the current period, where periods are
+   * of `step` duration.
+   */
+  def currentRemaining(step: Duration): Process1[(Any,Duration), Duration] =
+    process1.lift { (p: (Any,Duration)) =>
+      val d = p._2
+      val d1 = ceilingDuration(d, step)
+      d1 - d
+    }
+
+  /**
    * Emits the current value, which may be modified by the
    * given function, which receives the old value and
    * produces the new value.
