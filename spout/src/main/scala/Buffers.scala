@@ -26,8 +26,8 @@ object Buffers {
     P.emit(init) ++ P.await1[A => A].flatMap(f => variable(f(init)))
 
   /** Emits a running sum of its inputs, starting from `init`. */
-  def counter(init: Int): Process1[Int,Int] =
-    process1.scan(init)(_ + _)
+  def counter(init: Long): Process1[Long,Double] =
+    process1.scan(init.toDouble)(_ + _)
 
   /** Emits only values not yet seen. */
   def distinct[A]: Process1[A, A] = {
@@ -96,7 +96,7 @@ object Buffers {
     else d2
   }
 
-  def resettingRate(d: Duration): Process1[(Int,Duration),Int] =
+  def resettingRate(d: Duration): Process1[(Long,Duration),Double] =
     resetEvery(d)(counter(0))
 
   def stats: Process1[Double, Stats] =

@@ -16,11 +16,11 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * `previous/label` and `sliding/label`.
    * See [[intelmedia.ws.monitoring.Periodic]].
    */
-  def counter(label: String, init: Int = 0): Counter[Periodic[Int]] = {
-    val c = new Counter[Periodic[Int]] {
+  def counter(label: String, init: Int = 0): Counter[Periodic[Double]] = {
+    val c = new Counter[Periodic[Double]] {
       val count = B.resetEvery(window)(B.counter(init))
       val previousCount = B.emitEvery(window)(count)
-      val slidingCount = B.sliding(window)(identity[Int])(Group.intGroup)
+      val slidingCount = B.sliding(window)(identity[Double])(Group.doubleGroup)
       val (nowK, incrNow) = monitoring.topic(s"now/$label")(count)
       val (prevK, incrPrev) = monitoring.topic(s"previous/$label")(previousCount)
       val (slidingK, incrSliding) = monitoring.topic(s"sliding/$label")(slidingCount)
