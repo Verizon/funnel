@@ -12,6 +12,9 @@ object Output {
   import Reportable._
   import JSON.literal
 
+  def toJSON(u: Units[Any]): Action =
+    literal(u.toString)
+
   def toJSON(k: Key[Any]): Action =
     JSON.Obj("label" -> literal(k.label), "id" -> literal(k.id.toString))
 
@@ -36,7 +39,6 @@ object Output {
       "kurtosis"          -> toJSON(a.kurtosis))
 
   def toJSON[A](r: Reportable[A]): Action = r match {
-    case I(a) => k(a.toString)
     case B(a) => k(a.toString)
     case D(a) => k(a.toString)
     case S(s) => literal(s)
@@ -51,9 +53,16 @@ object Output {
           "value" -> toJSON(v))
     }}
 
-  def toJSON(tuple: (Key[Any], Reportable[Any])): Action = 
+  def unitsToJSON(m: Traversable[(Key[Any], Units[Any])]): Action =
+    JSON.list { m.toList.map { case (key, u) =>
+      JSON.Obj("label" -> literal(key.label),
+          "id" -> literal(key.id.toString),
+          "value" -> toJSON(u))
+    }}
+
+  def toJSON(tuple: (Key[Any], Reportable[Any])): Action =
     JSON.Obj(
-      "label"      -> literal(tuple._1.label), 
+      "label"      -> literal(tuple._1.label),
       "id"         -> literal(tuple._1.id.toString),
       "reportable" -> toJSON(tuple._2))
 
@@ -71,7 +80,7 @@ object Output {
    * thread indefinitely.
    */
   def eventsToSSE(events: Process[Task, (Key[Any], Reportable[Any])],
-                  sink: java.io.Writer): Unit = 
+                  sink: java.io.Writer): Unit =
     events.map(kv => s"event: reportable\ndata: ${toJSON(kv)}\n")
           .intersperse("\n")
           .map(writeTo(sink))

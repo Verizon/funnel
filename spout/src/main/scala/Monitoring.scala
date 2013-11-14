@@ -11,14 +11,18 @@ import scalaz.stream.async
 import scalaz.{~>, Monad}
 
 /**
- * TODO: document me
+ * A hub for publishing and subscribing to streams
+ * of values.
  */
 trait Monitoring {
   import Monitoring._
 
-  /** Create a new topic with the given label. */
+  /**
+   * Create a new topic with the given label and units,
+   * using a stream transducer to
+   */
   def topic[I, O <% Reportable[O]](
-    label: String)(
+    label: String, units: Units[O])(
     buf: Process1[(I,Duration),O]): (Key[O], I => Unit)
 
   /**
@@ -30,13 +34,18 @@ trait Monitoring {
   def get[O](k: Key[O]): async.immutable.Signal[Reportable[O]]
 
   /**
+   * Return the type associated with the given key.
+   */
+  def units[O](k: Key[O]): Units[O]
+
+  /**
    * Publish a metric with the given label on every tick of `events`.
    * See `Events` for various combinators for building up possible
    * arguments to pass here (periodically, when one or more keys
    * change, etc).
    */
   def publish[O <% Reportable[O]](
-      label: String)(events: Process[Task,Unit])(f: Metric[O]): Key[O] = {
+      label: String, units: Units[O])(events: Process[Task,Unit])(f: Metric[O]): Key[O] = {
     // `trans` is a polymorphic fn from `Key` to `Task`, picks out
     // latest value for that `Key`
     val trans = new (Key ~> Task) {
@@ -47,7 +56,7 @@ trait Monitoring {
     // Whenever `event` generates a new value, refresh the signal
     val proc: Process[Task, O] = events.flatMap(_ => Process.eval(refresh))
     // And finally republish these values to a new topic
-    val (k, snk) = topic[O,O](label)(Buffers.ignoreTime(process1.id))
+    val (k, snk) = topic[O,O](label, units)(Buffers.ignoreTime(process1.id))
     proc.map(snk).run.runAsync(_ => ()) // nonblocking
     k
   }
@@ -67,8 +76,8 @@ trait Monitoring {
 
   /** Create a new topic with the given label and discard the key. */
   def topic_[I, O <% Reportable[O]](
-    label: String)(
-    buf: Process1[(I,Duration),O]): I => Unit = topic(label)(buf)._2
+    label: String, units: Units[O])(
+    buf: Process1[(I,Duration),O]): I => Unit = topic(label, units)(buf)._2
 
   def keysByLabel(label: String): Process[Task, List[Key[Any]]] =
     keys.continuous.map(_.filter(_.label == label))
@@ -108,7 +117,8 @@ object Monitoring {
       publish: ((I,Duration), Option[Reportable[O]] => Unit) => Unit,
       current: async.immutable.Signal[Reportable[O]]
     )
-    var topics = new collection.concurrent.TrieMap[Key[Any], Topic[Any,Any]]()
+    val topics = new collection.concurrent.TrieMap[Key[Any], Topic[Any,Any]]()
+    val us = new collection.concurrent.TrieMap[Key[Any], Units[Any]]()
 
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
@@ -116,11 +126,12 @@ object Monitoring {
       def keys = keys_
 
       def topic[I, O <% Reportable[O]](
-          label: String)(
+          label: String, units: Units[O])(
           buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
         val (pub, v) = bufferedSignal(buf.map(Reportable.apply(_)))(ES)
         val k = Key[O](label)
         topics += (k -> eraseTopic(Topic(pub, v)))
+        us += (k -> units.asInstanceOf[Units[Any]])
         keys_.value.modify(k :: _)
         (k, (i: I) => {
           val elapsed = Duration.fromNanos(System.nanoTime - t0)
@@ -131,6 +142,10 @@ object Monitoring {
       def get[O](k: Key[O]): Signal[Reportable[O]] =
         topics.get(k).map(_.current.asInstanceOf[Signal[Reportable[O]]])
                      .getOrElse(sys.error("key not found: " + k))
+
+      def units[O](k: Key[O]): Units[O] =
+        us.get(k).map(_.asInstanceOf[Units[O]])
+                 .getOrElse(sys.error("key not found: " + k))
     }
   }
 

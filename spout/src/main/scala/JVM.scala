@@ -21,8 +21,8 @@ object JVM {
     import I._
     gcs.foreach { gc =>
       val name = gc.getName.replace(' ', '-')
-      val numCollections = numericGauge(s"jvm/gc/$name", 0)
-      val collectionTime = numericGauge(s"jvm/gc/$name/time", 0)
+      val numCollections = numericGauge(s"jvm/gc/$name", 0, Units.Count)
+      val collectionTime = numericGauge(s"jvm/gc/$name/time", 0, Units.Milliseconds)
       Strategy.Executor(ES) {
         Process.awakeEvery(3 seconds).map { _ =>
           numCollections.set(gc.getCollectionCount)
@@ -32,7 +32,7 @@ object JVM {
     }
 
     def MB(lbl: String): Gauge[Periodic[Stats], Double] =
-      Gauge.scale(1/1e6)(numericGauge(lbl, 0.0))
+      Gauge.scale(1/1e6)(numericGauge(lbl, 0.0, Units.Megabytes))
 
     val totalInit = MB("jvm/memory/total/init")
     val totalUsed = MB("jvm/memory/total/used")
@@ -41,13 +41,13 @@ object JVM {
 
     val heapInit = MB("jvm/memory/heap/init")
     val heapUsed = MB("jvm/memory/heap/used")
-    val heapUsage = numericGauge("jvm/memory/heap/usage", 0.0)
+    val heapUsage = numericGauge("jvm/memory/heap/usage", 0.0, Units.Ratio)
     val heapMax = MB("jvm/memory/heap/max")
     val heapCommitted = MB("jvm/memory/heap/committed")
 
     val nonheapInit = MB("jvm/memory/nonheap/init")
     val nonheapUsed = MB("jvm/memory/nonheap/used")
-    val nonheapUsage = numericGauge("jvm/memory/nonheap/usage", 0.0)
+    val nonheapUsage = numericGauge("jvm/memory/nonheap/usage", 0.0, Units.Ratio)
     val nonheapMax = MB("jvm/memory/nonheap/max")
     val nonheapCommitted = MB("jvm/memory/nonheap/committed")
 
