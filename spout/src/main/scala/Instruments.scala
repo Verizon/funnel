@@ -47,7 +47,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * window of values as well, see `numericGauge`.
    */
   def gauge[A <% Reportable[A]](label: String, init: A,
-                                units: Units[A] = Units.Dimensionless): Gauge[Continuous[A],A] = {
+                                units: Units[A] = Units.None): Gauge[Continuous[A],A] = {
     val g = new Gauge[Continuous[A],A] {
       val (key, snk) = monitoring.topic(s"now/$label", units)(B.resetEvery(window)(B.variable(init)))
       def set(a: A) = snk(_ => a)
@@ -65,7 +65,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * See [[intelmedia.ws.monitoring.Periodic]].
    */
   def numericGauge(label: String, init: Double,
-                   units: Units[Stats] = Units.Dimensionless): Gauge[Periodic[Stats],Double] = {
+                   units: Units[Stats] = Units.None): Gauge[Periodic[Stats],Double] = {
     val g = new Gauge[Periodic[Stats],Double] {
       val now = B.resetEvery(window)(B.stats)
       val prev = B.emitEvery(window)(now)
