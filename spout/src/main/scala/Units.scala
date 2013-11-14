@@ -17,6 +17,8 @@ object Units {
 
   val Milliseconds = Duration(TimeUnit.MILLISECONDS)
   val Seconds = Duration(TimeUnit.SECONDS)
+  val Minutes = Duration(TimeUnit.MINUTES)
+  val Hours = Duration(TimeUnit.HOURS)
   val Megabytes = Bytes(Base.Mega)
 
   trait Base

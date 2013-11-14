@@ -77,8 +77,8 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * been running whenver the returned `Gauge` is set. See `Elapsed.scala`.
    */
   private[monitoring] def uptime(label: String): Gauge[Continuous[Double], Unit] = {
-    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds)(
-      B.elapsed.map(_.toSeconds.toDouble))
+    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Minutes)(
+      B.elapsed.map(_.toSeconds.toDouble / 60))
     val g = new Gauge[Continuous[Double], Unit] {
       def set(u: Unit) = snk(u)
       def keys = Continuous(k)
