@@ -116,9 +116,9 @@ trait SomeFun {
     GetUserList.timeTask(getListTask)
     
     // for anything else procedural, the side-effecting API
-    GetUserList.start()
+    val stopwatch = GetUserList.start()
     val x = // operation to be timed
-    GetUserList.stop()
+    stopwatch() // stops the stopwatch and records the time taken
     
   }
   
