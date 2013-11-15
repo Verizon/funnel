@@ -36,14 +36,14 @@ object MonitoringSpec extends Properties("monitoring") {
    * some hardcoded examples.
    */
   property("roundDuration") = secure {
-    B.roundDuration(0 minutes, 5 minutes) == (5 minutes) &&
-    B.roundDuration(14 seconds, 1 minutes) == (1 minutes) &&
-    B.roundDuration(60 seconds, 1 minutes) == (2 minutes) &&
-    B.roundDuration(61 seconds, 1 minutes) == (2 minutes) &&
-    B.roundDuration(59 seconds, 2 minutes) == (2 minutes) &&
-    B.roundDuration(119 seconds, 1 minutes) == (2 minutes) &&
-    B.roundDuration(120 seconds, 1 minutes) == (3 minutes) &&
-    B.roundDuration(190 milliseconds, 50 milliseconds) == (200 milliseconds)
+    B.ceilingDuration(0 minutes, 5 minutes) == (5 minutes) &&
+    B.ceilingDuration(14 seconds, 1 minutes) == (1 minutes) &&
+    B.ceilingDuration(60 seconds, 1 minutes) == (2 minutes) &&
+    B.ceilingDuration(61 seconds, 1 minutes) == (2 minutes) &&
+    B.ceilingDuration(59 seconds, 2 minutes) == (2 minutes) &&
+    B.ceilingDuration(119 seconds, 1 minutes) == (2 minutes) &&
+    B.ceilingDuration(120 seconds, 1 minutes) == (3 minutes) &&
+    B.ceilingDuration(190 milliseconds, 50 milliseconds) == (200 milliseconds)
   }
 
   /*

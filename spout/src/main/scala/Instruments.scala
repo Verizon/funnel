@@ -7,7 +7,9 @@ import scala.concurrent.duration._
 
 /**
  * Provider of counters, gauges, and timers, tied to some
- * `Monitoring` server instance.
+ * `Monitoring` instance. Instruments returned by this class
+ * may update multiple metrics, see `counter`, `gauge` and
+ * `timer` methods for more information.
  */
 class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default) {
 
@@ -39,6 +41,51 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
   // todo: histogramgauge, histogramCount, histogramTimer
   // or maybe we just modify the existing combinators to
   // update some additional values
+
+  /**
+   * Records the elapsed time in the current period whenever the
+   * returned `Gauge` is set. See `Elapsed.scala`.
+   */
+  private[monitoring] def currentElapsed(label: String): Gauge[Continuous[Double], Unit] = {
+    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds)(
+      B.currentElapsed(window).map(_.toSeconds.toDouble))
+    val g = new Gauge[Continuous[Double], Unit] {
+      def set(u: Unit) = snk(u)
+      def keys = Continuous(k)
+    }
+    g.set(())
+    g
+
+  }
+  /**
+   * Records the elapsed time in the current period whenever the
+   * returned `Gauge` is set. See `Elapsed.scala`.
+   */
+  private[monitoring] def currentRemaining(label: String): Gauge[Continuous[Double], Unit] = {
+    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds)(
+      B.currentRemaining(window).map(_.toSeconds.toDouble))
+    val g = new Gauge[Continuous[Double], Unit] {
+      def set(u: Unit) = snk(u)
+      def keys = Continuous(k)
+    }
+    g.set(())
+    g
+  }
+
+  /**
+   * Records the elapsed time that the `Monitoring` instance has
+   * been running whenver the returned `Gauge` is set. See `Elapsed.scala`.
+   */
+  private[monitoring] def uptime(label: String): Gauge[Continuous[Double], Unit] = {
+    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Minutes)(
+      B.elapsed.map(_.toSeconds.toDouble / 60))
+    val g = new Gauge[Continuous[Double], Unit] {
+      def set(u: Unit) = snk(u)
+      def keys = Continuous(k)
+    }
+    g.set(())
+    g
+  }
 
   /**
    * Return a `Gauge` with the given starting value.

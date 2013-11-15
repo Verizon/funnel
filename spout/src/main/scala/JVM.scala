@@ -2,7 +2,7 @@ package intelmedia.ws.monitoring
 
 import java.lang.management.GarbageCollectorMXBean
 import java.lang.management.ManagementFactory
-import java.util.concurrent.ExecutorService
+import java.util.concurrent.{ExecutorService, ScheduledExecutorService}
 import collection.JavaConversions._
 import scala.concurrent.duration._
 import scalaz.concurrent.Strategy
@@ -14,7 +14,9 @@ object JVM {
   /**
    * Add various JVM metrics to a `Monitoring` instance.
    */
-  def instrument(I: Instruments)(implicit ES: ExecutorService = Monitoring.defaultPool): Unit = {
+  def instrument(I: Instruments)(
+    implicit ES: ExecutorService = Monitoring.defaultPool,
+             TS: ScheduledExecutorService = Monitoring.schedulingPool): Unit = {
     val mxBean = ManagementFactory.getMemoryMXBean
     val gcs = ManagementFactory.getGarbageCollectorMXBeans.toList
     val pools = ManagementFactory.getMemoryPoolMXBeans.toList
@@ -23,12 +25,10 @@ object JVM {
       val name = gc.getName.replace(' ', '-')
       val numCollections = numericGauge(s"jvm/gc/$name", 0, Units.Count)
       val collectionTime = numericGauge(s"jvm/gc/$name/time", 0, Units.Milliseconds)
-      Strategy.Executor(ES) {
-        Process.awakeEvery(3 seconds).map { _ =>
-          numCollections.set(gc.getCollectionCount)
-          collectionTime.set(gc.getCollectionTime.toDouble)
-        }.run.run
-      }
+      Process.awakeEvery(3 seconds)(ES,TS).map { _ =>
+        numCollections.set(gc.getCollectionCount)
+        collectionTime.set(gc.getCollectionTime.toDouble)
+      }.run.runAsync(_ => ())
     }
 
     def MB(lbl: String): Gauge[Periodic[Stats], Double] =
@@ -51,24 +51,22 @@ object JVM {
     val nonheapMax = MB("jvm/memory/nonheap/max")
     val nonheapCommitted = MB("jvm/memory/nonheap/committed")
 
-    Strategy.Executor(ES) {
-      Process.awakeEvery(3 seconds).map { _ =>
-        import mxBean.{getHeapMemoryUsage => heap, getNonHeapMemoryUsage => nonheap}
-        totalInit.set(heap.getInit + nonheap.getInit)
-        totalUsed.set(heap.getUsed + nonheap.getUsed)
-        totalMax.set(heap.getMax + nonheap.getMax)
-        totalCommitted.set(heap.getCommitted + nonheap.getCommitted)
-        heapInit.set(heap.getInit)
-        heapUsed.set(heap.getUsed)
-        heapUsage.set(heap.getUsed.toDouble / heap.getMax)
-        heapMax.set(heap.getMax)
-        heapCommitted.set(heap.getCommitted)
-        nonheapInit.set(nonheap.getInit)
-        nonheapUsed.set(nonheap.getUsed)
-        nonheapUsage.set(nonheap.getUsed.toDouble / nonheap.getMax)
-        nonheapMax.set(nonheap.getMax)
-        nonheapCommitted.set(nonheap.getCommitted)
-      }.run.run
-    }
+    Process.awakeEvery(3 seconds)(ES,TS).map { _ =>
+      import mxBean.{getHeapMemoryUsage => heap, getNonHeapMemoryUsage => nonheap}
+      totalInit.set(heap.getInit + nonheap.getInit)
+      totalUsed.set(heap.getUsed + nonheap.getUsed)
+      totalMax.set(heap.getMax + nonheap.getMax)
+      totalCommitted.set(heap.getCommitted + nonheap.getCommitted)
+      heapInit.set(heap.getInit)
+      heapUsed.set(heap.getUsed)
+      heapUsage.set(heap.getUsed.toDouble / heap.getMax)
+      heapMax.set(heap.getMax)
+      heapCommitted.set(heap.getCommitted)
+      nonheapInit.set(nonheap.getInit)
+      nonheapUsed.set(nonheap.getUsed)
+      nonheapUsage.set(nonheap.getUsed.toDouble / nonheap.getMax)
+      nonheapMax.set(nonheap.getMax)
+      nonheapCommitted.set(nonheap.getCommitted)
+    }.run.runAsync(_ => ())
   }
 }
