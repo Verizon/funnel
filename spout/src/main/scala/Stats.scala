@@ -21,7 +21,7 @@ class Stats(moments: Moments, val last: Option[Double]) {
   def ++(ds: Seq[Double]): Stats =
     this ++ Stats.reduce(ds)
 
-  override def toString = Output.toJSON(this).toString
+  override def toString = JSON.prettyEncode(this)(JSON.EncodeStats)
 }
 
 object Stats {

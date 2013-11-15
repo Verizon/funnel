@@ -9,8 +9,8 @@ object Build extends Build {
       organization := "intelmedia.ws.monitoring",
       scalaVersion := "2.10.3",
       scalacOptions ++= Seq(
-        "-feature", 
-        "-language:postfixOps", 
+        "-feature",
+        "-language:postfixOps",
         "-language:implicitConversions"))
 
   lazy val root = Project(
@@ -31,7 +31,7 @@ object Build extends Build {
       compile(scalaz) ++
       compile(scalazstream) ++
       compile(algebird) ++
-      compile("pru" %% "pru" % "0.3") ++
+      compile("io.argonaut" %% "argonaut" % "6.0.1") ++
       test(scalacheck) ++
       test(scalatest))
 

@@ -6,6 +6,11 @@ import java.util.concurrent.TimeUnit
 sealed trait Units[+A]
 
 object Units {
+
+  // NB: Duration, Bytes, Count, Ratio can be units associated
+  // with a Stats metric, or a single-value metric, hence
+  // the intersection type
+
   case class Duration(granularity: TimeUnit) extends Units[Double with monitoring.Stats]
   case class Bytes(base: Base) extends Units[Double with monitoring.Stats]
   case object Count extends Units[Double with monitoring.Stats]
@@ -21,7 +26,7 @@ object Units {
   val Hours = Duration(TimeUnit.HOURS)
   val Megabytes = Bytes(Base.Mega)
 
-  trait Base
+  sealed trait Base
   object Base {
     case object Zero extends Base // 10^0 = 1
     case object Kilo extends Base // 10^3
