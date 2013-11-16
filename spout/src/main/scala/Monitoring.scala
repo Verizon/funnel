@@ -61,6 +61,32 @@ trait Monitoring {
     k
   }
 
+  // gak, no typechecking - we should try to fail fast
+  // server should publish type as well as units
+  // switch away from using view bounds, Reportable[O]
+  // has a type and
+
+  // could have mirror(events)(url, prefix), which is polling
+  // rather than pushing
+
+  def mirror[O <% Reportable[O]](url: String, prefix: String)(
+      implicit S: ExecutorService = Monitoring.defaultPool): Task[Key[O]] =
+    SSE.readEvent(url, prefix).map { case (key, stream) =>
+      // todo: preserve the old key and units
+      val (k, snk) = topic[O,O](prefix, Units.None)(
+        Buffers.ignoreTime(process1.id)
+      )
+      // we want this process to be asynchronous
+      Process.eval { Task(()) } . flatMap { (u: Unit) =>
+        stream.evalMap { case (_, value) =>
+          Task { snk(value.get.asInstanceOf[O]) }
+        }
+      }.run.runAsync(_ => ())
+      key.asInstanceOf[Key[O]]
+    }
+
+  // def mirrorAll(url: String): Task[Unit]
+
   /** Return the elapsed time since this instance was started. */
   def elapsed: Duration
 

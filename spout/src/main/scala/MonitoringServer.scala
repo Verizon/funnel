@@ -80,7 +80,7 @@ object MonitoringServer {
     def handleKeys(M: Monitoring, req: HttpExchange, log: Log): Unit = {
       import JSON._; import argonaut.EncodeJson._
       val ks = M.keys.continuous.once.runLastOr(List()).run
-      val respBytes = JSON.prettyEncode(ks).getBytes
+      val respBytes = JSON.encode(ks).getBytes
       req.getResponseHeaders.set("Content-Type", "application/json")
       req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, respBytes.length)
@@ -92,7 +92,7 @@ object MonitoringServer {
       req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
       val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
-      JSON.keysToSSE(M.distinctKeys, sink)
+      SSE.writeKeys(M.distinctKeys, sink)
     }
 
     def handleStream(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
@@ -101,7 +101,7 @@ object MonitoringServer {
       req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
       val events = Monitoring.subscribe(M)(prefix, log)
       val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
-      JSON.eventsToSSE(events, sink)
+      SSE.writeEvents(events, sink)
     }
 
     def handleNow(M: Monitoring, label: String, req: HttpExchange, log: Log): Unit = {
@@ -133,7 +133,6 @@ object MonitoringServer {
   |<li><a href="/previous">/previous</a>: Current values for all metrics prefixed by 'previous'.</li>
   |<li><a href="/sliding">/sliding</a>: Current values for all metrics prefixed by 'sliding'.</li>
   |<li><a href="/stream/keys">/stream/keys</a>: Full stream of all metric keys.</li>
-  |<li><a href="/stream/keys/id">/keys/id</a>: Full stream of metric keys prefixed by 'id'.</li>
   |<li><a href="/stream">/stream</a>: Full stream of all metrics.</li>
   |</ul>
   |</body>

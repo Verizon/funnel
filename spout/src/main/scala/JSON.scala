@@ -2,7 +2,13 @@ package intelmedia.ws
 package monitoring
 
 import argonaut.{DecodeResult => D, _}
+import argonaut.EncodeJson.{
+  DoubleEncodeJson, StringEncodeJson, Tuple2EncodeJson,
+  jencode1, jencode2L, jencode6L, jencode7L
+}
+import argonaut.DecodeJson.{jdecode6L}
 
+import java.io.InputStream
 import java.util.concurrent.{ExecutorService, TimeUnit}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy,Task}
@@ -13,17 +19,10 @@ object JSON {
 
   val R = Reportable
   val kindF = "kind"
-  import EncodeJson.{
-    DoubleEncodeJson, StringEncodeJson, Tuple2EncodeJson,
-    jencode1, jencode2L, jencode6L, jencode7L
-  }
-  import DecodeJson.{jdecode6L}
 
   def encodeResult[A](a: A)(implicit A: EncodeJson[A]): Json = A(a)
   def encode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).nospaces
   def prettyEncode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).spaces2
-  def sseDataEncode[A](a: A)(implicit A: EncodeJson[A]): String =
-    "data: " + A(a).spaces2.replace("\n", "\ndata: ")
 
   def decodeUnion[A](kindF: String)(cases: (String, DecodeJson[A])*): DecodeJson[A] = {
     val byKind = cases.toMap
@@ -121,41 +120,5 @@ object JSON {
     c.as[String].map(R.S(_)) |||
     c.as[monitoring.Stats].map(R.Stats(_))
   }
-
-  /**
-   * Write a server-side event stream (http://www.w3.org/TR/eventsource/)
-   * of the given metrics to the `Writer`. This will block the calling
-   * thread indefinitely.
-   */
-  def eventsToSSE(events: Process[Task, (Key[Any], Reportable[Any])],
-                  sink: java.io.Writer): Unit =
-    events.map(kv => s"event: reportable\n${sseDataEncode(kv)(keyValue[Any])}\n")
-          .intersperse("\n")
-          .map(writeTo(sink))
-          .run.run
-
-  /**
-   * Write a server-side event stream (http://www.w3.org/TR/eventsource/)
-   * of the given keys to the given `Writer`. This will block the calling
-   * thread indefinitely.
-   */
-  def keysToSSE(events: Process[Task, Key[Any]], sink: java.io.Writer): Unit =
-    events.map(k => s"event: key\n${sseDataEncode(k)}\n")
-          .intersperse("\n")
-          .map(writeTo(sink))
-          .run.run
-
-  private def writeTo(sink: java.io.Writer): String => Unit =
-    line => try {
-      sink.write(line)
-      sink.flush // this is a line-oriented protocol,
-                 // so we flush after each line, otherwise
-                 // consumer may get delayed messages
-    }
-    catch { case e: java.io.IOException =>
-      // when client disconnects we'll get a broken pipe
-      // IOException from the above `sink.write`. This
-      // gets translated to normal termination
-      throw Process.End
-    }
 }
+
