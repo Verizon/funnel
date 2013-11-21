@@ -250,9 +250,9 @@ object MonitoringSpec extends Properties("monitoring") {
     val count = M.get(k)
     a.foreach { a => snk(a) }
     val expected = a.sum
-    var got = count.continuous.once.map(_.get).runLastOr(0.0).run
+    var got = count.continuous.once.runLastOr(0.0).run
     while (got !== expected) {
-      got = count.continuous.once.map(_.get).runLastOr(0.0).run
+      got = count.continuous.once.runLastOr(0.0).run
       Thread.sleep(10)
     }
     true
@@ -296,9 +296,9 @@ object MonitoringSpec extends Properties("monitoring") {
     val m = latest.run
     val millis = System.currentTimeMillis - t0
     // println(s"snapshot took: $millis")
-    (m(aN.keys.now).get.asInstanceOf[Double] === expectedA) &&
-    (m(bN.keys.now).get.asInstanceOf[Double] === expectedB) &&
-    (m(abN.keys.now).get.asInstanceOf[Double] === expectedAB)
+    (m(aN.keys.now).value.asInstanceOf[Double] === expectedA) &&
+    (m(bN.keys.now).value.asInstanceOf[Double] === expectedB) &&
+    (m(abN.keys.now).value.asInstanceOf[Double] === expectedAB)
   }
 
   property("derived-metrics") = forAll(Gen.listOf1(Gen.choose(-10,10))) { ls0 =>

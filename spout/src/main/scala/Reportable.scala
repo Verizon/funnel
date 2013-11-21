@@ -2,27 +2,50 @@ package intelmedia.ws
 package monitoring
 
 /**
- * A value of type `A`, constained to be either
- * an `Int`, `Double`, or `String`.
+ * A type, `A`, constained to be either `Int`,
+ * `Double`, `String`, or `Stats`.
  */
-sealed trait Reportable[+A] { def get: A }
+sealed trait Reportable[+A] {
+  def read(a: Any): Option[A]
+  def description: String
+}
 
 object Reportable {
-  case class B(get: Boolean) extends Reportable[Boolean]
-  case class D(get: Double) extends Reportable[Double]
-  case class S(get: String) extends Reportable[String]
-  case class Stats(get: monitoring.Stats) extends Reportable[monitoring.Stats]
-  case class Histogram(get: monitoring.Histogram[String]) extends Reportable[monitoring.Histogram[String]]
+  implicit case object B extends Reportable[Boolean] {
+    def read(a: Any): Option[Boolean] =
+      try Some(a.asInstanceOf[Boolean])
+      catch { case cce: ClassCastException => None }
+    def description = "Boolean"
+  }
+  implicit case object D extends Reportable[Double] {
+    def read(a: Any): Option[Double] =
+      try Some(a.asInstanceOf[Double])
+      catch { case cce: ClassCastException => None }
+    def description = "Double"
+  }
+  implicit case object S extends Reportable[String] {
+    def read(a: Any): Option[String] =
+      try Some(a.asInstanceOf[String])
+      catch { case cce: ClassCastException => None }
+    def description = "String"
+  }
+  implicit case object Stats extends Reportable[monitoring.Stats] {
+    def read(a: Any): Option[monitoring.Stats] =
+      try Some(a.asInstanceOf[monitoring.Stats])
+      catch { case cce: ClassCastException => None }
+    def description = "Stats"
+  }
 
-  implicit def reportableNumeric[N](a: N)(implicit N: Numeric[N]): Reportable[Double] =
-    D(N.toDouble(a))
-  implicit def reportableBoolean(a: Boolean): Reportable[Boolean] = B(a)
-  implicit def reportableDouble(a: Double): Reportable[Double] = D(a)
-  implicit def reportableString(a: String): Reportable[String] = S(a)
-  implicit def reportableStats(a: monitoring.Stats): Reportable[monitoring.Stats] = Stats(a)
-  implicit def reportableHistogram(a: monitoring.Histogram[String]): Reportable[monitoring.Histogram[String]] = Histogram(a)
-  implicit def reportableReportable[A](r: Reportable[A]): Reportable[A] = r
+  /** Parse a `Reportable` witness from a description. */
+  def fromDescription(s: String): Option[Reportable[Any]] = s match {
+    case "Boolean" => Some(B)
+    case "Double" => Some(D)
+    case "String" => Some(S)
+    case "Stats" => Some(Stats)
+    case _ => None
+  }
 
-  def apply[A](a: A)(implicit toReportable: A => Reportable[A]): Reportable[A] =
-    toReportable(a)
+  // case class Histogram(get: monitoring.Histogram[String]) extends Reportable[monitoring.Histogram[String]]
+
+  def apply[A:Reportable](a: A): A = a
 }

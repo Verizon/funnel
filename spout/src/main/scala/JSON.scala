@@ -4,7 +4,7 @@ package monitoring
 import argonaut.{DecodeResult => D, _}
 import argonaut.EncodeJson.{
   DoubleEncodeJson, StringEncodeJson, Tuple2EncodeJson,
-  jencode1, jencode2L, jencode6L, jencode7L
+  jencode1, jencode2L, jencode4L, jencode6L, jencode7L
 }
 import argonaut.DecodeJson.{jdecode6L}
 
@@ -33,8 +33,6 @@ object JSON {
       }
     }
   }
-
-  implicit def keyValue[A] = Tuple2EncodeJson(EncodeKey[A], EncodeReportable[A])
 
   // "HELLO" -> "Hello", "hello" -> "hello", "hELLO" -> "hello"
   def unCapsLock(s: String): String =
@@ -103,22 +101,42 @@ object JSON {
       new monitoring.Stats(com.twitter.algebird.Moments(m0, m1, m2, m3, m4), last)
     })("last", "mean", "count", "variance", "skewness", "kurtosis")
 
-  implicit def EncodeReportable[A]: EncodeJson[Reportable[A]] = {
-    import Reportable.{D => Dbl, _}
-    EncodeJson {
-      case Dbl(a) => encodeResult(a)
-      case B(a) => encodeResult(a)
-      case S(a) => encodeResult(a)
-      case Stats(a) => encodeResult(a)
-      case h => sys.error("unsupported reportable: " + h)
+  implicit def EncodeReportable[A:Reportable]: EncodeJson[A] = EncodeJson {
+    case a: Double => encodeResult(a)
+    case a: Boolean => encodeResult(a)
+    case a: String => encodeResult(a)
+    case a: monitoring.Stats => encodeResult(a)
+    case h => sys.error("unsupported reportable: " + h)
+  }
+
+  implicit def DecodeReportable(r: Reportable[Any]): DecodeJson[Any] = DecodeJson { c =>
+    c.as[Double] ||| c.as[Boolean] ||| c.as[String] ||| c.as[monitoring.Stats]
+  }
+
+  implicit def EncodeReportableT[A]: EncodeJson[Reportable[A]] =
+    jencode1((r: Reportable[A]) => r.description)
+
+  implicit def DecodeReportableT: DecodeJson[Reportable[Any]] = DecodeJson { c =>
+    c.as[String].flatMap { s =>
+      Reportable.fromDescription(s).map(D.ok)
+                .getOrElse(D.fail("invalid type: " + s, c.history))
     }
   }
 
-  implicit def DecodeReportable: DecodeJson[Reportable[Any]] = DecodeJson { c =>
-    c.as[Double].map(R.D(_)) |||
-    c.as[Boolean].map(R.B(_)) |||
-    c.as[String].map(R.S(_)) |||
-    c.as[monitoring.Stats].map(R.Stats(_))
-  }
+
+  implicit def EncodeDatapoint[A]: EncodeJson[Datapoint[A]] =
+    jencode4L((d: Datapoint[A]) =>
+      (d.key, d.typeOf, d.units, EncodeReportable(d.typeOf)(d.value)))(
+      "key", "type", "units", "value")
+
+  implicit def DecodeDatapoint: DecodeJson[Datapoint[Any]] = DecodeJson { c => for {
+    k <- (c --\ "key").as[Key[Any]]
+    t <- (c --\ "type").as[Reportable[Any]]
+    u <- (c --\ "units").as[Units[Any]]
+    v <- (c --\ "value").as[Any](DecodeReportable(t))
+    d <- t.read(v).map(v => D.ok(Datapoint(k,t, u, v)))
+                  .getOrElse(D.fail("value did not match type: " + t.description, c.history))
+  } yield d }
+
 }
 

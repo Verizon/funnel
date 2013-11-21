@@ -93,7 +93,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * For a historical gauge that summarizes an entire
    * window of values as well, see `numericGauge`.
    */
-  def gauge[A <% Reportable[A]](label: String, init: A,
+  def gauge[A:Reportable](label: String, init: A,
                                 units: Units[A] = Units.None): Gauge[Continuous[A],A] = {
     val g = new Gauge[Continuous[A],A] {
       val (key, snk) = monitoring.topic(s"now/$label", units)(B.resetEvery(window)(B.variable(init)))

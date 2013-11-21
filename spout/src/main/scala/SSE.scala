@@ -19,9 +19,9 @@ object SSE {
    * of the given metrics to the `Writer`. This will block the calling
    * thread indefinitely.
    */
-  def writeEvents(events: Process[Task, (Key[Any], Reportable[Any])],
+  def writeEvents(events: Process[Task, Datapoint[Any]],
                   sink: java.io.Writer): Unit =
-    events.map(kv => s"event: reportable\n${dataEncode(kv)(keyValue[Any])}\n")
+    events.map(kv => s"event: reportable\n${dataEncode(kv)(EncodeDatapoint[Any])}\n")
           .intersperse("\n")
           .map(writeTo(sink))
           .run.run
@@ -121,7 +121,7 @@ object SSE {
    * uniquely determine a `Key`.
    */
   def readEvent(url: String, prefix: String):
-      Task[(Key[Any], Process[Task, (Key[Any], Reportable[Any])])] =
+      Task[(Key[Any], Process[Task, Any])] =
     urlDecode[List[Key[Any]]](url + "/keys").map { ks =>
       ks.filter(_.matches(prefix)) match {
         case List(k) => (k, readEvents(s"$url/${k.id.toString}"))
@@ -134,9 +134,9 @@ object SSE {
    * Example: `readEvents("http://localhost:8001/sliding/jvm")`.
    */
   def readEvents(url: String):
-      Process[Task, (Key[Any], Reportable[Any])] =
+      Process[Task, Datapoint[Any]] =
     urlLinesR(url).pipe(blockParser).map {
-      case (_,data) => parseOrThrow[(Key[Any], Reportable[Any])](data)
+      case (_,data) => parseOrThrow[Datapoint[Any]](data)
     }
 
   // various helper functions
