@@ -120,12 +120,12 @@ object SSE {
    * in the event of an error, or if the given prefix does not
    * uniquely determine a `Key`.
    */
-  def readEvent[O](url: String, prefix: String)(implicit R: Reportable[O]):
+  def readEvent[O](url: String, prefix: String)(implicit R: Reportable[O], S: ExecutorService):
       Task[(KeyInfo[O], Process[Task, Datapoint[O]])] =
-    urlDecode[List[KeyInfo[Any]]](url + "/keys").map { ks =>
+    urlDecode[List[KeyInfo[Any]]](s"$url/keys/$prefix").map { ks =>
       ks.filter(_.key.matches(prefix)) match {
         case List(k) if k.typeOf == R =>
-          val s = readEvents(s"$url/${k.key.id.toString}").map { pt =>
+          val s = readEvents(s"$url/stream/${k.key.id.toString}").map { pt =>
             pt.cast(R).filter(_.units == k.units)
               .getOrElse(sys.error(s"mismatch! expected $R ${k.units}, got ${pt.typeOf} ${pt.units}"))
           }
@@ -136,11 +136,11 @@ object SSE {
 
   /**
    * Return a stream of all events from the given URL.
-   * Example: `readEvents("http://localhost:8001/sliding/jvm")`.
+   * Example: `readEvents("http://localhost:8001/stream/sliding/jvm")`.
    */
-  def readEvents(url: String):
+  def readEvents(url: String)(implicit S: ExecutorService = Monitoring.serverPool):
       Process[Task, Datapoint[Any]] =
-    urlLinesR(url).pipe(blockParser).map {
+    urlLinesR(url)(S).pipe(blockParser).map {
       case (_,data) => parseOrThrow[Datapoint[Any]](data)
     }
 
@@ -149,20 +149,19 @@ object SSE {
   def parseOrThrow[A:DecodeJson](s: String): A =
     argonaut.Parse.decodeEither[A](s).fold(e => throw ParseError(e), identity)
 
-  def urlDecode[A:DecodeJson](url: String): Task[A] =
-    urlFullR(url).map(parseOrThrow[A])
+  def urlDecode[A:DecodeJson](url: String)(implicit S: ExecutorService = Monitoring.serverPool): Task[A] =
+    urlFullR(url)(S).map(parseOrThrow[A])
 
-  def urlLinesR(url: String): Process[Task, String] =
-    Process.suspend { linesR(new java.net.URL(url).openStream) }
+  def urlLinesR(url: String)(implicit S: ExecutorService = Monitoring.serverPool): Process[Task, String] =
+    Process.suspend { linesR(new java.net.URL(url).openStream)(S) }
 
-  def urlFullR(url: String): Task[String] =
-    urlLinesR(url).chunkAll.map(_.mkString("\n")).runLastOr("")
+  def urlFullR(url: String)(implicit S: ExecutorService = Monitoring.serverPool): Task[String] =
+    urlLinesR(url)(S).chunkAll.map(_.mkString("\n")).runLastOr("")
 
   /**
-   * Copied from latest version of scalaz-stream
+   * Adapted from scalaz-stream, but this version is nonblocking.
    */
-  def linesR(in: InputStream)(implicit S: ExecutorService =
-                              Monitoring.defaultPool): Process[Task,String] =
+  def linesR(in: InputStream)(implicit S: ExecutorService = Monitoring.serverPool): Process[Task,String] =
     io.resource(Task(scala.io.Source.fromInputStream(in))(S))(
              src => Task(src.close)(S)) { src =>
       lazy val lines = src.getLines // A stateful iterator

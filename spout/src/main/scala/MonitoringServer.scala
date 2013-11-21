@@ -18,7 +18,11 @@ object Main extends App {
   val g = Process.awakeEvery(2 seconds).map { _ =>
     c.increment
     t.time(Thread.sleep(100))
-  }.run.run
+  }.run.runAsync(_ => ())
+  val k = mirror[Double]("http://localhost:8081", "now/requests", Some("now/requests-clone"), true)
+
+  k.map(_ * 10).publishEvery(5 seconds)("now/request-clone-times-10", Units.Count)
+  readLine()
 }
 
 object MonitoringServer {

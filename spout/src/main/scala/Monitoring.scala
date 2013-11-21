@@ -24,12 +24,13 @@ trait Monitoring {
   def topic[I, O:Reportable](
       label: String, units: Units[O])(
       buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
-    topic(Key[O](label), units)(buf)
+    val k = Key[O](label)
+    (k, topic(k, units)(buf))
   }
 
   protected def topic[I, O:Reportable](
     key: Key[O], units: Units[O])(
-    buf: Process1[(I,Duration),O]): (Key[O], I => Unit)
+    buf: Process1[(I,Duration),O]): I => Unit
 
   /**
    * Return the continuously updated signal of the current value
@@ -75,17 +76,29 @@ trait Monitoring {
   // could have mirror(events)(url, prefix), which is polling
   // rather than pushing
 
-  def mirror[O:Reportable](url: String, prefix: String)(
-      implicit S: ExecutorService = Monitoring.defaultPool): Task[Key[O]] =
-    SSE.readEvent(url, prefix)(implicitly[Reportable[O]]).map { case (key, pts) =>
-      val (k, snk) = topic[O,O](prefix, key.units)(
-        Buffers.ignoreTime(process1.id)
-      )
-      // we want this process to be asynchronous
-      Process.eval { Task(())(S) } . flatMap { _ =>
-        pts.evalMap { pt => Task { snk(pt.value) } (S) }
-      }.run.runAsync(_ => ())
-      key.key
+  /**
+   * Mirror the (assumed) unique event at the given url and prefix.
+   * Example: `mirror[String]("http://localhost:8080", "now/health")`.
+   * This will fetch the stream at `http://localhost:8080/stream/now/health`
+   * and keep it updated locally, as events are published at `url`.
+   * `localName` may be (optionally) supplied to change the name of the
+   * key used locally. The `id` field of the key is preserved, unless
+   * `clone` is set to `true`.
+   *
+   * This function checks that the given `prefix` uniquely determines a
+   * key, and that it has the expected type, and fails fast otherwise.
+   */
+  def mirror[O:Reportable](url: String, prefix: String, localName: Option[String] = None, clone: Boolean = false)(
+      implicit S: ExecutorService = Monitoring.serverPool): Task[Key[O]] =
+    SSE.readEvent(url, prefix)(implicitly[Reportable[O]], S).map { case (k, pts) =>
+      val key = if (clone) Key[O](localName.getOrElse(k.key.label))
+                else localName.map(k.key.rename(_)).getOrElse(k.key)
+      val snk = topic[O,O](key, k.units)(Buffers.ignoreTime(process1.id))
+      // send to sink asynchronously, this will not block
+      println("spawning updates")
+      pts.evalMap { pt => Task { snk(pt.value) } (S) }.run.runAsync(_ => ())
+      println("finished spawning updates")
+      key
     }
 
   // def mirrorAll(url: String): Task[Unit]
@@ -158,16 +171,16 @@ object Monitoring {
 
       def topic[I, O:Reportable](
           k: Key[O], units: Units[O])(
-          buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
+          buf: Process1[(I,Duration),O]): I => Unit = {
         val (pub, v) = bufferedSignal(buf)(ES)
         topics += (k -> eraseTopic(Topic(pub, v)))
         val t = (implicitly[Reportable[O]], units)
         us += (k -> t)
         keys_.value.modify(k :: _)
-        (k, (i: I) => {
+        (i: I) => {
           val elapsed = Duration.fromNanos(System.nanoTime - t0)
           pub(i -> elapsed, _ => {})
-        })
+        }
       }
 
       def get[O](k: Key[O]): Signal[O] =
