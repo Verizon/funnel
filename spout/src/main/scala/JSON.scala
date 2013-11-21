@@ -4,7 +4,7 @@ package monitoring
 import argonaut.{DecodeResult => D, _}
 import argonaut.EncodeJson.{
   DoubleEncodeJson, StringEncodeJson, Tuple2EncodeJson,
-  jencode1, jencode2L, jencode4L, jencode6L, jencode7L
+  jencode1, jencode2L, jencode3L, jencode4L, jencode6L, jencode7L
 }
 import argonaut.DecodeJson.{jdecode6L}
 
@@ -84,6 +84,14 @@ object JSON {
     }
   } yield new Key(lbl, id) }
 
+  implicit def EncodeKeyInfo[A]: EncodeJson[KeyInfo[A]] =
+    jencode3L((k: KeyInfo[A]) => (k.key, k.typeOf, k.units))("key", "type", "units")
+  implicit def DecodeKeyInfo: DecodeJson[KeyInfo[Any]] = DecodeJson { c => for {
+    k <- (c --\ "key").as[Key[Any]]
+    t <- (c --\ "type").as[Reportable[Any]]
+    u <- (c --\ "units").as[Units[Any]]
+  } yield KeyInfo(k, t, u) }
+
   implicit def EncodeStats: EncodeJson[monitoring.Stats] =
     jencode7L((s: monitoring.Stats) =>
       (s.last, s.mean, s.count, s.variance, s.standardDeviation, s.skewness, s.kurtosis))(
@@ -122,7 +130,6 @@ object JSON {
                 .getOrElse(D.fail("invalid type: " + s, c.history))
     }
   }
-
 
   implicit def EncodeDatapoint[A]: EncodeJson[Datapoint[A]] =
     jencode4L((d: Datapoint[A]) =>

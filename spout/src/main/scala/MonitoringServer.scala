@@ -52,11 +52,9 @@ object MonitoringServer {
         case "/" => List()
         case p => p.split("/").toList.tail
       }
-      log("split path: " + path)
       path match {
         case Nil => handleRoot(req)
-        case "keys" :: Nil => handleKeys(M, req, log)
-        case "units" :: tl => handleUnits(M, tl.mkString("/"), req, log)
+        case "keys" :: tl => handleKeys(M, tl.mkString("/"), req, log)
         case "stream" :: "keys" :: Nil => handleKeysStream(M, req, log)
         case "stream" :: tl => handleStream(M, tl.mkString("/"), req, log)
         case now => handleNow(M, now.mkString("/"), req, log)
@@ -67,20 +65,10 @@ object MonitoringServer {
     }
     finally req.close
 
-    def handleUnits(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
+    def handleKeys(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
       import JSON._; import argonaut.EncodeJson._
       val ks = M.keys.continuous.once.runLastOr(List()).run.filter(_.matches(prefix))
-      val respBytes = JSON.prettyEncode(ks.map(k => (k, M.units(k)))).getBytes
-      req.getResponseHeaders.set("Content-Type", "application/json")
-      req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
-      req.sendResponseHeaders(200, respBytes.length)
-      req.getResponseBody.write(respBytes)
-    }
-
-    def handleKeys(M: Monitoring, req: HttpExchange, log: Log): Unit = {
-      import JSON._; import argonaut.EncodeJson._
-      val ks = M.keys.continuous.once.runLastOr(List()).run
-      val respBytes = JSON.encode(ks).getBytes
+      val respBytes = JSON.prettyEncode(ks.map(k => KeyInfo(k, M.typeOf(k), M.units(k)))).getBytes
       req.getResponseHeaders.set("Content-Type", "application/json")
       req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, respBytes.length)
@@ -92,7 +80,7 @@ object MonitoringServer {
       req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
       val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
-      SSE.writeKeys(M.distinctKeys, sink)
+      SSE.writeKeys(M.distinctKeys.map(k => KeyInfo(k, M.typeOf(k), M.units(k))), sink)
     }
 
     def handleStream(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
@@ -126,9 +114,8 @@ object MonitoringServer {
   |<body>
   |<p>Monitoring resources:</p>
   |<ul>
-  |<li><a href="/keys">/keys</a>: Current snapshot of all metric keys. </li>
-  |<li><a href="/units">/units</a>: The units (milliseconds, megabytes, ratio) for all metrics.</li>
-  |<li><a href="/units/id">/units/id</a>: The units for all metrics prefixed by 'id'.</li>
+  |<li><a href="/keys">/keys</a>: Current snapshot of all metric keys.</li>
+  |<li><a href="/keys/id">/keys</a>: Current snapshot of all keys prefixed by 'id'.</li>
   |<li><a href="/now">/now</a>: Current values for all metrics prefixed by 'now'. </li>
   |<li><a href="/previous">/previous</a>: Current values for all metrics prefixed by 'previous'.</li>
   |<li><a href="/sliding">/sliding</a>: Current values for all metrics prefixed by 'sliding'.</li>

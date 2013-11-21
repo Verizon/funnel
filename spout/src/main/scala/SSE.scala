@@ -31,7 +31,7 @@ object SSE {
    * of the given keys to the given `Writer`. This will block the calling
    * thread indefinitely.
    */
-  def writeKeys(events: Process[Task, Key[Any]], sink: java.io.Writer): Unit =
+  def writeKeys(events: Process[Task, KeyInfo[Any]], sink: java.io.Writer): Unit =
     events.map(k => s"event: key\n${dataEncode(k)}\n")
           .intersperse("\n")
           .map(writeTo(sink))
@@ -120,11 +120,16 @@ object SSE {
    * in the event of an error, or if the given prefix does not
    * uniquely determine a `Key`.
    */
-  def readEvent(url: String, prefix: String):
-      Task[(Key[Any], Process[Task, Any])] =
-    urlDecode[List[Key[Any]]](url + "/keys").map { ks =>
-      ks.filter(_.matches(prefix)) match {
-        case List(k) => (k, readEvents(s"$url/${k.id.toString}").map(_.value))
+  def readEvent[O](url: String, prefix: String)(implicit R: Reportable[O]):
+      Task[(KeyInfo[O], Process[Task, Datapoint[O]])] =
+    urlDecode[List[KeyInfo[Any]]](url + "/keys").map { ks =>
+      ks.filter(_.key.matches(prefix)) match {
+        case List(k) if k.typeOf == R =>
+          val s = readEvents(s"$url/${k.key.id.toString}").map { pt =>
+            pt.cast(R).filter(_.units == k.units)
+              .getOrElse(sys.error(s"mismatch! expected $R ${k.units}, got ${pt.typeOf} ${pt.units}"))
+          }
+          (k.asInstanceOf[KeyInfo[O]], s)
         case ks2 => sys.error(s"'$prefix' did not return unique key set: $ks2")
       }
     }

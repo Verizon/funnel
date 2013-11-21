@@ -22,7 +22,13 @@ trait Monitoring {
    * using a stream transducer to
    */
   def topic[I, O:Reportable](
-    label: String, units: Units[O])(
+      label: String, units: Units[O])(
+      buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
+    topic(Key[O](label), units)(buf)
+  }
+
+  protected def topic[I, O:Reportable](
+    key: Key[O], units: Units[O])(
     buf: Process1[(I,Duration),O]): (Key[O], I => Unit)
 
   /**
@@ -66,28 +72,20 @@ trait Monitoring {
     k
   }
 
-  // gak, no typechecking - we should try to fail fast
-  // server should publish type as well as units
-  // switch away from using view bounds, Reportable[O]
-  // has a type and
-
   // could have mirror(events)(url, prefix), which is polling
   // rather than pushing
 
   def mirror[O:Reportable](url: String, prefix: String)(
       implicit S: ExecutorService = Monitoring.defaultPool): Task[Key[O]] =
-    SSE.readEvent(url, prefix).map { case (key, stream) =>
-      // todo: preserve the old key and units
-      val (k, snk) = topic[O,O](prefix, Units.None)(
+    SSE.readEvent(url, prefix)(implicitly[Reportable[O]]).map { case (key, pts) =>
+      val (k, snk) = topic[O,O](prefix, key.units)(
         Buffers.ignoreTime(process1.id)
       )
       // we want this process to be asynchronous
-      Process.eval { Task(()) } . flatMap { (u: Unit) =>
-        stream.evalMap { case (_, value) =>
-          Task { snk(value.asInstanceOf[O]) }
-        }
+      Process.eval { Task(())(S) } . flatMap { _ =>
+        pts.evalMap { pt => Task { snk(pt.value) } (S) }
       }.run.runAsync(_ => ())
-      key.asInstanceOf[Key[O]]
+      key.key
     }
 
   // def mirrorAll(url: String): Task[Unit]
@@ -112,7 +110,7 @@ trait Monitoring {
     buf: Process1[(I,Duration),O]): I => Unit = topic(label, units)(buf)._2
 
   def keysByLabel(label: String): Process[Task, List[Key[Any]]] =
-    keys.continuous.map(_.filter(_.label == label))
+    keys.continuous.map(_.filter(_ matches label))
 }
 
 object Monitoring {
@@ -159,10 +157,9 @@ object Monitoring {
       def keys = keys_
 
       def topic[I, O:Reportable](
-          label: String, units: Units[O])(
+          k: Key[O], units: Units[O])(
           buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
         val (pub, v) = bufferedSignal(buf)(ES)
-        val k = Key[O](label)
         topics += (k -> eraseTopic(Topic(pub, v)))
         val t = (implicitly[Reportable[O]], units)
         us += (k -> t)
