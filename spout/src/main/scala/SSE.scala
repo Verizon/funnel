@@ -124,7 +124,7 @@ object SSE {
       Task[(Key[Any], Process[Task, Any])] =
     urlDecode[List[Key[Any]]](url + "/keys").map { ks =>
       ks.filter(_.matches(prefix)) match {
-        case List(k) => (k, readEvents(s"$url/${k.id.toString}"))
+        case List(k) => (k, readEvents(s"$url/${k.id.toString}").map(_.value))
         case ks2 => sys.error(s"'$prefix' did not return unique key set: $ks2")
       }
     }
