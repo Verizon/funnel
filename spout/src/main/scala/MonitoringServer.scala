@@ -100,7 +100,7 @@ object MonitoringServer {
       import JSON._; import argonaut.EncodeJson._
       val m = Monitoring.snapshot(M).run
       val respBytes =
-        JSON.prettyEncode(m.filterKeys(_.matches(label)).toList).getBytes
+        JSON.prettyEncode(m.filterKeys(_.matches(label)).values.toList).getBytes
       req.getResponseHeaders.set("Content-Type", "application/json")
       req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, respBytes.length)
