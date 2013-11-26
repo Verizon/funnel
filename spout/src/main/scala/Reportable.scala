@@ -8,6 +8,9 @@ package monitoring
 sealed trait Reportable[+A] {
   def read(a: Any): Option[A]
   def description: String
+  def cast[B](R: Reportable[B]): Option[Reportable[B]] =
+    if (R == this) Some(R)
+    else None
 }
 
 object Reportable {

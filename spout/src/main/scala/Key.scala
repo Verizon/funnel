@@ -3,13 +3,13 @@ package intelmedia.ws.monitoring
 import scalaz.{~>, Monad}
 import scala.language.higherKinds
 
-class Key[+A] private[monitoring](val label: String, val id: java.util.UUID) {
+class Key[+A] private[monitoring](val name: String, val id: java.util.UUID) {
   override def equals(a: Any): Boolean =
     a.asInstanceOf[Key[Any]].id == id
   override def hashCode = id.hashCode
-  override def toString = s"Key($label)"
+  override def toString = s"Key($name)"
   def matches(prefix: String): Boolean =
-    label.startsWith(prefix) || id.toString.startsWith(prefix)
+    name.startsWith(prefix) || id.toString.startsWith(prefix)
   def rename(s: String) = new Key[A](s, id)
 }
 

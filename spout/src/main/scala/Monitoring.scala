@@ -73,6 +73,12 @@ trait Monitoring {
     k
   }
 
+  /**
+   * Update the current value associated with the given `Key`. Implementation
+   * detail, this should not be used by clients.
+   */
+  protected def update[O](k: Key[O], v: O)(implicit R: Reportable[O]): Task[Unit]
+
   // could have mirror(events)(url, prefix), which is polling
   // rather than pushing
 
@@ -92,7 +98,7 @@ trait Monitoring {
       implicit S: ExecutorService = Monitoring.serverPool,
                log: String => Unit = println): Task[Key[O]] =
     SSE.readEvent(url, prefix)(implicitly[Reportable[O]], S).map { case (k, pts) =>
-      val key = if (clone) Key[O](localName.getOrElse(k.key.label))
+      val key = if (clone) Key[O](localName.getOrElse(k.key.name))
                 else localName.map(k.key.rename(_)).getOrElse(k.key)
       val snk = topic[O,O](key, k.units)(Buffers.ignoreTime(process1.id))
       // send to sink asynchronously, this will not block
@@ -105,13 +111,19 @@ trait Monitoring {
       key
     }
 
-  protected def update[O](k: Key[O], v: O): Task[Unit]
-
-  /** Mirror all events from the given URL. */
-  def mirrorAll(url: String, localPrefix: String = "", clone: Boolean = false)(
+  /**
+   * Mirror all metrics from the given URL, adding `localPrefix` onto the front of
+   * all loaded keys.
+   */
+  def mirrorAll(url: String, localPrefix: String = "")(
                 implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
     SSE.readEvents(url).flatMap { pt =>
-      ???
+      if (exists(pt.key).run) Process.eval(update(pt.key, pt.value)(pt.typeOf))
+      else {
+        val key = pt.key.rename(localPrefix + pt.key.name)
+        val snk = topic[Any,Any](key, pt.units)(Buffers.ignoreTime(process1.id))(pt.typeOf)
+        Process.emit(snk(pt.value))
+      }
     }
   }
 
@@ -174,7 +186,7 @@ object Monitoring {
 
     case class Topic[I,O](
       publish: ((I,Duration)) => Unit,
-      current: async.immutable.Signal[O]
+      current: async.mutable.Signal[O]
     )
     val topics = new TrieMap[Key[Any], Topic[Any,Any]]()
     val us = new TrieMap[Key[Any], (Reportable[Any], Units[Any])]()
@@ -195,9 +207,10 @@ object Monitoring {
         (i: I) => pub(i -> Duration.fromNanos(System.nanoTime - t0))
       }
 
-      protected def update[O](k: Key[O], v: O): Task[Unit] = Task.delay {
-        // topics.get(k).map(_.publish)
-        ???
+      protected def update[O](k: Key[O], v: O)(implicit R: Reportable[O]): Task[Unit] = Task.delay {
+        us.get(k).map(_._1.cast(R)).flatMap { _ =>
+          topics.get(k).map(_.current.set(v))
+        } getOrElse (sys.error("key types did not match"))
       }
 
 

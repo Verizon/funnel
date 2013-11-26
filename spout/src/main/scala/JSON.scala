@@ -75,9 +75,9 @@ object JSON {
   }
 
   implicit def EncodeKey[A]: EncodeJson[Key[A]] =
-    jencode2L((k: Key[A]) => (k.label, k.id.toString))("label", "id")
+    jencode2L((k: Key[A]) => (k.name, k.id.toString))("name", "id")
   implicit def DecodeKey: DecodeJson[Key[Any]] = DecodeJson { c => for {
-    lbl <- (c --\ "label").as[String]
+    lbl <- (c --\ "name").as[String]
     id <- (c --\ "id").as[String].flatMap { s =>
       try D.ok { java.util.UUID.fromString(s) }
       catch { case e: IllegalArgumentException => D.fail("invalid UUID", c.history) }
