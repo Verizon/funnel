@@ -338,5 +338,18 @@ object MonitoringSpec extends Properties("monitoring") {
     }
     go(15)
   }
+
+  val bools = for {
+    n <- Gen.choose(0,25000)
+    bs <- Gen.listOfN(n, arbitrary[Boolean])
+  } yield bs
+
+  property("Metrics.majority") = forAll(bools) { bs =>
+    import scalaz.~>
+    import scalaz.std.option._
+    val alwaysNone = new (Key ~> Option) { def apply[A](k: Key[A]) = None }
+    val expected = bs.filter(x => x).length / bs.length.toDouble > .5
+    Metrics.majority(bs.map(Metric.point(_))).run(alwaysNone).get == expected
+  }
 }
 
