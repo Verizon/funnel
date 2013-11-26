@@ -16,6 +16,7 @@ object Units {
   case object Count extends Units[Double with monitoring.Stats]
   case object Ratio extends Units[Double with monitoring.Stats]
   case object Stoplight extends Units[String] // "red", "yellow", "green"
+  case object Healthy extends Units[Boolean]
   case object Load extends Units[String] // "idle", "busy", "overloaded"
 
   case object None extends Units[Nothing]

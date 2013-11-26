@@ -50,6 +50,7 @@ object JSON {
       case Count => "Count"
       case Ratio => "Ratio"
       case Stoplight => "Stoplight"
+      case Healthy => "Healthy"
       case Load => "Load"
       case None => "None"
     }
@@ -64,6 +65,7 @@ object JSON {
       case "Count" => D.ok { Count }
       case "Ratio" => D.ok { Ratio }
       case "Stoplight" => D.ok { Stoplight }
+      case "Healthy" => D.ok { Healthy }
       case "Load" => D.ok { Load }
       case "None" => D.ok { None }
       case timeunit =>
