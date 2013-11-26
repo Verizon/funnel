@@ -120,7 +120,7 @@ object SSE {
    * in the event of an error, or if the given prefix does not
    * uniquely determine a `Key`.
    */
-  def readEvent[O](url: String, prefix: String)(implicit R: Reportable[O], S: ExecutorService):
+  def readEvent[O](url: String, prefix: String)(implicit R: Reportable[O], S: ExecutorService, log: String => Unit = println):
       Task[(KeyInfo[O], Process[Task, Datapoint[O]])] =
     urlDecode[List[KeyInfo[Any]]](s"$url/keys/$prefix").map { ks =>
       ks.filter(_.key.matches(prefix)) match {
