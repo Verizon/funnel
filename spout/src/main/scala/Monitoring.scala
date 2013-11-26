@@ -18,13 +18,13 @@ trait Monitoring {
   import Monitoring._
 
   /**
-   * Create a new topic with the given label and units,
+   * Create a new topic with the given name and units,
    * using a stream transducer to
    */
   def topic[I, O:Reportable](
-      label: String, units: Units[O])(
+      name: String, units: Units[O])(
       buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
-    val k = Key[O](label)
+    val k = Key[O](name)
     (k, topic(k, units)(buf))
   }
 
@@ -51,13 +51,13 @@ trait Monitoring {
   def typeOf[O](k: Key[O]): Reportable[O]
 
   /**
-   * Publish a metric with the given label on every tick of `events`.
+   * Publish a metric with the given name on every tick of `events`.
    * See `Events` for various combinators for building up possible
    * arguments to pass here (periodically, when one or more keys
    * change, etc).
    */
   def publish[O:Reportable](
-      label: String, units: Units[O])(events: Process[Task,Unit])(f: Metric[O]): Key[O] = {
+      name: String, units: Units[O])(events: Process[Task,Unit])(f: Metric[O]): Key[O] = {
     // `trans` is a polymorphic fn from `Key` to `Task`, picks out
     // latest value for that `Key`
     val trans = new (Key ~> Task) {
@@ -68,7 +68,7 @@ trait Monitoring {
     // Whenever `event` generates a new value, refresh the signal
     val proc: Process[Task, O] = events.flatMap(_ => Process.eval(refresh))
     // And finally republish these values to a new topic
-    val (k, snk) = topic[O,O](label, units)(Buffers.ignoreTime(process1.id))
+    val (k, snk) = topic[O,O](name, units)(Buffers.ignoreTime(process1.id))
     proc.map(snk).run.runAsync(_ => ()) // nonblocking
     k
   }
@@ -146,17 +146,29 @@ trait Monitoring {
   /** Returns `true` if the given key currently exists. */
   def exists[O](k: Key[O]): Task[Boolean] = keys.continuous.once.runLastOr(List()).map(_.contains(k))
 
+  /** Attempt to uniquely resolve `name` to a key of some expected type. */
+  def lookup[O](name: String)(implicit R: Reportable[O]): Task[Key[O]] =
+    keysByName(name).once.runLastOr(List()).map {
+      case List(k) =>
+        val t = typeOf(k)
+        if (t == R) k.asInstanceOf[Key[O]]
+        else sys.error("type mismatch: $R $t")
+      case ks => sys.error(s"lookup($name) does not determine a unique key: $ks")
+    }
+
+  // def aggregateEvery[O,O2](name: String)(summarize: Seq[Key[O]] => Metric[O2])(implicit R: Reportable[O]):
+
   /** The infinite discrete stream of unique keys, as they are added. */
   def distinctKeys: Process[Task, Key[Any]] =
     keys.discrete.flatMap(Process.emitAll).pipe(Buffers.distinct)
 
-  /** Create a new topic with the given label and discard the key. */
+  /** Create a new topic with the given name and discard the key. */
   def topic_[I, O:Reportable](
-    label: String, units: Units[O])(
-    buf: Process1[(I,Duration),O]): I => Unit = topic(label, units)(buf)._2
+    name: String, units: Units[O])(
+    buf: Process1[(I,Duration),O]): I => Unit = topic(name, units)(buf)._2
 
-  def keysByLabel(label: String): Process[Task, List[Key[Any]]] =
-    keys.continuous.map(_.filter(_ matches label))
+  def keysByName(name: String): Process[Task, List[Key[Any]]] =
+    keys.continuous.map(_.filter(_ matches name))
 }
 
 object Monitoring {
