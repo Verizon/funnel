@@ -107,7 +107,7 @@ object MonitoringSpec extends Properties("monitoring") {
    */
   property("bufferedSignal") = forAll { (xs: List[Long]) =>
     val (snk, s) = Monitoring.bufferedSignal(B.counter(0))
-    xs.foreach(x => snk(x, _ => ()))
+    xs.foreach(snk)
     val expected = xs.sum
     // this will 'eventually' become true, and loop otherwise
     while (s.continuous.once.runLastOr(0.0).run !== expected) {
@@ -128,7 +128,7 @@ object MonitoringSpec extends Properties("monitoring") {
       val N = 100000
       val (snk, s) = Monitoring.bufferedSignal(B.counter(0))
       val t0 = System.nanoTime
-      (0 to N).foreach(x => snk(x, _ => ()))
+      (0 to N).foreach(x => snk(x))
       val expected = (0 to N).map(_.toDouble).sum
       while (s.continuous.once.runLastOr(0.0).run !== expected) {
         Thread.sleep(10)

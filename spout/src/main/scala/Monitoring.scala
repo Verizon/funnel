@@ -89,19 +89,31 @@ trait Monitoring {
    * key, and that it has the expected type, and fails fast otherwise.
    */
   def mirror[O:Reportable](url: String, prefix: String, localName: Option[String] = None, clone: Boolean = false)(
-      implicit S: ExecutorService = Monitoring.serverPool): Task[Key[O]] =
+      implicit S: ExecutorService = Monitoring.serverPool,
+               log: String => Unit = println): Task[Key[O]] =
     SSE.readEvent(url, prefix)(implicitly[Reportable[O]], S).map { case (k, pts) =>
       val key = if (clone) Key[O](localName.getOrElse(k.key.label))
                 else localName.map(k.key.rename(_)).getOrElse(k.key)
       val snk = topic[O,O](key, k.units)(Buffers.ignoreTime(process1.id))
       // send to sink asynchronously, this will not block
-      println("spawning updates")
-      pts.evalMap { pt => Task { snk(pt.value) } (S) }.run.runAsync(_ => ())
-      println("finished spawning updates")
+      log("spawning updates")
+      pts.evalMap { pt =>
+        import JSON._
+        log("got datapoint: " + pt)
+        Task { snk(pt.value) } (S)
+      }.run.runAsync(_ => ())
       key
     }
 
-  // def mirrorAll(url: String): Task[Unit]
+  protected def update[O](k: Key[O], v: O): Task[Unit]
+
+  /** Mirror all events from the given URL. */
+  def mirrorAll(url: String, localPrefix: String = "", clone: Boolean = false)(
+                implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
+    SSE.readEvents(url).flatMap { pt =>
+      ???
+    }
+  }
 
   /** Return the elapsed time since this instance was started. */
   def elapsed: Duration
@@ -112,6 +124,9 @@ trait Monitoring {
 
   /** The time-varying set of keys. */
   def keys: async.immutable.Signal[List[Key[Any]]]
+
+  /** Returns `true` if the given key currently exists. */
+  def exists[O](k: Key[O]): Task[Boolean] = keys.continuous.once.runLastOr(List()).map(_.contains(k))
 
   /** The infinite discrete stream of unique keys, as they are added. */
   def distinctKeys: Process[Task, Key[Any]] =
@@ -158,7 +173,7 @@ object Monitoring {
     keys_.value.set(List())
 
     case class Topic[I,O](
-      publish: ((I,Duration), Option[O] => Unit) => Unit,
+      publish: ((I,Duration)) => Unit,
       current: async.immutable.Signal[O]
     )
     val topics = new TrieMap[Key[Any], Topic[Any,Any]]()
@@ -177,11 +192,14 @@ object Monitoring {
         val t = (implicitly[Reportable[O]], units)
         us += (k -> t)
         keys_.value.modify(k :: _)
-        (i: I) => {
-          val elapsed = Duration.fromNanos(System.nanoTime - t0)
-          pub(i -> elapsed, _ => {})
-        }
+        (i: I) => pub(i -> Duration.fromNanos(System.nanoTime - t0))
       }
+
+      protected def update[O](k: Key[O], v: O): Task[Unit] = Task.delay {
+        // topics.get(k).map(_.publish)
+        ???
+      }
+
 
       def get[O](k: Key[O]): Signal[O] =
         topics.get(k).map(_.current.asInstanceOf[Signal[O]])
@@ -270,26 +288,22 @@ object Monitoring {
   private[monitoring] def bufferedSignal[I,O](
       buf: Process1[I,O])(
       implicit ES: ExecutorService = defaultPool):
-      ((I, Option[O] => Unit) => Unit, async.immutable.Signal[O]) = {
+      (I => Unit, async.mutable.Signal[O]) = {
     val signal = async.signal[O](Strategy.Executor(ES))
     var cur = buf.unemit match {
       case (h, t) if h.nonEmpty => signal.value.set(h.last); t
       case (h, t) => t
     }
-    val hub = Actor.actor[(I, Option[O] => Unit)] { case (i,done) =>
+    val hub = Actor.actor[I] { i =>
       val (h, t) = process1.feed1(i)(cur).unemit
-      if (h.nonEmpty) {
-        val out = Some(h.last)
-        signal.value.compareAndSet(_ => out, _ => done(out))
-      }
-      else done(None)
+      if (h.nonEmpty) signal.value.set(h.last)
       cur = t
       cur match {
         case Process.Halt(e) => signal.value.fail(e)
         case _ => ()
       }
     } (Strategy.Sequential)
-    ((i: I, done: Option[O] => Unit) => hub ! (i -> done), signal)
+    ((i: I) => hub ! i, signal)
   }
 
 }
