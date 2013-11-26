@@ -89,7 +89,7 @@ object SSE {
     def collectingData(event: String, buf: StringBuilder):
     Process1[String,(String,String)] =
       P.await1[String].flatMap { line =>
-        if (line.forall(_.isWhitespace)) P.emit(event -> buf.toString)
+        if (line.forall(_.isWhitespace)) P.emit(event -> buf.toString) ++ awaitingEvent
         else {
           val (k, v) = parseLine(line)
           if (k != "data") throw ParseError("expected 'data'")
