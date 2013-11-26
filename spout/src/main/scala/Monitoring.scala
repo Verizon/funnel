@@ -280,10 +280,7 @@ object Monitoring {
 
   /**
    * Send values through a `Process1[I,O]` to a `Signal[O]`, which will
-   * always be equal to the most recent value produced by `buf`. Sending
-   * `None` to the returned `Option[I] => Unit` closes the `Signal`.
-   * Sending `Some(i)` updates the value of the `Signal`, after passing
-   * `i` through `buf`.
+   * always be equal to the most recent value produced by `buf`.
    */
   private[monitoring] def bufferedSignal[I,O](
       buf: Process1[I,O])(
