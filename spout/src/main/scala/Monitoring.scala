@@ -94,12 +94,12 @@ trait Monitoring {
    * This function checks that the given `prefix` uniquely determines a
    * key, and that it has the expected type, and fails fast otherwise.
    */
-  def mirror[O:Reportable](url: String, prefix: String, localName: Option[String] = None, clone: Boolean = false)(
+  def mirror[O:Reportable](url: String, prefix: String, localName: Option[String] = None)(
       implicit S: ExecutorService = Monitoring.serverPool,
                log: String => Unit = println): Task[Key[O]] =
     SSE.readEvent(url, prefix)(implicitly[Reportable[O]], S).map { case (k, pts) =>
-      val key = if (clone) Key[O](localName.getOrElse(k.key.name))
-                else localName.map(k.key.rename(_)).getOrElse(k.key)
+      if (exists(k.key).run) sys.error("cannot mirror pre-existing key: " + k.key)
+      val key = localName.map(k.key.rename(_)).getOrElse(k.key)
       val snk = topic[O,O](key, k.units)(Buffers.ignoreTime(process1.id))
       // send to sink asynchronously, this will not block
       log("spawning updates")
@@ -116,10 +116,16 @@ trait Monitoring {
    * all loaded keys.
    */
   def mirrorAll(url: String, localPrefix: String = "")(
-                implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
+                implicit S: ExecutorService = Monitoring.serverPool,
+                log: String => Unit = println): Process[Task,Unit] = {
     SSE.readEvents(url).flatMap { pt =>
-      if (exists(pt.key).run) Process.eval(update(pt.key, pt.value)(pt.typeOf))
+      if (exists(pt.key).run) {
+        log(s"mirrorAll - new key: ${pt.key}")
+        log(s"mirrorAll - got: $pt")
+        Process.eval(update(pt.key, pt.value)(pt.typeOf))
+      }
       else {
+        log(s"mirrorAll - got: $pt")
         val key = pt.key.rename(localPrefix + pt.key.name)
         val snk = topic[Any,Any](key, pt.units)(Buffers.ignoreTime(process1.id))(pt.typeOf)
         Process.emit(snk(pt.value))
@@ -209,7 +215,7 @@ object Monitoring {
 
       protected def update[O](k: Key[O], v: O)(implicit R: Reportable[O]): Task[Unit] = Task.delay {
         us.get(k).map(_._1.cast(R)).flatMap { _ =>
-          topics.get(k).map(_.current.set(v))
+          topics.get(k).map(_.current.value.set(v))
         } getOrElse (sys.error("key types did not match"))
       }
 

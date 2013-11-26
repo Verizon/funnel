@@ -19,9 +19,28 @@ object Main extends App {
     c.increment
     t.time(Thread.sleep(100))
   }.run.runAsync(_ => ())
-  val k = mirror[Double]("http://localhost:8081", "now/requests", Some("now/requests-clone"), true)
 
-  k.map(_ * 10).publishEvery(5 seconds)("now/request-clone-times-10", Units.Count)
+  val M = Monitoring.instance
+  val I = new Instruments(5 minutes, M)
+  MonitoringServer.start(M, 8082)
+
+  val c2 = I.counter("requests")
+  val c3 = I.counter("requests2")
+  val g2 = Process.awakeEvery(2 seconds).map { _ => c2.increment; c3.increment }
+                  .run.runAsync(_ => ())
+
+  // val k = mirror[Double]("http://localhost:8082", "now/requests", Some("now/requests-clone"))
+  mirrorAll("http://localhost:8082/stream", "node1/").run.runAsync(_ => ())
+
+  //
+  // application that given a Process[Task,URL], mirr
+  // def mirrorAll(nodes: Process[Task,(Int,URL)])(health: (Int, List[Key[Boolean]]) => Metric[Boolean]): Unit = ???
+
+  // mirrorAll("http://node1:8081/now", Some("node1/"))
+  // mirrorAll("http://node2:8081/now", Some("node1/"))
+  // mirrorAll("http://node3:8081/now", Some("node1/"))
+
+  // k.map(_ * 10).publishEvery(5 seconds)("now/request-clone-times-10", Units.Count)
   readLine()
 }
 

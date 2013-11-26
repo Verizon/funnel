@@ -4,6 +4,8 @@ import com.twitter.algebird.Group
 import intelmedia.ws.monitoring.{Buffers => B}
 import java.util.concurrent.{ExecutorService,TimeUnit}
 import scala.concurrent.duration._
+import scalaz.concurrent.Task
+import scalaz.stream.Process
 
 /**
  * Provider of counters, gauges, and timers, tied to some
@@ -164,7 +166,11 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * This function checks that the given `prefix` uniquely determines a
    * key, and that it has the expected type, and fails fast otherwise.
    */
-  def mirror[O:Reportable](url: String, prefix: String, localName: Option[String] = None, clone: Boolean = false)(
+  def mirror[O:Reportable](url: String, prefix: String, localName: Option[String] = None)(
       implicit S: ExecutorService = Monitoring.serverPool): Key[O] =
-    monitoring.mirror(url, prefix, localName, clone)(implicitly[Reportable[O]], S).run
+    monitoring.mirror(url, prefix, localName)(implicitly[Reportable[O]], S).run
+
+  def mirrorAll(url: String, localPrefix: String = "")(
+                implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] =
+    monitoring.mirrorAll(url, localPrefix)(S)
 }
