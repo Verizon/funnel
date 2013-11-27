@@ -91,7 +91,7 @@ object MonitoringServer {
     def handleKeys(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
       import JSON._; import argonaut.EncodeJson._
       val ks = M.keys.continuous.once.runLastOr(List()).run.filter(_.matches(prefix))
-      val respBytes = JSON.prettyEncode(ks.map(k => KeyInfo(k, M.typeOf(k), M.units(k)))).getBytes
+      val respBytes = JSON.prettyEncode(ks).getBytes
       req.getResponseHeaders.set("Content-Type", "application/json")
       req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, respBytes.length)
@@ -103,7 +103,7 @@ object MonitoringServer {
       req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
       val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
-      SSE.writeKeys(M.distinctKeys.map(k => KeyInfo(k, M.typeOf(k), M.units(k))), sink)
+      SSE.writeKeys(M.distinctKeys, sink)
     }
 
     def handleStream(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {

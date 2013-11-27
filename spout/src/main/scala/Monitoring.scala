@@ -24,13 +24,11 @@ trait Monitoring {
   def topic[I, O:Reportable](
       name: String, units: Units[O])(
       buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
-    val k = Key[O](name)
-    (k, topic(k, units)(buf))
+    val k = Key[O](name, units)
+    (k, topic(k)(buf))
   }
 
-  protected def topic[I, O:Reportable](
-    key: Key[O], units: Units[O])(
-    buf: Process1[(I,Duration),O]): I => Unit
+  protected def topic[I,O](key: Key[O])(buf: Process1[(I,Duration),O]): I => Unit
 
   /**
    * Return the continuously updated signal of the current value
@@ -40,24 +38,22 @@ trait Monitoring {
    */
   def get[O](k: Key[O]): async.immutable.Signal[O]
 
-  /**
-   * Return the units associated with the given key.
-   */
-  def units[O](k: Key[O]): Units[O]
-
-  /**
-   * Return a witness for the type of the given key.
-   */
-  def typeOf[O](k: Key[O]): Reportable[O]
+  /** Convience function to publish a metric under a newly created key. */
+  def publish[O:Reportable](name: String, units: Units[O])(
+                            events: Process[Task,Unit])(
+                            f: Metric[O]): Task[Key[O]] =
+    publish(Key(name, units))(events)(f)
 
   /**
    * Publish a metric with the given name on every tick of `events`.
    * See `Events` for various combinators for building up possible
    * arguments to pass here (periodically, when one or more keys
    * change, etc).
+   *
+   * This method does not check for uniqueness.
    */
-  def publish[O:Reportable](
-      name: String, units: Units[O])(events: Process[Task,Unit])(f: Metric[O]): Key[O] = {
+  def publish[O](key: Key[O])(events: Process[Task,Unit])(f: Metric[O]): Task[Key[O]] = Task.delay {
+    if (exists(key).run) sys.error("key not unique, use republish if this is intended: " + key)
     // `trans` is a polymorphic fn from `Key` to `Task`, picks out
     // latest value for that `Key`
     val trans = new (Key ~> Task) {
@@ -68,16 +64,16 @@ trait Monitoring {
     // Whenever `event` generates a new value, refresh the signal
     val proc: Process[Task, O] = events.flatMap(_ => Process.eval(refresh))
     // And finally republish these values to a new topic
-    val (k, snk) = topic[O,O](name, units)(Buffers.ignoreTime(process1.id))
+    val snk = topic[O,O](key)(Buffers.ignoreTime(process1.id))
     proc.map(snk).run.runAsync(_ => ()) // nonblocking
-    k
+    key
   }
 
   /**
    * Update the current value associated with the given `Key`. Implementation
    * detail, this should not be used by clients.
    */
-  protected def update[O](k: Key[O], v: O)(implicit R: Reportable[O]): Task[Unit]
+  protected def update[O](k: Key[O], v: O): Task[Unit]
 
   // could have mirror(events)(url, prefix), which is polling
   // rather than pushing
@@ -98,9 +94,9 @@ trait Monitoring {
       implicit S: ExecutorService = Monitoring.serverPool,
                log: String => Unit = println): Task[Key[O]] =
     SSE.readEvent(url, prefix)(implicitly[Reportable[O]], S).map { case (k, pts) =>
-      if (exists(k.key).run) sys.error("cannot mirror pre-existing key: " + k.key)
-      val key = localName.map(k.key.rename(_)).getOrElse(k.key)
-      val snk = topic[O,O](key, k.units)(Buffers.ignoreTime(process1.id))
+      if (exists(k).run) sys.error("cannot mirror pre-existing key: " + k)
+      val key = localName.map(k.rename(_)).getOrElse(k)
+      val snk = topic[O,O](key)(Buffers.ignoreTime(process1.id))
       // send to sink asynchronously, this will not block
       log("spawning updates")
       pts.evalMap { pt =>
@@ -122,12 +118,12 @@ trait Monitoring {
       if (exists(pt.key).run) {
         log(s"mirrorAll - new key: ${pt.key}")
         log(s"mirrorAll - got: $pt")
-        Process.eval(update(pt.key, pt.value)(pt.typeOf))
+        Process.eval(update(pt.key, pt.value))
       }
       else {
         log(s"mirrorAll - got: $pt")
         val key = pt.key.rename(localPrefix + pt.key.name)
-        val snk = topic[Any,Any](key, pt.units)(Buffers.ignoreTime(process1.id))(pt.typeOf)
+        val snk = topic[Any,Any](key)(Buffers.ignoreTime(process1.id))
         Process.emit(snk(pt.value))
       }
     }
@@ -150,7 +146,7 @@ trait Monitoring {
   def lookup[O](name: String)(implicit R: Reportable[O]): Task[Key[O]] =
     keysByName(name).once.runLastOr(List()).map {
       case List(k) =>
-        val t = typeOf(k)
+        val t = k.typeOf
         if (t == R) k.asInstanceOf[Key[O]]
         else sys.error("type mismatch: $R $t")
       case ks => sys.error(s"lookup($name) does not determine a unique key: $ks")
@@ -214,19 +210,17 @@ object Monitoring {
     new Monitoring {
       def keys = keys_
 
-      def topic[I, O:Reportable](
-          k: Key[O], units: Units[O])(
-          buf: Process1[(I,Duration),O]): I => Unit = {
+      def topic[I,O](k: Key[O])(buf: Process1[(I,Duration),O]): I => Unit = {
         val (pub, v) = bufferedSignal(buf)(ES)
         topics += (k -> eraseTopic(Topic(pub, v)))
-        val t = (implicitly[Reportable[O]], units)
+        val t = (k.typeOf, k.units)
         us += (k -> t)
         keys_.value.modify(k :: _)
         (i: I) => pub(i -> Duration.fromNanos(System.nanoTime - t0))
       }
 
-      protected def update[O](k: Key[O], v: O)(implicit R: Reportable[O]): Task[Unit] = Task.delay {
-        us.get(k).map(_._1.cast(R)).flatMap { _ =>
+      protected def update[O](k: Key[O], v: O): Task[Unit] = Task.delay {
+        us.get(k).map(_._1.cast(k.typeOf)).flatMap { _ =>
           topics.get(k).map(_.current.value.set(v))
         } getOrElse (sys.error("key types did not match"))
       }
@@ -273,7 +267,7 @@ object Monitoring {
         .map { k =>
           // asynchronously set the output
           S { M.get(k).discrete
-               .map(v => out.value.set(Datapoint(k, M.typeOf(k), M.units(k), v)))
+               .map(v => out.value.set(Datapoint(k, v)))
                .zip(heartbeat)
                .onComplete { Process.eval_{ Task.delay(log("unsubscribing: " + k))} }
                .run.run
@@ -302,7 +296,7 @@ object Monitoring {
       ks <- M.keys.continuous.once.runLastOr(List())
       t <- Nondeterminism[Task].gatherUnordered {
         ks.map(k => M.get(k).continuous.once.runLast.map(
-          _.map(v => k -> Datapoint(k, M.typeOf(k), M.units(k), v))
+          _.map(v => k -> Datapoint(k, v))
         ).timed(100L).attempt.map(_.toOption))
       }
       _ <- Task { t.flatten.flatten.foreach(m += _) }

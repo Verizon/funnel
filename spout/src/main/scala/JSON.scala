@@ -77,22 +77,12 @@ object JSON {
   }
 
   implicit def EncodeKey[A]: EncodeJson[Key[A]] =
-    jencode2L((k: Key[A]) => (k.name, k.id.toString))("name", "id")
+    jencode3L((k: Key[A]) => (k.name, k.typeOf, k.units))("name", "type", "units")
   implicit def DecodeKey: DecodeJson[Key[Any]] = DecodeJson { c => for {
-    lbl <- (c --\ "name").as[String]
-    id <- (c --\ "id").as[String].flatMap { s =>
-      try D.ok { java.util.UUID.fromString(s) }
-      catch { case e: IllegalArgumentException => D.fail("invalid UUID", c.history) }
-    }
-  } yield new Key(lbl, id) }
-
-  implicit def EncodeKeyInfo[A]: EncodeJson[KeyInfo[A]] =
-    jencode3L((k: KeyInfo[A]) => (k.key, k.typeOf, k.units))("key", "type", "units")
-  implicit def DecodeKeyInfo: DecodeJson[KeyInfo[Any]] = DecodeJson { c => for {
-    k <- (c --\ "key").as[Key[Any]]
-    t <- (c --\ "type").as[Reportable[Any]]
-    u <- (c --\ "units").as[Units[Any]]
-  } yield KeyInfo(k, t, u) }
+    name   <- (c --\ "name").as[String]
+    typeOf <- (c --\ "type").as[Reportable[Any]]
+    u      <- (c --\ "units").as[Units[Any]]
+  } yield Key(name, typeOf, u) }
 
   implicit def EncodeStats: EncodeJson[monitoring.Stats] =
     jencode7L((s: monitoring.Stats) =>
@@ -120,7 +110,12 @@ object JSON {
   }
 
   implicit def DecodeReportable(r: Reportable[Any]): DecodeJson[Any] = DecodeJson { c =>
-    c.as[Double] ||| c.as[Boolean] ||| c.as[String] ||| c.as[monitoring.Stats]
+    r match {
+      case Reportable.B => c.as[Boolean] ||| D.fail("expected Boolean", c.history)
+      case Reportable.D => c.as[Double] ||| D.fail("expected Double", c.history)
+      case Reportable.Stats => c.as[monitoring.Stats] ||| D.fail("expected Stats", c.history)
+      case Reportable.S => c.as[String] ||| D.fail("expected String", c.history)
+    }
   }
 
   implicit def EncodeReportableT[A]: EncodeJson[Reportable[A]] =
@@ -134,18 +129,12 @@ object JSON {
   }
 
   implicit def EncodeDatapoint[A]: EncodeJson[Datapoint[A]] =
-    jencode4L((d: Datapoint[A]) =>
-      (d.key, d.typeOf, d.units, EncodeReportable(d.typeOf)(d.value)))(
-      "key", "type", "units", "value")
+    jencode2L((d: Datapoint[A]) => (d.key, EncodeReportable(d.key.typeOf)(d.value)))("key", "value")
 
   implicit def DecodeDatapoint: DecodeJson[Datapoint[Any]] = DecodeJson { c => for {
     k <- (c --\ "key").as[Key[Any]]
-    t <- (c --\ "type").as[Reportable[Any]]
-    u <- (c --\ "units").as[Units[Any]]
-    v <- (c --\ "value").as[Any](DecodeReportable(t))
-    d <- t.read(v).map(v => D.ok(Datapoint(k,t, u, v)))
-                  .getOrElse(D.fail("value did not match type: " + t.description, c.history))
-  } yield d }
+    v <- (c --\ "value").as[Any](DecodeReportable(k.typeOf))
+  } yield Datapoint(k, v) }
 
 }
 

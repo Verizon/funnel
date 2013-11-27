@@ -303,14 +303,15 @@ object MonitoringSpec extends Properties("monitoring") {
 
   property("derived-metrics") = forAll(Gen.listOf1(Gen.choose(-10,10))) { ls0 =>
     val ls = ls0.take(50)
-    import instruments._
+    implicit val M = Monitoring.instance
+    val I = new Instruments(5 minutes, M); import I._
     val a = counter("a")
     val b = counter("b")
 
     val ab = Metric.apply2(a.key, b.key)(_ + _)
     val kab1 = ab.publishEvery(30 milliseconds)("sum:ab-1", Units.Count)
     val kab2 = ab.publishOnChange(a.key)("sum:ab-2", Units.Count)
-    val kab3 = ab.publishOnChanges(a.key, b.key)("sum:ab-2", Units.Count)
+    val kab3 = ab.publishOnChanges(a.key, b.key)("sum:ab-3", Units.Count)
 
     Strategy.Executor(Monitoring.defaultPool) {
       ls.foreach(a.incrementBy)
@@ -323,9 +324,9 @@ object MonitoringSpec extends Properties("monitoring") {
 
     def go(rounds: Int): Prop = {
       Thread.sleep(30)
-      val ab1r = Monitoring.default.latest(kab1).run
-      val ab2r = Monitoring.default.latest(kab2).run
-      val ab3r = Monitoring.default.latest(kab3).run
+      val ab1r = M.latest(kab1).run
+      val ab2r = M.latest(kab2).run
+      val ab3r = M.latest(kab3).run
       // since ab2r is only refreshed when `a` changes, we
       // artifically refresh `a`, otherwise this test would
       // have a race condition if `a` completed before `b`
