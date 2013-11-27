@@ -107,7 +107,7 @@ object MonitoringSpec extends Properties("monitoring") {
    */
   property("bufferedSignal") = forAll { (xs: List[Long]) =>
     val (snk, s) = Monitoring.bufferedSignal(B.counter(0))
-    xs.foreach(x => snk(x, _ => ()))
+    xs.foreach(snk)
     val expected = xs.sum
     // this will 'eventually' become true, and loop otherwise
     while (s.continuous.once.runLastOr(0.0).run !== expected) {
@@ -128,7 +128,7 @@ object MonitoringSpec extends Properties("monitoring") {
       val N = 100000
       val (snk, s) = Monitoring.bufferedSignal(B.counter(0))
       val t0 = System.nanoTime
-      (0 to N).foreach(x => snk(x, _ => ()))
+      (0 to N).foreach(x => snk(x))
       val expected = (0 to N).map(_.toDouble).sum
       while (s.continuous.once.runLastOr(0.0).run !== expected) {
         Thread.sleep(10)
@@ -250,9 +250,9 @@ object MonitoringSpec extends Properties("monitoring") {
     val count = M.get(k)
     a.foreach { a => snk(a) }
     val expected = a.sum
-    var got = count.continuous.once.map(_.get).runLastOr(0.0).run
+    var got = count.continuous.once.runLastOr(0.0).run
     while (got !== expected) {
-      got = count.continuous.once.map(_.get).runLastOr(0.0).run
+      got = count.continuous.once.runLastOr(0.0).run
       Thread.sleep(10)
     }
     true
@@ -296,21 +296,22 @@ object MonitoringSpec extends Properties("monitoring") {
     val m = latest.run
     val millis = System.currentTimeMillis - t0
     // println(s"snapshot took: $millis")
-    (m(aN.keys.now).get.asInstanceOf[Double] === expectedA) &&
-    (m(bN.keys.now).get.asInstanceOf[Double] === expectedB) &&
-    (m(abN.keys.now).get.asInstanceOf[Double] === expectedAB)
+    (m(aN.keys.now).value.asInstanceOf[Double] === expectedA) &&
+    (m(bN.keys.now).value.asInstanceOf[Double] === expectedB) &&
+    (m(abN.keys.now).value.asInstanceOf[Double] === expectedAB)
   }
 
   property("derived-metrics") = forAll(Gen.listOf1(Gen.choose(-10,10))) { ls0 =>
     val ls = ls0.take(50)
-    import instruments._
+    implicit val M = Monitoring.instance
+    val I = new Instruments(5 minutes, M); import I._
     val a = counter("a")
     val b = counter("b")
 
     val ab = Metric.apply2(a.key, b.key)(_ + _)
     val kab1 = ab.publishEvery(30 milliseconds)("sum:ab-1", Units.Count)
     val kab2 = ab.publishOnChange(a.key)("sum:ab-2", Units.Count)
-    val kab3 = ab.publishOnChanges(a.key, b.key)("sum:ab-2", Units.Count)
+    val kab3 = ab.publishOnChanges(a.key, b.key)("sum:ab-3", Units.Count)
 
     Strategy.Executor(Monitoring.defaultPool) {
       ls.foreach(a.incrementBy)
@@ -323,9 +324,9 @@ object MonitoringSpec extends Properties("monitoring") {
 
     def go(rounds: Int): Prop = {
       Thread.sleep(30)
-      val ab1r = Monitoring.default.latest(kab1).run
-      val ab2r = Monitoring.default.latest(kab2).run
-      val ab3r = Monitoring.default.latest(kab3).run
+      val ab1r = M.latest(kab1).run
+      val ab2r = M.latest(kab2).run
+      val ab3r = M.latest(kab3).run
       // since ab2r is only refreshed when `a` changes, we
       // artifically refresh `a`, otherwise this test would
       // have a race condition if `a` completed before `b`
@@ -337,6 +338,42 @@ object MonitoringSpec extends Properties("monitoring") {
       }
     }
     go(15)
+  }
+
+  val bools = for {
+    n <- Gen.choose(0,25000)
+    bs <- Gen.listOfN(n, arbitrary[Boolean])
+  } yield bs
+
+  property("Metric.bsequence") = forAll(bools) { bs =>
+    import scalaz.~>
+    import scalaz.std.option._
+    val alwaysNone = new (Key ~> Option) { def apply[A](k: Key[A]) = None }
+    val expected = Policies.majority(bs)
+    Metric.bsequence(bs.map(Metric.point(_)))
+          .map(Policies.majority)
+          .run(alwaysNone)
+          .get == expected
+  }
+
+  property("aggregate") = secure {
+    List(List(), List(1), List(-1,1), List.range(0,100)).forall { xs =>
+      val M = Monitoring.instance
+      val I = new Instruments(5 minutes, M)
+      val counters = xs.zipWithIndex.map { case (x,i) =>
+        val c = I.counter(s"count/$i")
+        c.incrementBy(x)
+        c
+      }
+      val family = Key[Double]("now/count", Units.Count)
+      val out = Key[Double]("sum", Units.Count)
+      M.aggregate(family, out)(Events.takeEvery(15 milliseconds, 50))(_.sum).run
+      Thread.sleep(1000)
+      // println("xs: " + xs)
+      val l = M.latest(out).run
+      val r = xs.map(_.toDouble).sum
+      l === r || { println(l, r); false }
+    }
   }
 }
 

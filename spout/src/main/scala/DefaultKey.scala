@@ -45,3 +45,5 @@ trait DefaultKeys {
       def apply(a: Periodic[A]): Key[A] = a.sliding
     }
 }
+
+object DefaultKey extends DefaultKeys

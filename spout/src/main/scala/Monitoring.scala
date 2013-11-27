@@ -8,7 +8,8 @@ import scalaz.concurrent.{Actor,Strategy,Task}
 import scalaz.Nondeterminism
 import scalaz.stream._
 import scalaz.stream.async
-import scalaz.{~>, Monad}
+import scalaz.{\/, ~>, Monad}
+import Events.Event
 
 /**
  * A hub for publishing and subscribing to streams
@@ -18,12 +19,17 @@ trait Monitoring {
   import Monitoring._
 
   /**
-   * Create a new topic with the given label and units,
+   * Create a new topic with the given name and units,
    * using a stream transducer to
    */
-  def topic[I, O <% Reportable[O]](
-    label: String, units: Units[O])(
-    buf: Process1[(I,Duration),O]): (Key[O], I => Unit)
+  def topic[I, O:Reportable](
+      name: String, units: Units[O])(
+      buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
+    val k = Key[O](name, units)
+    (k, topic(k)(buf))
+  }
+
+  protected def topic[I,O](key: Key[O])(buf: Process1[(I,Duration),O]): I => Unit
 
   /**
    * Return the continuously updated signal of the current value
@@ -31,57 +37,239 @@ trait Monitoring {
    * discrete stream of values for this key, updated only
    * when new values are produced.
    */
-  def get[O](k: Key[O]): async.immutable.Signal[Reportable[O]]
+  def get[O](k: Key[O]): async.immutable.Signal[O]
+
+  /** Convience function to publish a metric under a newly created key. */
+  def publish[O:Reportable](name: String, units: Units[O])(e: Event)(
+                            f: Metric[O]): Task[Key[O]] =
+    publish(Key(name, units))(e)(f)
 
   /**
-   * Return the type associated with the given key.
+   * Like `publish`, but if `key` is preexisting, sends updates
+   * to it rather than throwing an exception.
    */
-  def units[O](k: Key[O]): Units[O]
+  def republish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = Task.delay {
+    val refresh: Task[O] = eval(f)
+    // Whenever `event` generates a new value, refresh the signal
+    val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(refresh))
+    // Republish these values to a new topic
+    val snk =
+      if (!exists(key).run) topic[O,O](key)(Buffers.ignoreTime(process1.id))
+      else (o: O) => update(key, o).runAsync(_ => ())
+    proc.map(snk).run.runAsync(_ => ()) // nonblocking
+    key
+  }
 
   /**
-   * Publish a metric with the given label on every tick of `events`.
+   * Publish a metric with the given name on every tick of `events`.
    * See `Events` for various combinators for building up possible
    * arguments to pass here (periodically, when one or more keys
-   * change, etc).
+   * change, etc). Example `publish(k)(Events.every(5 seconds))(
+   *
+   * This method checks that the given key is not preexisting and
+   * throws an error if the key already exists. Use `republish` if
+   * preexisting `key` is not an error condition.
    */
-  def publish[O <% Reportable[O]](
-      label: String, units: Units[O])(events: Process[Task,Unit])(f: Metric[O]): Key[O] = {
+  def publish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = Task.suspend {
+    if (exists(key).run) sys.error("key not unique, use republish if this is intended: " + key)
+    else republish(key)(e)(f)
+  }
+
+  /** Compute the current value for the given `Metric`. */
+  def eval[A](f: Metric[A]): Task[A] = {
     // `trans` is a polymorphic fn from `Key` to `Task`, picks out
     // latest value for that `Key`
     val trans = new (Key ~> Task) {
       def apply[A](k: Key[A]): Task[A] = latest(k)
     }
     // Invoke Metric interpreter, giving it function from Key to Task
-    val refresh: Task[O] = f.run(trans)
-    // Whenever `event` generates a new value, refresh the signal
-    val proc: Process[Task, O] = events.flatMap(_ => Process.eval(refresh))
-    // And finally republish these values to a new topic
-    val (k, snk) = topic[O,O](label, units)(Buffers.ignoreTime(process1.id))
-    proc.map(snk).run.runAsync(_ => ()) // nonblocking
-    k
+    f.run(trans)
   }
+
+  /**
+   * Update the current value associated with the given `Key`. Implementation
+   * detail, this should not be used by clients.
+   */
+  protected def update[O](k: Key[O], v: O): Task[Unit]
+
+  // could have mirror(events)(url, prefix), which is polling
+  // rather than pushing
+
+  /**
+   * Mirror the (assumed) unique event at the given url and prefix.
+   * Example: `mirror[String]("http://localhost:8080", "now/health")`.
+   * This will fetch the stream at `http://localhost:8080/stream/now/health`
+   * and keep it updated locally, as events are published at `url`.
+   * `localName` may be (optionally) supplied to change the name of the
+   * key used locally. The `id` field of the key is preserved, unless
+   * `clone` is set to `true`.
+   *
+   * This function checks that the given `prefix` uniquely determines a
+   * key, and that it has the expected type, and fails fast otherwise.
+   */
+  def mirror[O:Reportable](url: String, prefix: String, localName: Option[String] = None)(
+      implicit S: ExecutorService = Monitoring.serverPool,
+               log: String => Unit = println): Task[Key[O]] =
+    SSE.readEvent(url, prefix)(implicitly[Reportable[O]], S).map { case (k, pts) =>
+      val key = localName.map(k.rename(_)).getOrElse(k)
+      val snk = if (exists(key).run) (o: O) => update(key, o)
+                else topic[O,O](key)(Buffers.ignoreTime(process1.id))
+      // send to sink asynchronously, this will not block
+      log(s"Monitoring.mirror: listening for updates to $url/$prefix")
+      pts.evalMap { pt =>
+        import JSON._
+        log("Monitoring.mirror: got datapoint " + pt)
+        Task { snk(pt.value) } (S)
+      }.run.runAsync(_ => ())
+      key
+    }
+
+  /**
+   * Mirror all metrics from the given URL, adding `localPrefix` onto the front of
+   * all loaded keys.
+   */
+  def mirrorAll(url: String, localPrefix: String = "")(
+                implicit S: ExecutorService = Monitoring.serverPool,
+                log: String => Unit = println): Process[Task,Unit] = {
+    SSE.readEvents(url).flatMap { pt =>
+      val msg = "Monitoring.mirrorAll:" // logging msg prefix
+      val k = pt.key.modifyName(localPrefix + _)
+      if (exists(k).run) {
+        log(s"$msg got $pt")
+        Process.eval(update(k, pt.value))
+      }
+      else {
+        log(s"$msg new key ${pt.key}")
+        log(s"$msg got $pt")
+        val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
+        Process.emit(snk(pt.value))
+      }
+    }
+  }
+
+  /**
+   * Like `mirrorAll`, but tries to reconnect periodically, using
+   * the schedule set by `breaker`. Example:
+   * `attemptMirrorAll(Events.takeEvery(3 minutes, 5))(url, prefix)`
+   * will call `mirrorAll`, and retry every three minutes up to
+   * 5 attempts before raising the most recent exception.
+   */
+  def attemptMirrorAll(breaker: Event)(url: String, localPrefix: String = "")(
+                       implicit S: ExecutorService = Monitoring.serverPool,
+                       log: String => Unit = println): Process[Task,Unit] = {
+    val e = breaker(this)
+    val step: Process[Task, Throwable \/ Unit] =
+      mirrorAll(url, localPrefix)(S, log).attempt()
+    step.stripW ++ e.terminated.flatMap {
+      // on our last reconnect attempt, rethrow error
+      case None => step.flatMap(_.fold(Process.fail, Process.emit))
+      // on other attempts, ignore the exceptions
+      case Some(_) => step.stripW
+    }
+  }
+
+  private def initialize[O](key: Key[O]): Unit = {
+    if (!exists(key).run) topic[O,O](key)(Buffers.ignoreTime(process1.id))
+    ()
+  }
+
+  /**
+   * Publish a new metric by aggregating all keys in the given family.
+   * This just calls `evalFamily(family)` on each tick of `e`, and
+   * publishes the result of `f` to the output key `out`.
+   */
+  def aggregate[O,O2](family: Key[O], out: Key[O2])(e: Event)(
+                      f: Seq[O] => O2)(
+                      implicit log: String => Unit = _ => ()): Task[Key[O2]] = Task.delay {
+    initialize(out)
+    e(this).flatMap { _ =>
+      log("Monitoring.aggregate: gathering values")
+      Process.eval { evalFamily(family).flatMap { vs =>
+        val v = f(vs)
+        // log(s"Monitoring.aggregate: aggregated $v from ${vs.length} matching keys")
+        update(out, v)
+      }}
+    }.run.runAsync(_ => ())
+    out
+  }
+
+  /**
+   * Reset all keys matching the given prefix back to their default
+   * values if they receive no updates between ticks of `e`. Example:
+   * `decay("node1/health")(Event.every(10 seconds))` would set the
+   * `node1/health` metric(s) to `false` if no new values are published
+   * within a 10 second window. See `Units.default`.
+   */
+  def decay(prefix: String)(e: Event)(
+            implicit log: String => Unit = println): Task[Unit] = Task.delay {
+    def reset = keys.continuous.once.map {
+      _.foreach(k => k.default.foreach(update(k, _).run))
+    }.run
+    val msg = "Monitoring.decay:" // logging msg prefix
+
+    // we merge the `e` stream and the stream of datapoints for the
+    // given prefix; if we ever encounter two ticks in a row from `e`,
+    // we reset all matching keys back to their default
+    val alive = async.signal[Unit](Strategy.Sequential); alive.value.set(())
+    val pts = Monitoring.subscribe(this)(prefix).onComplete {
+      Process.eval_ { alive.close flatMap { _ =>
+        log(s"$msg no more data points for '$prefix', resetting...")
+        reset
+      }}
+    }
+    e(this).zip(alive.continuous).map(_._1).either(pts)
+           .scan(Vector(false,false))((acc,a) => acc.tail :+ a.isLeft)
+           .filter { xs => xs forall (identity) }
+           .evalMap { _ => log(s"$msg no activity for key prefix '$prefix', resetting..."); reset }
+           .run.runAsync { _ => () }
+  }
+
 
   /** Return the elapsed time since this instance was started. */
   def elapsed: Duration
 
   /** Return the most recent value for a given key. */
   def latest[O](k: Key[O]): Task[O] =
-    get(k).continuous.once.runLast.map(_.get.get)
+    get(k).continuous.once.runLast.map(_.get)
 
   /** The time-varying set of keys. */
   def keys: async.immutable.Signal[List[Key[Any]]]
+
+  /** Returns `true` if the given key currently exists. */
+  def exists[O](k: Key[O]): Task[Boolean] = keys.continuous.once.runLastOr(List()).map(_.contains(k))
+
+  /** Attempt to uniquely resolve `name` to a key of some expected type. */
+  def lookup[O](name: String)(implicit R: Reportable[O]): Task[Key[O]] =
+    keysByName(name).once.runLastOr(List()).map {
+      case List(k) =>
+        val t = k.typeOf
+        if (t == R) k.asInstanceOf[Key[O]]
+        else sys.error("type mismatch: $R $t")
+      case ks => sys.error(s"lookup($name) does not determine a unique key: $ks")
+    }
 
   /** The infinite discrete stream of unique keys, as they are added. */
   def distinctKeys: Process[Task, Key[Any]] =
     keys.discrete.flatMap(Process.emitAll).pipe(Buffers.distinct)
 
-  /** Create a new topic with the given label and discard the key. */
-  def topic_[I, O <% Reportable[O]](
-    label: String, units: Units[O])(
-    buf: Process1[(I,Duration),O]): I => Unit = topic(label, units)(buf)._2
+  /** Create a new topic with the given name and discard the key. */
+  def topic_[I, O:Reportable](
+    name: String, units: Units[O])(
+    buf: Process1[(I,Duration),O]): I => Unit = topic(name, units)(buf)._2
 
-  def keysByLabel(label: String): Process[Task, List[Key[Any]]] =
-    keys.continuous.map(_.filter(_.label == label))
+  def keysByName(name: String): Process[Task, List[Key[Any]]] =
+    keys.continuous.map(_.filter(_ matches name))
+
+  /**
+   * Returns the continuous stream of values for keys whose type
+   * and units match `family`, and whose name is prefixed by
+   * `family.name`. The sequences emitted are in no particular order.
+   */
+  def evalFamily[O](family: Key[O]): Task[Seq[O]] =
+    keysByName(family.name).once.runLastOr(List()).flatMap { ks =>
+      val ksO: Seq[Key[O]] = ks.flatMap(_.cast(family.typeOf, family.units))
+      Nondeterminism[Task].gatherUnordered(ksO map (k => eval(k)))
+    }
 }
 
 object Monitoring {
@@ -108,6 +296,7 @@ object Monitoring {
 
   def instance(implicit ES: ExecutorService = defaultPool): Monitoring = {
     import async.immutable.Signal
+    import scala.collection.concurrent.TrieMap
     val t0 = System.nanoTime
     val S = Strategy.Executor(ES)
     val P = Process
@@ -115,38 +304,31 @@ object Monitoring {
     keys_.value.set(List())
 
     case class Topic[I,O](
-      publish: ((I,Duration), Option[Reportable[O]] => Unit) => Unit,
-      current: async.immutable.Signal[Reportable[O]]
+      publish: ((I,Duration)) => Unit,
+      current: async.mutable.Signal[O]
     )
-    val topics = new collection.concurrent.TrieMap[Key[Any], Topic[Any,Any]]()
-    val us = new collection.concurrent.TrieMap[Key[Any], Units[Any]]()
+    val topics = new TrieMap[Key[Any], Topic[Any,Any]]()
 
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
     new Monitoring {
       def keys = keys_
 
-      def topic[I, O <% Reportable[O]](
-          label: String, units: Units[O])(
-          buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
-        val (pub, v) = bufferedSignal(buf.map(Reportable.apply(_)))(ES)
-        val k = Key[O](label)
+      def topic[I,O](k: Key[O])(buf: Process1[(I,Duration),O]): I => Unit = {
+        val (pub, v) = bufferedSignal(buf)(ES)
         topics += (k -> eraseTopic(Topic(pub, v)))
-        us += (k -> units.asInstanceOf[Units[Any]])
+        val t = (k.typeOf, k.units)
         keys_.value.modify(k :: _)
-        (k, (i: I) => {
-          val elapsed = Duration.fromNanos(System.nanoTime - t0)
-          pub(i -> elapsed, _ => {})
-        })
+        (i: I) => pub(i -> Duration.fromNanos(System.nanoTime - t0))
       }
 
-      def get[O](k: Key[O]): Signal[Reportable[O]] =
-        topics.get(k).map(_.current.asInstanceOf[Signal[Reportable[O]]])
-                     .getOrElse(sys.error("key not found: " + k))
+      protected def update[O](k: Key[O], v: O): Task[Unit] = Task.delay {
+        topics.get(k).map(_.current.value.set(v))
+      }
 
-      def units[O](k: Key[O]): Units[O] =
-        us.get(k).map(_.asInstanceOf[Units[O]])
-                 .getOrElse(sys.error("key not found: " + k))
+      def get[O](k: Key[O]): Signal[O] =
+        topics.get(k).map(_.current.asInstanceOf[Signal[O]])
+                     .getOrElse(sys.error("key not found: " + k))
 
       def elapsed: Duration = Duration.fromNanos(System.nanoTime - t0)
     }
@@ -162,12 +344,13 @@ object Monitoring {
    *      halt the producer when completed. Just
    *      resubscribe if you need a fresh stream.
    */
-  def subscribe(M: Monitoring)(prefix: String, log: String => Unit = println)(
-  implicit ES: ExecutorService = serverPool):
-      Process[Task, (Key[Any], Reportable[Any])] =
+  def subscribe(M: Monitoring)(prefix: String)(
+  implicit ES: ExecutorService = serverPool,
+           log: String => Unit = println):
+      Process[Task, Datapoint[Any]] =
     Process.suspend { // don't actually do anything until we have a consumer
       val S = Strategy.Executor(ES)
-      val out = scalaz.stream.async.signal[(Key[Any], Reportable[Any])](S)
+      val out = scalaz.stream.async.signal[Datapoint[Any]](S)
       val alive = scalaz.stream.async.signal[Boolean](S)
       val heartbeat = alive.continuous.takeWhile(identity)
       alive.value.set(true)
@@ -177,7 +360,7 @@ object Monitoring {
         .map { k =>
           // asynchronously set the output
           S { M.get(k).discrete
-               .map(v => out.value.set(k -> v))
+               .map(v => out.value.set(Datapoint(k, v)))
                .zip(heartbeat)
                .onComplete { Process.eval_{ Task.delay(log("unsubscribing: " + k))} }
                .run.run
@@ -199,14 +382,14 @@ object Monitoring {
    * Obtain the latest values for all active metrics.
    */
   def snapshot(M: Monitoring)(implicit ES: ExecutorService = defaultPool):
-    Task[collection.Map[Key[Any], Reportable[Any]]] = {
-    val m = collection.concurrent.TrieMap[Key[Any], Reportable[Any]]()
+    Task[collection.Map[Key[Any], Datapoint[Any]]] = {
+    val m = collection.concurrent.TrieMap[Key[Any], Datapoint[Any]]()
     val S = Strategy.Executor(ES)
     for {
       ks <- M.keys.continuous.once.runLastOr(List())
       t <- Nondeterminism[Task].gatherUnordered {
         ks.map(k => M.get(k).continuous.once.runLast.map(
-          _.map((k, _))
+          _.map(v => k -> Datapoint(k, v))
         ).timed(100L).attempt.map(_.toOption))
       }
       _ <- Task { t.flatten.flatten.foreach(m += _) }
@@ -215,34 +398,27 @@ object Monitoring {
 
   /**
    * Send values through a `Process1[I,O]` to a `Signal[O]`, which will
-   * always be equal to the most recent value produced by `buf`. Sending
-   * `None` to the returned `Option[I] => Unit` closes the `Signal`.
-   * Sending `Some(i)` updates the value of the `Signal`, after passing
-   * `i` through `buf`.
+   * always be equal to the most recent value produced by `buf`.
    */
   private[monitoring] def bufferedSignal[I,O](
       buf: Process1[I,O])(
       implicit ES: ExecutorService = defaultPool):
-      ((I, Option[O] => Unit) => Unit, async.immutable.Signal[O]) = {
+      (I => Unit, async.mutable.Signal[O]) = {
     val signal = async.signal[O](Strategy.Executor(ES))
     var cur = buf.unemit match {
       case (h, t) if h.nonEmpty => signal.value.set(h.last); t
       case (h, t) => t
     }
-    val hub = Actor.actor[(I, Option[O] => Unit)] { case (i,done) =>
+    val hub = Actor.actor[I] { i =>
       val (h, t) = process1.feed1(i)(cur).unemit
-      if (h.nonEmpty) {
-        val out = Some(h.last)
-        signal.value.compareAndSet(_ => out, _ => done(out))
-      }
-      else done(None)
+      if (h.nonEmpty) signal.value.set(h.last)
       cur = t
       cur match {
         case Process.Halt(e) => signal.value.fail(e)
         case _ => ()
       }
     } (Strategy.Sequential)
-    ((i: I, done: Option[O] => Unit) => hub ! (i -> done), signal)
+    ((i: I) => hub ! i, signal)
   }
 
 }

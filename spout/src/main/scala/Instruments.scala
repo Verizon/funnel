@@ -2,8 +2,10 @@ package intelmedia.ws.monitoring
 
 import com.twitter.algebird.Group
 import intelmedia.ws.monitoring.{Buffers => B}
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{ExecutorService,TimeUnit}
 import scala.concurrent.duration._
+import scalaz.concurrent.Task
+import scalaz.stream.Process
 
 /**
  * Provider of counters, gauges, and timers, tied to some
@@ -93,7 +95,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * For a historical gauge that summarizes an entire
    * window of values as well, see `numericGauge`.
    */
-  def gauge[A <% Reportable[A]](label: String, init: A,
+  def gauge[A:Reportable](label: String, init: A,
                                 units: Units[A] = Units.None): Gauge[Continuous[A],A] = {
     val g = new Gauge[Continuous[A],A] {
       val (key, snk) = monitoring.topic(s"now/$label", units)(B.resetEvery(window)(B.variable(init)))
@@ -152,4 +154,23 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
     }
     t.buffer(50 milliseconds)
   }
+
+  /**
+   * Mirror the (assumed) unique event at the given url and prefix.
+   * Example: `mirror[String]("http://localhost:8080", "now/health")`.
+   * This will fetch the stream at `http://localhost:8080/stream/now/health`
+   * and keep it updated locally, as events are published at `url`.
+   * `localName` may be (optionally) supplied to change the name of the
+   * key used locally. The `id` field of the key is preserved.
+   *
+   * This function checks that the given `prefix` uniquely determines a
+   * key, and that it has the expected type, and fails fast otherwise.
+   */
+  def mirror[O:Reportable](url: String, prefix: String, localName: Option[String] = None)(
+      implicit S: ExecutorService = Monitoring.serverPool): Key[O] =
+    monitoring.mirror(url, prefix, localName)(implicitly[Reportable[O]], S).run
+
+  def mirrorAll(url: String, localPrefix: String = "")(
+                implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] =
+    monitoring.mirrorAll(url, localPrefix)(S)
 }
