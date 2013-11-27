@@ -170,7 +170,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
       implicit S: ExecutorService = Monitoring.serverPool): Key[O] =
     monitoring.mirror(url, prefix, localName)(implicitly[Reportable[O]], S).run
 
-  def mirrorAll(url: String, localPrefix: String = "")(
+  def mirrorAll(url: String, localName: String => String = identity)(
                 implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] =
-    monitoring.mirrorAll(url, localPrefix)(S)
+    monitoring.mirrorAll(url, localName)(S)
 }
