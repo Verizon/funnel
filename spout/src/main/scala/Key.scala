@@ -3,6 +3,7 @@ package intelmedia.ws.monitoring
 case class Key[+A] private[monitoring](name: String, typeOf: Reportable[A], units: Units[A]) {
   def matches(prefix: String): Boolean = name.startsWith(prefix)
   def rename(s: String) = copy(name = s)
+  def modifyName(f: String => String): Key[A] = rename(f(name))
   def cast[B](R: Reportable[B], U: Units[B]): Option[Key[B]] =
     if (R == typeOf && units == U) Some(this.asInstanceOf[Key[B]])
     else None

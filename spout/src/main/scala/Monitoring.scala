@@ -115,15 +115,15 @@ trait Monitoring {
                 implicit S: ExecutorService = Monitoring.serverPool,
                 log: String => Unit = println): Process[Task,Unit] = {
     SSE.readEvents(url).flatMap { pt =>
-      if (exists(pt.key).run) {
-        log(s"mirrorAll - new key: ${pt.key}")
+      val k = pt.key.modifyName(localPrefix + _)
+      if (exists(k).run) {
         log(s"mirrorAll - got: $pt")
-        Process.eval(update(pt.key, pt.value))
+        Process.eval(update(k, pt.value))
       }
       else {
+        log(s"mirrorAll - new key: ${pt.key}")
         log(s"mirrorAll - got: $pt")
-        val key = pt.key.rename(localPrefix + pt.key.name)
-        val snk = topic[Any,Any](key)(Buffers.ignoreTime(process1.id))
+        val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
         Process.emit(snk(pt.value))
       }
     }
@@ -203,7 +203,6 @@ object Monitoring {
       current: async.mutable.Signal[O]
     )
     val topics = new TrieMap[Key[Any], Topic[Any,Any]]()
-    val us = new TrieMap[Key[Any], (Reportable[Any], Units[Any])]()
 
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
@@ -214,29 +213,17 @@ object Monitoring {
         val (pub, v) = bufferedSignal(buf)(ES)
         topics += (k -> eraseTopic(Topic(pub, v)))
         val t = (k.typeOf, k.units)
-        us += (k -> t)
         keys_.value.modify(k :: _)
         (i: I) => pub(i -> Duration.fromNanos(System.nanoTime - t0))
       }
 
       protected def update[O](k: Key[O], v: O): Task[Unit] = Task.delay {
-        us.get(k).map(_._1.cast(k.typeOf)).flatMap { _ =>
-          topics.get(k).map(_.current.value.set(v))
-        } getOrElse (sys.error("key types did not match"))
+        topics.get(k).map(_.current.value.set(v))
       }
-
 
       def get[O](k: Key[O]): Signal[O] =
         topics.get(k).map(_.current.asInstanceOf[Signal[O]])
                      .getOrElse(sys.error("key not found: " + k))
-
-      def units[O](k: Key[O]): Units[O] =
-        us.get(k).map(_._2.asInstanceOf[Units[O]])
-                 .getOrElse(sys.error("key not found: " + k))
-
-      def typeOf[O](k: Key[O]): Reportable[O] =
-        us.get(k).map(_._1.asInstanceOf[Reportable[O]])
-                 .getOrElse(sys.error("key not found: " + k))
 
       def elapsed: Duration = Duration.fromNanos(System.nanoTime - t0)
     }
