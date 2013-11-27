@@ -195,8 +195,8 @@ trait Monitoring {
         if (!seen.contains(group)) {
           val aggregateKey = health.modifyName(group + "/" + _)
           val keyFamily = health.modifyName(x => s"$group/$x/")
-          decay(group)(Events.every(1 minutes)).run
-          aggregate(keyFamily, aggregateKey)(Events.every(5 seconds))(f(group))(log = println).run
+          decay(keyFamily.name)(Events.every(15 seconds)).run
+          aggregate(keyFamily, aggregateKey)(Events.every(5 seconds))(f(group)).run
           seen = seen + group
         }
         val urlS = url.toString

@@ -18,8 +18,8 @@ object MirroringExample extends Properties("mirroring") {
      * Generate some bogus activity for a `Monitoring` instance,
      * and die off after about 5 minutes.
      */
-    def activity(M: Monitoring, port: Int): Unit = {
-      val ttl = (math.random * 1200).toInt
+    def activity(M: Monitoring, name: String, port: Int): Unit = {
+      val ttl = (math.random * 60).toInt + 30
       val I = new Instruments(5 minutes, M)
       val ok = I.gauge("health", true, Units.Healthy)
       val reqs = I.counter("reqs")
@@ -27,21 +27,22 @@ object MirroringExample extends Properties("mirroring") {
       Process.awakeEvery(2 seconds).takeWhile(_ < (ttl seconds)).map { _ =>
         reqs.incrementBy((math.random * 10).toInt)
         ok.set(true)
-      }.onComplete(Process.eval_(Task.delay(kill()))).run.runAsync(_ => ())
+      }.onComplete(Process.eval_(
+        Task.delay { println(s"halting $name:$port"); kill() })).run.runAsync(_ => ())
     }
 
     val accountCluster = (1 to 3).map { i =>
       val port = 8080 + i
-      activity(Monitoring.instance, port)
+      activity(Monitoring.instance, "accounts", port)
       ("http://localhost:"+port+"/stream", "accounts")
     }
     val decodingCluster = (1 to 5).map { i =>
       val port = 9080 + i
-      activity(Monitoring.instance, port)
+      activity(Monitoring.instance, "decoding", port)
       ("http://localhost:"+port+"/stream", "decoding")
     }
 
-    val urls = // cluster comes online gradually
+    val urls: Process[Task, (URL,String)] = // cluster comes online gradually
       Process.emitSeq(accountCluster ++ decodingCluster).flatMap {
         case (url,group) => Process.sleep(2 seconds) ++
                             Process.emit(new URL(url) -> group)
