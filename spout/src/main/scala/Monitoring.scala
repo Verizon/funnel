@@ -94,11 +94,11 @@ trait Monitoring {
       implicit S: ExecutorService = Monitoring.serverPool,
                log: String => Unit = println): Task[Key[O]] =
     SSE.readEvent(url, prefix)(implicitly[Reportable[O]], S).map { case (k, pts) =>
-      if (exists(k).run) sys.error("cannot mirror pre-existing key: " + k)
       val key = localName.map(k.rename(_)).getOrElse(k)
-      val snk = topic[O,O](key)(Buffers.ignoreTime(process1.id))
+      val snk = if (exists(key).run) (o: O) => update(key, o)
+                else topic[O,O](key)(Buffers.ignoreTime(process1.id))
       // send to sink asynchronously, this will not block
-      log("spawning updates")
+      log(s"listening for updates to: $url/$prefix")
       pts.evalMap { pt =>
         import JSON._
         log("got datapoint: " + pt)
