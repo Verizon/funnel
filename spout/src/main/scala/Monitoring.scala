@@ -8,7 +8,7 @@ import scalaz.concurrent.{Actor,Strategy,Task}
 import scalaz.Nondeterminism
 import scalaz.stream._
 import scalaz.stream.async
-import scalaz.{~>, Monad}
+import scalaz.{\/, ~>, Monad}
 import Events.Event
 
 /**
@@ -144,6 +144,27 @@ trait Monitoring {
         val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
         Process.emit(snk(pt.value))
       }
+    }
+  }
+
+  /**
+   * Like `mirrorAll`, but tries to reconnect periodically, using
+   * the schedule set by `breaker`. Example:
+   * `attemptMirrorAll(Events.takeEvery(3 minutes, 5))(url, prefix)`
+   * will call `mirrorAll`, and retry every three minutes up to
+   * 5 attempts before raising the most recent exception.
+   */
+  def attemptMirrorAll(breaker: Event)(url: String, localPrefix: String = "")(
+                       implicit S: ExecutorService = Monitoring.serverPool,
+                       log: String => Unit = println): Process[Task,Unit] = {
+    val e = breaker(this)
+    val step: Process[Task, Throwable \/ Unit] =
+      mirrorAll(url, localPrefix)(S, log).attempt()
+    step.stripW ++ e.terminated.flatMap {
+      // on our last reconnect attempt, rethrow error
+      case None => step.flatMap(_.fold(Process.fail, Process.emit))
+      // on other attempts, ignore the exceptions
+      case Some(_) => step.stripW
     }
   }
 
