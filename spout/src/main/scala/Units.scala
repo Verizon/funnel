@@ -34,4 +34,18 @@ object Units {
     case object Mega extends Base // 10^6
     case object Giga extends Base // 10^9
   }
+
+  /**
+   * Returns the default value associated with the given type and
+   * units. This is the value that should be assumed if a metric
+   * of the given type and units cannot be properly mirrored (say,
+   * because the node being contacted is down). See `Monitoring.mirror`
+   * and `Monitoring.mirrorAll` for how this is used.
+   */
+  def default[O](t: Reportable[O], u: Units[O]): Option[O] = (t, u) match {
+    case (Reportable.B, Healthy) => Some(false)
+    case (Reportable.S, Stoplight) => Some("red")
+    case _ => scala.None
+  }
+
 }

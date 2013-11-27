@@ -9,6 +9,7 @@ import scalaz.Nondeterminism
 import scalaz.stream._
 import scalaz.stream.async
 import scalaz.{~>, Monad}
+import Events.Event
 
 /**
  * A hub for publishing and subscribing to streams
@@ -129,6 +130,34 @@ trait Monitoring {
     }
   }
 
+  /**
+   * Reset all keys matching the given prefix back to their default
+   * values if they receive no updates between ticks of `e`. Example:
+   * `decay(node1/health)(Event.every(10 seconds))` would set the
+   * `node1/health` metric to `false` if no new values are published
+   * within a 10 second window.
+   */
+  def decay(prefix: String)(e: Event)(
+      implicit ES: ExecutorService = Monitoring.serverPool,
+      log: String => Unit = println): Task[Unit] = Task.delay {
+
+    def go = keys.continuous.once.map {
+      _.foreach(k => update(k, k.default).run)
+    }.run
+
+    // we merge the `e` stream and the stream of datapoints for the
+    // given prefix; if we ever encounter two ticks in a row from `e`,
+    // we reset all matching keys back to their default
+    val alive = async.signal[Boolean](Strategy.Executor(ES))
+    val pts = Monitoring.subscribe(this)(prefix).onComplete { Process.eval_(alive.close) }
+    e(this).zip(alive.changes).map(_._1).either(pts)
+           .scan(Vector(false,false))((acc,a) => acc.tail :+ a.isLeft)
+           .filter { _ forall (identity) }
+           .evalMap { _ => log(s"no activity for keys: $prefix, resetting..."); go }
+           .run.runAsync { _ => () }
+  }
+
+
   /** Return the elapsed time since this instance was started. */
   def elapsed: Duration
 
@@ -239,8 +268,9 @@ object Monitoring {
    *      halt the producer when completed. Just
    *      resubscribe if you need a fresh stream.
    */
-  def subscribe(M: Monitoring)(prefix: String, log: String => Unit = println)(
-  implicit ES: ExecutorService = serverPool):
+  def subscribe(M: Monitoring)(prefix: String)(
+  implicit ES: ExecutorService = serverPool,
+           log: String => Unit = println):
       Process[Task, Datapoint[Any]] =
     Process.suspend { // don't actually do anything until we have a consumer
       val S = Strategy.Executor(ES)

@@ -110,7 +110,7 @@ object MonitoringServer {
       req.getResponseHeaders.set("Content-Type", "text/event-stream")
       req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
-      val events = Monitoring.subscribe(M)(prefix, log)
+      val events = Monitoring.subscribe(M)(prefix)(log = log)
       val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
       SSE.writeEvents(events, sink)
     }

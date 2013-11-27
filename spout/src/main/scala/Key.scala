@@ -7,6 +7,7 @@ case class Key[+A] private[monitoring](name: String, typeOf: Reportable[A], unit
   def cast[B](R: Reportable[B], U: Units[B]): Option[Key[B]] =
     if (R == typeOf && units == U) Some(this.asInstanceOf[Key[B]])
     else None
+  def default: Option[A] = Units.default(typeOf, units)
 }
 
 object Key {
