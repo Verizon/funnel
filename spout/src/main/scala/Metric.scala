@@ -90,7 +90,7 @@ object Metric extends scalaz.Monad[Metric] {
     def publish(ticks: Event)(label: String, units: Units[A] = Units.None)(
                 implicit R: Reportable[A],
                 M: Monitoring = Monitoring.default): Key[A] =
-      M.publish(label, units)(ticks(M))(self).run
+      M.publish(label, units)(ticks)(self).run
 
     /** Publish this `Metric` to `M` every `d` elapsed time. */
     def publishEvery(d: Duration)(label: String, units: Units[A] = Units.None)(

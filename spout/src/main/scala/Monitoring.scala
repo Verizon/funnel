@@ -40,34 +40,50 @@ trait Monitoring {
   def get[O](k: Key[O]): async.immutable.Signal[O]
 
   /** Convience function to publish a metric under a newly created key. */
-  def publish[O:Reportable](name: String, units: Units[O])(
-                            events: Process[Task,Unit])(
+  def publish[O:Reportable](name: String, units: Units[O])(e: Event)(
                             f: Metric[O]): Task[Key[O]] =
-    publish(Key(name, units))(events)(f)
+    publish(Key(name, units))(e)(f)
+
+  /**
+   * Like `publish`, but if `key` is preexisting, sends updates
+   * to it rather than throwing an exception.
+   */
+  def republish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = Task.delay {
+    val refresh: Task[O] = eval(f)
+    // Whenever `event` generates a new value, refresh the signal
+    val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(refresh))
+    // Republish these values to a new topic
+    val snk =
+      if (!exists(key).run) topic[O,O](key)(Buffers.ignoreTime(process1.id))
+      else (o: O) => update(key, o).runAsync(_ => ())
+    proc.map(snk).run.runAsync(_ => ()) // nonblocking
+    key
+  }
 
   /**
    * Publish a metric with the given name on every tick of `events`.
    * See `Events` for various combinators for building up possible
    * arguments to pass here (periodically, when one or more keys
-   * change, etc).
+   * change, etc). Example `publish(k)(Events.every(5 seconds))(
    *
-   * This method does not check for uniqueness.
+   * This method checks that the given key is not preexisting and
+   * throws an error if the key already exists. Use `republish` if
+   * preexisting `key` is not an error condition.
    */
-  def publish[O](key: Key[O])(events: Process[Task,Unit])(f: Metric[O]): Task[Key[O]] = Task.delay {
+  def publish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = Task.suspend {
     if (exists(key).run) sys.error("key not unique, use republish if this is intended: " + key)
+    else republish(key)(e)(f)
+  }
+
+  /** Compute the current value for the given `Metric`. */
+  def eval[A](f: Metric[A]): Task[A] = {
     // `trans` is a polymorphic fn from `Key` to `Task`, picks out
     // latest value for that `Key`
     val trans = new (Key ~> Task) {
       def apply[A](k: Key[A]): Task[A] = latest(k)
     }
     // Invoke Metric interpreter, giving it function from Key to Task
-    val refresh: Task[O] = f.run(trans)
-    // Whenever `event` generates a new value, refresh the signal
-    val proc: Process[Task, O] = events.flatMap(_ => Process.eval(refresh))
-    // And finally republish these values to a new topic
-    val snk = topic[O,O](key)(Buffers.ignoreTime(process1.id))
-    proc.map(snk).run.runAsync(_ => ()) // nonblocking
-    key
+    f.run(trans)
   }
 
   /**
@@ -99,10 +115,10 @@ trait Monitoring {
       val snk = if (exists(key).run) (o: O) => update(key, o)
                 else topic[O,O](key)(Buffers.ignoreTime(process1.id))
       // send to sink asynchronously, this will not block
-      log(s"listening for updates to: $url/$prefix")
+      log(s"Monitoring.mirror: listening for updates to $url/$prefix")
       pts.evalMap { pt =>
         import JSON._
-        log("got datapoint: " + pt)
+        log("Monitoring.mirror: got datapoint " + pt)
         Task { snk(pt.value) } (S)
       }.run.runAsync(_ => ())
       key
@@ -116,31 +132,35 @@ trait Monitoring {
                 implicit S: ExecutorService = Monitoring.serverPool,
                 log: String => Unit = println): Process[Task,Unit] = {
     SSE.readEvents(url).flatMap { pt =>
+      val msg = "Monitoring.mirrorAll:" // logging msg prefix
       val k = pt.key.modifyName(localPrefix + _)
       if (exists(k).run) {
-        log(s"mirrorAll - got: $pt")
+        log(s"$msg got $pt")
         Process.eval(update(k, pt.value))
       }
       else {
-        log(s"mirrorAll - new key: ${pt.key}")
-        log(s"mirrorAll - got: $pt")
+        log(s"$msg new key ${pt.key}")
+        log(s"$msg got $pt")
         val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
         Process.emit(snk(pt.value))
       }
     }
   }
 
+  def aggregate[O,O2](family: Key[O], out: Key[O2])(e: Event)(
+                      f: Seq[Metric[O]] => Metric[O2]): Task[Key[O2]] = Task.delay {
+    ???
+  }
+
   /**
    * Reset all keys matching the given prefix back to their default
    * values if they receive no updates between ticks of `e`. Example:
-   * `decay(node1/health)(Event.every(10 seconds))` would set the
-   * `node1/health` metric to `false` if no new values are published
-   * within a 10 second window.
+   * `decay("node1/health")(Event.every(10 seconds))` would set the
+   * `node1/health` metric(s) to `false` if no new values are published
+   * within a 10 second window. See `Units.default`.
    */
   def decay(prefix: String)(e: Event)(
-      implicit ES: ExecutorService = Monitoring.serverPool,
-      log: String => Unit = println): Task[Unit] = Task.delay {
-
+            implicit log: String => Unit = println): Task[Unit] = Task.delay {
     def reset = keys.continuous.once.map {
       _.foreach(k => k.default.foreach(update(k, _).run))
     }.run
@@ -149,7 +169,7 @@ trait Monitoring {
     // we merge the `e` stream and the stream of datapoints for the
     // given prefix; if we ever encounter two ticks in a row from `e`,
     // we reset all matching keys back to their default
-    val alive = async.signal[Unit](Strategy.Executor(ES)); alive.value.set(())
+    val alive = async.signal[Unit](Strategy.Sequential); alive.value.set(())
     val pts = Monitoring.subscribe(this)(prefix).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
         log(s"$msg no more data points for '$prefix', resetting...")
@@ -186,8 +206,6 @@ trait Monitoring {
         else sys.error("type mismatch: $R $t")
       case ks => sys.error(s"lookup($name) does not determine a unique key: $ks")
     }
-
-  // def aggregateEvery[O,O2](name: String)(summarize: Seq[Key[O]] => Metric[O2])(implicit R: Reportable[O]):
 
   /** The infinite discrete stream of unique keys, as they are added. */
   def distinctKeys: Process[Task, Key[Any]] =

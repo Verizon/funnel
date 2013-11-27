@@ -11,7 +11,7 @@ case class Key[+A] private[monitoring](name: String, typeOf: Reportable[A], unit
 }
 
 object Key {
-  private[monitoring] def apply[A](name: String, units: Units[A])(implicit R: Reportable[A]): Key[A] =
+  def apply[A](name: String, units: Units[A])(implicit R: Reportable[A]): Key[A] =
     Key(name, R, units)
 
   implicit def keyToMetric[A](k: Key[A]): Metric[A] = Metric.key(k)
