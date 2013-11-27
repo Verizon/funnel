@@ -141,19 +141,25 @@ trait Monitoring {
       implicit ES: ExecutorService = Monitoring.serverPool,
       log: String => Unit = println): Task[Unit] = Task.delay {
 
-    def go = keys.continuous.once.map {
-      _.foreach(k => update(k, k.default).run)
+    def reset = keys.continuous.once.map {
+      _.foreach(k => k.default.foreach(update(k, _).run))
     }.run
+    val msg = "Monitoring.decay:" // logging msg prefix
 
     // we merge the `e` stream and the stream of datapoints for the
     // given prefix; if we ever encounter two ticks in a row from `e`,
     // we reset all matching keys back to their default
-    val alive = async.signal[Boolean](Strategy.Executor(ES))
-    val pts = Monitoring.subscribe(this)(prefix).onComplete { Process.eval_(alive.close) }
-    e(this).zip(alive.changes).map(_._1).either(pts)
+    val alive = async.signal[Unit](Strategy.Executor(ES)); alive.value.set(())
+    val pts = Monitoring.subscribe(this)(prefix).onComplete {
+      Process.eval_ { alive.close flatMap { _ =>
+        log(s"$msg no more data points for '$prefix', resetting...")
+        reset
+      }}
+    }
+    e(this).zip(alive.continuous).map(_._1).either(pts)
            .scan(Vector(false,false))((acc,a) => acc.tail :+ a.isLeft)
-           .filter { _ forall (identity) }
-           .evalMap { _ => log(s"no activity for keys: $prefix, resetting..."); go }
+           .filter { xs => xs forall (identity) }
+           .evalMap { _ => log(s"$msg no activity for key prefix '$prefix', resetting..."); reset }
            .run.runAsync { _ => () }
   }
 

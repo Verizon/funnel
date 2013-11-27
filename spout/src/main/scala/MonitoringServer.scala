@@ -26,11 +26,13 @@ object Main extends App {
 
   val c2 = I.counter("requests")
   val c3 = I.counter("requests2")
-  val g2 = Process.awakeEvery(2 seconds).map { _ => c2.increment; c3.increment }
-                  .run.runAsync(_ => ())
+  val h = I.gauge("health", true, Units.Healthy)
+  val g2 = Process.awakeEvery(2 seconds).map { _ => c2.increment; c3.increment; h.set(true) }
+                  .take(5).run.runAsync(_ => ())
 
   // val k = mirror[Double]("http://localhost:8082", "now/requests", Some("now/requests-clone"))
   mirrorAll("http://localhost:8082/stream", "node1/").run.runAsync(_ => ())
+  Monitoring.default.decay("node1")(Events.every(5 seconds)).run
 
   //
   // application that given a Process[Task,URL], mirr

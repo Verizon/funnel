@@ -3,10 +3,10 @@ package monitoring
 
 import argonaut.{DecodeResult => D, _}
 import argonaut.EncodeJson.{
-  DoubleEncodeJson, StringEncodeJson, Tuple2EncodeJson,
+  BooleanEncodeJson, DoubleEncodeJson, StringEncodeJson, Tuple2EncodeJson,
   jencode1, jencode2L, jencode3L, jencode4L, jencode6L, jencode7L
 }
-import argonaut.DecodeJson.{jdecode6L}
+import argonaut.DecodeJson.jdecode6L
 
 import java.io.InputStream
 import java.util.concurrent.{ExecutorService, TimeUnit}
