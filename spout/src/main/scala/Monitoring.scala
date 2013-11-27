@@ -218,6 +218,17 @@ trait Monitoring {
 
   def keysByName(name: String): Process[Task, List[Key[Any]]] =
     keys.continuous.map(_.filter(_ matches name))
+
+  /**
+   * Returns the continuous stream of values for keys whose type
+   * and units match `family`, and whose name is prefixed by
+   * `family.name`. The sequences emitted are in no particular order.
+   */
+  def evalFamily[O](family: Key[O]): Task[Seq[O]] =
+    keysByName(family.name).once.runLastOr(List()).flatMap { ks =>
+      val ksO: Seq[Key[O]] = ks.flatMap(_.cast(family.typeOf, family.units))
+      Nondeterminism[Task].gatherUnordered(ksO map (k => eval(k)))
+    }
 }
 
 object Monitoring {
