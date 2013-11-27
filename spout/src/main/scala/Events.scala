@@ -19,6 +19,15 @@ object Events {
     schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool):
     Event = _ => Process.awakeEvery(d)(pool, schedulingPool).map(_ => ())
 
+  /**
+   * The first `n` ticks of an event which fires at the supplied
+   * regular interval.
+   */
+  def takeEvery(d: Duration, n: Int)(
+    implicit pool: ExecutorService = Monitoring.defaultPool,
+    schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool):
+    Event = every(d) andThen (_.take(n))
+
   /** An event which fires whenever the given `Key` is updated. */
   def changed[A](k: Key[A]): Event = m => m.get(k).changes
 

@@ -147,9 +147,29 @@ trait Monitoring {
     }
   }
 
+  private def initialize[O](key: Key[O]): Unit = {
+    if (!exists(key).run) topic[O,O](key)(Buffers.ignoreTime(process1.id))
+    ()
+  }
+
+  /**
+   * Publish a new metric by aggregating all keys in the given family.
+   * This just calls `evalFamily(family)` on each tick of `e`, and
+   * publishes the result of `f` to the output key `out`.
+   */
   def aggregate[O,O2](family: Key[O], out: Key[O2])(e: Event)(
-                      f: Seq[Metric[O]] => Metric[O2]): Task[Key[O2]] = Task.delay {
-    ???
+                      f: Seq[O] => O2)(
+                      implicit log: String => Unit = _ => ()): Task[Key[O2]] = Task.delay {
+    initialize(out)
+    e(this).flatMap { _ =>
+      log("Monitoring.aggregate: gathering values")
+      Process.eval { evalFamily(family).flatMap { vs =>
+        val v = f(vs)
+        // log(s"Monitoring.aggregate: aggregated $v from ${vs.length} matching keys")
+        update(out, v)
+      }}
+    }.run.runAsync(_ => ())
+    out
   }
 
   /**

@@ -355,5 +355,25 @@ object MonitoringSpec extends Properties("monitoring") {
           .run(alwaysNone)
           .get == expected
   }
+
+  property("aggregate") = secure {
+    List(List(), List(1), List(-1,1), List.range(0,100)).forall { xs =>
+      val M = Monitoring.instance
+      val I = new Instruments(5 minutes, M)
+      val counters = xs.zipWithIndex.map { case (x,i) =>
+        val c = I.counter(s"count/$i")
+        c.incrementBy(x)
+        c
+      }
+      val family = Key[Double]("now/count", Units.Count)
+      val out = Key[Double]("sum", Units.Count)
+      M.aggregate(family, out)(Events.takeEvery(15 milliseconds, 50))(_.sum).run
+      Thread.sleep(1000)
+      // println("xs: " + xs)
+      val l = M.latest(out).run
+      val r = xs.map(_.toDouble).sum
+      l === r || { println(l, r); false }
+    }
+  }
 }
 
