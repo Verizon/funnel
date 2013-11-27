@@ -345,12 +345,15 @@ object MonitoringSpec extends Properties("monitoring") {
     bs <- Gen.listOfN(n, arbitrary[Boolean])
   } yield bs
 
-  property("Metrics.majority") = forAll(bools) { bs =>
+  property("Metric.bsequence") = forAll(bools) { bs =>
     import scalaz.~>
     import scalaz.std.option._
     val alwaysNone = new (Key ~> Option) { def apply[A](k: Key[A]) = None }
-    val expected = bs.filter(x => x).length / bs.length.toDouble > .5
-    Metrics.majority(bs.map(Metric.point(_))).run(alwaysNone).get == expected
+    val expected = Policies.majority(bs)
+    Metric.bsequence(bs.map(Metric.point(_)))
+          .map(Policies.majority)
+          .run(alwaysNone)
+          .get == expected
   }
 }
 

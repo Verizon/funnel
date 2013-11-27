@@ -18,23 +18,23 @@ trait Metric[+A] {
     Metric.run(this)(f)
 }
 
-object Metrics {
+object Policies {
 
-  /** Returns `true` if at least one of the input metrics is `true`. */
-  def any(xs: Seq[Metric[Boolean]]): Metric[Boolean] =
-    Metric.bsequence(xs).map(_.exists(b => b))
+  /** Returns `true` if at least one of the inputs is `true`. */
+  def any(xs: Seq[Boolean]): Boolean =
+    xs.exists(identity)
 
-  /** Returns `true` if all input metrics are `true`. */
-  def all(xs: Seq[Metric[Boolean]]): Metric[Boolean] =
-    Metric.bsequence(xs).map(_.forall(b => b))
+  /** Returns `true` if all inputs are `true`. */
+  def all(xs: Seq[Boolean]): Boolean =
+    xs.forall(identity)
 
-  /** Returns `true` if at least `k` of the input metrics are `true`. */
-  def quorum(k: Int)(xs: Seq[Metric[Boolean]]): Metric[Boolean] =
-    Metric.bsequence(xs).map(_.filter(b => b).length >= k)
+  /** Returns `true` if at least `k` of the inputs are `true`. */
+  def quorum(k: Int)(xs: Seq[Boolean]): Boolean =
+    xs.filter(b => b).length >= k
 
-  /** Returns `true` if at least 50% of the input metrics are `true`. */
-  def majority(xs: Seq[Metric[Boolean]]): Metric[Boolean] =
-    fraction(.50001)(xs)
+  /** Returns `true` if at least 50% of the inputs are `true`. */
+  def majority(xs: Seq[Boolean]): Boolean =
+    fraction(.500001)(xs)
 
   /**
    * Returns `true` if `count(true) / xs.length` exceeds `d`.
@@ -42,8 +42,9 @@ object Metrics {
    * 2/3, and so on.
    * @param d - a value between 0 and 1.
    */
-  def fraction(d: Double)(xs: Seq[Metric[Boolean]]): Metric[Boolean] =
-    Metric.bsequence(xs).map(_.filter(b => b).length.toDouble / xs.length > d)
+  def fraction(d: Double)(xs: Seq[Boolean]): Boolean =
+    if (xs.isEmpty && d != 0.0) false
+    else xs.filter(b => b).length.toDouble / xs.length > d
 }
 
 object Metric extends scalaz.Monad[Metric] {
