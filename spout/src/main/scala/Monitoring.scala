@@ -1,5 +1,6 @@
 package intelmedia.ws.monitoring
 
+import java.net.{URL,URLEncoder}
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 import scala.concurrent.duration._
@@ -126,21 +127,21 @@ trait Monitoring {
 
   /**
    * Mirror all metrics from the given URL, adding `localPrefix` onto the front of
-   * all loaded keys.
+   * all loaded keys. `url` is assumed to be a stream of datapoints in SSE format.
    */
-  def mirrorAll(url: String, localPrefix: String = "")(
+  def mirrorAll(url: String, localName: String => String = identity)(
                 implicit S: ExecutorService = Monitoring.serverPool,
                 log: String => Unit = println): Process[Task,Unit] = {
     SSE.readEvents(url).flatMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
-      val k = pt.key.modifyName(localPrefix + _)
+      val k = pt.key.modifyName(localName)
       if (exists(k).run) {
-        log(s"$msg got $pt")
+        // log(s"$msg got $pt")
         Process.eval(update(k, pt.value))
       }
       else {
         log(s"$msg new key ${pt.key}")
-        log(s"$msg got $pt")
+        // log(s"$msg got $pt")
         val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
         Process.emit(snk(pt.value))
       }
@@ -154,12 +155,12 @@ trait Monitoring {
    * will call `mirrorAll`, and retry every three minutes up to
    * 5 attempts before raising the most recent exception.
    */
-  def attemptMirrorAll(breaker: Event)(url: String, localPrefix: String = "")(
+  def attemptMirrorAll(breaker: Event)(url: String, localName: String => String = identity)(
                        implicit S: ExecutorService = Monitoring.serverPool,
                        log: String => Unit = println): Process[Task,Unit] = {
     val e = breaker(this)
     val step: Process[Task, Throwable \/ Unit] =
-      mirrorAll(url, localPrefix)(S, log).attempt()
+      mirrorAll(url, localName)(S, log).attempt()
     step.stripW ++ e.terminated.flatMap {
       // on our last reconnect attempt, rethrow error
       case None => step.flatMap(_.fold(Process.fail, Process.emit))
@@ -167,6 +168,43 @@ trait Monitoring {
       case Some(_) => step.stripW
     }
   }
+
+  /**
+   * Given a stream of URLs with associated group names, mirror all
+   * metrics from these URLs, and aggregate the `health` key for
+   * clusters of nodes with the same name. `breaker` controls reconnect
+   * attempts. Example:
+   *
+   * {{{
+   * mirrorAndAggregate(Events.every(2 minutes))(urls)(
+   *   Key[Boolean]("health", Units.Healthy)) {
+   *     case "accounts" => Policies.quorum(2) _
+   *     case "decoding" => Policies.majority _
+   *     case "blah"     => Policies.all _
+   *   }
+   * }}}
+   */
+  def mirrorAndAggregate(
+      breaker: Event)(
+      groupedUrls: Process[Task, (URL,String)],
+      health: Key[Boolean])(f: String => Seq[Boolean] => Boolean): Task[Unit] =
+    Task.delay {
+      // use urls as the local names for keys
+      var seen = Set[String]()
+      groupedUrls.evalMap { case (url,group) => Task.delay {
+        if (!seen.contains(group)) {
+          val aggregateKey = health.modifyName(group + "/" + _)
+          val keyFamily = health.modifyName(x => s"$group/$x/")
+          decay(keyFamily.name)(Events.every(15 seconds)).run
+          aggregate(keyFamily, aggregateKey)(Events.every(5 seconds))(f(group)).run
+          seen = seen + group
+        }
+        val localName = prettyURL(url)
+        // ex - `now/health` ==> `accounts/now/health/192.168.2.1`
+        attemptMirrorAll(breaker)(url.toString, m => s"$group/$m/$localName").
+        run.runAsync(_ => ())
+      }}.run.runAsync(_ => ())
+    }
 
   private def initialize[O](key: Key[O]): Unit = {
     if (!exists(key).run) topic[O,O](key)(Buffers.ignoreTime(process1.id))
@@ -186,7 +224,7 @@ trait Monitoring {
       log("Monitoring.aggregate: gathering values")
       Process.eval { evalFamily(family).flatMap { vs =>
         val v = f(vs)
-        // log(s"Monitoring.aggregate: aggregated $v from ${vs.length} matching keys")
+        log(s"Monitoring.aggregate: aggregated $v from ${vs.length} matching keys")
         update(out, v)
       }}
     }.run.runAsync(_ => ())
@@ -421,5 +459,15 @@ object Monitoring {
     ((i: I) => hub ! i, signal)
   }
 
+
+  private[monitoring] def prettyURL(url: URL): String = {
+    val host = url.getHost
+    val path = url.getPath
+    val port = url.getPort match {
+      case -1 => ""
+      case x => "-"+x
+    }
+    host + port + path
+  }
 }
 

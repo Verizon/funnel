@@ -42,4 +42,7 @@ object Events {
       val s2 = e2(m)
       s1.flatMap(_ => s2.once)
     }
+
+  // def exponentialBackoff(failure: Signal[Boolean], base: Duration): Event
+  // def exponentialBackoff(failure: Key[Boolean], base: Duration): Event
 }

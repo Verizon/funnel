@@ -31,7 +31,7 @@ object Main extends App {
                   .take(5).run.runAsync(_ => ())
 
   // val k = mirror[Double]("http://localhost:8082", "now/requests", Some("now/requests-clone"))
-  mirrorAll("http://localhost:8082/stream", "node1/").run.runAsync(_ => ())
+  mirrorAll("http://localhost:8082/stream", "node1/" + _).run.runAsync(_ => ())
   Monitoring.default.decay("node1")(Events.every(5 seconds)).run
 
   //
@@ -62,12 +62,13 @@ object MonitoringServer {
    * `/stream/<keyid>`: stream of metrics for the given key
    * `/stream/<prefix>`: stream of metrics whose labels start with 'prefix'
    */
-  def start(M: Monitoring, port: Int = 8080, log: Log = println): Unit = {
+  def start(M: Monitoring, port: Int = 8080, log: Log = println): () => Unit = {
     val server = HttpServer.create(new InetSocketAddress(port), 0)
     server.setExecutor(Monitoring.serverPool)
     server.createContext("/", handler(M, log))
     server.start()
     log("server started on port: " + port)
+    () => server.stop(0)
   }
 
   private[monitoring] def handler(M: Monitoring, log: Log) = new HttpHandler {
