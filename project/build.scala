@@ -25,13 +25,12 @@ object Build extends Build {
 
   lazy val spout = Project("spout", file("spout"))
     .settings(buildSettings:_*)
-    .settings(resolvers += "pchiusano/bintray" at "http://dl.bintray.com/pchiusano/maven")
     .settings(name := "spout")
     .settings(libraryDependencies ++=
       compile(scalaz) ++
       compile(scalazstream) ++
       compile(algebird) ++
-      compile("io.argonaut" %% "argonaut" % "6.0.1") ++
+      compile(argonaut) ++
       test(scalacheck) ++
       test(scalatest))
 
