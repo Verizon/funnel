@@ -35,8 +35,8 @@ object Build extends Build {
       test(scalacheck) ++
       test(scalatest))
 
-  lazy val hopper = Project("hopper", file("hopper"))
+  lazy val funnel = Project("funnel", file("funnel"))
     .settings(buildSettings:_*)
-    .settings(crossPaths := false) // adding this because its a executable
+    .settings(crossPaths := false) // adding this because its an executable
     .dependsOn(spout)
 }
