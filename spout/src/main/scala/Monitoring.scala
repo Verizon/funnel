@@ -199,8 +199,7 @@ trait Monitoring {
           aggregate(keyFamily, aggregateKey)(Events.every(5 seconds))(f(group)).run
           seen = seen + group
         }
-        val urlS = url.toString
-        val localName = URLEncoder.encode(urlS, "UTF-8")
+        val localName = prettyURL(url)
         // ex - `now/health` ==> `accounts/now/health/192.168.2.1`
         attemptMirrorAll(breaker)(url.toString, m => s"$group/$m/$localName").
         run.runAsync(_ => ())
@@ -460,5 +459,15 @@ object Monitoring {
     ((i: I) => hub ! i, signal)
   }
 
+
+  private[monitoring] def prettyURL(url: URL): String = {
+    val host = url.getHost
+    val path = url.getPath
+    val port = url.getPort match {
+      case -1 => ""
+      case x => "-"+x
+    }
+    host + port + path
+  }
 }
 
