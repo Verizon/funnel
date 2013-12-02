@@ -3,7 +3,7 @@ package monitoring
 
 import argonaut.{DecodeResult => D, _}
 import argonaut.EncodeJson.{
-  BooleanEncodeJson, DoubleEncodeJson, StringEncodeJson, Tuple2EncodeJson,
+  BooleanEncodeJson, StringEncodeJson, Tuple2EncodeJson,
   jencode1, jencode2L, jencode3L, jencode4L, jencode6L, jencode7L
 }
 import argonaut.DecodeJson.jdecode6L
@@ -23,6 +23,12 @@ object JSON {
   def encodeResult[A](a: A)(implicit A: EncodeJson[A]): Json = A(a)
   def encode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).nospaces
   def prettyEncode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).spaces2
+
+  implicit val DoubleEncodeJson =
+    jencode1[Double,Option[Double]] {
+      case d if d.isNaN || d.isInfinity => None
+      case d => Some(d)
+    } (argonaut.EncodeJson.OptionEncodeJson(argonaut.EncodeJson.DoubleEncodeJson))
 
   def decodeUnion[A](kindF: String)(cases: (String, DecodeJson[A])*): DecodeJson[A] = {
     val byKind = cases.toMap
@@ -86,7 +92,7 @@ object JSON {
 
   implicit def EncodeStats: EncodeJson[monitoring.Stats] =
     jencode7L((s: monitoring.Stats) =>
-      (s.last, s.mean, s.count, s.variance, s.standardDeviation, s.skewness, s.kurtosis))(
+      (s.last, s.mean, s.count.toDouble, s.variance, s.standardDeviation, s.skewness, s.kurtosis))(
        "last", "mean", "count", "variance", "standardDeviation", "skewness", "kurtosis")
   implicit def DecodeStats: DecodeJson[monitoring.Stats] =
     jdecode6L((last: Option[Double], mean: Double, count: Double, variance: Double,

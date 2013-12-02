@@ -375,5 +375,23 @@ object MonitoringSpec extends Properties("monitoring") {
       l === r || { println(l, r); false }
     }
   }
+
+  import argonaut.{DecodeJson, EncodeJson, Parse}
+
+  def roundTrip[A:EncodeJson:DecodeJson](a: A): Prop = {
+    val out1: String = implicitly[EncodeJson[A]].apply(a).nospaces
+    // println(out1)
+    val parsed = Parse.decode[A](out1).toOption.get
+    val out2: String = implicitly[EncodeJson[A]].apply(parsed).nospaces
+    out1 == out2 || (s"out1: $out1, out2: $out2" |: false)
+  }
+
+  property("NaN handling") = secure {
+    import JSON._
+    roundTrip(Stats.statsGroup.zero) &&
+    roundTrip(Double.NaN) &&
+    roundTrip(Double.PositiveInfinity) &&
+    roundTrip(Double.NegativeInfinity)
+  }
 }
 
