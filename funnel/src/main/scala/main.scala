@@ -50,6 +50,9 @@ object Funnel extends FunnelCommandLine {
   def main(args: Array[String]): Unit = 
     run(args){ options =>  
       println(">>>> "+ options)
+
+      MonitoringServer.start(Monitoring.default, 5775)
+
       val health = Key[Boolean](options.healthKey, Units.Healthy)
       val events = Events.takeEvery(options.aggregationInterval, options.retryLimit)
 
