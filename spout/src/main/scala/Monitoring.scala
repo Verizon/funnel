@@ -147,11 +147,23 @@ trait Monitoring {
   /**
    * Given a stream of URLs with associated group names, mirror all
    * metrics from these URLs, and aggregate the `health` key for
-   * clusters of nodes with the same name. `breaker` controls reconnect
+   * clusters of nodes with the same name. `reconnectFrequency` controls reconnect
    * attempts. Example:
    *
    * {{{
-   * mirrorAndAggregate(Events.every(2 minutes))(urls)(
+   * val parser: DatapointParser = url => ....
+   *
+   * // when there's a failure connecting to a node, define the reconnect frequency
+   * val reconnect   = Events.every(2 minutes) 
+   *
+   * // if the url has not produced any updates in this duration/event cycle, 
+   * // reset the values to their defaults after this bound 
+   * val decay       = Event.every(15 seconds) 
+   *
+   * // how frequently to produce the "aggregate" health `key` for each group of urls
+   * val aggregating = Event.every(5 seconds)
+   *
+   * mirrorAndAggregate(parser)(reconnect,decay,aggregating)(urls)(
    *   Key[Boolean]("health", Units.Healthy)) {
    *     case "accounts" => Policies.quorum(2) _
    *     case "decoding" => Policies.majority _
@@ -161,7 +173,9 @@ trait Monitoring {
    */
   def mirrorAndAggregate(
       parse: DatapointParser)(
-      breaker: Event)(
+      reconnectFrequency: Event,
+      decayFrequency: Event,
+      aggregateFrequency: Event)(
       groupedUrls: Process[Task, (URL,String)],
       health: Key[Boolean])(f: String => Seq[Boolean] => Boolean): Task[Unit] =
     Task.delay {
@@ -171,13 +185,13 @@ trait Monitoring {
         if (!seen.contains(group)) {
           val aggregateKey = health.modifyName(group + "/" + _)
           val keyFamily = health.modifyName(x => s"$group/$x/")
-          decay(keyFamily.name)(Events.every(15 seconds)).run
-          aggregate(keyFamily, aggregateKey)(Events.every(5 seconds))(f(group)).run
+          decay(keyFamily.name)(decayFrequency).run
+          aggregate(keyFamily, aggregateKey)(aggregateFrequency)(f(group)).run
           seen = seen + group
         }
         val localName = prettyURL(url)
         // ex - `now/health` ==> `accounts/now/health/192.168.2.1`
-        attemptMirrorAll(parse)(breaker)(
+        attemptMirrorAll(parse)(reconnectFrequency)(
           url, m => s"$group/$m/$localName"
         ).run.runAsync(_ => ())
       }}.run.runAsync(_ => ())

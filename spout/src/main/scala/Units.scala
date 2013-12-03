@@ -15,7 +15,7 @@ object Units {
   case class Bytes(base: Base) extends Units[Double with monitoring.Stats]
   case object Count extends Units[Double with monitoring.Stats]
   case object Ratio extends Units[Double with monitoring.Stats]
-  case object Stoplight extends Units[String] // "red", "yellow", "green"
+  case object TrafficLight extends Units[String] // "red", "yellow", "green"
   case object Healthy extends Units[Boolean]
   case object Load extends Units[String] // "idle", "busy", "overloaded"
 
@@ -44,7 +44,7 @@ object Units {
    */
   def default[O](t: Reportable[O], u: Units[O]): Option[O] = (t, u) match {
     case (Reportable.B, Healthy) => Some(false)
-    case (Reportable.S, Stoplight) => Some("red")
+    case (Reportable.S, TrafficLight) => Some("red")
     case _ => scala.None
   }
 

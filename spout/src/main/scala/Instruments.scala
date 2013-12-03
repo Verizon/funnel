@@ -108,6 +108,9 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
     g.buffer(50 milliseconds)
   }
 
+  def trafficLight(label: String): TrafficLight = 
+    TrafficLight(gauge(label, TrafficLight.Red, Units.TrafficLight))
+
   /**
    * Return a `Gauge` with the given starting value.
    * Unlike `gauge`, keys updated by this `Counter` are

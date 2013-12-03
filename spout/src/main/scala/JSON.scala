@@ -55,7 +55,7 @@ object JSON {
       case Duration(g) => unCapsLock(g.toString)
       case Count => "Count"
       case Ratio => "Ratio"
-      case Stoplight => "Stoplight"
+      case TrafficLight => "TrafficLight"
       case Healthy => "Healthy"
       case Load => "Load"
       case None => "None"
@@ -70,7 +70,7 @@ object JSON {
       case "Gigabytes" => D.ok { Bytes(Giga) }
       case "Count" => D.ok { Count }
       case "Ratio" => D.ok { Ratio }
-      case "Stoplight" => D.ok { Stoplight }
+      case "TrafficLight" => D.ok { TrafficLight }
       case "Healthy" => D.ok { Healthy }
       case "Load" => D.ok { Load }
       case "None" => D.ok { None }
