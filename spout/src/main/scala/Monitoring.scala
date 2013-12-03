@@ -97,42 +97,14 @@ trait Monitoring {
   // rather than pushing
 
   /**
-   * Mirror the (assumed) unique event at the given url and prefix.
-   * Example: `mirror[String]("http://localhost:8080", "now/health")`.
-   * This will fetch the stream at `http://localhost:8080/stream/now/health`
-   * and keep it updated locally, as events are published at `url`.
-   * `localName` may be (optionally) supplied to change the name of the
-   * key used locally. The `id` field of the key is preserved, unless
-   * `clone` is set to `true`.
-   *
-   * This function checks that the given `prefix` uniquely determines a
-   * key, and that it has the expected type, and fails fast otherwise.
-   */
-  def mirror[O:Reportable](url: String, prefix: String, localName: Option[String] = None)(
-      implicit S: ExecutorService = Monitoring.serverPool,
-               log: String => Unit = println): Task[Key[O]] =
-    SSE.readEvent(url, prefix)(implicitly[Reportable[O]], S).map { case (k, pts) =>
-      val key = localName.map(k.rename(_)).getOrElse(k)
-      val snk = if (exists(key).run) (o: O) => update(key, o)
-                else topic[O,O](key)(Buffers.ignoreTime(process1.id))
-      // send to sink asynchronously, this will not block
-      log(s"Monitoring.mirror: listening for updates to $url/$prefix")
-      pts.evalMap { pt =>
-        import JSON._
-        log("Monitoring.mirror: got datapoint " + pt)
-        Task { snk(pt.value) } (S)
-      }.run.runAsync(_ => ())
-      key
-    }
-
-  /**
    * Mirror all metrics from the given URL, adding `localPrefix` onto the front of
    * all loaded keys. `url` is assumed to be a stream of datapoints in SSE format.
    */
-  def mirrorAll(url: String, localName: String => String = identity)(
+  def mirrorAll(parse: DatapointParser)(
+                url: URL, localName: String => String = identity)(
                 implicit S: ExecutorService = Monitoring.serverPool,
                 log: String => Unit = println): Process[Task,Unit] = {
-    SSE.readEvents(url).flatMap { pt =>
+    parse(url).flatMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
       val k = pt.key.modifyName(localName)
       if (exists(k).run) {
@@ -155,12 +127,15 @@ trait Monitoring {
    * will call `mirrorAll`, and retry every three minutes up to
    * 5 attempts before raising the most recent exception.
    */
-  def attemptMirrorAll(breaker: Event)(url: String, localName: String => String = identity)(
-                       implicit S: ExecutorService = Monitoring.serverPool,
-                       log: String => Unit = println): Process[Task,Unit] = {
+  def attemptMirrorAll(
+      parse: DatapointParser)(
+      breaker: Event)(
+      url: URL, localName: String => String = identity)(
+        implicit S: ExecutorService = Monitoring.serverPool,
+        log: String => Unit = println): Process[Task,Unit] = {
     val e = breaker(this)
     val step: Process[Task, Throwable \/ Unit] =
-      mirrorAll(url, localName)(S, log).attempt()
+      mirrorAll(parse)(url, localName)(S, log).attempt()
     step.stripW ++ e.terminated.flatMap {
       // on our last reconnect attempt, rethrow error
       case None => step.flatMap(_.fold(Process.fail, Process.emit))
@@ -185,6 +160,7 @@ trait Monitoring {
    * }}}
    */
   def mirrorAndAggregate(
+      parse: DatapointParser)(
       breaker: Event)(
       groupedUrls: Process[Task, (URL,String)],
       health: Key[Boolean])(f: String => Seq[Boolean] => Boolean): Task[Unit] =
@@ -201,8 +177,9 @@ trait Monitoring {
         }
         val localName = prettyURL(url)
         // ex - `now/health` ==> `accounts/now/health/192.168.2.1`
-        attemptMirrorAll(breaker)(url.toString, m => s"$group/$m/$localName").
-        run.runAsync(_ => ())
+        attemptMirrorAll(parse)(breaker)(
+          url, m => s"$group/$m/$localName"
+        ).run.runAsync(_ => ())
       }}.run.runAsync(_ => ())
     }
 

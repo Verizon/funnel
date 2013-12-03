@@ -3,6 +3,7 @@ package intelmedia.ws.monitoring
 import argonaut.{DecodeJson, EncodeJson}
 import java.io.InputStream
 import java.util.concurrent.ExecutorService
+import java.net.URL
 import scalaz.concurrent.Task
 import scalaz.stream._
 import scalaz.stream.{Process => P}
@@ -120,12 +121,14 @@ object SSE {
    * in the event of an error, or if the given prefix does not
    * uniquely determine a `Key`.
    */
-  def readEvent[O](url: String, prefix: String)(implicit R: Reportable[O], S: ExecutorService, log: String => Unit = println):
+  def readEvent[O](url: URL, prefix: String)(implicit R: Reportable[O], S: ExecutorService, log: String => Unit = println):
       Task[(Key[O], Process[Task, Datapoint[O]])] =
-    urlDecode[List[Key[Any]]](s"$url/keys/$prefix").map { ks =>
+    urlDecode[List[Key[Any]]](new URL(s"${url.toString}/keys/$prefix"))
+    .map { ks =>
       ks.filter(_.matches(prefix)) match {
         case List(k) if k.typeOf == R =>
-          val s = readEvents(s"$url/stream/${k.name}").map { pt =>
+          val kURL = new URL(s"${url.toString}/stream/${k.name}")
+          val s = readEvents(kURL).map { pt =>
             pt.cast(R).filter(_.units == k.units)
               .getOrElse(sys.error(s"mismatch! expected $R ${k.units}, got ${pt.typeOf} ${pt.units}"))
           }
@@ -138,7 +141,7 @@ object SSE {
    * Return a stream of all events from the given URL.
    * Example: `readEvents("http://localhost:8001/stream/sliding/jvm")`.
    */
-  def readEvents(url: String)(implicit S: ExecutorService = Monitoring.serverPool):
+  def readEvents(url: URL)(implicit S: ExecutorService = Monitoring.serverPool):
       Process[Task, Datapoint[Any]] =
     urlLinesR(url)(S).pipe(blockParser).map {
       case (_,data) => parseOrThrow[Datapoint[Any]](data)
@@ -149,13 +152,13 @@ object SSE {
   def parseOrThrow[A:DecodeJson](s: String): A =
     argonaut.Parse.decodeEither[A](s).fold(e => throw ParseError(e), identity)
 
-  def urlDecode[A:DecodeJson](url: String)(implicit S: ExecutorService = Monitoring.serverPool): Task[A] =
+  def urlDecode[A:DecodeJson](url: URL)(implicit S: ExecutorService = Monitoring.serverPool): Task[A] =
     urlFullR(url)(S).map(parseOrThrow[A])
 
-  def urlLinesR(url: String)(implicit S: ExecutorService = Monitoring.serverPool): Process[Task, String] =
-    Process.suspend { linesR(new java.net.URL(url).openStream)(S) }
+  def urlLinesR(url: URL)(implicit S: ExecutorService = Monitoring.serverPool): Process[Task, String] =
+    Process.suspend { linesR(url.openStream)(S) }
 
-  def urlFullR(url: String)(implicit S: ExecutorService = Monitoring.serverPool): Task[String] =
+  def urlFullR(url: URL)(implicit S: ExecutorService = Monitoring.serverPool): Task[String] =
     urlLinesR(url)(S).chunkAll.map(_.mkString("\n")).runLastOr("")
 
   /**

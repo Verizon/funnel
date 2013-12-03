@@ -51,11 +51,12 @@ object MirroringExample extends Properties("mirroring") {
     val M = Monitoring.instance
     MonitoringServer.start(M, 8000)
 
-    M.mirrorAndAggregate(Events.takeEvery(1 minutes, 5))(urls, health) {
-      case "accounts" => Policies.quorum(2)
-      case "decoding" => Policies.majority
-      case _          => sys.error("unknown group type")
-    }.run
+    M.mirrorAndAggregate(SSE.readEvents)(
+      Events.takeEvery(1 minutes, 5))(urls, health) {
+        case "accounts" => Policies.quorum(2)
+        case "decoding" => Policies.majority
+        case _          => sys.error("unknown group type")
+      }.run
 
     true
   }

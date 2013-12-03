@@ -4,7 +4,7 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
 import java.io.{BufferedWriter, IOException, OutputStream, OutputStreamWriter}
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress, URL}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
@@ -31,7 +31,10 @@ object Main extends App {
                   .take(5).run.runAsync(_ => ())
 
   // val k = mirror[Double]("http://localhost:8082", "now/requests", Some("now/requests-clone"))
-  mirrorAll("http://localhost:8082/stream", "node1/" + _).run.runAsync(_ => ())
+  M.mirrorAll(SSE.readEvents)(
+    new URL("http://localhost:8082/stream"),
+    "node1/" + _
+  ).run.runAsync(_ => ())
   Monitoring.default.decay("node1")(Events.every(5 seconds)).run
 
   //
