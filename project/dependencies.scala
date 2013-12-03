@@ -14,4 +14,5 @@ object Dependencies {
   val algebird     = "com.twitter"       %% "algebird-core" % "0.3.0"
   val scalacheck   = "org.scalacheck"    %% "scalacheck"    % "1.10.0"
   val argonaut     = "io.argonaut"       %% "argonaut"      % "6.0.1"
+  val scopt        = "com.github.scopt"  %% "scopt"         % "3.2.0"
 }

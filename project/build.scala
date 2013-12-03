@@ -37,5 +37,6 @@ object Build extends Build {
   lazy val funnel = Project("funnel", file("funnel"))
     .settings(buildSettings:_*)
     .settings(crossPaths := false) // adding this because its an executable
+    .settings(libraryDependencies ++= compile(scopt))
     .dependsOn(spout)
 }
