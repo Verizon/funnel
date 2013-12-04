@@ -44,7 +44,7 @@ object Units {
    */
   def default[O](t: Reportable[O], u: Units[O]): Option[O] = (t, u) match {
     case (Reportable.B, Healthy) => Some(false)
-    case (Reportable.S, TrafficLight) => Some("red")
+    case (Reportable.S, TrafficLight) => Some(monitoring.TrafficLight.Red)
     case _ => scala.None
   }
 
