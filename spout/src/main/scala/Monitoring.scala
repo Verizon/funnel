@@ -181,17 +181,19 @@ trait Monitoring {
     Task.delay {
       // use urls as the local names for keys
       var seen = Set[String]()
+      var seenURLs = Set[(URL,String)]()
       groupedUrls.evalMap { case (url,group) => Task.delay {
         if (!seen.contains(group)) {
           val aggregateKey = health.modifyName(group + "/" + _)
           val keyFamily = health.modifyName(x => s"$group/$x/")
-          // todo - really we should apply the decay to the individual
-          // url streams
-          decay(keyFamily.name)(decayFrequency).run
           aggregate(keyFamily, aggregateKey)(aggregateFrequency)(f(group)).run
           seen = seen + group
         }
         val localName = prettyURL(url)
+        if (!seenURLs.contains(url -> group)) {
+          decay(Key.EndsWith(localName))(decayFrequency).run
+          seenURLs = seenURLs + (url -> group)
+        }
         // ex - `now/health` ==> `accounts/now/health/192.168.2.1`
         attemptMirrorAll(parse)(reconnectFrequency)(
           url, m => s"$group/$m/$localName"
@@ -231,7 +233,7 @@ trait Monitoring {
    * `node1/health` metric(s) to `false` if no new values are published
    * within a 10 second window. See `Units.default`.
    */
-  def decay(prefix: String)(e: Event)(
+  def decay(f: Key[Any] => Boolean)(e: Event)(
             implicit log: String => Unit = println): Task[Unit] = Task.delay {
     def reset = keys.continuous.once.map {
       _.foreach(k => k.default.foreach(update(k, _).run))
@@ -242,16 +244,16 @@ trait Monitoring {
     // given prefix; if we ever encounter two ticks in a row from `e`,
     // we reset all matching keys back to their default
     val alive = async.signal[Unit](Strategy.Sequential); alive.value.set(())
-    val pts = Monitoring.subscribe(this)(prefix).onComplete {
+    val pts = Monitoring.subscribe(this)(f).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
-        log(s"$msg no more data points for '$prefix', resetting...")
+        log(s"$msg no more data points for '$f', resetting...")
         reset
       }}
     }
     e(this).zip(alive.continuous).map(_._1).either(pts)
            .scan(Vector(false,false))((acc,a) => acc.tail :+ a.isLeft)
            .filter { xs => xs forall (identity) }
-           .evalMap { _ => log(s"$msg no activity for key prefix '$prefix', resetting..."); reset }
+           .evalMap { _ => log(s"$msg no activity for '$f', resetting..."); reset }
            .run.runAsync { _ => () }
   }
 
@@ -271,7 +273,7 @@ trait Monitoring {
 
   /** Attempt to uniquely resolve `name` to a key of some expected type. */
   def lookup[O](name: String)(implicit R: Reportable[O]): Task[Key[O]] =
-    keysByName(name).once.runLastOr(List()).map {
+    filterKeys(Key.StartsWith(name)).once.runLastOr(List()).map {
       case List(k) =>
         val t = k.typeOf
         if (t == R) k.asInstanceOf[Key[O]]
@@ -288,8 +290,8 @@ trait Monitoring {
     name: String, units: Units[O])(
     buf: Process1[(I,Duration),O]): I => Unit = topic(name, units)(buf)._2
 
-  def keysByName(name: String): Process[Task, List[Key[Any]]] =
-    keys.continuous.map(_.filter(_ matches name))
+  def filterKeys(f: Key[Any] => Boolean): Process[Task, List[Key[Any]]] =
+    keys.continuous.map(_.filter(f))
 
   /**
    * Returns the continuous stream of values for keys whose type
@@ -297,7 +299,7 @@ trait Monitoring {
    * `family.name`. The sequences emitted are in no particular order.
    */
   def evalFamily[O](family: Key[O]): Task[Seq[O]] =
-    keysByName(family.name).once.runLastOr(List()).flatMap { ks =>
+    filterKeys(Key.StartsWith(family.name)).once.runLastOr(List()).flatMap { ks =>
       val ksO: Seq[Key[O]] = ks.flatMap(_.cast(family.typeOf, family.units))
       Nondeterminism[Task].gatherUnordered(ksO map (k => eval(k)))
     }
@@ -375,7 +377,7 @@ object Monitoring {
    *      halt the producer when completed. Just
    *      resubscribe if you need a fresh stream.
    */
-  def subscribe(M: Monitoring)(prefix: String)(
+  def subscribe(M: Monitoring)(f: Key[Any] => Boolean)(
   implicit ES: ExecutorService = serverPool,
            log: String => Unit = println):
       Process[Task, Datapoint[Any]] =
@@ -387,7 +389,7 @@ object Monitoring {
       alive.value.set(true)
       S { // in the background, populate the 'out' `Signal`
         alive.discrete.map(!_).wye(M.distinctKeys)(wye.interrupt)
-        .filter(_.matches(prefix))
+        .filter(f)
         .map { k =>
           // asynchronously set the output
           S { M.get(k).discrete
@@ -397,12 +399,12 @@ object Monitoring {
                .run.run
             }
         }.run.run
-        log("killed producer for prefix: " + prefix)
+        log("killed producer for: " + f)
       }
       // kill the producers when the consumer completes
       out.discrete onComplete {
         Process.eval_ { Task.delay {
-          log("killing producers for prefix: " + prefix)
+          log("killing producers for: " + f)
           out.close
           alive.value.set(false)
         }}

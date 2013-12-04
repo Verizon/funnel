@@ -125,7 +125,7 @@ object SSE {
       Task[(Key[O], Process[Task, Datapoint[O]])] =
     urlDecode[List[Key[Any]]](new URL(s"${url.toString}/keys/$prefix"))
     .map { ks =>
-      ks.filter(_.matches(prefix)) match {
+      ks.filter(_.startsWith(prefix)) match {
         case List(k) if k.typeOf == R =>
           val kURL = new URL(s"${url.toString}/stream/${k.name}")
           val s = readEvents(kURL).map { pt =>

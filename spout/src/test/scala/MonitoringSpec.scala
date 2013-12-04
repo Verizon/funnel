@@ -406,5 +406,37 @@ object MonitoringSpec extends Properties("monitoring") {
     o._3 == "google.com-80" &&
     o._4 == "google.com" || ("" + o |: false)
   }
+
+  property("TrafficLight.quorum") = secure {
+    import TrafficLight._
+    quorum(1)(List()) == Red &&
+    quorum(1)(List(Red)) == Red &&
+    quorum(1)(List(Green)) == Green &&
+    quorum(1)(List(Amber)) == Green &&
+    quorum(1)(List(Red,Green)) == Amber &&
+    quorum(1)(List(Amber,Green)) == Green &&
+    quorum(1)(List(Green,Green)) == Green &&
+    quorum(2)(List(Green,Green,Green)) == Green &&
+    quorum(2)(List(Green,Amber,Green)) == Green &&
+    quorum(2)(List(Red,Amber,Green)) == Amber &&
+    quorum(2)(List(Red,Red,Green)) == Red
+  }
+
+  property("TrafficLight.fraction") = secure {
+    import TrafficLight._
+    fraction(.5)(List()) == Green &&
+    fraction(.5)(List(Red)) == Red &&
+    fraction(.5)(List(Green)) == Green &&
+    fraction(.5)(List(Amber)) == Green &&
+    fraction(.5)(List(Red,Green)) == Amber &&
+    fraction(.5)(List(Amber,Green)) == Green &&
+    fraction(.5)(List(Green,Green)) == Green &&
+    fraction(.67)(List(Green,Green,Green)) == Green &&
+    fraction(.67)(List(Green,Amber,Green)) == Green && true
+    fraction(.66)(List(Red,Amber,Green)) == Amber &&
+    fraction(.68)(List(Red,Amber,Green)) == Red &&
+    fraction(.66)(List(Red,Red,Green)) == Red &&
+    fraction(.5)(List(Red,Red,Green,Green)) == Amber
+  }
 }
 

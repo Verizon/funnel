@@ -38,7 +38,7 @@ object Main extends App {
     new URL("http://localhost:8083/stream"),
     "node1/" + _
   ).run.runAsync(_ => ())
-  M2.decay("node1")(Events.every(10 seconds)).run
+  M2.decay(Key.StartsWith("node1"))(Events.every(10 seconds)).run
 
   //
   // application that given a Process[Task,URL], mirr
@@ -99,7 +99,7 @@ object MonitoringServer {
 
     def handleKeys(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
       import JSON._; import argonaut.EncodeJson._
-      val ks = M.keys.continuous.once.runLastOr(List()).run.filter(_.matches(prefix))
+      val ks = M.keys.continuous.once.runLastOr(List()).run.filter(_.startsWith(prefix))
       val respBytes = JSON.prettyEncode(ks).getBytes
       req.getResponseHeaders.set("Content-Type", "application/json")
       req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
@@ -119,7 +119,7 @@ object MonitoringServer {
       req.getResponseHeaders.set("Content-Type", "text/event-stream")
       req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
-      val events = Monitoring.subscribe(M)(prefix)(log = log)
+      val events = Monitoring.subscribe(M)(Key.StartsWith(prefix))(log = log)
       val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
       SSE.writeEvents(events, sink)
     }
@@ -128,7 +128,7 @@ object MonitoringServer {
       import JSON._; import argonaut.EncodeJson._
       val m = Monitoring.snapshot(M).run
       val respBytes =
-        JSON.prettyEncode(m.filterKeys(_.matches(label)).values.toList).getBytes
+        JSON.prettyEncode(m.filterKeys(_.startsWith(label)).values.toList).getBytes
       req.getResponseHeaders.set("Content-Type", "application/json")
       req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
       req.sendResponseHeaders(200, respBytes.length)
