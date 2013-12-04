@@ -21,21 +21,26 @@ object Build extends Build {
       publish := (),
       publishLocal := ()
     ) ++ ScctPlugin.mergeReportSettings
-  ).aggregate(spout, funnel)
+  ).aggregate(funnel, funnelhttp, funnelcli)
 
-  lazy val spout = Project("spout", file("spout"))
+  lazy val funnel = Project("funnel", file("funnel"))
     .settings(buildSettings:_*)
-    .settings(name := "spout")
+    .settings(name := "funnel")
     .settings(libraryDependencies ++=
       compile(scalaz) ++
       compile(scalazstream) ++
       compile(algebird) ++
-      compile(argonaut) ++
       test(scalacheck) ++
       test(scalatest))
 
-  lazy val funnel = Project("funnel", file("funnel"))
+  lazy val funnelhttp = Project("funnel-http", file("funnel-http"))
+    .settings(buildSettings:_*)
+    .settings(libraryDependencies ++=
+      compile(argonaut))
+    .dependsOn(funnel)
+
+  lazy val funnelcli = Project("funnel-cli", file("funnel-cli"))
     .settings(buildSettings:_*)
     .settings(crossPaths := false) // adding this because its an executable
-    .dependsOn(spout)
+    .dependsOn(funnel)
 }
