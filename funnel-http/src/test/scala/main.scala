@@ -16,21 +16,24 @@ object Main extends App {
   }.run.runAsync(_ => ())
 
   val M = Monitoring.instance
+  val M2 = Monitoring.instance
   val I = new Instruments(5 minutes, M)
-  MonitoringServer.start(M, 8082)
+  MonitoringServer.start(M, 8083)
+  MonitoringServer.start(M2, 8082)
 
   val c2 = I.counter("requests")
   val c3 = I.counter("requests2")
   val h = I.gauge("health", true, Units.Healthy)
-  val g2 = Process.awakeEvery(2 seconds).map { _ => c2.increment; c3.increment; h.set(true) }
-                  .take(5).run.runAsync(_ => ())
+  val g2 = Process.awakeEvery(2 seconds).map { _ =>
+    c2.increment; c3.increment; h.set(true)
+  }.take(5).run.runAsync(_ => ())
 
   // val k = mirror[Double]("http://localhost:8082", "now/requests", Some("now/requests-clone"))
-  // M.mirrorAll(SSE.readEvents)(
-  //   new URL("http://localhost:8082/stream"),
-  //   "node1/" + _
-  // ).run.runAsync(_ => ())
-  // Monitoring.default.decay("node1")(Events.every(5 seconds)).run
+  M2.mirrorAll(SSE.readEvents)(
+    new URL("http://localhost:8083/stream"),
+    "node1/" + _
+  ).run.runAsync(_ => ())
+  M2.decay("node1")(Events.every(10 seconds)).run
 
   //
   // application that given a Process[Task,URL], mirr
