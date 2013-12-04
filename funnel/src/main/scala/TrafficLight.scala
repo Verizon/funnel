@@ -48,15 +48,15 @@ object TrafficLight {
     fraction(.5000000001)(signals)
 
   /**
-   * Succeed if at least `math.ceil(d * signals.length)` inputs are
-   * `Green` / `Amber`. Succeed with `Green` if no inputs are `Red`,
-   * and `Amber` if at least one input is `Red`.
+   * Succeed if at least `d * signals.length` inputs are `Green` / `Amber`.
+   * Succeed with `Green` if no inputs are `Red`, and `Amber` if at least one input is `Red`.
    */
   def fraction(d: Double)(signals: Seq[String]): String = {
     if (!(d >= 0 && d <= 1.0))
       sys.error("d must be between 0 and 1, inclusive, was: " + d)
-    val ok = signals.filter(atLeast(Amber)).length.toDouble >=
-             (d * signals.length).ceil
-    downgrade(signals.exists(_ == Red))(ok)
+    if (signals.isEmpty) Green
+    else downgrade(signals.exists(_ == Red)) {
+      signals.filter(atLeast(Amber)).length.toDouble / signals.length >= d
+    }
   }
 }

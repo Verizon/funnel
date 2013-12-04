@@ -28,21 +28,9 @@ object Main extends App {
     c2.increment; c3.increment; h.set(true)
   }.take(5).run.runAsync(_ => ())
 
-  // val k = mirror[Double]("http://localhost:8082", "now/requests", Some("now/requests-clone"))
   M2.mirrorAll(SSE.readEvents)(
     new URL("http://localhost:8083/stream"),
     "node1/" + _
   ).run.runAsync(_ => ())
-  M2.decay("node1")(Events.every(10 seconds)).run
-
-  //
-  // application that given a Process[Task,URL], mirr
-  // def mirrorAll(nodes: Process[Task,(Int,URL)])(health: (Int, List[Key[Boolean]]) => Metric[Boolean]): Unit = ???
-
-  // mirrorAll("http://node1:8081/now", Some("node1/"))
-  // mirrorAll("http://node2:8081/now", Some("node1/"))
-  // mirrorAll("http://node3:8081/now", Some("node1/"))
-
-  // k.map(_ * 10).publishEvery(5 seconds)("now/request-clone-times-10", Units.Count)
-  readLine()
+  M2.decay(Key.StartsWith("node1"))(Events.every(10 seconds)).run
 }
