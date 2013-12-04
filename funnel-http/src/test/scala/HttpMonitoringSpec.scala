@@ -1,16 +1,9 @@
 package intelmedia.ws
 package monitoring
 
-import com.twitter.algebird.Group
-import org.scalacheck._
-import Prop._
-import Arbitrary._
-import scala.concurrent.duration._
-import scalaz.concurrent.{Strategy, Task}
-import scalaz.Nondeterminism
-import scalaz.stream.{process1, Process}
+import org.scalacheck._, Prop._, Arbitrary._
 
-object MonitoringSpec extends Properties("monitoring"){
+object HttpMonitoringSpec extends Properties("monitoring.http"){
   import argonaut.{DecodeJson, EncodeJson, Parse}
 
   def roundTrip[A:EncodeJson:DecodeJson](a: A): Prop = {
