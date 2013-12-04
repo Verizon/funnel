@@ -154,11 +154,11 @@ trait Monitoring {
    * val parser: DatapointParser = url => ....
    *
    * // when there's a failure connecting to a node, define the reconnect frequency
-   * val reconnect   = Events.every(2 minutes) 
+   * val reconnect   = Events.every(2 minutes)
    *
-   * // if the url has not produced any updates in this duration/event cycle, 
-   * // reset the values to their defaults after this bound 
-   * val decay       = Event.every(15 seconds) 
+   * // if the url has not produced any updates in this duration/event cycle,
+   * // reset the values to their defaults after this bound
+   * val decay       = Event.every(15 seconds)
    *
    * // how frequently to produce the "aggregate" health `key` for each group of urls
    * val aggregating = Event.every(5 seconds)
@@ -171,13 +171,13 @@ trait Monitoring {
    *   }
    * }}}
    */
-  def mirrorAndAggregate(
+  def mirrorAndAggregate[A](
       parse: DatapointParser)(
       reconnectFrequency: Event,
       decayFrequency: Event,
       aggregateFrequency: Event)(
       groupedUrls: Process[Task, (URL,String)],
-      health: Key[Boolean])(f: String => Seq[Boolean] => Boolean): Task[Unit] =
+      health: Key[A])(f: String => Seq[A] => A): Task[Unit] =
     Task.delay {
       // use urls as the local names for keys
       var seen = Set[String]()
@@ -185,6 +185,8 @@ trait Monitoring {
         if (!seen.contains(group)) {
           val aggregateKey = health.modifyName(group + "/" + _)
           val keyFamily = health.modifyName(x => s"$group/$x/")
+          // todo - really we should apply the decay to the individual
+          // url streams
           decay(keyFamily.name)(decayFrequency).run
           aggregate(keyFamily, aggregateKey)(aggregateFrequency)(f(group)).run
           seen = seen + group
