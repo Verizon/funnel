@@ -21,7 +21,7 @@ object Build extends Build {
       publish := (),
       publishLocal := ()
     ) ++ ScctPlugin.mergeReportSettings
-  ).aggregate(funnel, funnelhttp, funnelcli)
+  ).aggregate(funnel, funnelhttp, funnelcli, funnelRiemann)
 
   lazy val funnel = Project("funnel", file("funnel"))
     .settings(buildSettings:_*)
@@ -38,6 +38,11 @@ object Build extends Build {
     .settings(libraryDependencies ++=
       compile(argonaut))
     .dependsOn(funnel)
+
+  lazy val funnelRiemann = Project("funnel-reimann", file("funnel-reimann"))
+    .settings(buildSettings:_*)
+    .settings(resolvers += "clojars.org" at "http://clojars.org/repo")
+    .settings(libraryDependencies ++= compile(reimann))
 
   lazy val funnelcli = Project("funnel-cli", file("funnel-cli"))
     .settings(buildSettings:_*)
