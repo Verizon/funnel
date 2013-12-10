@@ -4,6 +4,8 @@ package reimann
 import com.aphyr.riemann.client.RiemannClient
 import intelmedia.ws.monitoring.Events.Event
 import java.net.URL
+import scala.concurrent.duration._
+import scalaz.\/
 import scalaz.concurrent.{Strategy,Task}
 import scalaz.stream.{async,Process}
 import scalaz.stream.async.immutable.Signal
@@ -27,11 +29,11 @@ object Riemann {
       case a: Double => e.metric(a)
       case a: String => e.state(a)
       case b: Boolean => e.state(b.toString)
-      case _ => ???
+      case _ => log("todo: stats")
     }
-    log("sending: " + e2)
+    log("sending: " + pt)
     e2.send()
-    log("successfully sent " + e2)
+    log("successfully sent " + pt)
   } (Monitoring.defaultPool)
 
   /**
@@ -42,14 +44,18 @@ object Riemann {
    * the same, but only retry a total of five times before raising
    * the latest error.
    */
-  def retry[A](retries: Process[Task,Any])(p: Process[Task,A]): Process[Task,A] =
-    p.attempt().stripW ++
-    retries.terminated.flatMap {
+  def retry[A](retries: Process[Task,Any])(p: Process[Task,A]):
+  Process[Task,A] = {
+    val alive = async.signal[Unit]; alive.value.set(())
+    val step: Process[Task,Throwable \/ A] =
+      p.attempt().append(Process.eval_(alive.close))
+    step.stripW ++ link(alive)(retries).terminated.flatMap {
       // on our last reconnect attempt, rethrow error
-      case None => p.attempt().flatMap(_.fold(Process.fail, Process.emit))
+      case None => step.flatMap(_.fold(Process.fail, Process.emit))
       // on other attempts, ignore the exceptions
-      case Some(_) => p.attempt().stripW
+      case Some(_) => step.stripW
     }
+  }
 
   /** Terminate `p` when the given `Signal` terminates. */
   def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
@@ -61,7 +67,8 @@ object Riemann {
    * Uses `retries` to control the reconnect frequency if `RiemannClient`
    * is unavailable.
    */
-  def publish(M: Monitoring, ttlInSeconds: Float, retries: Event)(c: RiemannClient)(
+  def publish(M: Monitoring, ttlInSeconds: Float = 20f,
+             retries: Event = Events.every(1 minutes))(c: RiemannClient)(
              implicit log: String => Unit = s => println("[Riemann.publish] "+s)):
              () => Unit = {
     val alive = async.signal[Unit](Strategy.Executor(Monitoring.defaultPool))
@@ -79,13 +86,14 @@ object Riemann {
    * `reimannRetries` controls how often we attempt to reconnect to the
    * Riemann server in the event of an error.
    */
-  def mirrorAndPublish[A](M: Monitoring, ttlInSeconds: Float, nodeRetries: Event)(
-                          c: RiemannClient, reimannRetries: Event)(
-                          parse: DatapointParser)(
-                          groupedUrls: Process[Task, (URL,String)])(
-                          implicit log: String => Unit =
-                            s => println("[Riemann.publishAll] "+s)):
-                          () => Unit = {
+  def mirrorAndPublish[A](
+      M: Monitoring, ttlInSeconds: Float = 20f, nodeRetries: Event = Events.every(1 minutes))(
+      c: RiemannClient, reimannRetries: Event = Events.every(1 minutes))(
+      parse: DatapointParser)(
+      groupedUrls: Process[Task, (URL,String)])(
+      implicit log: String => Unit =
+      s => println("[Riemann.publishAll] "+s)):
+      () => Unit = {
     val alive = async.signal[Unit](Strategy.Executor(Monitoring.defaultPool))
     alive.value.set(())
     // use urls as the local names for keys
