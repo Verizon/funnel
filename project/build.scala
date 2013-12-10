@@ -39,10 +39,10 @@ object Build extends Build {
       compile(argonaut))
     .dependsOn(funnel)
 
-  lazy val funnelRiemann = Project("funnel-reimann", file("funnel-reimann"))
+  lazy val funnelRiemann = Project("funnel-riemann", file("funnel-riemann"))
     .settings(buildSettings:_*)
     .settings(resolvers += "clojars.org" at "http://clojars.org/repo")
-    .settings(libraryDependencies ++= compile(reimann) ++ compile(logback))
+    .settings(libraryDependencies ++= compile(riemann) ++ compile(logback))
     .dependsOn(funnel)
 
   lazy val funnelcli = Project("funnel-cli", file("funnel-cli"))

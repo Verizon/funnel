@@ -14,6 +14,6 @@ object Dependencies {
   val algebird     = "com.twitter"       %% "algebird-core"       % "0.3.0"
   val scalacheck   = "org.scalacheck"    %% "scalacheck"          % "1.10.0"
   val argonaut     = "io.argonaut"       %% "argonaut"            % "6.0.1"
-  val reimann      = "com.aphyr"          % "riemann-java-client" % "0.2.8" exclude("com.yammer.metrics","metrics-core")
+  val riemann      = "com.aphyr"          % "riemann-java-client" % "0.2.8" exclude("com.yammer.metrics","metrics-core")
   val logback      = "ch.qos.logback"     % "logback-classic"     % "1.0.+"
 }
