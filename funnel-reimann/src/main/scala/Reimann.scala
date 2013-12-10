@@ -13,26 +13,31 @@ import Monitoring.prettyURL
 
 object Riemann {
 
-  def top(s: String) = s.split("/").headOption.getOrElse(s)
+  // def top(s: String) = s.split("/").headOption.getOrElse(s)
   def tags(s: String) = s.split("/")
 
-  private def toEvent(c: RiemannClient, ttl: Float)(
-                      pt: Datapoint[Any])(
+  private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any])(
                       implicit log: String => Unit =
                         s => "[Riemann.toEvent] "+s): Task[Unit] = Task {
-    val e = c.event.service(top(pt.key.name))
+    val e = c.event.service(pt.key.name)
+             .host(pt.key.name.split(":::").lastOption.getOrElse(pt.key.name))
              .tags(tags(pt.key.name): _*)
              .description(s"${pt.key.typeOf} ${pt.key.units}")
-             .time(System.currentTimeMillis)
+             .time(System.currentTimeMillis / 1000L)
              .ttl(ttl)
     val e2 = pt.value match {
       case a: Double => e.metric(a)
       case a: String => e.state(a)
       case b: Boolean => e.state(b.toString)
-      case _ => log("todo: stats")
+      case _ => log("todo: stats"); e
     }
     log("sending: " + pt)
-    e2.send()
+    try e2.send()
+    catch { case e: Exception =>
+      log("unable to send datapoint to Reimann server due to: " + e)
+      log("waiting")
+      throw e
+    }
     log("successfully sent " + pt)
   } (Monitoring.defaultPool)
 
@@ -48,7 +53,7 @@ object Riemann {
   Process[Task,A] = {
     val alive = async.signal[Unit]; alive.value.set(())
     val step: Process[Task,Throwable \/ A] =
-      p.attempt().append(Process.eval_(alive.close))
+      p.append(Process.eval_(alive.close)).attempt()
     step.stripW ++ link(alive)(retries).terminated.flatMap {
       // on our last reconnect attempt, rethrow error
       case None => step.flatMap(_.fold(Process.fail, Process.emit))
@@ -101,10 +106,20 @@ object Riemann {
     link(alive)(groupedUrls).evalMap { case (url,group) => Task.delay {
       val localName = prettyURL(url)
       link(alive)(M.attemptMirrorAll(parse)(nodeRetries)(
-        url, m => s"$group/$m/$localName"
+        url, m => s"$group/$m:::localName"
       )).run.runAsync(_ => ())
     }}.run.runAsync(_ => ())
     publish(M, ttlInSeconds, reimannRetries)(c)
     () => alive.close.run
+  }
+
+  def main(args: Array[String]): Unit = {
+    if (args.length != 2) println("expected arguments <hostname> <port>")
+    else {
+      val (hostname, portS) = (args(0), args(1))
+      val R = RiemannClient.tcp(hostname, portS.toInt)
+      R.connect
+      publish(Monitoring.default)(R)
+    }
   }
 }
