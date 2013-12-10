@@ -42,8 +42,7 @@ object Build extends Build {
   lazy val funnelRiemann = Project("funnel-reimann", file("funnel-reimann"))
     .settings(buildSettings:_*)
     .settings(resolvers += "clojars.org" at "http://clojars.org/repo")
-    .settings(libraryDependencies ++= compile(reimann))
-    .settings(libraryDependencies ++= compile(logback))
+    .settings(libraryDependencies ++= compile(reimann) ++ compile(logback))
     .dependsOn(funnel)
 
   lazy val funnelcli = Project("funnel-cli", file("funnel-cli"))

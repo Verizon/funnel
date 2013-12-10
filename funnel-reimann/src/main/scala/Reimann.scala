@@ -1,5 +1,5 @@
 package intelmedia.ws.monitoring
-package reimann
+package riemann
 
 import com.aphyr.riemann.client.RiemannClient
 import intelmedia.ws.monitoring.Events.Event
@@ -13,33 +13,71 @@ import Monitoring.prettyURL
 
 object Riemann {
 
-  // def top(s: String) = s.split("/").headOption.getOrElse(s)
-  def tags(s: String) = s.split("/")
+  private def splitStats(key: Key[Any], s: Stats): List[Datapoint[Any]] = {
+    val (k, tl) = key.name.split(":::") match {
+      case Array(hd,tl) => (key.rename(hd), tl) 
+      case _ => (key,"")
+    }
+    val tl2 = if (tl.isEmpty) "" else ":::"+tl
+    List(
+      Datapoint(k.modifyName(_ + "/count" + tl2), s.count.toDouble),
+      Datapoint(k.modifyName(_ + "/variance" + tl2), s.variance),
+      Datapoint(k.modifyName(_ + "/mean" + tl2), s.mean),
+      Datapoint(k.modifyName(_ + "/last" + tl2), s.last.getOrElse(Double.NaN)),
+      Datapoint(k.modifyName(_ + "/standardDeviation" + tl2), s.standardDeviation)
+    )
+  }
 
+  private def trafficLightToRiemannState(dp: Datapoint[Any]): Datapoint[Any] = 
+    if(dp.units == Units.TrafficLight) 
+      dp.value match {
+        case TrafficLight.Red     => Datapoint(dp.key, "critical")
+        case TrafficLight.Yellow  => Datapoint(dp.key, "warning")
+        case TrafficLight.Green   => Datapoint(dp.key, "ok")
+      }
+    else dp
+
+  // def top(s: String) = s.split("/").headOption.getOrElse(s)
+  private def tags(s: String) = s.split("/")
+
+  // imperitive gehto.
   private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any])(
                       implicit log: String => Unit =
-                        s => "[Riemann.toEvent] "+s): Task[Unit] = Task {
+                        s => "[Riemann.toEvent] "+s): Unit = {
+
     val e = c.event.service(pt.key.name)
-             .host(pt.key.name.split(":::").lastOption.getOrElse(pt.key.name))
+             // .state("critical")
              .tags(tags(pt.key.name): _*)
              .description(s"${pt.key.typeOf} ${pt.key.units}")
              .time(System.currentTimeMillis / 1000L)
              .ttl(ttl)
-    val e2 = pt.value match {
+
+    // bawws like side-effects as the underlying api is totally mutable.
+    // GO JAVA!!
+    pt.key.name.split(":::") match {
+      case Array(name,host) => e.host(host)
+      case _                => ()
+    }
+
+    pt.value match {
       case a: Double => e.metric(a)
       case a: String => e.state(a)
       case b: Boolean => e.state(b.toString)
-      case _ => log("todo: stats"); e
+      // will never be encountered at this point
+      // case s: Stats => 
+      case x => log(x.getClass.getName); ???
     }
+
     log("sending: " + pt)
-    try e2.send()
-    catch { case e: Exception =>
+    
+    try e.send()
+    catch { case err: Exception =>
       log("unable to send datapoint to Reimann server due to: " + e)
       log("waiting")
-      throw e
+      throw err
     }
     log("successfully sent " + pt)
-  } (Monitoring.defaultPool)
+  }
 
   /**
    * Try running the process `p`, retrying in the event of failure.
@@ -66,6 +104,12 @@ object Riemann {
   def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
     alive.continuous.zip(p).map(_._2)
 
+  private def liftDatapointToStream(dp: Datapoint[Any]): Process[Task, Datapoint[Any]] = 
+    dp.value match {
+      case s: Stats => Process.emitSeq(splitStats(dp.key, s))
+      case _        => Process.emit(dp)
+    }
+
   /**
    * Publish all datapoints from this `Monitoring` to the given
    * `RiemannClient`. Returns a thunk that can be used to terminate.
@@ -78,9 +122,15 @@ object Riemann {
              () => Unit = {
     val alive = async.signal[Unit](Strategy.Executor(Monitoring.defaultPool))
     alive.value.set(())
-    link(alive) { Monitoring.subscribe(M)(_ => true).flatMap { pt =>
-      retry(retries(M))(Process.eval_(toEvent(c, ttlInSeconds)(pt)))
-    }}.run.runAsync(_.fold(err => log(err.toString), _ => ()))
+    link(alive){ 
+      Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream).flatMap { pt =>
+        retry(retries(M))(Process.eval_(
+          Task { 
+            toEvent(c, ttlInSeconds)(pt) 
+          }(Monitoring.defaultPool))
+        )
+      }
+    }.run.runAsync(_.fold(err => log(err.toString), _ => ()))
     () => alive.value.close
   }
 
@@ -111,15 +161,5 @@ object Riemann {
     }}.run.runAsync(_ => ())
     publish(M, ttlInSeconds, reimannRetries)(c)
     () => alive.close.run
-  }
-
-  def main(args: Array[String]): Unit = {
-    if (args.length != 2) println("expected arguments <hostname> <port>")
-    else {
-      val (hostname, portS) = (args(0), args(1))
-      val R = RiemannClient.tcp(hostname, portS.toInt)
-      R.connect
-      publish(Monitoring.default)(R)
-    }
   }
 }
