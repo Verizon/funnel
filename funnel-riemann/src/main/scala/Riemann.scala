@@ -37,16 +37,24 @@ object Riemann {
       }
     else dp
 
-  // def top(s: String) = s.split("/").headOption.getOrElse(s)
   private def tags(s: String) = s.split("/")
 
-  // imperitive gehto.
+  /**
+    * This whole method is an imperitive getho. However, we use the 
+    * Riemann java client DSL, and make "use" of the fact that the underlying
+    * objects are actually affecting the protocol buffers wire format. 
+    * 
+    * This method really needs to die, but unless we go to the trouble of 
+    * implementing our own client, that's not going to happen as there has to
+    * be some plumbing to mediate from our world to the riemann world. 
+    *
+    * C'est la vie!
+    */
   private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any])(
                       implicit log: String => Unit =
                         s => "[Riemann.toEvent] "+s): Unit = {
 
     val e = c.event.service(pt.key.name)
-             // .state("critical")
              .tags(tags(pt.key.name): _*)
              .description(s"${pt.key.typeOf} ${pt.key.units}")
              .time(System.currentTimeMillis / 1000L)
@@ -63,7 +71,7 @@ object Riemann {
       case a: Double => e.metric(a)
       case a: String => e.state(trafficLightToRiemannState(pt).value.toString)
       case b: Boolean => e.state(b.toString)
-      // will never be encountered at this point
+      // will *never* be encountered at this point
       // case s: Stats => 
       case x => log("]]]]]]]]]]]]]]] "+x.getClass.getName); ???
     }
