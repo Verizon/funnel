@@ -1,4 +1,4 @@
-## Monitoring
+## Monitoring Funnel
 
 A distributed monitoring system based on a lightweight streaming protocol. **This library depends upon Scala 2.10.x - you will see crazy errors if you try to use this on 2.9.x**
 
@@ -7,9 +7,9 @@ A distributed monitoring system based on a lightweight streaming protocol. **Thi
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
 ````
-libraryDependencies += "intelmedia.ws.monitoring" %% "spout" % "1.0.11"
+libraryDependencies += "intelmedia.ws.monitoring" %% "funnel" % "x.y.z"
 ````
-(check for the latest release by [looking on the nexus](http://nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/repositories/releases/intelmedia/ws/monitoring/spout_2.10/))
+(check for the latest release by [looking on the nexus](http://nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/repositories/releases/intelmedia/ws/monitoring/funnel_2.10))
 
 Current transitive dependencies this will introduce on your classpath:
 
@@ -156,13 +156,56 @@ trait SomeFun {
 ````
 By default, the following types are supported as values for gauges:
 
+* `String`
 * Any `Numeric[A]` instance; the Scala std library supplies typeclasses for:
 	* `Int`
 	* `Double`
 	* `Float`
 	* `BigDecimal` 
 	* `Long`
-* `String`
+
+##### Traffic Light
+
+As an extension to the concept of `Gauge`, there is also the notion of a "traffic light" which is essentially a gauge that can be in only one of three possible finite states:
+
+* Red
+* Amber
+* Green
+
+Traffic light metrics are used to derive actionable signals for operations (they can derive whatever they like too), but for example, one might put a traffic light metric on database access, or the status of a circuit breaker used to invoke a 3rd party system. Using traffic lights is super simple:
+
+````
+package intelmedia.ws
+package yourproject
+
+import monitoring.instruments._
+
+object metrics {
+  val GeoLocationCircuit = trafficLight("circuit/geo") 
+}
+
+````
+And the actual usage in the circuit breaking code:
+
+````
+import metrics._
+
+trait SomeFun {
+  def doGeoLocation = {
+    // your logic for the function
+	  …
+	// if all went well, set the breaker accordingly 
+   GeoLocationCircuit.green
+    
+   /*
+   Traffic lights can be set into red and amber states in a similar fashion:
+   GeoLocationCircuit.amber
+   GeoLocationCircuit.red
+   */
+  }
+}
+````
+
 
 ### Monitoring Server 
 
@@ -180,11 +223,5 @@ object Main {
 }
 
 ````
-With this in your application, and assuming you are developing locally, once running you will be able to access [http://127.0.0.1:5775/](http://127.0.0.1:5775/) in your local web browser.
+With this in your application, and assuming you are developing locally, once running you will be able to access [http://127.0.0.1:5775/](http://127.0.0.1:5775/) in your local web browser, where the index page will give you a list of available resources and descriptions of their function. 
 
-
-### More docs to come:
-
-* talk about streaming
-* transducers (logically)
-* diagram?
