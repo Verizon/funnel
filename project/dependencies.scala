@@ -8,10 +8,12 @@ object Dependencies {
   def runtime   (deps: ModuleID*): Seq[ModuleID] = deps map (_ % "runtime")
   def container (deps: ModuleID*): Seq[ModuleID] = deps map (_ % "container")
 
-  val scalatest    = "org.scalatest"     %% "scalatest"     % "1.9.2"
-  val scalaz       = "org.scalaz"        %% "scalaz-core"   % "7.0.4"
-  val scalazstream = "org.scalaz.stream" %% "scalaz-stream" % "0.1"
-  val algebird     = "com.twitter"       %% "algebird-core" % "0.3.0"
-  val scalacheck   = "org.scalacheck"    %% "scalacheck"    % "1.10.0"
-  val argonaut     = "io.argonaut"       %% "argonaut"      % "6.0.1"
+  val scalatest    = "org.scalatest"     %% "scalatest"           % "1.9.2"
+  val scalaz       = "org.scalaz"        %% "scalaz-core"         % "7.0.4"
+  val scalazstream = "org.scalaz.stream" %% "scalaz-stream"       % "0.1"
+  val algebird     = "com.twitter"       %% "algebird-core"       % "0.3.0"
+  val scalacheck   = "org.scalacheck"    %% "scalacheck"          % "1.10.0"
+  val argonaut     = "io.argonaut"       %% "argonaut"            % "6.0.1"
+  val riemann      = "com.aphyr"          % "riemann-java-client" % "0.2.8" exclude("com.yammer.metrics","metrics-core")
+  val logback      = "ch.qos.logback"     % "logback-classic"     % "1.0.+"
 }
