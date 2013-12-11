@@ -21,7 +21,7 @@ object Build extends Build {
       publish := (),
       publishLocal := ()
     ) ++ ScctPlugin.mergeReportSettings
-  ).aggregate(funnel, funnelhttp, funnelcli, funnelRiemann)
+  ).aggregate(funnel, funnelhttp, funnelcli, funnelriemann)
 
   lazy val funnel = Project("funnel", file("funnel"))
     .settings(buildSettings:_*)
