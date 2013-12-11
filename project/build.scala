@@ -43,7 +43,7 @@ object Build extends Build {
     .settings(buildSettings:_*)
     .settings(resolvers += "clojars.org" at "http://clojars.org/repo")
     .settings(libraryDependencies ++= compile(riemann) ++ compile(logback))
-    .dependsOn(funnel)
+    .dependsOn(funnel, funnelhttp)
 
   lazy val funnelcli = Project("funnel-cli", file("funnel-cli"))
     .settings(buildSettings:_*)

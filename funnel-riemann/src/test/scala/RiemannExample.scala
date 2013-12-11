@@ -5,9 +5,18 @@ import scalaz.stream.Process
 import scala.concurrent.duration._
 
 object Main {
+  private def randomLight(tl: TrafficLight) = 
+    util.Random.nextInt(3) match {
+      case 1 => tl.yellow
+      case 2 => tl.green
+      case _ => tl.red
+    }
+
   def main(args: Array[String]): Unit = {
     
     import instruments._
+
+    MonitoringServer.start(Monitoring.default, 5775)
 
     val R = com.aphyr.riemann.client.RiemannClient.tcp("127.0.0.1", 5555)
 
@@ -17,9 +26,13 @@ object Main {
 
     val c = counter("requests")
     val t = timer("response-time")
+
+    val l = trafficLight("stoplight")
+
     val g = Process.awakeEvery(2 seconds).map { _ =>
       c.increment
       t.time(Thread.sleep(100))
+      randomLight(l)
     }.run.run
 
   }

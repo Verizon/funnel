@@ -61,11 +61,11 @@ object Riemann {
 
     pt.value match {
       case a: Double => e.metric(a)
-      case a: String => e.state(a)
+      case a: String => e.state(trafficLightToRiemannState(pt).value.toString)
       case b: Boolean => e.state(b.toString)
       // will never be encountered at this point
       // case s: Stats => 
-      case x => log(x.getClass.getName); ???
+      case x => log("]]]]]]]]]]]]]]] "+x.getClass.getName); ???
     }
 
     log("sending: " + pt)
