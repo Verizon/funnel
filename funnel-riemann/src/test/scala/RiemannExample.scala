@@ -16,8 +16,6 @@ object Main {
     
     import instruments._
 
-    MonitoringServer.start(Monitoring.default, 5775)
-
     val R = com.aphyr.riemann.client.RiemannClient.tcp("127.0.0.1", 5555)
 
     R.connect() // give me stregth!
