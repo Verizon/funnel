@@ -6,7 +6,7 @@ object Build extends Build {
   lazy val buildSettings =
     Defaults.defaultSettings ++
     ImBuildPlugin.imBuildSettings ++ Seq(
-      organization := "intelmedia.ws.monitoring",
+      organization := "intelmedia.ws.funnel",
       scalaVersion := "2.10.3",
       scalacOptions ++= Seq(
         "-feature",
@@ -14,18 +14,18 @@ object Build extends Build {
         "-language:implicitConversions"))
 
   lazy val root = Project(
-    id = "monitoring",
+    id = "funnel",
     base = file("."),
     settings = buildSettings ++ Seq(
       publishArtifact in (Compile, packageBin) := false,
       publish := (),
       publishLocal := ()
     ) ++ ScctPlugin.mergeReportSettings
-  ).aggregate(funnel, funnelhttp, funnelcli, funnelriemann)
+  ).aggregate(core, http, riemann, utensil)
 
-  lazy val funnel = Project("funnel", file("funnel"))
+  lazy val core = Project("core", file("core"))
     .settings(buildSettings:_*)
-    .settings(name := "funnel")
+    .settings(name := "core")
     .settings(libraryDependencies ++=
       compile(scalaz) ++
       compile(scalazstream) ++
@@ -33,22 +33,23 @@ object Build extends Build {
       test(scalacheck) ++
       test(scalatest))
 
-  lazy val funnelhttp = Project("funnel-http", file("funnel-http"))
+  lazy val http = Project("http", file("http"))
     .settings(buildSettings:_*)
     .settings(libraryDependencies ++=
       compile(argonaut))
-    .dependsOn(funnel)
+    .dependsOn(core)
 
-  lazy val funnelriemann = Project("funnel-riemann", file("funnel-riemann"))
+  lazy val riemann = Project("riemann", file("riemann"))
     .settings(buildSettings:_*)
     .settings(resolvers += "clojars.org" at "http://clojars.org/repo")
     .settings(libraryDependencies ++= 
-      compile(riemann) ++ 
+      compile(riemannapi) ++ 
       compile(logback))
-    .dependsOn(funnel)
+    .dependsOn(core)
 
-  lazy val funnelcli = Project("funnel-cli", file("funnel-cli"))
+  lazy val utensil = Project("utensil", file("utensil"))
     .settings(buildSettings:_*)
     .settings(crossPaths := false) // adding this because its an executable
-    .dependsOn(funnel)
+    .settings(libraryDependencies ++= compile(scopt))
+    .dependsOn(core, http, riemann)
 }
