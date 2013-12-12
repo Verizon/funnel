@@ -1,7 +1,8 @@
 package intelmedia.ws.monitoring
 
 case class Key[+A] private[monitoring](name: String, typeOf: Reportable[A], units: Units[A]) {
-  def matches(prefix: String): Boolean = name.startsWith(prefix)
+  def endsWith(suffix: String): Boolean = name.endsWith(suffix)
+  def startsWith(prefix: String): Boolean = name.startsWith(prefix)
   def rename(s: String) = copy(name = s)
   def modifyName(f: String => String): Key[A] = rename(f(name))
   def cast[B](R: Reportable[B], U: Units[B]): Option[Key[B]] =
@@ -11,6 +12,16 @@ case class Key[+A] private[monitoring](name: String, typeOf: Reportable[A], unit
 }
 
 object Key {
+
+  def StartsWith(prefix: String) = new Function1[Key[Any],Boolean] {
+    def apply(k: Key[Any]) = k.startsWith(prefix)
+    override def toString = "Key.StartsWith("+prefix+")"
+  }
+  def EndsWith(suffix: String) = new Function1[Key[Any],Boolean] {
+    def apply(k: Key[Any]) = k.endsWith(suffix)
+    override def toString = "Key.EndsWith("+suffix+")"
+  }
+
   def apply[A](name: String, units: Units[A])(implicit R: Reportable[A]): Key[A] =
     Key(name, R, units)
 

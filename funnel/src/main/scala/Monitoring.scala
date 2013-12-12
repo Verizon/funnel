@@ -97,42 +97,14 @@ trait Monitoring {
   // rather than pushing
 
   /**
-   * Mirror the (assumed) unique event at the given url and prefix.
-   * Example: `mirror[String]("http://localhost:8080", "now/health")`.
-   * This will fetch the stream at `http://localhost:8080/stream/now/health`
-   * and keep it updated locally, as events are published at `url`.
-   * `localName` may be (optionally) supplied to change the name of the
-   * key used locally. The `id` field of the key is preserved, unless
-   * `clone` is set to `true`.
-   *
-   * This function checks that the given `prefix` uniquely determines a
-   * key, and that it has the expected type, and fails fast otherwise.
-   */
-  def mirror[O:Reportable](url: String, prefix: String, localName: Option[String] = None)(
-      implicit S: ExecutorService = Monitoring.serverPool,
-               log: String => Unit = println): Task[Key[O]] =
-    SSE.readEvent(url, prefix)(implicitly[Reportable[O]], S).map { case (k, pts) =>
-      val key = localName.map(k.rename(_)).getOrElse(k)
-      val snk = if (exists(key).run) (o: O) => update(key, o)
-                else topic[O,O](key)(Buffers.ignoreTime(process1.id))
-      // send to sink asynchronously, this will not block
-      log(s"Monitoring.mirror: listening for updates to $url/$prefix")
-      pts.evalMap { pt =>
-        import JSON._
-        log("Monitoring.mirror: got datapoint " + pt)
-        Task { snk(pt.value) } (S)
-      }.run.runAsync(_ => ())
-      key
-    }
-
-  /**
    * Mirror all metrics from the given URL, adding `localPrefix` onto the front of
    * all loaded keys. `url` is assumed to be a stream of datapoints in SSE format.
    */
-  def mirrorAll(url: String, localName: String => String = identity)(
+  def mirrorAll(parse: DatapointParser)(
+                url: URL, localName: String => String = identity)(
                 implicit S: ExecutorService = Monitoring.serverPool,
                 log: String => Unit = println): Process[Task,Unit] = {
-    SSE.readEvents(url).flatMap { pt =>
+    parse(url).flatMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
       val k = pt.key.modifyName(localName)
       if (exists(k).run) {
@@ -155,12 +127,15 @@ trait Monitoring {
    * will call `mirrorAll`, and retry every three minutes up to
    * 5 attempts before raising the most recent exception.
    */
-  def attemptMirrorAll(breaker: Event)(url: String, localName: String => String = identity)(
-                       implicit S: ExecutorService = Monitoring.serverPool,
-                       log: String => Unit = println): Process[Task,Unit] = {
+  def attemptMirrorAll(
+      parse: DatapointParser)(
+      breaker: Event)(
+      url: URL, localName: String => String = identity)(
+        implicit S: ExecutorService = Monitoring.serverPool,
+        log: String => Unit = println): Process[Task,Unit] = {
     val e = breaker(this)
     val step: Process[Task, Throwable \/ Unit] =
-      mirrorAll(url, localName)(S, log).attempt()
+      mirrorAll(parse)(url, localName)(S, log).attempt()
     step.stripW ++ e.terminated.flatMap {
       // on our last reconnect attempt, rethrow error
       case None => step.flatMap(_.fold(Process.fail, Process.emit))
@@ -172,11 +147,23 @@ trait Monitoring {
   /**
    * Given a stream of URLs with associated group names, mirror all
    * metrics from these URLs, and aggregate the `health` key for
-   * clusters of nodes with the same name. `breaker` controls reconnect
+   * clusters of nodes with the same name. `reconnectFrequency` controls reconnect
    * attempts. Example:
    *
    * {{{
-   * mirrorAndAggregate(Events.every(2 minutes))(urls)(
+   * val parser: DatapointParser = url => ....
+   *
+   * // when there's a failure connecting to a node, define the reconnect frequency
+   * val reconnect   = Events.every(2 minutes)
+   *
+   * // if the url has not produced any updates in this duration/event cycle,
+   * // reset the values to their defaults after this bound
+   * val decay       = Event.every(15 seconds)
+   *
+   * // how frequently to produce the "aggregate" health `key` for each group of urls
+   * val aggregating = Event.every(5 seconds)
+   *
+   * mirrorAndAggregate(parser)(reconnect,decay,aggregating)(urls)(
    *   Key[Boolean]("health", Units.Healthy)) {
    *     case "accounts" => Policies.quorum(2) _
    *     case "decoding" => Policies.majority _
@@ -184,25 +171,33 @@ trait Monitoring {
    *   }
    * }}}
    */
-  def mirrorAndAggregate(
-      breaker: Event)(
+  def mirrorAndAggregate[A](
+      parse: DatapointParser)(
+      reconnectFrequency: Event,
+      decayFrequency: Event,
+      aggregateFrequency: Event)(
       groupedUrls: Process[Task, (URL,String)],
-      health: Key[Boolean])(f: String => Seq[Boolean] => Boolean): Task[Unit] =
+      health: Key[A])(f: String => Seq[A] => A): Task[Unit] =
     Task.delay {
       // use urls as the local names for keys
       var seen = Set[String]()
+      var seenURLs = Set[(URL,String)]()
       groupedUrls.evalMap { case (url,group) => Task.delay {
         if (!seen.contains(group)) {
           val aggregateKey = health.modifyName(group + "/" + _)
           val keyFamily = health.modifyName(x => s"$group/$x/")
-          decay(keyFamily.name)(Events.every(15 seconds)).run
-          aggregate(keyFamily, aggregateKey)(Events.every(5 seconds))(f(group)).run
+          aggregate(keyFamily, aggregateKey)(aggregateFrequency)(f(group)).run
           seen = seen + group
         }
         val localName = prettyURL(url)
+        if (!seenURLs.contains(url -> group)) {
+          decay(Key.EndsWith(localName))(decayFrequency).run
+          seenURLs = seenURLs + (url -> group)
+        }
         // ex - `now/health` ==> `accounts/now/health/192.168.2.1`
-        attemptMirrorAll(breaker)(url.toString, m => s"$group/$m/$localName").
-        run.runAsync(_ => ())
+        attemptMirrorAll(parse)(reconnectFrequency)(
+          url, m => s"$group/$m/$localName"
+        ).run.runAsync(_ => ())
       }}.run.runAsync(_ => ())
     }
 
@@ -238,7 +233,7 @@ trait Monitoring {
    * `node1/health` metric(s) to `false` if no new values are published
    * within a 10 second window. See `Units.default`.
    */
-  def decay(prefix: String)(e: Event)(
+  def decay(f: Key[Any] => Boolean)(e: Event)(
             implicit log: String => Unit = println): Task[Unit] = Task.delay {
     def reset = keys.continuous.once.map {
       _.foreach(k => k.default.foreach(update(k, _).run))
@@ -249,16 +244,16 @@ trait Monitoring {
     // given prefix; if we ever encounter two ticks in a row from `e`,
     // we reset all matching keys back to their default
     val alive = async.signal[Unit](Strategy.Sequential); alive.value.set(())
-    val pts = Monitoring.subscribe(this)(prefix).onComplete {
+    val pts = Monitoring.subscribe(this)(f).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
-        log(s"$msg no more data points for '$prefix', resetting...")
+        log(s"$msg no more data points for '$f', resetting...")
         reset
       }}
     }
     e(this).zip(alive.continuous).map(_._1).either(pts)
            .scan(Vector(false,false))((acc,a) => acc.tail :+ a.isLeft)
            .filter { xs => xs forall (identity) }
-           .evalMap { _ => log(s"$msg no activity for key prefix '$prefix', resetting..."); reset }
+           .evalMap { _ => log(s"$msg no activity for '$f', resetting..."); reset }
            .run.runAsync { _ => () }
   }
 
@@ -278,7 +273,7 @@ trait Monitoring {
 
   /** Attempt to uniquely resolve `name` to a key of some expected type. */
   def lookup[O](name: String)(implicit R: Reportable[O]): Task[Key[O]] =
-    keysByName(name).once.runLastOr(List()).map {
+    filterKeys(Key.StartsWith(name)).once.runLastOr(List()).map {
       case List(k) =>
         val t = k.typeOf
         if (t == R) k.asInstanceOf[Key[O]]
@@ -295,8 +290,8 @@ trait Monitoring {
     name: String, units: Units[O])(
     buf: Process1[(I,Duration),O]): I => Unit = topic(name, units)(buf)._2
 
-  def keysByName(name: String): Process[Task, List[Key[Any]]] =
-    keys.continuous.map(_.filter(_ matches name))
+  def filterKeys(f: Key[Any] => Boolean): Process[Task, List[Key[Any]]] =
+    keys.continuous.map(_.filter(f))
 
   /**
    * Returns the continuous stream of values for keys whose type
@@ -304,7 +299,7 @@ trait Monitoring {
    * `family.name`. The sequences emitted are in no particular order.
    */
   def evalFamily[O](family: Key[O]): Task[Seq[O]] =
-    keysByName(family.name).once.runLastOr(List()).flatMap { ks =>
+    filterKeys(Key.StartsWith(family.name)).once.runLastOr(List()).flatMap { ks =>
       val ksO: Seq[Key[O]] = ks.flatMap(_.cast(family.typeOf, family.units))
       Nondeterminism[Task].gatherUnordered(ksO map (k => eval(k)))
     }
@@ -382,7 +377,7 @@ object Monitoring {
    *      halt the producer when completed. Just
    *      resubscribe if you need a fresh stream.
    */
-  def subscribe(M: Monitoring)(prefix: String)(
+  def subscribe(M: Monitoring)(f: Key[Any] => Boolean)(
   implicit ES: ExecutorService = serverPool,
            log: String => Unit = println):
       Process[Task, Datapoint[Any]] =
@@ -394,7 +389,7 @@ object Monitoring {
       alive.value.set(true)
       S { // in the background, populate the 'out' `Signal`
         alive.discrete.map(!_).wye(M.distinctKeys)(wye.interrupt)
-        .filter(_.matches(prefix))
+        .filter(f)
         .map { k =>
           // asynchronously set the output
           S { M.get(k).discrete
@@ -404,12 +399,12 @@ object Monitoring {
                .run.run
             }
         }.run.run
-        log("killed producer for prefix: " + prefix)
+        log("killed producer for: " + f)
       }
       // kill the producers when the consumer completes
       out.discrete onComplete {
         Process.eval_ { Task.delay {
-          log("killing producers for prefix: " + prefix)
+          log("killing producers for: " + f)
           out.close
           alive.value.set(false)
         }}

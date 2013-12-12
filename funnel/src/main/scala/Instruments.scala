@@ -2,6 +2,7 @@ package intelmedia.ws.monitoring
 
 import com.twitter.algebird.Group
 import intelmedia.ws.monitoring.{Buffers => B}
+import java.net.URL
 import java.util.concurrent.{ExecutorService,TimeUnit}
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
@@ -107,6 +108,9 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
     g.buffer(50 milliseconds)
   }
 
+  def trafficLight(label: String): TrafficLight = 
+    TrafficLight(gauge(label, TrafficLight.Red, Units.TrafficLight))
+
   /**
    * Return a `Gauge` with the given starting value.
    * Unlike `gauge`, keys updated by this `Counter` are
@@ -155,22 +159,4 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
     t.buffer(50 milliseconds)
   }
 
-  /**
-   * Mirror the (assumed) unique event at the given url and prefix.
-   * Example: `mirror[String]("http://localhost:8080", "now/health")`.
-   * This will fetch the stream at `http://localhost:8080/stream/now/health`
-   * and keep it updated locally, as events are published at `url`.
-   * `localName` may be (optionally) supplied to change the name of the
-   * key used locally. The `id` field of the key is preserved.
-   *
-   * This function checks that the given `prefix` uniquely determines a
-   * key, and that it has the expected type, and fails fast otherwise.
-   */
-  def mirror[O:Reportable](url: String, prefix: String, localName: Option[String] = None)(
-      implicit S: ExecutorService = Monitoring.serverPool): Key[O] =
-    monitoring.mirror(url, prefix, localName)(implicitly[Reportable[O]], S).run
-
-  def mirrorAll(url: String, localName: String => String = identity)(
-                implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] =
-    monitoring.mirrorAll(url, localName)(S)
 }

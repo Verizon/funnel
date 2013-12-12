@@ -12,7 +12,7 @@ object MirroringExample extends Properties("mirroring") {
 
   property("example") = secure {
 
-    val health = Key[Boolean]("now/health", Units.Healthy)
+    val health = Key[String]("now/health", Units.TrafficLight)
 
     /**
      * Generate some bogus activity for a `Monitoring` instance,
@@ -21,12 +21,12 @@ object MirroringExample extends Properties("mirroring") {
     def activity(M: Monitoring, name: String, port: Int): Unit = {
       val ttl = (math.random * 60).toInt + 30
       val I = new Instruments(5 minutes, M)
-      val ok = I.gauge("health", true, Units.Healthy)
+      val ok = I.trafficLight("health")
       val reqs = I.counter("reqs")
       val kill = MonitoringServer.start(M, port)
       Process.awakeEvery(2 seconds).takeWhile(_ < (ttl seconds)).map { _ =>
         reqs.incrementBy((math.random * 10).toInt)
-        ok.set(true)
+        ok.green
       }.onComplete(Process.eval_(
         Task.delay { println(s"halting $name:$port"); kill() })).run.runAsync(_ => ())
     }
@@ -51,11 +51,14 @@ object MirroringExample extends Properties("mirroring") {
     val M = Monitoring.instance
     MonitoringServer.start(M, 8000)
 
-    M.mirrorAndAggregate(Events.takeEvery(1 minutes, 5))(urls, health) {
-      case "accounts" => Policies.quorum(2)
-      case "decoding" => Policies.majority
-      case _          => sys.error("unknown group type")
-    }.run
+    M.mirrorAndAggregate(SSE.readEvents)(
+      Events.takeEvery(1 minutes, 5),
+      Events.every(15 seconds),
+      Events.every(5 seconds))(urls, health) {
+        case "accounts" => TrafficLight.quorum(2)
+        case "decoding" => TrafficLight.majority
+        case _          => sys.error("unknown group type")
+      }.run
 
     true
   }
