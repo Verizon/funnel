@@ -7,7 +7,7 @@ A distributed monitoring system based on a lightweight streaming protocol. **Thi
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
 ````
-libraryDependencies += "intelmedia.ws.monitoring" %% "funnel" % "x.y.z"
+libraryDependencies += "intelmedia.ws.funnel" %% "funnel-http" % "x.y.z"
 ````
 (check for the latest release by [looking on the nexus](http://nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/repositories/releases/intelmedia/ws/monitoring/funnel_2.10))
 
@@ -23,7 +23,7 @@ With the dependency setup complete, you can now start instrumenting your code. T
 package intelmedia.ws
 package myproject
 
-import monitoring.instruments._
+import funnel.instruments._
 
 object metrics {
   val HttpReadWidgets = timer("http/get/widgets")
@@ -45,7 +45,7 @@ These simply increment an integer value specified by a label that you supply. Ty
 package intelmedia.ws
 package yourproject
 
-import monitoring.instruments._
+import funnel.instruments._
 
 object metrics {
   val NumberOfCacheHits = counter("cache/hits")
@@ -82,7 +82,7 @@ As the name suggests, **timers** are all about the amount of time take to perfor
 package intelmedia.ws
 package yourproject
 
-import monitoring.instruments._
+import funnel.instruments._
 
 object metrics {
   val GetUserList = timer("db/get-user-list")
@@ -134,7 +134,7 @@ Gauges represent the current state of a value. The best way to visualise this is
 package intelmedia.ws
 package yourproject
 
-import monitoring.instruments._
+import funnel.instruments._
 
 object metrics {
   val OilGauge = gauge("oil", 0d) // gauges require an initial value
@@ -178,7 +178,7 @@ Traffic light metrics are used to derive actionable signals for operations (they
 package intelmedia.ws
 package yourproject
 
-import monitoring.instruments._
+import funnel.instruments._
 
 object metrics {
   val GeoLocationCircuit = trafficLight("circuit/geo") 
@@ -212,11 +212,11 @@ trait SomeFun {
 All the metrics you define in your application, plus some additional platform metrics supplied by the monitoring library can be exposed via a baked in administration server. In order to use this server, one simply only needs to add the following line to the `main` of their application:
 
 ````
-import monitoring.{MonitoringServer,Monitoring}
+import funnel.{MonitoringServer,Monitoring}
 
 object Main {
   def def main(args: Array[String]): Unit = {
-    MonitoringServer.start(Monitoring.default, 5775)
+    MonitoringServer.start(funnel.default, 5775)
 
     // your application code starts here 
   }
