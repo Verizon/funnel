@@ -90,11 +90,11 @@ object JSON {
     u      <- (c --\ "units").as[Units[Any]]
   } yield Key(name, typeOf, u) }
 
-  implicit def EncodeStats: EncodeJson[monitoring.Stats] =
-    jencode7L((s: monitoring.Stats) =>
+  implicit def EncodeStats: EncodeJson[funnel.Stats] =
+    jencode7L((s: funnel.Stats) =>
       (s.last, s.mean, s.count.toDouble, s.variance, s.standardDeviation, s.skewness, s.kurtosis))(
        "last", "mean", "count", "variance", "standardDeviation", "skewness", "kurtosis")
-  implicit def DecodeStats: DecodeJson[monitoring.Stats] =
+  implicit def DecodeStats: DecodeJson[funnel.Stats] =
     jdecode6L((last: Option[Double], mean: Double, count: Double, variance: Double,
                skewness: Double, kurtosis: Double) => {
       val m0 = count.toLong
@@ -104,14 +104,14 @@ object JSON {
       val m2 = variance * count
       val m3 = skewness / math.sqrt(count) * math.pow(m2, 1.5)
       val m4 = (kurtosis + 3)/count * math.pow(m2, 2)
-      new monitoring.Stats(com.twitter.algebird.Moments(m0, m1, m2, m3, m4), last)
+      new funnel.Stats(com.twitter.algebird.Moments(m0, m1, m2, m3, m4), last)
     })("last", "mean", "count", "variance", "skewness", "kurtosis")
 
   implicit def EncodeReportable[A:Reportable]: EncodeJson[A] = EncodeJson {
     case a: Double => encodeResult(a)
     case a: Boolean => encodeResult(a)
     case a: String => encodeResult(a)
-    case a: monitoring.Stats => encodeResult(a)
+    case a: funnel.Stats => encodeResult(a)
     case h => sys.error("unsupported reportable: " + h)
   }
 
@@ -119,7 +119,7 @@ object JSON {
     r match {
       case Reportable.B => c.as[Boolean] ||| D.fail("expected Boolean", c.history)
       case Reportable.D => c.as[Double] ||| D.fail("expected Double", c.history)
-      case Reportable.Stats => c.as[monitoring.Stats] ||| D.fail("expected Stats", c.history)
+      case Reportable.Stats => c.as[funnel.Stats] ||| D.fail("expected Stats", c.history)
       case Reportable.S => c.as[String] ||| D.fail("expected String", c.history)
     }
   }

@@ -1,7 +1,7 @@
 package intelmedia.ws.funnel
 
 import com.twitter.algebird.Group
-import intelmedia.ws.monitoring.{Buffers => B}
+import intelmedia.ws.funnel.{Buffers => B}
 import java.net.URL
 import java.util.concurrent.{ExecutorService,TimeUnit}
 import scala.concurrent.duration._
@@ -20,7 +20,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * Return a `Counter` with the given starting count.
    * Keys updated by this `Counter` are `now/label`,
    * `previous/label` and `sliding/label`.
-   * See [[intelmedia.ws.monitoring.Periodic]].
+   * See [[intelmedia.ws.funnel.Periodic]].
    */
   def counter(label: String, init: Int = 0): Counter[Periodic[Double]] = {
     val c = new Counter[Periodic[Double]] {
@@ -49,7 +49,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * Records the elapsed time in the current period whenever the
    * returned `Gauge` is set. See `Elapsed.scala`.
    */
-  private[monitoring] def currentElapsed(label: String): Gauge[Continuous[Double], Unit] = {
+  private[funnel] def currentElapsed(label: String): Gauge[Continuous[Double], Unit] = {
     val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds)(
       B.currentElapsed(window).map(_.toSeconds.toDouble))
     val g = new Gauge[Continuous[Double], Unit] {
@@ -64,7 +64,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * Records the elapsed time in the current period whenever the
    * returned `Gauge` is set. See `Elapsed.scala`.
    */
-  private[monitoring] def currentRemaining(label: String): Gauge[Continuous[Double], Unit] = {
+  private[funnel] def currentRemaining(label: String): Gauge[Continuous[Double], Unit] = {
     val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds)(
       B.currentRemaining(window).map(_.toSeconds.toDouble))
     val g = new Gauge[Continuous[Double], Unit] {
@@ -79,7 +79,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * Records the elapsed time that the `Monitoring` instance has
    * been running whenver the returned `Gauge` is set. See `Elapsed.scala`.
    */
-  private[monitoring] def uptime(label: String): Gauge[Continuous[Double], Unit] = {
+  private[funnel] def uptime(label: String): Gauge[Continuous[Double], Unit] = {
     val (k, snk) = monitoring.topic[Unit,Double](label, Units.Minutes)(
       B.elapsed.map(_.toSeconds.toDouble / 60))
     val g = new Gauge[Continuous[Double], Unit] {
@@ -115,7 +115,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * Return a `Gauge` with the given starting value.
    * Unlike `gauge`, keys updated by this `Counter` are
    * `now/label`, `previous/label` and `sliding/label`.
-   * See [[intelmedia.ws.monitoring.Periodic]].
+   * See [[intelmedia.ws.funnel.Periodic]].
    */
   def numericGauge(label: String, init: Double,
                    units: Units[Stats] = Units.None): Gauge[Periodic[Stats],Double] = {
@@ -138,7 +138,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
   /**
    * Return a `Timer` which updates the following keys:
    * `now/label`, `previous/label`, and `sliding/label`.
-   * See [[intelmedia.ws.monitoring.Periodic]].
+   * See [[intelmedia.ws.funnel.Periodic]].
    */
   def timer(label: String): Timer[Periodic[Stats]] = {
     val t = new Timer[Periodic[Stats]] {

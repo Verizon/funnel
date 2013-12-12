@@ -1,71 +1,54 @@
 package intelmedia.ws
-package funnel 
+package funnel
 
-import scopt.{OptionParser,Read}
-import java.net.URL
-import scala.concurrent.duration._
+import riemann.Riemann
 
-case class Options(
-  urls: Seq[(URL,String)], 
-  aggregationInterval: Duration = 5 minutes,
-  retryLimit: Int = 3,
-  healthKey: String = "now/health")
-
-trait FunnelCommandLine {
-  // takes strings of the form:
-  // accounts@http://foobar.com
-  private def splitBucketURLPairs(str: String): (URL,String) = 
-    str.split('@') match {
-      case Array(bucket,urlstring) => (new URL(urlstring),bucket)
-      case _ => sys.error(s"Unable to parse the supplied bucket@url pair: $str")
-    }
-
-  implicit val scoptReadUrl: Read[(URL,String)] = Read.reads { splitBucketURLPairs(_) }
-  implicit val scoptReadDuration: Read[Duration] = Read.reads { Duration(_) }
-
-  // protected val build = new BuildData
-  protected val parser = new OptionParser[Options]("funnel"){
-    head("funnel", "1.0")
-    
-    opt[Duration]('i',"interval").action { (duration, opts) =>
-      opts.copy(aggregationInterval = duration)
-    }
-
-    opt[Int]('r',"retries").action { (limit, opts) => 
-      opts.copy(retryLimit = limit)
-    }
-
-    arg[(URL,String)]("<url>[,url]...") unbounded() optional() action { (url, opts) =>
-      opts.copy(urls = opts.urls :+ url) } text("optional unbounded args")
-  }
-
-  def run(args: Array[String])(f: Options => Unit): Unit = 
-    parser.parse(args, Options(Seq.empty)).foreach(f)
-}
-
-import Monitoring.default.mirrorAndAggregate
-import scalaz.stream.Process
-
-object Funnel extends FunnelCommandLine {
-  def main(args: Array[String]): Unit = 
-    run(args){ options =>  
-      println(">>>> "+ options)
-
-      MonitoringServer.start(Monitoring.default, 5775)
-
-      val health = Key[Boolean](options.healthKey, Units.Healthy)
-      val events = Events.takeEvery(options.aggregationInterval, options.retryLimit)
-
-      mirrorAndAggregate(events)(Process.emitAll(options.urls), health) {
-        case "accounts" => Policies.quorum(2)
-        case "test"     => Policies.majority
-        case _          => sys.error("unknown group type")
-      }.run
+object Utensil extends CLI {
+  def main(args: Array[String]): Unit = {
+    run(args){ options =>
+      val shutdown = MonitoringServer.start(Monitoring.default, options.funnelPort)
 
       println
-      println("Press [Enter] to stop the funnel...")
+      println("Press [Enter] to stop the Funnel utensil...")
       println
 
       readLine()
+
+      shutdown()
     }
+  }
 } 
+
+import java.net.URL
+import scopt.{OptionParser,Read}
+import scala.concurrent.duration._
+
+case class RiemannSettings(host: String, port: Int)
+
+case class Options(
+  riemann: RiemannSettings = RiemannSettings("localhost",5555),
+  funnelPort: Int = 5775
+)
+
+trait CLI {
+  implicit val scoptReadUrl: Read[RiemannSettings] = 
+    Read.reads { str =>
+      str.split(':') match {
+        case Array(host,port) => RiemannSettings(host,port.toInt) // ok to explode here
+        case _ => sys.error("The supplied host:port combination for the riemann server are not valid.")
+      }
+    }
+  implicit val scoptReadDuration: Read[Duration] = Read.reads { Duration(_) }
+
+  protected val parser = new OptionParser[Options]("funnel"){
+    head("funnel", "1.0")
+
+    opt[RiemannSettings]('r',"riemann").action { (rs, opts) => 
+      opts.copy(riemann = rs)
+    }
+  }
+
+  def run(args: Array[String])(f: Options => Unit): Unit = 
+    parser.parse(args, Options()).foreach(f)
+}
+

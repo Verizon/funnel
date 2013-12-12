@@ -10,10 +10,10 @@ case class TrafficLight(gauge: Gauge[Continuous[String], String]){
   def key = gauge.key
 }
 object TrafficLight {
-  private[monitoring] val Red = "red"
-  private[monitoring] val Amber = "amber"
-  private[monitoring] val Yellow = Amber
-  private[monitoring] val Green = "green"
+  private[funnel] val Red = "red"
+  private[funnel] val Amber = "amber"
+  private[funnel] val Yellow = Amber
+  private[funnel] val Green = "green"
 
   private def downgrade(anyFailures: Boolean)(s: Boolean): String =
     if (anyFailures && s) Amber

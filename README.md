@@ -7,7 +7,7 @@ A distributed monitoring system based on a lightweight streaming protocol. **Thi
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
 ````
-libraryDependencies += "intelmedia.ws.monitoring" %% "funnel" % "x.y.z"
+libraryDependencies += "intelmedia.ws.funnel" %% "funnel" % "x.y.z"
 ````
 (check for the latest release by [looking on the nexus](http://nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/repositories/releases/intelmedia/ws/monitoring/funnel_2.10))
 

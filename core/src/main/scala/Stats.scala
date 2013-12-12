@@ -4,7 +4,7 @@ import com.twitter.algebird.{Group, Moments, MomentsGroup}
 
 /** Monoidally track count/mean/variance/skewness/kurtosis. */
 class Stats(moments: Moments, val last: Option[Double]) {
-  private[monitoring] def get = moments
+  private[funnel] def get = moments
   def count = moments.count
   def mean = moments.mean
   def variance = moments.variance

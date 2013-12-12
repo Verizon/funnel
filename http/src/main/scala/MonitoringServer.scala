@@ -34,7 +34,7 @@ object MonitoringServer {
     () => server.stop(0)
   }
 
-  private[monitoring] def handler(M: Monitoring, log: Log) = new HttpHandler {
+  private[funnel] def handler(M: Monitoring, log: Log) = new HttpHandler {
     def handle(req: HttpExchange): Unit = try {
       log("path: " + req.getRequestURI.getPath)
       val path = req.getRequestURI.getPath match {

@@ -8,7 +8,7 @@ import scala.concurrent.duration._
 object Example extends Properties("example") {
 
   object metrics {
-    import intelmedia.ws.monitoring.instruments._
+    import intelmedia.ws.funnel.instruments._
     val reqs = counter("requests#")
     val dbOk = gauge("db-up?", true)
     val query = timer("query-speed")

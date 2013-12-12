@@ -1,6 +1,6 @@
 package intelmedia.ws.funnel
 
-case class Key[+A] private[monitoring](name: String, typeOf: Reportable[A], units: Units[A]) {
+case class Key[+A] private[funnel](name: String, typeOf: Reportable[A], units: Units[A]) {
   def endsWith(suffix: String): Boolean = name.endsWith(suffix)
   def startsWith(prefix: String): Boolean = name.startsWith(prefix)
   def rename(s: String) = copy(name = s)

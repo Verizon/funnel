@@ -32,9 +32,9 @@ object Reportable {
       catch { case cce: ClassCastException => None }
     def description = "String"
   }
-  implicit case object Stats extends Reportable[monitoring.Stats] {
-    def read(a: Any): Option[monitoring.Stats] =
-      try Some(a.asInstanceOf[monitoring.Stats])
+  implicit case object Stats extends Reportable[funnel.Stats] {
+    def read(a: Any): Option[funnel.Stats] =
+      try Some(a.asInstanceOf[funnel.Stats])
       catch { case cce: ClassCastException => None }
     def description = "Stats"
   }

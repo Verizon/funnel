@@ -11,10 +11,10 @@ object Units {
   // with a Stats metric, or a single-value metric, hence
   // the intersection type
 
-  case class Duration(granularity: TimeUnit) extends Units[Double with monitoring.Stats]
-  case class Bytes(base: Base) extends Units[Double with monitoring.Stats]
-  case object Count extends Units[Double with monitoring.Stats]
-  case object Ratio extends Units[Double with monitoring.Stats]
+  case class Duration(granularity: TimeUnit) extends Units[Double with funnel.Stats]
+  case class Bytes(base: Base) extends Units[Double with funnel.Stats]
+  case object Count extends Units[Double with funnel.Stats]
+  case object Ratio extends Units[Double with funnel.Stats]
   case object TrafficLight extends Units[String] // "red", "yellow", "green"
   case object Healthy extends Units[Boolean]
   case object Load extends Units[String] // "idle", "busy", "overloaded"
@@ -44,7 +44,7 @@ object Units {
    */
   def default[O](t: Reportable[O], u: Units[O]): Option[O] = (t, u) match {
     case (Reportable.B, Healthy) => Some(false)
-    case (Reportable.S, TrafficLight) => Some(monitoring.TrafficLight.Red)
+    case (Reportable.S, TrafficLight) => Some(funnel.TrafficLight.Red)
     case _ => scala.None
   }
 

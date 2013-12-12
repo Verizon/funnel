@@ -2,7 +2,7 @@ package intelmedia.ws.funnel
 package riemann
 
 import com.aphyr.riemann.client.RiemannClient
-import intelmedia.ws.monitoring.Events.Event
+import intelmedia.ws.funnel.Events.Event
 import java.net.URL
 import scala.concurrent.duration._
 import scalaz.\/

@@ -433,7 +433,7 @@ object Monitoring {
    * Send values through a `Process1[I,O]` to a `Signal[O]`, which will
    * always be equal to the most recent value produced by `buf`.
    */
-  private[monitoring] def bufferedSignal[I,O](
+  private[funnel] def bufferedSignal[I,O](
       buf: Process1[I,O])(
       implicit ES: ExecutorService = defaultPool):
       (I => Unit, async.mutable.Signal[O]) = {
@@ -455,7 +455,7 @@ object Monitoring {
   }
 
 
-  private[monitoring] def prettyURL(url: URL): String = {
+  private[funnel] def prettyURL(url: URL): String = {
     val host = url.getHost
     val path = url.getPath
     val port = url.getPort match {

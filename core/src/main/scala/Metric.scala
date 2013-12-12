@@ -14,7 +14,7 @@ trait Metric[+A] {
 
   def map[B](f: A => B): Metric[B] = flatMap(a => Pure(f(a)))
 
-  private[monitoring] def run[F[+_]](f: Key ~> F)(implicit F: Monad[F]): F[A] =
+  private[funnel] def run[F[+_]](f: Key ~> F)(implicit F: Monad[F]): F[A] =
     Metric.run(this)(f)
 }
 
