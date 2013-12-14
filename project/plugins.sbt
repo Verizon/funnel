@@ -12,4 +12,6 @@ resolvers ++= Seq(
 
 addSbtPlugin("intelmedia.build" %% "sbt-imbuild" % "4.0.0")
 
+addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "0.6.4")
+
 credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")

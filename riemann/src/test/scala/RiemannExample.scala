@@ -3,6 +3,7 @@ package riemann
 
 import scalaz.stream.Process
 import scala.concurrent.duration._
+import scalaz.concurrent.Task
 
 object Main {
   private def randomLight(tl: TrafficLight) = 
@@ -20,18 +21,30 @@ object Main {
 
     R.connect() // give me stregth!
 
-    Riemann.publish(Monitoring.default, 10f, Events.every(10 seconds))(R)
-
     val c = counter("requests")
     val t = timer("response-time")
-
     val l = trafficLight("stoplight")
 
-    val g = Process.awakeEvery(2 seconds).map { _ =>
-      c.increment
-      t.time(Thread.sleep(100))
-      randomLight(l)
-    }.run.run
+    val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
 
+    val t1 = Process.awakeEvery(2 seconds).map { _ =>
+             c.increment
+             t.time(Thread.sleep(100))
+             randomLight(l)
+           }.run.runAsyncInterruptibly(println, stop)
+
+    val t2 = Riemann.publish(Monitoring.default, 10f, 
+        Events.every(10 seconds))(R).runAsyncInterruptibly(println, stop)
+
+    println
+    println("Press [Enter] to quit...")
+    println
+
+    readLine()
+    // nice little hack to get make it easy to just hit return and shutdown
+    // this running example
+    stop.set(true)
+
+    if(R.isConnected) R.disconnect else ()
   }
 }

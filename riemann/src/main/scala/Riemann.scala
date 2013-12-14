@@ -51,8 +51,8 @@ object Riemann {
     * C'est la vie!
     */
   private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any])(
-                      implicit log: String => Unit =
-                        s => "[Riemann.toEvent] "+s): Unit = {
+                      implicit log: String => SafeUnit =
+                        s => println("[Riemann.toEvent] "+s)): SafeUnit = {
 
     val e = c.event.service(pt.key.name)
              .tags(tags(pt.key.name): _*)
@@ -97,7 +97,7 @@ object Riemann {
    */
   def retry[A](retries: Process[Task,Any])(p: Process[Task,A]):
   Process[Task,A] = {
-    val alive = async.signal[Unit]; alive.value.set(())
+    val alive = async.signal[SafeUnit]; alive.value.set(())
     val step: Process[Task,Throwable \/ A] =
       p.append(Process.eval_(alive.close)).attempt()
     step.stripW ++ link(alive)(retries).terminated.flatMap {
@@ -109,7 +109,7 @@ object Riemann {
   }
 
   /** Terminate `p` when the given `Signal` terminates. */
-  def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
+  def link[A](alive: Signal[SafeUnit])(p: Process[Task,A]): Process[Task,A] =
     alive.continuous.zip(p).map(_._2)
 
   private def liftDatapointToStream(dp: Datapoint[Any]): Process[Task, Datapoint[Any]] = 
@@ -126,20 +126,22 @@ object Riemann {
    */
   def publish(M: Monitoring, ttlInSeconds: Float = 20f,
              retries: Event = Events.every(1 minutes))(c: RiemannClient)(
-             implicit log: String => Unit = s => println("[Riemann.publish] "+s)):
-             () => Unit = {
-    val alive = async.signal[Unit](Strategy.Executor(Monitoring.defaultPool))
-    alive.value.set(())
-    link(alive){ 
-      Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream).flatMap { pt =>
-        retry(retries(M))(Process.eval_(
-          Task { 
-            toEvent(c, ttlInSeconds)(pt) 
-          }(Monitoring.defaultPool))
-        )
-      }
-    }.run.runAsync(_.fold(err => log(err.toString), _ => ()))
-    () => alive.value.close
+             implicit log: String => SafeUnit = s => println("[Riemann.publish] "+s)
+  ): Task[SafeUnit] = {
+    for {
+      alive <- Task(async.signal[SafeUnit](Strategy.Executor(Monitoring.defaultPool)))
+      _     <- Task(alive.value.set(()))
+      _     <- link(alive){ 
+                 Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream).flatMap { pt =>
+                  retry(retries(M))(Process.eval_(
+                    Task { 
+                      toEvent(c, ttlInSeconds)(pt) 
+                    }(Monitoring.defaultPool))
+                  )
+                }
+               }.run
+      _     <- Task(alive.value.close)
+    } yield ()
   }
 
   /**
@@ -154,20 +156,20 @@ object Riemann {
       c: RiemannClient, reimannRetries: Event = Events.every(1 minutes))(
       parse: DatapointParser)(
       groupedUrls: Process[Task, (URL,String)])(
-      implicit log: String => Unit =
-      s => println("[Riemann.publishAll] "+s)):
-      () => Unit = {
-    val alive = async.signal[Unit](Strategy.Executor(Monitoring.defaultPool))
-    alive.value.set(())
-    // use urls as the local names for keys
-    var seenURLs = Set[(URL,String)]()
-    link(alive)(groupedUrls).evalMap { case (url,group) => Task.delay {
-      val localName = prettyURL(url)
-      link(alive)(M.attemptMirrorAll(parse)(nodeRetries)(
-        url, m => s"$group/$m:::localName"
-      )).run.runAsync(_ => ())
-    }}.run.runAsync(_ => ())
-    publish(M, ttlInSeconds, reimannRetries)(c)
-    () => alive.close.run
+      implicit log: String => SafeUnit =
+      s => println("[Riemann.publishAll] "+s)): Task[SafeUnit] = {
+
+    val alive = async.signal[SafeUnit](Strategy.Executor(Monitoring.defaultPool))
+    for {
+      _ <- Task(alive.value.set(()))
+      _ <- link(alive)(groupedUrls).evalMap { case (url,group) => Task.delay {
+              val localName = prettyURL(url)
+              link(alive)(M.attemptMirrorAll(parse)(nodeRetries)(
+                url, m => s"$group/$m:::localName"
+              )).run //.runAsync(_ => ())
+            }}.run
+      _ <- publish(M, ttlInSeconds, reimannRetries)(c)
+      _ <- Task(alive.close)
+    } yield ()
   }
 }
