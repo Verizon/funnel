@@ -162,14 +162,17 @@ object Riemann {
     val alive = async.signal[SafeUnit](Strategy.Executor(Monitoring.defaultPool))
     for {
       _ <- Task(alive.value.set(()))
-      _ <- link(alive)(groupedUrls).evalMap { case (url,group) => Task.delay {
-              val localName = prettyURL(url)
-              link(alive)(M.attemptMirrorAll(parse)(nodeRetries)(
-                url, m => s"$group/$m:::localName"
-              )).run //.runAsync(_ => ())
-            }}.run
+      _ <- Task(println(">> 1 >>>>>>>>>>>>>> "))
+      _ <- link(alive)(groupedUrls).evalMap { case (url,group) => 
+             val localName = prettyURL(url)
+             link(alive)(M.attemptMirrorAll(parse)(nodeRetries)(
+               url, m => s"$group/$m:::localName"
+             )).run
+           }.run
+      _ <- Task(println(">> 2 >>>>>>>>>>>>>> "))
       _ <- publish(M, ttlInSeconds, reimannRetries)(c)
-      _ <- Task(alive.close)
+      // _ <- Task(println(">> 3 >>>>>>>>>>>>>> "))
+      // _ <- Task(alive.value.close)
     } yield ()
   }
 }

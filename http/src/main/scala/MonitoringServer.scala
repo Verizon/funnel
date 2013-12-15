@@ -39,11 +39,11 @@ object MonitoringServer {
     req.getResponseBody.write(helpHTML.getBytes)
   }
 
-  protected def handleStream(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
+  protected def handleStream(M: Monitoring, prefix: String, req: HttpExchange, l: Log): Unit = {
     req.getResponseHeaders.set("Content-Type", "text/event-stream")
     req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
     req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
-    val events = Monitoring.subscribe(M)(Key.StartsWith(prefix))(log = log)
+    val events = Monitoring.subscribe(M)(Key.StartsWith(prefix))(log = l(_))
     val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
     SSE.writeEvents(events, sink)
   }
