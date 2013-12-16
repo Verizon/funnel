@@ -166,7 +166,7 @@ object Riemann {
             Task.delay {
                val localName = prettyURL(url)
                link(alive)(M.attemptMirrorAll(parse)(nodeRetries)(
-                 url, m => s"$group/$m:::localName"
+                 url, m => s"$group/$m:::$localName"
                )).run.runAsync(_ => ())
             }
            }.run

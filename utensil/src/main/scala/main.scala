@@ -13,44 +13,17 @@ object Utensil extends CLI {
       
       val M = Monitoring.default
 
-      val M2 = Monitoring.instance()
-
-      // startup the http monitoring server
-      val shutdown = MonitoringServer.start(M, 4000)
-
-      val shutdown2 = MonitoringServer.start(M2, 5775)
+      val shutdown = MonitoringServer.start(M, options.funnelPort)
 
       val R = RiemannClient.tcp(options.riemann.host, options.riemann.port)
       R.connect() // urgh. Give me stregth! 
 
       val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
 
-      import instruments._
-
-      val c = counter("requests")
-      val t = timer("response-time")
-    
-      val t1 = Process.awakeEvery(2 seconds).map { _ =>
-             c.increment
-             t.time(Thread.sleep(100))
-           }.run.runAsyncInterruptibly(println, stop)
-
-
-      // M.mirrorStream.evalMap { case (url,group) => 
-      //   println(">>>>>>>>>>>>> " + url)
-
-      //   Riemann.mirrorAndPublish(M)(R)(SSE.readEvents)(Process.emit((url, group)))
-      // }.run.runAsyncInterruptibly(println, stop)
-
-
-      // M2.attemptMirrorAll(SSE.readEvents)(Events.every(1 minute))(
-      //   new java.net.URL("http://localhost:4000/stream"),
-      //   "p4000/" + _
-      // ).run.runAsyncInterruptibly(println,stop)
-
-      Riemann.mirrorAndPublish(M2)(R)(SSE.readEvents)(
-        Process.emit((new java.net.URL("http://127.0.0.1:4000/stream"), "foo"))
-          ).runAsyncInterruptibly(println, stop)
+      M.mirrorStream.evalMap { case (url,bucket) =>
+       Riemann.mirrorAndPublish(M)(R)(SSE.readEvents)(
+          Process.emit((url, bucket)))
+      }.run.runAsyncInterruptibly(println, stop)
 
       println
       println("Press [Enter] to quit...")
@@ -58,7 +31,9 @@ object Utensil extends CLI {
 
       readLine()
 
-      shutdown2()
+      // nice little hack to get make it easy to just hit return and shutdown
+      // this running example
+      stop.set(true)
       shutdown()
       if(R.isConnected) R.disconnect else ()
     }
