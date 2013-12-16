@@ -93,11 +93,6 @@ trait Monitoring {
    */
   protected def update[O](k: Key[O], v: O): Task[SafeUnit]
 
-  // could have mirror(events)(url, prefix), which is polling
-  // rather than pushing
-
-  private[funnel] val (mirrorQueue,mirrorStream) = scalaz.stream.async.queue[(URL,String)]
-
   /**
    * Mirror all metrics from the given URL, adding `localPrefix` onto the front of
    * all loaded keys. `url` is assumed to be a stream of datapoints in SSE format.
@@ -332,7 +327,6 @@ object Monitoring {
   def instance(implicit ES: ExecutorService = defaultPool): Monitoring = {
     import async.immutable.Signal
     import scala.collection.concurrent.TrieMap
-    import scalaz.stream.async.queue
 
     val t0 = System.nanoTime
     val S = Strategy.Executor(ES)

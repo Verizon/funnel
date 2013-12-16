@@ -1,7 +1,8 @@
-package intelmedia.ws
-package funnel
+package intelmedia.ws.funnel
+package utensil
 
 import riemann.Riemann
+import http.{MonitoringServer,SSE}
 import com.aphyr.riemann.client.RiemannClient
 import scalaz.concurrent.Task
 import scalaz.stream.Process
@@ -13,14 +14,14 @@ object Utensil extends CLI {
       
       val M = Monitoring.default
 
-      val shutdown = MonitoringServer.start(M, options.funnelPort)
+      val server = MonitoringServer.start(M, options.funnelPort)
 
       val R = RiemannClient.tcp(options.riemann.host, options.riemann.port)
       R.connect() // urgh. Give me stregth! 
 
       val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
 
-      M.mirrorStream.evalMap { case (url,bucket) =>
+      server.mirroringSources.evalMap { case (url,bucket) =>
        Riemann.mirrorAndPublish(M)(R)(SSE.readEvents)(
           Process.emit((url, bucket)))
       }.run.runAsyncInterruptibly(println, stop)
@@ -34,7 +35,7 @@ object Utensil extends CLI {
       // nice little hack to get make it easy to just hit return and shutdown
       // this running example
       stop.set(true)
-      shutdown()
+      server.stop()
       if(R.isConnected) R.disconnect else ()
     }
   }

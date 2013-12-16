@@ -1,4 +1,5 @@
 package intelmedia.ws.funnel
+package http
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
@@ -10,7 +11,6 @@ import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
 
 object MonitoringServer {
-
   type Log = String => Unit
 
   /**
@@ -25,14 +25,28 @@ object MonitoringServer {
    * `/stream/<keyid>`: stream of metrics for the given key
    * `/stream/<prefix>`: stream of metrics whose labels start with 'prefix'
    */
-  def start(M: Monitoring, port: Int = 8080, log: Log = println): () => Unit = {
-    val server = HttpServer.create(new InetSocketAddress(port), 0)
+  def start(M: Monitoring, port: Int = 8080, log: Log = println): MonitoringServer = {
+    val svr = (new MonitoringServer(M, port, log))
+    svr.start()
+    svr
+  }
+}
+
+class MonitoringServer(M: Monitoring, port: Int, log: MonitoringServer.Log) extends ControlServer {
+  import MonitoringServer.Log
+
+  private[funnel] val (mirroringQueue,mirroringSources) = async.queue[(URL,String)]
+
+  private val server = HttpServer.create(new InetSocketAddress(port), 0)
+
+  def start(): Unit = {
     server.setExecutor(Monitoring.serverPool)
     server.createContext("/", handleMetrics(M, log))
     server.start()
     log("server started on port: " + port)
-    () => server.stop(0)
   }
+
+  def stop(): Unit = server.stop(0)
 
   protected def handleIndex(req: HttpExchange): Unit = {
     req.sendResponseHeaders(200, helpHTML.length)
@@ -79,20 +93,19 @@ object MonitoringServer {
 
   protected def handleAddMirroringURLs(M: Monitoring, req: HttpExchange, log: Log): Unit = {
     import JSON._; import argonaut.Parse; import scala.io.Source
-    import scalaz.{\/,-\/,\/-}
 
     if(req.getRequestMethod.toLowerCase == "post"){
       // as the payloads here will be small, lets just turn it into a string
       val json = Source.fromInputStream(req.getRequestBody).mkString
-      Parse.decodeEither[List[Bucket]](json) match {
-        case -\/(error) => flush(400, error.toString, req)
-        case \/-(blist) => {
+      Parse.decodeEither[List[Bucket]](json).fold(
+        error => flush(400, error.toString, req),
+        blist => {
           blist.flatMap(b => b.urls.map(u => new URL(u) -> b.label)
-            ).foreach(M.mirrorQueue.enqueue)
+            ).foreach(mirroringQueue.enqueue)
 
           flush(202, Array.empty[Byte], req)
         }
-      }
+      )
     } else flush(405, "Request method not allowed.", req)
   }
 

@@ -1,5 +1,6 @@
 package intelmedia.ws
 package funnel
+package http
 
 import argonaut.{DecodeResult => D, _}
 import argonaut.EncodeJson.{

@@ -140,7 +140,7 @@ object Riemann {
                   )
                 }
                }.run
-      _     <- Task(alive.value.close)
+      _     <- alive.set(())
     } yield ()
   }
 

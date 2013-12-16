@@ -1,4 +1,5 @@
 package intelmedia.ws.funnel
+package http
 package examples
 
 import java.net.URL
@@ -23,12 +24,12 @@ object MirroringExample extends Properties("mirroring") {
       val I = new Instruments(5 minutes, M)
       val ok = I.trafficLight("health")
       val reqs = I.counter("reqs")
-      val kill = MonitoringServer.start(M, port)
+      val svr = MonitoringServer.start(M, port)
       Process.awakeEvery(2 seconds).takeWhile(_ < (ttl seconds)).map { _ =>
         reqs.incrementBy((math.random * 10).toInt)
         ok.green
       }.onComplete(Process.eval_(
-        Task.delay { println(s"halting $name:$port"); kill() })).run.runAsync(_ => ())
+        Task.delay { println(s"halting $name:$port"); svr.stop() })).run.runAsync(_ => ())
     }
 
     val accountCluster = (1 to 3).map { i =>
