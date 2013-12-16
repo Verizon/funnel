@@ -130,7 +130,7 @@ object Riemann {
   ): Task[SafeUnit] = {
     for {
       alive <- Task(async.signal[SafeUnit](Strategy.Executor(Monitoring.defaultPool)))
-      _     <- Task(alive.value.set(()))
+      _     <- alive.set(())
       _     <- link(alive){ 
                  Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream).flatMap { pt =>
                   retry(retries(M))(Process.eval_(
@@ -140,7 +140,7 @@ object Riemann {
                   )
                 }
                }.run
-      _     <- alive.set(())
+      _     <- alive.close
     } yield ()
   }
 
@@ -161,9 +161,12 @@ object Riemann {
 
     val alive = async.signal[SafeUnit](Strategy.Executor(Monitoring.defaultPool))
     for {
-      _ <- Task(alive.value.set(()))
+      _ <- alive.set(())
       _ <- link(alive)(groupedUrls).evalMap { case (url,group) => 
             Task.delay {
+               // adding the `localName` onto the string here so that later in the 
+               // process its possible to find the key we're specifically looking for
+               // and trim off the `localName`
                val localName = prettyURL(url)
                link(alive)(M.attemptMirrorAll(parse)(nodeRetries)(
                  url, m => s"$group/$m:::$localName"
@@ -171,7 +174,7 @@ object Riemann {
             }
            }.run
       _ <- publish(M, ttlInSeconds, reimannRetries)(c)
-      _ <- Task(alive.value.close)
+      _ <- alive.close
     } yield ()
   }
 }

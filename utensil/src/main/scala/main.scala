@@ -8,6 +8,16 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scala.concurrent.duration._
 
+/**
+  * How to use:
+  * 
+  * utensil \
+  *   --riemann localhost:5555 \
+  *   --transport http-sse \
+  *   --port 5775
+  * 
+  * utensil -r localhost:5555 -t http-sse -p 5775
+  */
 object Utensil extends CLI {
   def main(args: Array[String]): Unit = {
     run(args){ options =>
@@ -81,7 +91,7 @@ trait CLI {
       opts.copy(riemann = rs)
     }
     
-    opt[Int]('p', "http-port").action { (p, opts) => 
+    opt[Int]('p', "port").action { (p, opts) => 
       opts.copy(funnelPort = p)
     }
 
