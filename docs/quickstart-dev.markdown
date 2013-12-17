@@ -14,7 +14,11 @@ Current transitive dependencies this will introduce on your classpath:
 - [Scalaz Stream](https://github.com/scalaz/scalaz-stream) 0.1
 - [Algebird Core](https://github.com/twitter/algebird) 0.3.0
 
-With the dependency setup complete, you can now start instrumenting your code. The first thing you need to do is create a `metrics.scala` file, which should look like this:
+You will likely never touch these dependencies directly, but its important to be aware of them in case you decide yourself to use Scalaz (for example); if you have conflicting versions then you will see some very strange binary collisions at runtime.
+
+### Defining Metrics
+
+With the dependency setup complete, you can now start instrumenting your code. The first thing you need to do is create a `metrics.scala` file, which should look something like this:
 
 ````
 package intelmedia.ws
@@ -29,9 +33,63 @@ object metrics {
 }
 ````
 
-The goal of `metrics` is that you need to define your metrics up front, and think about the metric requirements that your application has. These should all be defined in the `metrics` object, and imported where they are needed by specific APIs. 
+The goal of this `metrics` object is to define your metrics up front, and force yourself to think about the metric requirements that your application has. All of your application metrics should be defined in the `metrics` object, and imported where they are needed by specific APIs. 
 
-In the 1.0.x series of the monitoring library there are three supported metric types: counters, timers and gauges.
+> **NOTE:** When it comes to naming metrics, always bucket your metrics using `/` as a delimiter, and try to logically order things as a "tree". For example:
+>
+> * When implementing timers for HTTP resources, use the idiom: `http/<verb>/<resource>`. If parts of the resource are variable, then use `:yourvar`, or whatever parameter name makes most sense. The reason for structure HTTP metrics like this is that it is easily consumable by operations and that it makes it easy to quickly compare different resources for a given HTTP verb (for example)
+> * As a rule of thumb, try to logically order your metrics in order of component coarseness. For example, anything starting with "db" for database operations can all be compared together in a convenient fashion, so it would make sense to bucket all database operations together, and then perhaps bucket all the *read* operations together, versus the *write* operations (see below for a more complete example)
+
+At first blush, clearly having a single namespace for the entire world of application metrics could become unwieldy, so it is recommended to organise your metrics with nested objects, based on logical application layering. Here's a more complete example from the SU3 service that illustrates this pattern:
+
+````
+package intelmedia.ws
+package su
+
+import funnel.instruments._
+
+object metrics {
+
+  /**
+    * Instruments for everything related to the HTTP stack.
+    */
+  object http {
+    val ReadUpdates       = timer("http/post/updates")
+    val CreateAllocations = timer("http/post/allocations")
+    val ReadAllocations   = timer("http/get/allocations/:key")
+    val DeleteAllocation  = timer("http/delete/:key")
+    val ReadGroups        = timer("http/get/groups")
+    val CreateGroup       = timer("http/post/groups")
+    val ReadGroup         = timer("http/get/groups/:key")
+    val UpdateGroup       = timer("http/put/groups/:key")
+    val DeleteGroup       = timer("http/delete/groups/:key")
+  }
+
+  /**
+    * Instruments for the database access operations
+    */
+  object db {
+    val ReadLatency       = timer("db/read/single/latency")
+    val ReadBatchLatency  = timer("db/read/batch/latency")
+    val ReadListLatency   = timer("db/read/list/latency")
+    val ReadScanLatency   = timer("db/read/scan/latency")
+    val WriteLatency      = timer("db/write/single/latency")
+    val WriteBatchLatency = timer("db/write/batch/latency")
+    val DeleteLatency     = timer("db/delete/batch/latency")
+  }
+
+  /**
+    * Instruments for the domain-specific operations contained within SU
+    */
+  object domain {
+    val ResolverLatency   = timer("domain/resolver/latency")
+  }
+}
+
+
+````
+
+The 1.0.x series of `funnel-core` has four supported metric types: `Counter`, `Timer`, `Gauge` and `TrafficLight`.
 
 
 ##### Counters
@@ -213,7 +271,7 @@ import funnel.http.{MonitoringServer,Monitoring}
 
 object Main {
   def def main(args: Array[String]): Unit = {
-    MonitoringServer.start(funnel.default, 5775)
+    MonitoringServer.start(Monitoring.default, 5775)
 
     // your application code starts here 
   }
