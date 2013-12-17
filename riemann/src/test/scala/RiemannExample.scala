@@ -6,7 +6,7 @@ import scala.concurrent.duration._
 import scalaz.concurrent.Task
 
 object Main {
-  private def randomLight(tl: TrafficLight) = 
+  private def randomLight(tl: TrafficLight) =
     util.Random.nextInt(3) match {
       case 1 => tl.yellow
       case 2 => tl.green
@@ -14,7 +14,7 @@ object Main {
     }
 
   def main(args: Array[String]): Unit = {
-    
+
     import instruments._
 
     val R = com.aphyr.riemann.client.RiemannClient.tcp("127.0.0.1", 5555)
@@ -33,7 +33,7 @@ object Main {
              randomLight(l)
            }.run.runAsyncInterruptibly(println, stop)
 
-    val t2 = Riemann.publish(Monitoring.default, 10f, 
+    val t2 = Riemann.publish(Monitoring.default, 10f,
         Events.every(10 seconds))(R).runAsyncInterruptibly(println, stop)
 
     println

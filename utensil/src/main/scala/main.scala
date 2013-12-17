@@ -10,12 +10,12 @@ import scala.concurrent.duration._
 
 /**
   * How to use:
-  * 
+  *
   * utensil \
   *   --riemann localhost:5555 \
   *   --transport http-sse \
   *   --port 5775
-  * 
+  *
   * utensil -r localhost:5555 -t http-sse -p 5775
   */
 object Utensil extends CLI {
@@ -40,13 +40,13 @@ object Utensil extends CLI {
 
   def main(args: Array[String]): Unit = {
     run(args){ options =>
-      
+
       val M = Monitoring.default
       val S = MonitoringServer.start(M, options.funnelPort)
 
       val R = RiemannClient.tcp(options.riemann.host, options.riemann.port)
       try {
-        R.connect() // urgh. Give me stregth! 
+        R.connect() // urgh. Give me stregth!
       } catch {
         case e: java.io.IOException => {
           errorAndQuit(options,() => shutdown(S,R))
@@ -84,7 +84,7 @@ trait CLI {
     transport: DatapointParser = SSE.readEvents _
   )
 
-  implicit val scoptReadUrl: Read[RiemannSettings] = 
+  implicit val scoptReadUrl: Read[RiemannSettings] =
     Read.reads { str =>
       str.split(':') match {
         case Array(host,port) => RiemannSettings(host,port.toInt) // ok to explode here
@@ -92,7 +92,7 @@ trait CLI {
       }
     }
 
-  implicit val scoptDpParser: Read[DatapointParser] = 
+  implicit val scoptDpParser: Read[DatapointParser] =
     Read.reads { str =>
       str match {
         case "http-sse" => SSE.readEvents _
@@ -105,11 +105,11 @@ trait CLI {
   protected val parser = new OptionParser[Options]("funnel"){
     head("Funnel Utensil", "1.0")
 
-    opt[RiemannSettings]('r',"riemann").action { (rs, opts) => 
+    opt[RiemannSettings]('r',"riemann").action { (rs, opts) =>
       opts.copy(riemann = rs)
     }
-    
-    opt[Int]('p', "port").action { (p, opts) => 
+
+    opt[Int]('p', "port").action { (p, opts) =>
       opts.copy(funnelPort = p)
     }
 
@@ -119,7 +119,7 @@ trait CLI {
     }
   }
 
-  def run(args: Array[String])(f: Options => Unit): Unit = 
+  def run(args: Array[String])(f: Options => Unit): Unit =
     parser.parse(args, Options()).map(f).getOrElse(())
 }
 

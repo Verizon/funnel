@@ -16,10 +16,10 @@ import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy,Task}
 import scalaz.stream._
 
-/** 
+/**
   * Use this JSON construction to instruct the admin server of new URLs
   * that it should add to the incoming "mirror" stream.
-  * 
+  *
   * ````
   * [
   *   {
@@ -31,7 +31,7 @@ import scalaz.stream._
   *   }
   * ]
   * ````
-  **/ 
+  **/
 case class Bucket(label: String, urls: List[String])
 
 /** JSON encoders and decoders for types in the this library. */

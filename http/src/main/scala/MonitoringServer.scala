@@ -109,7 +109,7 @@ class MonitoringServer(M: Monitoring, port: Int, log: MonitoringServer.Log) exte
     } else flush(405, "Request method not allowed.", req)
   }
 
-  private def flush(status: Int, body: String, req: HttpExchange): Unit = 
+  private def flush(status: Int, body: String, req: HttpExchange): Unit =
     flush(status, body.getBytes, req)
 
   private def flush(status: Int, body: Array[Byte], req: HttpExchange): Unit = {

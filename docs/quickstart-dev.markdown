@@ -1,8 +1,5 @@
-## Monitoring Funnel
 
-A distributed monitoring system based on a lightweight streaming protocol. **This library depends upon Scala 2.10.x - you will see crazy errors if you try to use this on 2.9.x**
-
-### Quickstart
+## Quickstart: Engineering Team
 
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
@@ -212,7 +209,7 @@ trait SomeFun {
 All the metrics you define in your application, plus some additional platform metrics supplied by the monitoring library can be exposed via a baked in administration server. In order to use this server, one simply only needs to add the following line to the `main` of their application:
 
 ````
-import funnel.{MonitoringServer,Monitoring}
+import funnel.http.{MonitoringServer,Monitoring}
 
 object Main {
   def def main(args: Array[String]): Unit = {
