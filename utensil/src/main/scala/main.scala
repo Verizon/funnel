@@ -19,19 +19,41 @@ import scala.concurrent.duration._
   * utensil -r localhost:5555 -t http-sse -p 5775
   */
 object Utensil extends CLI {
+  private val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
+  private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
+    server.stop()
+    // nice little hack to get make it easy to just hit return and shutdown
+    // this running example
+    stop.set(true)
+    R.disconnect
+  }
+
+  private def errorAndQuit(options: Options, f: () => Unit): Unit = {
+    val msg = s"# Riemann is not running at the specified location (${options.riemann.host}:${options.riemann.port}) #"
+    val padding = (for(_ <- 1 to msg.length) yield "#").mkString
+    Console.err.println(padding)
+    Console.err.println(msg)
+    Console.err.println(padding)
+    f()
+    System.exit(1)
+  }
+
   def main(args: Array[String]): Unit = {
     run(args){ options =>
       
       val M = Monitoring.default
-
-      val server = MonitoringServer.start(M, options.funnelPort)
+      val S = MonitoringServer.start(M, options.funnelPort)
 
       val R = RiemannClient.tcp(options.riemann.host, options.riemann.port)
-      R.connect() // urgh. Give me stregth! 
+      try {
+        R.connect() // urgh. Give me stregth! 
+      } catch {
+        case e: java.io.IOException => {
+          errorAndQuit(options,() => shutdown(S,R))
+        }
+      }
 
-      val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
-
-      server.mirroringSources.evalMap { case (url,bucket) =>
+      S.mirroringSources.evalMap { case (url,bucket) =>
        Riemann.mirrorAndPublish(M)(R)(SSE.readEvents)(
           Process.emit((url, bucket)))
       }.run.runAsyncInterruptibly(println, stop)
@@ -42,11 +64,7 @@ object Utensil extends CLI {
 
       readLine()
 
-      // nice little hack to get make it easy to just hit return and shutdown
-      // this running example
-      stop.set(true)
-      server.stop()
-      if(R.isConnected) R.disconnect else ()
+      shutdown(S,R)
     }
   }
 
@@ -85,7 +103,7 @@ trait CLI {
   implicit val scoptReadDuration: Read[Duration] = Read.reads { Duration(_) }
 
   protected val parser = new OptionParser[Options]("funnel"){
-    head("funnel", "1.0")
+    head("Funnel Utensil", "1.0")
 
     opt[RiemannSettings]('r',"riemann").action { (rs, opts) => 
       opts.copy(riemann = rs)
@@ -102,6 +120,6 @@ trait CLI {
   }
 
   def run(args: Array[String])(f: Options => Unit): Unit = 
-    parser.parse(args, Options()).foreach(f)
+    parser.parse(args, Options()).map(f).getOrElse(())
 }
 

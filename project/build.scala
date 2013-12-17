@@ -60,6 +60,7 @@ object Build extends Build {
       packageSummary := "Intel Media Monitoring Utensil",
       packageDescription := """Testing description""",
       name in Rpm := "funnel-utensil",
+      version in Rpm <<= version apply { sv => sv.split("[^\\d]").filterNot(_.isEmpty).mkString(".") },
       rpmRelease := "1",
       rpmVendor := "intelmedia",
       rpmLicense := Some("Copyright Intel, 2013")
