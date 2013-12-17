@@ -4,6 +4,8 @@ import java.net.URL
 import scala.concurrent.duration._
 import scalaz.stream.Process
 
+import http.{MonitoringServer,SSE}
+
 object Main extends App {
   MonitoringServer.start(Monitoring.default, 8081)
 

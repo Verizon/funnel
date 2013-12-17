@@ -1,4 +1,5 @@
 package intelmedia.ws.funnel
+package http
 
 import argonaut.{DecodeJson, EncodeJson}
 import java.io.InputStream

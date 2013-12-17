@@ -25,12 +25,12 @@ trait Monitoring {
    */
   def topic[I, O:Reportable](
       name: String, units: Units[O])(
-      buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
+      buf: Process1[(I,Duration),O]): (Key[O], I => SafeUnit) = {
     val k = Key[O](name, units)
     (k, topic(k)(buf))
   }
 
-  protected def topic[I,O](key: Key[O])(buf: Process1[(I,Duration),O]): I => Unit
+  protected def topic[I,O](key: Key[O])(buf: Process1[(I,Duration),O]): I => SafeUnit
 
   /**
    * Return the continuously updated signal of the current value
@@ -91,10 +91,7 @@ trait Monitoring {
    * Update the current value associated with the given `Key`. Implementation
    * detail, this should not be used by clients.
    */
-  protected def update[O](k: Key[O], v: O): Task[Unit]
-
-  // could have mirror(events)(url, prefix), which is polling
-  // rather than pushing
+  protected def update[O](k: Key[O], v: O): Task[SafeUnit]
 
   /**
    * Mirror all metrics from the given URL, adding `localPrefix` onto the front of
@@ -103,7 +100,7 @@ trait Monitoring {
   def mirrorAll(parse: DatapointParser)(
                 url: URL, localName: String => String = identity)(
                 implicit S: ExecutorService = Monitoring.serverPool,
-                log: String => Unit = println): Process[Task,Unit] = {
+                log: String => SafeUnit = println(_)): Process[Task,SafeUnit] = {
     parse(url).flatMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
       val k = pt.key.modifyName(localName)
@@ -132,9 +129,9 @@ trait Monitoring {
       breaker: Event)(
       url: URL, localName: String => String = identity)(
         implicit S: ExecutorService = Monitoring.serverPool,
-        log: String => Unit = println): Process[Task,Unit] = {
+        log: String => SafeUnit = println(_)): Process[Task,SafeUnit] = {
     val e = breaker(this)
-    val step: Process[Task, Throwable \/ Unit] =
+    val step: Process[Task, Throwable \/ SafeUnit] =
       mirrorAll(parse)(url, localName)(S, log).attempt()
     step.stripW ++ e.terminated.flatMap {
       // on our last reconnect attempt, rethrow error
@@ -177,7 +174,7 @@ trait Monitoring {
       decayFrequency: Event,
       aggregateFrequency: Event)(
       groupedUrls: Process[Task, (URL,String)],
-      health: Key[A])(f: String => Seq[A] => A): Task[Unit] =
+      health: Key[A])(f: String => Seq[A] => A): Task[SafeUnit] =
     Task.delay {
       // use urls as the local names for keys
       var seen = Set[String]()
@@ -201,7 +198,7 @@ trait Monitoring {
       }}.run.runAsync(_ => ())
     }
 
-  private def initialize[O](key: Key[O]): Unit = {
+  private def initialize[O](key: Key[O]): SafeUnit = {
     if (!exists(key).run) topic[O,O](key)(Buffers.ignoreTime(process1.id))
     ()
   }
@@ -213,7 +210,7 @@ trait Monitoring {
    */
   def aggregate[O,O2](family: Key[O], out: Key[O2])(e: Event)(
                       f: Seq[O] => O2)(
-                      implicit log: String => Unit = _ => ()): Task[Key[O2]] = Task.delay {
+                      implicit log: String => SafeUnit = _ => ()): Task[Key[O2]] = Task.delay {
     initialize(out)
     e(this).flatMap { _ =>
       log("Monitoring.aggregate: gathering values")
@@ -234,7 +231,7 @@ trait Monitoring {
    * within a 10 second window. See `Units.default`.
    */
   def decay(f: Key[Any] => Boolean)(e: Event)(
-            implicit log: String => Unit = println): Task[Unit] = Task.delay {
+            implicit log: String => SafeUnit = println(_)): Task[SafeUnit] = Task.delay {
     def reset = keys.continuous.once.map {
       _.foreach(k => k.default.foreach(update(k, _).run))
     }.run
@@ -243,7 +240,7 @@ trait Monitoring {
     // we merge the `e` stream and the stream of datapoints for the
     // given prefix; if we ever encounter two ticks in a row from `e`,
     // we reset all matching keys back to their default
-    val alive = async.signal[Unit](Strategy.Sequential); alive.value.set(())
+    val alive = async.signal[SafeUnit](Strategy.Sequential); alive.value.set(())
     val pts = Monitoring.subscribe(this)(f).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
         log(s"$msg no more data points for '$f', resetting...")
@@ -288,7 +285,7 @@ trait Monitoring {
   /** Create a new topic with the given name and discard the key. */
   def topic_[I, O:Reportable](
     name: String, units: Units[O])(
-    buf: Process1[(I,Duration),O]): I => Unit = topic(name, units)(buf)._2
+    buf: Process1[(I,Duration),O]): I => SafeUnit = topic(name, units)(buf)._2
 
   def filterKeys(f: Key[Any] => Boolean): Process[Task, List[Key[Any]]] =
     keys.continuous.map(_.filter(f))
@@ -320,7 +317,7 @@ object Monitoring {
     Executors.newFixedThreadPool(8, daemonThreads("monitoring-thread"))
 
   val serverPool: ExecutorService =
-    Executors.newCachedThreadPool(daemonThreads("monitoring-http-server"))
+    Executors.newCachedThreadPool(daemonThreads("monitoring-server"))
 
   val schedulingPool: ScheduledExecutorService =
     Executors.newScheduledThreadPool(4, daemonThreads("monitoring-scheduled-tasks"))
@@ -330,6 +327,7 @@ object Monitoring {
   def instance(implicit ES: ExecutorService = defaultPool): Monitoring = {
     import async.immutable.Signal
     import scala.collection.concurrent.TrieMap
+
     val t0 = System.nanoTime
     val S = Strategy.Executor(ES)
     val P = Process
@@ -337,7 +335,7 @@ object Monitoring {
     keys_.value.set(List())
 
     case class Topic[I,O](
-      publish: ((I,Duration)) => Unit,
+      publish: ((I,Duration)) => SafeUnit,
       current: async.mutable.Signal[O]
     )
     val topics = new TrieMap[Key[Any], Topic[Any,Any]]()
@@ -347,7 +345,7 @@ object Monitoring {
     new Monitoring {
       def keys = keys_
 
-      def topic[I,O](k: Key[O])(buf: Process1[(I,Duration),O]): I => Unit = {
+      def topic[I,O](k: Key[O])(buf: Process1[(I,Duration),O]): I => SafeUnit = {
         val (pub, v) = bufferedSignal(buf)(ES)
         topics += (k -> eraseTopic(Topic(pub, v)))
         val t = (k.typeOf, k.units)
@@ -355,8 +353,8 @@ object Monitoring {
         (i: I) => pub(i -> Duration.fromNanos(System.nanoTime - t0))
       }
 
-      protected def update[O](k: Key[O], v: O): Task[Unit] = Task.delay {
-        topics.get(k).map(_.current.value.set(v))
+      protected def update[O](k: Key[O], v: O): Task[SafeUnit] = Task.delay {
+        topics.get(k).foreach(_.current.value.set(v))
       }
 
       def get[O](k: Key[O]): Signal[O] =
@@ -379,7 +377,7 @@ object Monitoring {
    */
   def subscribe(M: Monitoring)(f: Key[Any] => Boolean)(
   implicit ES: ExecutorService = serverPool,
-           log: String => Unit = println):
+           log: String => SafeUnit = println(_)):
       Process[Task, Datapoint[Any]] =
     Process.suspend { // don't actually do anything until we have a consumer
       val S = Strategy.Executor(ES)
@@ -436,7 +434,7 @@ object Monitoring {
   private[funnel] def bufferedSignal[I,O](
       buf: Process1[I,O])(
       implicit ES: ExecutorService = defaultPool):
-      (I => Unit, async.mutable.Signal[O]) = {
+      (I => SafeUnit, async.mutable.Signal[O]) = {
     val signal = async.signal[O](Strategy.Executor(ES))
     var cur = buf.unemit match {
       case (h, t) if h.nonEmpty => signal.value.set(h.last); t

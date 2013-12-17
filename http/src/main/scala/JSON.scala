@@ -1,5 +1,6 @@
 package intelmedia.ws
 package funnel
+package http
 
 import argonaut.{DecodeResult => D, _}
 import argonaut.EncodeJson.{
@@ -7,12 +8,31 @@ import argonaut.EncodeJson.{
   jencode1, jencode2L, jencode3L, jencode4L, jencode6L, jencode7L
 }
 import argonaut.DecodeJson.jdecode6L
+import argonaut.CodecJson.casecodec2
 
 import java.io.InputStream
 import java.util.concurrent.{ExecutorService, TimeUnit}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy,Task}
 import scalaz.stream._
+
+/** 
+  * Use this JSON construction to instruct the admin server of new URLs
+  * that it should add to the incoming "mirror" stream.
+  * 
+  * ````
+  * [
+  *   {
+  *     "bucket": "accounts",
+  *     "urls": [
+  *       "http://sdfsd.com/sdf",
+  *       "http://improd.dfs/sdfsd"
+  *     ]
+  *   }
+  * ]
+  * ````
+  **/ 
+case class Bucket(label: String, urls: List[String])
 
 /** JSON encoders and decoders for types in the this library. */
 object JSON {
@@ -23,6 +43,9 @@ object JSON {
   def encodeResult[A](a: A)(implicit A: EncodeJson[A]): Json = A(a)
   def encode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).nospaces
   def prettyEncode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).spaces2
+
+  implicit val BucketCodecJson: DecodeJson[Bucket] =
+    casecodec2(Bucket.apply, Bucket.unapply)("bucket", "urls")
 
   implicit val DoubleEncodeJson =
     jencode1[Double,Option[Double]] {

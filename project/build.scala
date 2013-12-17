@@ -47,9 +47,23 @@ object Build extends Build {
       compile(logback))
     .dependsOn(core)
 
+  import com.typesafe.sbt.SbtNativePackager._
+  import com.typesafe.sbt.packager.Keys._
+
   lazy val utensil = Project("utensil", file("utensil"))
     .settings(buildSettings:_*)
     .settings(crossPaths := false) // adding this because its an executable
     .settings(libraryDependencies ++= compile(scopt))
+    .settings(packageArchetype.java_server:_*)
+    .settings(
+      maintainer := "Timothy Perrett <timothy.m.perrett@intel.com>",
+      packageSummary := "Intel Media Monitoring Utensil",
+      packageDescription := """Testing description""",
+      name in Rpm := "funnel-utensil",
+      version in Rpm <<= version apply { sv => sv.split("[^\\d]").filterNot(_.isEmpty).mkString(".") },
+      rpmRelease := "1",
+      rpmVendor := "intelmedia",
+      rpmLicense := Some("Copyright Intel, 2013")
+    )
     .dependsOn(core, http, riemann)
 }
