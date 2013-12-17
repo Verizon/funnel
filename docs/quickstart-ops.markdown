@@ -4,7 +4,7 @@ Before reading this guide, ensure you have read the [primer document](http://git
 
 Assuming you have that done, and you're keen to get started, great!
 
-** NOTE: Media deployments are always done to Linux machines, and operational monitoring will only be supported on linux. **
+**NOTE: Media deployments are always done to Linux machines, and operational monitoring will only be supported on linux.**
 
 ### Installing Funnel Utensil 
 
