@@ -52,8 +52,10 @@ From an operational perspective the only thing that one should really care about
 ````
 This simple structure represents the "buckets" of nodes that one wishes to monitor. The expectation is that a given logical bucket (for example, accounts-2.1-us-east) there will be an associated set of nodes that are exposing metrics. This bucketing is entirely arbitrary, and you can construct whatever bucket/URL combinations you want, with the one restriction that a given stream can only be connected to a single bucket at any given time (on the basis that connecting over and over to the same machine is a needless drain on resources).
 
-### Visualise metrics
 
+### Monitoring Server: Mirroring
+
+TODO
 
 
 

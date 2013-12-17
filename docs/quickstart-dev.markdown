@@ -86,7 +86,6 @@ object metrics {
   }
 }
 
-
 ````
 
 The 1.0.x series of `funnel-core` has four supported metric types: `Counter`, `Timer`, `Gauge` and `TrafficLight`.
@@ -278,5 +277,8 @@ object Main {
 }
 
 ````
+
+**NOTE: By application `main`, this does not have to be the actual main, but rather, the end of the world for your application (which however, would usually be the main). For Play! applications, this means the Global object.**
+
 With this in your application, and assuming you are developing locally, once running you will be able to access [http://127.0.0.1:5775/](http://127.0.0.1:5775/) in your local web browser, where the index page will give you a list of available resources and descriptions of their function. 
 
