@@ -15,7 +15,7 @@ object Riemann {
 
   private def splitStats(key: Key[Any], s: Stats): List[Datapoint[Any]] = {
     val (k, tl) = key.name.split(":::") match {
-      case Array(hd,tl) => (key.rename(hd), tl) 
+      case Array(hd,tl) => (key.rename(hd), tl)
       case _ => (key,"")
     }
     val tl2 = if (tl.isEmpty) "" else ":::"+tl
@@ -28,8 +28,8 @@ object Riemann {
     )
   }
 
-  private def trafficLightToRiemannState(dp: Datapoint[Any]): Datapoint[Any] = 
-    if(dp.units == Units.TrafficLight) 
+  private def trafficLightToRiemannState(dp: Datapoint[Any]): Datapoint[Any] =
+    if(dp.units == Units.TrafficLight)
       dp.value match {
         case TrafficLight.Red     => Datapoint(dp.key, "critical")
         case TrafficLight.Yellow  => Datapoint(dp.key, "warning")
@@ -40,13 +40,13 @@ object Riemann {
   private def tags(s: String) = s.split("/")
 
   /**
-    * This whole method is an imperitive getho. However, we use the 
+    * This whole method is an imperitive getho. However, we use the
     * Riemann java client DSL, and make "use" of the fact that the underlying
-    * objects are actually affecting the protocol buffers wire format. 
-    * 
-    * This method really needs to die, but unless we go to the trouble of 
+    * objects are actually affecting the protocol buffers wire format.
+    *
+    * This method really needs to die, but unless we go to the trouble of
     * implementing our own client, that's not going to happen as there has to
-    * be some plumbing to mediate from our world to the riemann world. 
+    * be some plumbing to mediate from our world to the riemann world.
     *
     * C'est la vie!
     */
@@ -72,12 +72,12 @@ object Riemann {
       case a: String => e.state(trafficLightToRiemannState(pt).value.toString)
       case b: Boolean => e.state(b.toString)
       // will *never* be encountered at this point
-      // case s: Stats => 
+      // case s: Stats =>
       case x => log("]]]]]]]]]]]]]]] "+x.getClass.getName); ???
     }
 
     log("sending: " + pt)
-    
+
     try e.send()
     catch { case err: Exception =>
       log("unable to send datapoint to Reimann server due to: " + e)
@@ -112,7 +112,7 @@ object Riemann {
   def link[A](alive: Signal[SafeUnit])(p: Process[Task,A]): Process[Task,A] =
     alive.continuous.zip(p).map(_._2)
 
-  private def liftDatapointToStream(dp: Datapoint[Any]): Process[Task, Datapoint[Any]] = 
+  private def liftDatapointToStream(dp: Datapoint[Any]): Process[Task, Datapoint[Any]] =
     dp.value match {
       case s: Stats => Process.emitSeq(splitStats(dp.key, s))
       case _        => Process.emit(dp)
@@ -131,11 +131,11 @@ object Riemann {
     for {
       alive <- Task(async.signal[SafeUnit](Strategy.Executor(Monitoring.defaultPool)))
       _     <- alive.set(())
-      _     <- link(alive){ 
+      _     <- link(alive){
                  Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream).flatMap { pt =>
                   retry(retries(M))(Process.eval_(
-                    Task { 
-                      toEvent(c, ttlInSeconds)(pt) 
+                    Task {
+                      toEvent(c, ttlInSeconds)(pt)
                     }(Monitoring.defaultPool))
                   )
                 }
@@ -159,19 +159,29 @@ object Riemann {
       implicit log: String => SafeUnit =
       s => println("[Riemann.publishAll] "+s)): Task[SafeUnit] = {
 
-    val alive = async.signal[SafeUnit](Strategy.Executor(Monitoring.defaultPool))
+    val S = Strategy.Executor(Monitoring.defaultPool)
+    val alive = async.signal[SafeUnit](S)
+    val active = async.signal[Set[URL]](S); active.value.set(Set())
+    def modifyActive(f: Set[URL] => Set[URL]): Task[SafeUnit] =
+      active.compareAndSet(a => Some(f(a.getOrElse(Set())))).map(_ => ())
     for {
       _ <- alive.set(())
-      _ <- link(alive)(groupedUrls).evalMap { case (url,group) => 
+      _ <- link(alive)(groupedUrls).evalMap { case (url,group) =>
             Task.delay {
-               // adding the `localName` onto the string here so that later in the 
+               // adding the `localName` onto the string here so that later in the
                // process its possible to find the key we're specifically looking for
                // and trim off the `localName`
                val localName = prettyURL(url)
-               link(alive)(M.attemptMirrorAll(parse)(nodeRetries)(
+               val received = link(alive) { M.attemptMirrorAll(parse)(nodeRetries)(
                  url, m => s"$group/$m:::$localName"
-               )).run.runAsync(_ => ())
-            }
+               )}
+               val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
+                 if (urls.contains(url)) Process.halt // skip it, alread running
+                 else Process.eval_(modifyActive(_ + url)) ++ // add to active at start
+                      received.onComplete(Process.eval_(modifyActive(_ - url))) // and remove it when done
+               }
+               receivedIdempotent.run.runAsync(_ => ())
+             }
            }.run
       _ <- publish(M, ttlInSeconds, reimannRetries)(c)
       _ <- alive.close
