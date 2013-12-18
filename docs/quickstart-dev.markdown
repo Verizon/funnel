@@ -29,6 +29,7 @@ import funnel.instruments._
 object metrics {
   val HttpReadWidgets = timer("http/get/widgets")
   val HttpReadWidget  = timer("http/get/widgets/:id")
+  val FooCount        = counter("domain/foocount")
   // more metrics here
 }
 ````
@@ -218,6 +219,22 @@ By default, the following types are supported as values for gauges:
 	* `Float`
 	* `BigDecimal` 
 	* `Long`
+
+In addition to simply recording the value of the gauge, there is a specialised gauge that can also track numerical statistics like `mean`, `variance` etc. To use it, just adjust your `metrics` declaration like so:
+
+````
+package intelmedia.ws
+package yourproject
+
+import funnel.instruments._
+
+object metrics {
+  // gauges require an initial value
+  val OilGauge = numericGauge("oil", 0d, Units.Count) 
+}
+
+````
+
 
 ##### Traffic Light
 
