@@ -1,0 +1,3 @@
+[0m[[0mdebug[0m] [0mRunning TaskDef(intelmedia.ws.funnel.http.HttpMonitoringSpec, sbt.SubclassFingerprintWrapper@4fe23da9, false, [SuiteSelector])[0m
+[0m[[0mdebug[0m] [0mRunning TaskDef(intelmedia.ws.funnel.examples.Example, sbt.SubclassFingerprintWrapper@4fe23da9, false, [SuiteSelector])[0m
+[0m[[0mdebug[0m] [0mRunning TaskDef(intelmedia.ws.funnel.http.examples.MirroringExample, sbt.SubclassFingerprintWrapper@4fe23da9, false, [SuiteSelector])[0m

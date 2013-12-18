@@ -1,0 +1,211 @@
+[0m[[0mdebug[0m] [0m[0m
+[0m[[0mdebug[0m] [0mInitial source changes: [0m
+[0m[[0mdebug[0m] [0m	removed:Set()[0m
+[0m[[0mdebug[0m] [0m	added: Set(/Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Events.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Units.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Timer.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/package.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Metric.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/TrafficLight.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Key.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Clocks.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/MonitoringServer.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Instrument.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/JVM.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Datapoint.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Monitoring.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Instruments.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Stats.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Periodic.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/DefaultKey.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Buffers.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Counter.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Gauge.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Histogram.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Reportable.scala)[0m
+[0m[[0mdebug[0m] [0m	modified: Set()[0m
+[0m[[0mdebug[0m] [0mRemoved products: Set()[0m
+[0m[[0mdebug[0m] [0mModified external sources: Set()[0m
+[0m[[0mdebug[0m] [0mModified binary dependencies: Set()[0m
+[0m[[0mdebug[0m] [0mInitial directly invalidated sources: Set(/Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Events.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Units.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Timer.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/package.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Metric.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/TrafficLight.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Key.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Clocks.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/MonitoringServer.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Instrument.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/JVM.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Datapoint.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Monitoring.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Instruments.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Stats.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Periodic.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/DefaultKey.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Buffers.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Counter.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Gauge.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Histogram.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Reportable.scala)[0m
+[0m[[0mdebug[0m] [0m[0m
+[0m[[0mdebug[0m] [0mSources indirectly invalidated by:[0m
+[0m[[0mdebug[0m] [0m	product: Set()[0m
+[0m[[0mdebug[0m] [0m	binary dep: Set()[0m
+[0m[[0mdebug[0m] [0m	external source: Set()[0m
+[0m[[0mdebug[0m] [0mAll initially invalidated sources: Set(/Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Events.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Units.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Timer.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/package.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Metric.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/TrafficLight.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Key.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Clocks.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/MonitoringServer.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Instrument.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/JVM.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Datapoint.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Monitoring.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Instruments.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Stats.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Periodic.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/DefaultKey.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Buffers.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Counter.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Gauge.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Histogram.scala, /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/Reportable.scala)[0m
+[0m[[0mdebug[0m] [0mRecompiling all 22 sources: invalidated sources (22) exceeded 50.0% of all sources[0m
+[0m[[0minfo[0m] [0mCompiling 22 Scala sources to /Users/tmperret/repositories/intel/libraries/monitoring/core/target/scala-2.10/scct-classes...[0m
+[0m[[0mdebug[0m] [0mGetting compiler-interface from component compiler for Scala 2.10.3[0m
+[0m[[0mdebug[0m] [0mGetting compiler-interface from component compiler for Scala 2.10.3[0m
+[0m[[0mdebug[0m] [0mRunning cached compiler 61ca2677, interfacing (CompilerInterface) with Scala compiler version 2.10.3[0m
+[0m[[0mdebug[0m] [0mCalling Scala compiler with arguments  (CompilerInterface):[0m
+[0m[[0mdebug[0m] [0m	-deprecation[0m
+[0m[[0mdebug[0m] [0m	-unchecked[0m
+[0m[[0mdebug[0m] [0m	-feature[0m
+[0m[[0mdebug[0m] [0m	-language:postfixOps[0m
+[0m[[0mdebug[0m] [0m	-language:implicitConversions[0m
+[0m[[0mdebug[0m] [0m	-Xplugin:/Users/tmperret/.ivy2/cache/reaktor/scct_2.10/jars/scct_2.10-0.2.2.jar[0m
+[0m[[0mdebug[0m] [0m	-P:scct:projectId:core[0m
+[0m[[0mdebug[0m] [0m	-P:scct:basedir:/Users/tmperret/repositories/intel/libraries/monitoring/core[0m
+[0m[[0mdebug[0m] [0m	-bootclasspath[0m
+[0m[[0mdebug[0m] [0m	/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/resources.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/rt.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/sunrsasign.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/jsse.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/jce.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/charsets.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/jfr.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/JObjC.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/classes:/Users/tmperret/.ivy2/cache/org.scala-lang/scala-library/jars/scala-library-2.10.3.jar[0m
+[0m[[0mdebug[0m] [0m	-classpath[0m
+[0m[[0mdebug[0m] [0m	/Users/tmperret/repositories/intel/libraries/monitoring/core/target/scala-2.10/scct-classes:/Users/tmperret/.ivy2/cache/reaktor/scct_2.10/jars/scct_2.10-0.2.2.jar:/Users/tmperret/.ivy2/cache/org.scalaz/scalaz-core_2.10/bundles/scalaz-core_2.10-7.0.4.jar:/Users/tmperret/.ivy2/cache/org.scalaz.stream/scalaz-stream_2.10/jars/scalaz-stream_2.10-0.1.jar:/Users/tmperret/.ivy2/cache/org.scalaz/scalaz-concurrent_2.10/bundles/scalaz-concurrent_2.10-7.0.4.jar:/Users/tmperret/.ivy2/cache/org.scalaz/scalaz-effect_2.10/bundles/scalaz-effect_2.10-7.0.4.jar:/Users/tmperret/.ivy2/cache/com.twitter/algebird-core_2.10/jars/algebird-core_2.10-0.3.0.jar:/Users/tmperret/.ivy2/cache/com.googlecode.javaewah/JavaEWAH/jars/JavaEWAH-0.6.6.jar[0m
+[0m[[31merror[0m] [0mIllegal tree in gen: reaktor.scct.Coverage.invoked("1387407253473-1542827330805983770", 534)[0m
+[0m[[31merror[0m] [0muncaught exception during compilation: scala.reflect.internal.FatalError[0m
+scala.reflect.internal.FatalError: 
+     while compiling: /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/MonitoringServer.scala
+        during phase: icode
+     library version: version 2.10.3
+    compiler version: version 2.10.3
+  reconstructed args: -Xplugin:/Users/tmperret/.ivy2/cache/reaktor/scct_2.10/jars/scct_2.10-0.2.2.jar -deprecation -feature -classpath /Users/tmperret/repositories/intel/libraries/monitoring/core/target/scala-2.10/scct-classes:/Users/tmperret/.ivy2/cache/reaktor/scct_2.10/jars/scct_2.10-0.2.2.jar:/Users/tmperret/.ivy2/cache/org.scalaz/scalaz-core_2.10/bundles/scalaz-core_2.10-7.0.4.jar:/Users/tmperret/.ivy2/cache/org.scalaz.stream/scalaz-stream_2.10/jars/scalaz-stream_2.10-0.1.jar:/Users/tmperret/.ivy2/cache/org.scalaz/scalaz-concurrent_2.10/bundles/scalaz-concurrent_2.10-7.0.4.jar:/Users/tmperret/.ivy2/cache/org.scalaz/scalaz-effect_2.10/bundles/scalaz-effect_2.10-7.0.4.jar:/Users/tmperret/.ivy2/cache/com.twitter/algebird-core_2.10/jars/algebird-core_2.10-0.3.0.jar:/Users/tmperret/.ivy2/cache/com.googlecode.javaewah/JavaEWAH/jars/JavaEWAH-0.6.6.jar -language:postfixOps -language:implicitConversions -P:scct:projectId:core -P:scct:basedir:/Users/tmperret/repositories/intel/libraries/monitoring/core -bootclasspath /Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/resources.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/rt.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/sunrsasign.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/jsse.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/jce.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/charsets.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/jfr.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/JObjC.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/classes:/Users/tmperret/.ivy2/cache/org.scala-lang/scala-library/jars/scala-library-2.10.3.jar -unchecked
+
+  last tree to typer: Block
+              symbol: null
+   symbol definition: null
+                 tpe: intelmedia.ws.funnel.package$SafeUnit
+       symbol owners: 
+      context owners: class package$SafeUnit -> package funnel
+
+== Enclosing template or block ==
+
+Template( // val <local SafeUnit>: <notype> in class package$SafeUnit, tree.tpe=intelmedia.ws.funnel.package$SafeUnit
+  "java.lang.Object" // parents
+  ValDef(
+    private
+    "_"
+    <tpt>
+    <empty>
+  )
+  DefDef( // def <init>(): intelmedia.ws.funnel.package$SafeUnit in class package$SafeUnit
+    <method> <triedcooking>
+    "<init>"
+    []
+    List(Nil)
+    <tpt> // tree.tpe=intelmedia.ws.funnel.package$SafeUnit
+    Block( // tree.tpe=Unit
+      // 2 statements
+      Apply( // def <init>(): Object in class Object, tree.tpe=Object
+        package$SafeUnit.super."<init>" // def <init>(): Object in class Object, tree.tpe=()Object
+        Nil
+      )
+      Apply( // def invoked(compilationId: String,id: Int): Unit in object Coverage, tree.tpe=Unit
+        "reaktor"."scct"."Coverage"."invoked" // def invoked(compilationId: String,id: Int): Unit in object Coverage, tree.tpe=(compilationId: String, id: Int)Unit
+        // 2 arguments
+        "1387407253473-1542827330805983770"
+        693
+      )
+      ()
+    )
+  )
+)
+
+== Expanded type of tree ==
+
+TypeRef(TypeSymbol(sealed class package$SafeUnit extends Object))
+
+Illegal tree in gen: reaktor.scct.Coverage.invoked("1387407253473-1542827330805983770", 534)
+	at scala.reflect.internal.SymbolTable.abort(SymbolTable.scala:49)
+	at scala.tools.nsc.Global.abort(Global.scala:254)
+	at scala.tools.nsc.backend.icode.GenICode$ICodePhase.gen(GenICode.scala:152)
+	at scala.tools.nsc.backend.icode.GenICode$ICodePhase.gen(GenICode.scala:72)
+	at scala.tools.nsc.backend.icode.GenICode$ICodePhase.gen(GenICode.scala:149)
+	at scala.tools.nsc.backend.icode.GenICode$ICodePhase.gen(GenICode.scala:99)
+	at scala.tools.nsc.backend.icode.GenICode$ICodePhase.gen(GenICode.scala:72)
+	at scala.tools.nsc.backend.icode.GenICode$ICodePhase.gen(GenICode.scala:90)
+	at scala.tools.nsc.backend.icode.GenICode$ICodePhase.gen(GenICode.scala:68)
+	at scala.tools.nsc.backend.icode.GenICode$ICodePhase.apply(GenICode.scala:64)
+	at scala.tools.nsc.Global$GlobalPhase.applyPhase(Global.scala:464)
+	at scala.tools.nsc.Global$GlobalPhase$$anonfun$run$1.apply(Global.scala:431)
+	at scala.tools.nsc.Global$GlobalPhase$$anonfun$run$1.apply(Global.scala:431)
+	at scala.collection.Iterator$class.foreach(Iterator.scala:727)
+	at scala.collection.AbstractIterator.foreach(Iterator.scala:1157)
+	at scala.tools.nsc.Global$GlobalPhase.run(Global.scala:431)
+	at scala.tools.nsc.backend.icode.GenICode$ICodePhase.run(GenICode.scala:57)
+	at scala.tools.nsc.Global$Run.compileUnitsInternal(Global.scala:1583)
+	at scala.tools.nsc.Global$Run.compileUnits(Global.scala:1557)
+	at scala.tools.nsc.Global$Run.compileSources(Global.scala:1553)
+	at scala.tools.nsc.Global$Run.compile(Global.scala:1662)
+	at xsbt.CachedCompiler0.run(CompilerInterface.scala:123)
+	at xsbt.CachedCompiler0.run(CompilerInterface.scala:99)
+	at xsbt.CompilerInterface.run(CompilerInterface.scala:27)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:606)
+	at sbt.compiler.AnalyzingCompiler.call(AnalyzingCompiler.scala:102)
+	at sbt.compiler.AnalyzingCompiler.compile(AnalyzingCompiler.scala:48)
+	at sbt.compiler.AnalyzingCompiler.compile(AnalyzingCompiler.scala:41)
+	at sbt.compiler.AggressiveCompile$$anonfun$3$$anonfun$compileScala$1$1.apply$mcV$sp(AggressiveCompile.scala:98)
+	at sbt.compiler.AggressiveCompile$$anonfun$3$$anonfun$compileScala$1$1.apply(AggressiveCompile.scala:98)
+	at sbt.compiler.AggressiveCompile$$anonfun$3$$anonfun$compileScala$1$1.apply(AggressiveCompile.scala:98)
+	at sbt.compiler.AggressiveCompile.sbt$compiler$AggressiveCompile$$timed(AggressiveCompile.scala:159)
+	at sbt.compiler.AggressiveCompile$$anonfun$3.compileScala$1(AggressiveCompile.scala:97)
+	at sbt.compiler.AggressiveCompile$$anonfun$3.apply(AggressiveCompile.scala:142)
+	at sbt.compiler.AggressiveCompile$$anonfun$3.apply(AggressiveCompile.scala:86)
+	at sbt.inc.IncrementalCompile$$anonfun$doCompile$1.apply(Compile.scala:38)
+	at sbt.inc.IncrementalCompile$$anonfun$doCompile$1.apply(Compile.scala:36)
+	at sbt.inc.Incremental$.cycle(Incremental.scala:73)
+	at sbt.inc.Incremental$$anonfun$1.apply(Incremental.scala:33)
+	at sbt.inc.Incremental$$anonfun$1.apply(Incremental.scala:32)
+	at sbt.inc.Incremental$.manageClassfiles(Incremental.scala:41)
+	at sbt.inc.Incremental$.compile(Incremental.scala:32)
+	at sbt.inc.IncrementalCompile$.apply(Compile.scala:26)
+	at sbt.compiler.AggressiveCompile.compile2(AggressiveCompile.scala:150)
+	at sbt.compiler.AggressiveCompile.compile1(AggressiveCompile.scala:70)
+	at sbt.compiler.AggressiveCompile.apply(AggressiveCompile.scala:45)
+	at sbt.Compiler$.apply(Compiler.scala:70)
+	at sbt.Defaults$.sbt$Defaults$$compileTaskImpl(Defaults.scala:722)
+	at sbt.Defaults$$anonfun$compileTask$1.apply(Defaults.scala:716)
+	at sbt.Defaults$$anonfun$compileTask$1.apply(Defaults.scala:716)
+	at scala.Function1$$anonfun$compose$1.apply(Function1.scala:47)
+	at sbt.$tilde$greater$$anonfun$$u2219$1.apply(TypeFunctions.scala:42)
+	at sbt.std.Transform$$anon$4.work(System.scala:64)
+	at sbt.Execute$$anonfun$submit$1$$anonfun$apply$1.apply(Execute.scala:237)
+	at sbt.Execute$$anonfun$submit$1$$anonfun$apply$1.apply(Execute.scala:237)
+	at sbt.ErrorHandling$.wideConvert(ErrorHandling.scala:18)
+	at sbt.Execute.work(Execute.scala:244)
+	at sbt.Execute$$anonfun$submit$1.apply(Execute.scala:237)
+	at sbt.Execute$$anonfun$submit$1.apply(Execute.scala:237)
+	at sbt.ConcurrentRestrictions$$anon$4$$anonfun$1.apply(ConcurrentRestrictions.scala:160)
+	at sbt.CompletionService$$anon$2.call(CompletionService.scala:30)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:166)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:471)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:334)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:166)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+	at java.lang.Thread.run(Thread.java:724)
+[0m[[31merror[0m] [0m(core/scct:[31mcompile[0m) scala.reflect.internal.FatalError: [0m
+[0m[[31merror[0m] [0m     while compiling: /Users/tmperret/repositories/intel/libraries/monitoring/core/src/main/scala/MonitoringServer.scala[0m
+[0m[[31merror[0m] [0m        during phase: icode[0m
+[0m[[31merror[0m] [0m     library version: version 2.10.3[0m
+[0m[[31merror[0m] [0m    compiler version: version 2.10.3[0m
+[0m[[31merror[0m] [0m  reconstructed args: -Xplugin:/Users/tmperret/.ivy2/cache/reaktor/scct_2.10/jars/scct_2.10-0.2.2.jar -deprecation -feature -classpath /Users/tmperret/repositories/intel/libraries/monitoring/core/target/scala-2.10/scct-classes:/Users/tmperret/.ivy2/cache/reaktor/scct_2.10/jars/scct_2.10-0.2.2.jar:/Users/tmperret/.ivy2/cache/org.scalaz/scalaz-core_2.10/bundles/scalaz-core_2.10-7.0.4.jar:/Users/tmperret/.ivy2/cache/org.scalaz.stream/scalaz-stream_2.10/jars/scalaz-stream_2.10-0.1.jar:/Users/tmperret/.ivy2/cache/org.scalaz/scalaz-concurrent_2.10/bundles/scalaz-concurrent_2.10-7.0.4.jar:/Users/tmperret/.ivy2/cache/org.scalaz/scalaz-effect_2.10/bundles/scalaz-effect_2.10-7.0.4.jar:/Users/tmperret/.ivy2/cache/com.twitter/algebird-core_2.10/jars/algebird-core_2.10-0.3.0.jar:/Users/tmperret/.ivy2/cache/com.googlecode.javaewah/JavaEWAH/jars/JavaEWAH-0.6.6.jar -language:postfixOps -language:implicitConversions -P:scct:projectId:core -P:scct:basedir:/Users/tmperret/repositories/intel/libraries/monitoring/core -bootclasspath /Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/resources.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/rt.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/sunrsasign.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/jsse.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/jce.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/charsets.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/jfr.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/lib/JObjC.jar:/Library/Java/JavaVirtualMachines/jdk1.7.0_25.jdk/Contents/Home/jre/classes:/Users/tmperret/.ivy2/cache/org.scala-lang/scala-library/jars/scala-library-2.10.3.jar -unchecked[0m
+[0m[[31merror[0m] [0m[0m
+[0m[[31merror[0m] [0m  last tree to typer: Block[0m
+[0m[[31merror[0m] [0m              symbol: null[0m
+[0m[[31merror[0m] [0m   symbol definition: null[0m
+[0m[[31merror[0m] [0m                 tpe: intelmedia.ws.funnel.package$SafeUnit[0m
+[0m[[31merror[0m] [0m       symbol owners: [0m
+[0m[[31merror[0m] [0m      context owners: class package$SafeUnit -> package funnel[0m
+[0m[[31merror[0m] [0m[0m
+[0m[[31merror[0m] [0m== Enclosing template or block ==[0m
+[0m[[31merror[0m] [0m[0m
+[0m[[31merror[0m] [0mTemplate( // val <local SafeUnit>: <notype> in class package$SafeUnit, tree.tpe=intelmedia.ws.funnel.package$SafeUnit[0m
+[0m[[31merror[0m] [0m  "java.lang.Object" // parents[0m
+[0m[[31merror[0m] [0m  ValDef([0m
+[0m[[31merror[0m] [0m    private[0m
+[0m[[31merror[0m] [0m    "_"[0m
+[0m[[31merror[0m] [0m    <tpt>[0m
+[0m[[31merror[0m] [0m    <empty>[0m
+[0m[[31merror[0m] [0m  )[0m
+[0m[[31merror[0m] [0m  DefDef( // def <init>(): intelmedia.ws.funnel.package$SafeUnit in class package$SafeUnit[0m
+[0m[[31merror[0m] [0m    <method> <triedcooking>[0m
+[0m[[31merror[0m] [0m    "<init>"[0m
+[0m[[31merror[0m] [0m    [][0m
+[0m[[31merror[0m] [0m    List(Nil)[0m
+[0m[[31merror[0m] [0m    <tpt> // tree.tpe=intelmedia.ws.funnel.package$SafeUnit[0m
+[0m[[31merror[0m] [0m    Block( // tree.tpe=Unit[0m
+[0m[[31merror[0m] [0m      // 2 statements[0m
+[0m[[31merror[0m] [0m      Apply( // def <init>(): Object in class Object, tree.tpe=Object[0m
+[0m[[31merror[0m] [0m        package$SafeUnit.super."<init>" // def <init>(): Object in class Object, tree.tpe=()Object[0m
+[0m[[31merror[0m] [0m        Nil[0m
+[0m[[31merror[0m] [0m      )[0m
+[0m[[31merror[0m] [0m      Apply( // def invoked(compilationId: String,id: Int): Unit in object Coverage, tree.tpe=Unit[0m
+[0m[[31merror[0m] [0m        "reaktor"."scct"."Coverage"."invoked" // def invoked(compilationId: String,id: Int): Unit in object Coverage, tree.tpe=(compilationId: String, id: Int)Unit[0m
+[0m[[31merror[0m] [0m        // 2 arguments[0m
+[0m[[31merror[0m] [0m        "1387407253473-1542827330805983770"[0m
+[0m[[31merror[0m] [0m        693[0m
+[0m[[31merror[0m] [0m      )[0m
+[0m[[31merror[0m] [0m      ()[0m
+[0m[[31merror[0m] [0m    )[0m
+[0m[[31merror[0m] [0m  )[0m
+[0m[[31merror[0m] [0m)[0m
+[0m[[31merror[0m] [0m[0m
+[0m[[31merror[0m] [0m== Expanded type of tree ==[0m
+[0m[[31merror[0m] [0m[0m
+[0m[[31merror[0m] [0mTypeRef(TypeSymbol(sealed class package$SafeUnit extends Object))[0m
+[0m[[31merror[0m] [0m[0m
+[0m[[31merror[0m] [0mIllegal tree in gen: reaktor.scct.Coverage.invoked("1387407253473-1542827330805983770", 534)[0m

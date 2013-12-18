@@ -1,0 +1,2 @@
+[0m[[0minfo[0m] [0m! mirroring.example: Exception raised on property evaluation.[0m
+[0m[[0minfo[0m] [0m> Exception: java.lang.NoClassDefFoundError: Could not initialize class reaktor.scct.Coverage$[0m

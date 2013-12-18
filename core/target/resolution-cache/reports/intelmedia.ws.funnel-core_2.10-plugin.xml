@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="ivy-report.xsl"?>
+<ivy-report version="1.0">
+	<info
+		organisation="intelmedia.ws.funnel"
+		module="core_2.10"
+		revision="1.0-SNAPSHOT"
+		conf="plugin"
+		confs="compile, runtime, test, provided, optional, compile-internal, runtime-internal, test-internal, plugin, sources, docs, pom, scala-tool, scct, scct-test, findbugs, cpd"
+		date="20131218145245"/>
+	<dependencies>
+	</dependencies>
+</ivy-report>
