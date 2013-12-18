@@ -191,7 +191,8 @@ package yourproject
 import funnel.instruments._
 
 object metrics {
-  val OilGauge = gauge("oil", 0d) // gauges require an initial value
+  // gauges require an initial value
+  val OilGauge = gauge("oil", 0d, Units.Count) 
 }
 
 ````
