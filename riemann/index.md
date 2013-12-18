@@ -3,7 +3,7 @@ layout: default
 title:  "Riemann Integration"
 ---
 
-## Riemann Integration
+# Riemann Integration
 
 On the receiving side, to make the funnel system work for operations it is required to have a consumer of the stream that allows for definition of operational logic and associated actions, based on said domain logic. For example, if certain systems fall into an "unhealthy" state, then perhaps the operations manager should receive a text message, or maybe the engineer responsible should receive an email. These are trivial examples, but "action" in this context is essentially any executable function - basically, do something useful based on operations defined domain logic.
 

@@ -3,7 +3,7 @@ layout: default
 title:  "Quickstart - Operations"
 ---
 
-## Quickstart: Operations Team
+# Quickstart: Operations Team
 
 Before reading this guide, ensure you have read the [primer document](http://github-media.sc.intel.com/IntelMedia/monitoring/tree/master/docs/riemann.markdown) that discusses the setup required for [Riemann](http://riemann.io/).
 

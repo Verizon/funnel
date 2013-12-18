@@ -3,7 +3,7 @@ layout: default
 title:  "Quickstart - Engineering"
 ---
 
-## Quickstart: Engineering Team
+# Quickstart: Engineering Team
 
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
