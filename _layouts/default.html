@@ -19,9 +19,11 @@
         <p>Generic lightweight stream-based monitoring system for Scala.</p>
         <p class="view"><a href="http://github-media.sc.intel.com/intelmedia/monitoring">View the Project on GitHub Enterprise <small>intelmedia/monitoring</small></a></p>
         <hr />
-        {% for post in site.pages %}
-        <p><a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a></p>
+
+        {% for post in site.pages | sort: 'title' %}
+          <p><a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a></p>
         {% endfor %}
+
         <hr />
         <!-- </ul> -->
       </header>
