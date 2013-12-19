@@ -20,7 +20,7 @@
         <p class="view"><a href="http://github-media.sc.intel.com/intelmedia/monitoring">View the Project on GitHub Enterprise <small>intelmedia/monitoring</small></a></p>
         <hr />
 
-        {% for post in site.pages | sort:'title' %}
+        {% for post in site.pages %}
           <p><a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a></p>
         {% endfor %}
 
