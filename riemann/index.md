@@ -9,7 +9,7 @@ On the receiving side, to make the funnel system work for operations it is requi
 
 So as not to reinvent the wheel, we have adopted the [Riemann](http://riemann.io/) stream processing server, which we will host at the edges of our platform network. This module represents a stream consumer that translates metrics from the funnel system to the protocol used by Riemann. Architecturally, you can visualise this setup like this:
 
-![Workflow]({{ site.baseurl }}img/funnel-riemann.png)
+![Workflow]({{ site.baseurl }}/img/funnel-riemann.png)
 
 ### Getting Started
 

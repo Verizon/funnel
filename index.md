@@ -15,5 +15,5 @@ To get started, please read the appropriate documentation:
 
 The funnel allows systems to push, pull, mirror and aggregate metrics from disparate systems, all with a unified API which can be seamlessly streamed into a real-time dashboard:
 
-![image]({{ site.baseurl }}img/riemann-dash.png)
+![image]({{ site.baseurl }}/img/riemann-dash.png)
 
