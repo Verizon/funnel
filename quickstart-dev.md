@@ -8,9 +8,9 @@ title:  "Quickstart - Engineering"
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
 ````
-libraryDependencies += "intelmedia.ws.funnel" %% "funnel-http" % "x.y.z"
+libraryDependencies += "intelmedia.ws.funnel" %% "http" % "x.y.z"
 ````
-(check for the latest release by [looking on the nexus](http://nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/repositories/releases/intelmedia/ws/monitoring/funnel_2.10))
+(check for the latest release by [looking on the nexus](http://nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/repositories/releases/intelmedia/ws/funnel/http_2.10/))
 
 Current transitive dependencies this will introduce on your classpath:
 
