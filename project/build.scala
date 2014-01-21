@@ -42,28 +42,36 @@ object Build extends Build {
   lazy val riemann = Project("riemann", file("riemann"))
     .settings(buildSettings:_*)
     .settings(resolvers += "clojars.org" at "http://clojars.org/repo")
-    .settings(libraryDependencies ++= 
-      compile(riemannapi) ++ 
+    .settings(libraryDependencies ++=
+      compile(riemannapi) ++
       compile(logback))
     .dependsOn(core)
 
   import com.typesafe.sbt.SbtNativePackager._
   import com.typesafe.sbt.packager.Keys._
 
+  lazy val bundleRpmSettings = Seq(
+    maintainer := "Timothy Perrett <timothy.m.perrett@intel.com>",
+    packageSummary := "Intel Media Monitoring Utensil",
+    packageDescription := """Testing description""",
+    name in Rpm := "utensil",
+    version in Rpm <<= version apply { sv => sv.split("[^\\d]").filterNot(_.isEmpty).mkString(".") },
+    rpmRelease := "1",
+    rpmVendor := "intelmedia",
+    rpmLicense := Some("Copyright Intel, 2013")
+  )
+
+  lazy val bundleZipSettings = Seq(
+    name in Universal := "utensil"
+  )
+
   lazy val utensil = Project("utensil", file("utensil"))
     .settings(buildSettings:_*)
     .settings(crossPaths := false) // adding this because its an executable
     .settings(libraryDependencies ++= compile(scopt))
+    .settings(deploymentSettings:_*)
     .settings(packageArchetype.java_server:_*)
-    .settings(
-      maintainer := "Timothy Perrett <timothy.m.perrett@intel.com>",
-      packageSummary := "Intel Media Monitoring Utensil",
-      packageDescription := """Testing description""",
-      name in Rpm := "funnel-utensil",
-      version in Rpm <<= version apply { sv => sv.split("[^\\d]").filterNot(_.isEmpty).mkString(".") },
-      rpmRelease := "1",
-      rpmVendor := "intelmedia",
-      rpmLicense := Some("Copyright Intel, 2013")
-    )
+    .settings(bundleRpmSettings:_*)
+    .settings(bundleZipSettings:_*)
     .dependsOn(core, http, riemann)
 }
