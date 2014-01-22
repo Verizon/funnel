@@ -11,9 +11,20 @@ Assuming you have that done, and you're keen to get started, great!
 
 **NOTE: Media deployments are always done to Linux machines, and operational monitoring will only be supported on linux.**
 
-### Installing Funnel Utensil
+For operations staff, the funnel system has a binary called `utensil` that simply boots a local monitoring server and has the ability to funnel metrics into Riemann for operational consumption. 
 
-For operations staff, the funnel system has a binary called `utensil` that simply boots a local monitoring server and has the ability to funnel metrics into Riemann for operational consumption. This binary has been made available with a super simple `yum` command:
+### Manual Installation 
+
+If you would like to simply download the binary and run it manually using your shell, TGZ and ZIP packages are available on the nexus. Download the [.zip or .tgz](http://nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/repositories/releases/intelmedia/ws/funnel/utensil/) files and expand them into the directory of your choice. 
+
+On unix systems, make the `./bin/utensil` shell executable (`chmod 755 ./bin/utensil`) and then execute the same file. This will boot up a local funnel instance that is ready to receive monitoring instructions. 
+
+
+### System Package Installation 
+
+***CURRENTLY NOT AVAILABLE DUE TO A PROBLEM WITH OUR REPOSITORIES***
+
+The binary has been made available with a super simple `yum` command:
 
 ````
 sudo yum install funnel-utensil
@@ -39,7 +50,6 @@ With the binary installed, you can simply start the service using the regular `i
 ````
 // TODO: Binary does not currently have init.d bash scripts and runs in the foreground. Swap this to use init.d
 ````
-
 
 ### Request metrics
 
