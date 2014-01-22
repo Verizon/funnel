@@ -54,7 +54,7 @@ object Utensil extends CLI {
       }
 
       S.mirroringSources.evalMap { case (url,bucket) =>
-       Riemann.mirrorAndPublish(M)(R)(SSE.readEvents)(
+       Riemann.mirrorAndPublish(M, options.riemannTTL.toSeconds.toFloat)(R)(SSE.readEvents)(
           Process.emit((url, bucket)))
       }.run.runAsyncInterruptibly(println, stop)
 
@@ -76,18 +76,19 @@ import scala.concurrent.duration._
 
 trait CLI {
 
-  case class RiemannSettings(host: String, port: Int)
+  case class RiemannHostPort(host: String, port: Int)
 
   case class Options(
-    riemann: RiemannSettings = RiemannSettings("localhost",5555),
+    riemann: RiemannHostPort = RiemannHostPort("localhost", 5555),
+    riemannTTL: Duration = 5 minutes,
     funnelPort: Int = 5775,
     transport: DatapointParser = SSE.readEvents _
   )
 
-  implicit val scoptReadUrl: Read[RiemannSettings] =
+  implicit val scoptReadUrl: Read[RiemannHostPort] =
     Read.reads { str =>
       str.split(':') match {
-        case Array(host,port) => RiemannSettings(host,port.toInt) // ok to explode here
+        case Array(host,port) => RiemannHostPort(host,port.toInt) // ok to explode here
         case _ => sys.error("The supplied host:port combination for the riemann server are not valid.")
       }
     }
@@ -105,8 +106,12 @@ trait CLI {
   protected val parser = new OptionParser[Options]("funnel"){
     head("Funnel Utensil", "1.0")
 
-    opt[RiemannSettings]('r',"riemann").action { (rs, opts) =>
+    opt[RiemannHostPort]('r',"riemann").action { (rs, opts) =>
       opts.copy(riemann = rs)
+    }
+
+    opt[Duration]('e', "expiry").action { (e, opts) =>
+      opts.copy(riemannTTL = e)
     }
 
     opt[Int]('p', "port").action { (p, opts) =>
