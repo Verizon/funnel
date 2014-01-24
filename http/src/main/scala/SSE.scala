@@ -122,7 +122,7 @@ object SSE {
    * in the event of an error, or if the given prefix does not
    * uniquely determine a `Key`.
    */
-  def readEvent[O](url: URL, prefix: String)(implicit R: Reportable[O], S: ExecutorService, log: String => Unit = println):
+  def readEvent[O](url: URL, prefix: String)(implicit R: Reportable[O], S: ExecutorService, log: String => SafeUnit):
       Task[(Key[O], Process[Task, Datapoint[O]])] =
     urlDecode[List[Key[Any]]](new URL(s"${url.toString}/keys/$prefix"))
     .map { ks =>

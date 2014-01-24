@@ -11,7 +11,7 @@ import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
 
 object MonitoringServer {
-  type Log = String => Unit
+  type Log = String => SafeUnit
 
   /**
    * `/`: self-describing list of available resources
@@ -25,7 +25,7 @@ object MonitoringServer {
    * `/stream/<keyid>`: stream of metrics for the given key
    * `/stream/<prefix>`: stream of metrics whose labels start with 'prefix'
    */
-  def start(M: Monitoring, port: Int = 8080, log: Log = println): MonitoringServer = {
+  def start(M: Monitoring, port: Int = 8080, log: Log): MonitoringServer = {
     val svr = (new MonitoringServer(M, port, log))
     svr.start()
     svr

@@ -62,13 +62,16 @@ object Build extends Build {
   )
 
   lazy val bundleZipSettings = Seq(
-    name in Universal := "utensil"
+    name in Universal := "utensil",
+    mappings in Universal += {
+      file("utensil/etc/logback.xml") -> "etc/logback.xml"
+    }
   )
 
   lazy val utensil = Project("utensil", file("utensil"))
     .settings(buildSettings:_*)
     .settings(crossPaths := false) // adding this because its an executable
-    .settings(libraryDependencies ++= compile(scopt))
+    .settings(libraryDependencies ++= compile(scopt) ++ compile(logs3))
     .settings(deploymentSettings:_*)
     .settings(packageArchetype.java_server:_*)
     .settings(bundleRpmSettings:_*)

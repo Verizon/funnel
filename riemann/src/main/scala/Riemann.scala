@@ -51,8 +51,7 @@ object Riemann {
     * C'est la vie!
     */
   private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any])(
-                      implicit log: String => SafeUnit =
-                        s => println("[Riemann.toEvent] "+s)): SafeUnit = {
+                      implicit log: String => SafeUnit): SafeUnit = {
 
     val e = c.event.service(pt.key.name)
              .tags(tags(pt.key.name): _*)
@@ -126,7 +125,7 @@ object Riemann {
    */
   def publish(M: Monitoring, ttlInSeconds: Float = 20f,
              retries: Event = Events.every(1 minutes))(c: RiemannClient)(
-             implicit log: String => SafeUnit = s => println("[Riemann.publish] "+s)
+             implicit log: String => SafeUnit
   ): Task[SafeUnit] = {
     for {
       alive <- Task(async.signal[SafeUnit](Strategy.Executor(Monitoring.defaultPool)))
@@ -156,8 +155,7 @@ object Riemann {
       c: RiemannClient, reimannRetries: Event = Events.every(1 minutes))(
       parse: DatapointParser)(
       groupedUrls: Process[Task, (URL,String)])(
-      implicit log: String => SafeUnit =
-      s => println("[Riemann.publishAll] "+s)): Task[SafeUnit] = {
+      implicit log: String => SafeUnit): Task[SafeUnit] = {
 
     val S = Strategy.Executor(Monitoring.defaultPool)
     val alive = async.signal[SafeUnit](S)

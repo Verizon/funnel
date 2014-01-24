@@ -100,7 +100,7 @@ trait Monitoring {
   def mirrorAll(parse: DatapointParser)(
                 url: URL, localName: String => String = identity)(
                 implicit S: ExecutorService = Monitoring.serverPool,
-                log: String => SafeUnit = println(_)): Process[Task,SafeUnit] = {
+                log: String => SafeUnit): Process[Task,SafeUnit] = {
     parse(url).flatMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
       val k = pt.key.modifyName(localName)
@@ -129,7 +129,7 @@ trait Monitoring {
       breaker: Event)(
       url: URL, localName: String => String = identity)(
         implicit S: ExecutorService = Monitoring.serverPool,
-        log: String => SafeUnit = println(_)): Process[Task,SafeUnit] = {
+        log: String => SafeUnit): Process[Task,SafeUnit] = {
     val e = breaker(this)
     val step: Process[Task, Throwable \/ SafeUnit] =
       mirrorAll(parse)(url, localName)(S, log).attempt()
@@ -174,7 +174,8 @@ trait Monitoring {
       decayFrequency: Event,
       aggregateFrequency: Event)(
       groupedUrls: Process[Task, (URL,String)],
-      health: Key[A])(f: String => Seq[A] => A): Task[SafeUnit] =
+      health: Key[A])(f: String => Seq[A] => A)(
+      implicit log: String => SafeUnit): Task[SafeUnit] =
     Task.delay {
       // use urls as the local names for keys
       var seen = Set[String]()
@@ -231,7 +232,7 @@ trait Monitoring {
    * within a 10 second window. See `Units.default`.
    */
   def decay(f: Key[Any] => Boolean)(e: Event)(
-            implicit log: String => SafeUnit = println(_)): Task[SafeUnit] = Task.delay {
+            implicit log: String => SafeUnit): Task[SafeUnit] = Task.delay {
     def reset = keys.continuous.once.map {
       _.foreach(k => k.default.foreach(update(k, _).run))
     }.run
@@ -377,7 +378,7 @@ object Monitoring {
    */
   def subscribe(M: Monitoring)(f: Key[Any] => Boolean)(
   implicit ES: ExecutorService = serverPool,
-           log: String => SafeUnit = println(_)):
+           log: String => SafeUnit):
       Process[Task, Datapoint[Any]] =
     Process.suspend { // don't actually do anything until we have a consumer
       val S = Strategy.Executor(ES)
