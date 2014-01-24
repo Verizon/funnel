@@ -157,7 +157,9 @@ object SSE {
     urlFullR(url)(S).map(parseOrThrow[A])
 
   def urlLinesR(url: URL)(implicit S: ExecutorService = Monitoring.serverPool): Process[Task, String] =
-    Process.suspend { linesR(url.openStream)(S) }
+    Process.suspend {
+      linesR(url.openStream)(S)
+    }
 
   def urlFullR(url: URL)(implicit S: ExecutorService = Monitoring.serverPool): Task[String] =
     urlLinesR(url)(S).chunkAll.map(_.mkString("\n")).runLastOr("")

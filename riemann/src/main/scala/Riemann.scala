@@ -178,7 +178,7 @@ object Riemann {
                  else Process.eval_(modifyActive(_ + url)) ++ // add to active at start
                       received.onComplete(Process.eval_(modifyActive(_ - url))) // and remove it when done
                }
-               receivedIdempotent.run.runAsync(_ => ())
+               receivedIdempotent.run.runAsync(_.fold(err => log(err.getMessage), identity))
              }
            }.run
       _ <- publish(M, ttlInSeconds, reimannRetries)(c)

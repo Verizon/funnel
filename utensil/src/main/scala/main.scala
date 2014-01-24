@@ -42,12 +42,8 @@ object Utensil extends CLI {
   def main(args: Array[String]): Unit = {
     run(args){ options =>
 
-      // val L = LoggerFactory.getLogger("utensil")
-      // L.info(">>>>>>>>")
-
-      implicit val log: String => SafeUnit = s => println(s)
-
-      log("sdfsddfsd")
+      val L = LoggerFactory.getLogger("utensil")
+      implicit val log: String => SafeUnit = s => L.info(s)
 
       val M = Monitoring.default
       val S = MonitoringServer.start(M, options.funnelPort, log)

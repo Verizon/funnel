@@ -132,7 +132,7 @@ trait Monitoring {
         log: String => SafeUnit): Process[Task,SafeUnit] = {
     val e = breaker(this)
     val step: Process[Task, Throwable \/ SafeUnit] =
-      mirrorAll(parse)(url, localName)(S, log).attempt()
+      mirrorAll(parse)(url, localName)(S, log).attempt((e: Throwable) => { log("ERROR " + e.toString); Process.halt })
     step.stripW ++ e.terminated.flatMap {
       // on our last reconnect attempt, rethrow error
       case None => step.flatMap(_.fold(Process.fail, Process.emit))
