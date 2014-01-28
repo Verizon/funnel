@@ -151,8 +151,8 @@ object Riemann {
    * Riemann server in the event of an error.
    */
   def mirrorAndPublish[A](
-      M: Monitoring, ttlInSeconds: Float = 20f, nodeRetries: Event = Events.every(1 minutes))(
-      c: RiemannClient, reimannRetries: Event = Events.every(1 minutes))(
+      M: Monitoring, ttlInSeconds: Float = 20f, nodeRetries: Event = Events.takeEvery(30 seconds, 6))(
+      c: RiemannClient, reimannRetries: Event = Events.takeEvery(30 seconds, 6))(
       parse: DatapointParser)(
       groupedUrls: Process[Task, (URL,String)])(
       implicit log: String => SafeUnit): Task[SafeUnit] = {

@@ -130,15 +130,12 @@ trait Monitoring {
       url: URL, localName: String => String = identity)(
         implicit S: ExecutorService = Monitoring.serverPool,
         log: String => SafeUnit): Process[Task,SafeUnit] = {
-    val e = breaker(this)
-    val step: Process[Task, Throwable \/ SafeUnit] =
-      mirrorAll(parse)(url, localName)(S, log).attempt((e: Throwable) => { log("ERROR " + e.toString); Process.halt })
-    step.stripW ++ e.terminated.flatMap {
-      // on our last reconnect attempt, rethrow error
-      case None => step.flatMap(_.fold(Process.fail, Process.emit))
-      // on other attempts, ignore the exceptions
-      case Some(_) => step.stripW
+    val report = (e: Throwable) => {
+      log("attemptMirrorAll.ERROR: "+e)
+      ()
     }
+    Monitoring.attemptRepeatedly(report)(
+      mirrorAll(parse)(url, localName))(breaker(this))
   }
 
   /**
@@ -453,6 +450,19 @@ object Monitoring {
     ((i: I) => hub ! i, signal)
   }
 
+  private[funnel] def attemptRepeatedly[A](
+    maskedError: Throwable => Unit)(
+    p: Process[Task,A])(
+    schedule: Process[Task,Unit]): Process[Task,A] = {
+    val step: Process[Task, Throwable \/ A] =
+      p.attempt(e => Process.eval { Task.delay { maskedError(e); e }})
+    step.stripW ++ schedule.terminated.flatMap {
+      // on our last reconnect attempt, rethrow error
+      case None => step.flatMap(_.fold(Process.fail, Process.emit))
+      // on other attempts, ignore the exceptions
+      case Some(_) => step.stripW
+    }
+  }
 
   private[funnel] def prettyURL(url: URL): String = {
     val host = url.getHost

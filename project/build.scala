@@ -26,8 +26,8 @@ object Build extends Build {
   lazy val core = Project("core", file("core"))
     .settings(buildSettings:_*)
     .settings(name := "core")
+    .settings(resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases")
     .settings(libraryDependencies ++=
-      compile(scalaz) ++
       compile(scalazstream) ++
       compile(algebird) ++
       test(scalacheck) ++

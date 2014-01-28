@@ -144,9 +144,9 @@ object SSE {
    */
   def readEvents(url: URL)(implicit S: ExecutorService = Monitoring.serverPool):
       Process[Task, Datapoint[Any]] =
-    urlLinesR(url)(S).pipe(blockParser).map {
+    urlLinesR(url)(S).attempt().pipeO(blockParser.map {
       case (_,data) => parseOrThrow[Datapoint[Any]](data)
-    }
+    }).flatMap(_.fold(Process.fail, Process.emit))
 
   // various helper functions
 
@@ -158,7 +158,8 @@ object SSE {
 
   def urlLinesR(url: URL)(implicit S: ExecutorService = Monitoring.serverPool): Process[Task, String] =
     Process.suspend {
-      linesR(url.openStream)(S)
+      try linesR(url.openStream)(S)
+      catch { case e: Throwable => Process.Halt(e) }
     }
 
   def urlFullR(url: URL)(implicit S: ExecutorService = Monitoring.serverPool): Task[String] =
