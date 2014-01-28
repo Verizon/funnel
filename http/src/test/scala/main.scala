@@ -7,7 +7,8 @@ import scalaz.stream.Process
 import http.{MonitoringServer,SSE}
 
 object Main extends App {
-  MonitoringServer.start(Monitoring.default, 8081)
+  implicit val log = (s: String) => { println(s); Safe }
+  MonitoringServer.start(Monitoring.default, 8081, log)
 
   import instruments._
   val c = counter("requests")
@@ -20,8 +21,8 @@ object Main extends App {
   val M = Monitoring.instance
   val M2 = Monitoring.instance
   val I = new Instruments(5 minutes, M)
-  MonitoringServer.start(M, 8083)
-  MonitoringServer.start(M2, 8082)
+  MonitoringServer.start(M, 8083, log)
+  MonitoringServer.start(M2, 8082, log)
 
   val c2 = I.counter("requests")
   val c3 = I.counter("requests2")
