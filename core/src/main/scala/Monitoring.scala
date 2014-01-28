@@ -450,6 +450,15 @@ object Monitoring {
     ((i: I) => hub ! i, signal)
   }
 
+  /**
+   * Try running the given process `p`, catching errors and reporting
+   * them with `maskedError`, using `schedule` to determine when further
+   * attempts are made. If `schedule` is exhausted, the error is raised.
+   * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
+   * will run `p`; if it encounters an error, it will print the error using `println`,
+   * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
+   * the error in the `Process`.
+   */
   private[funnel] def attemptRepeatedly[A](
     maskedError: Throwable => Unit)(
     p: Process[Task,A])(
