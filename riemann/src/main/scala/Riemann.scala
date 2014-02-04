@@ -51,8 +51,7 @@ object Riemann {
     * C'est la vie!
     */
   private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any])(
-                      implicit log: String => SafeUnit =
-                        s => println("[Riemann.toEvent] "+s)): SafeUnit = {
+                      implicit log: String => SafeUnit): SafeUnit = {
 
     val e = c.event.service(pt.key.name)
              .tags(tags(pt.key.name): _*)
@@ -126,7 +125,7 @@ object Riemann {
    */
   def publish(M: Monitoring, ttlInSeconds: Float = 20f,
              retries: Event = Events.every(1 minutes))(c: RiemannClient)(
-             implicit log: String => SafeUnit = s => println("[Riemann.publish] "+s)
+             implicit log: String => SafeUnit
   ): Task[SafeUnit] = {
     for {
       alive <- Task(async.signal[SafeUnit](Strategy.Executor(Monitoring.defaultPool)))
@@ -152,12 +151,11 @@ object Riemann {
    * Riemann server in the event of an error.
    */
   def mirrorAndPublish[A](
-      M: Monitoring, ttlInSeconds: Float = 20f, nodeRetries: Event = Events.every(1 minutes))(
-      c: RiemannClient, reimannRetries: Event = Events.every(1 minutes))(
+      M: Monitoring, ttlInSeconds: Float = 20f, nodeRetries: Event = Events.takeEvery(30 seconds, 6))(
+      c: RiemannClient, reimannRetries: Event = Events.takeEvery(30 seconds, 6))(
       parse: DatapointParser)(
       groupedUrls: Process[Task, (URL,String)])(
-      implicit log: String => SafeUnit =
-      s => println("[Riemann.publishAll] "+s)): Task[SafeUnit] = {
+      implicit log: String => SafeUnit): Task[SafeUnit] = {
 
     val S = Strategy.Executor(Monitoring.defaultPool)
     val alive = async.signal[SafeUnit](S)
@@ -180,7 +178,7 @@ object Riemann {
                  else Process.eval_(modifyActive(_ + url)) ++ // add to active at start
                       received.onComplete(Process.eval_(modifyActive(_ - url))) // and remove it when done
                }
-               receivedIdempotent.run.runAsync(_ => ())
+               receivedIdempotent.run.runAsync(_.fold(err => log(err.getMessage), identity))
              }
            }.run
       _ <- publish(M, ttlInSeconds, reimannRetries)(c)

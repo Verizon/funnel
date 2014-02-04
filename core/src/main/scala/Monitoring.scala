@@ -100,7 +100,7 @@ trait Monitoring {
   def mirrorAll(parse: DatapointParser)(
                 url: URL, localName: String => String = identity)(
                 implicit S: ExecutorService = Monitoring.serverPool,
-                log: String => SafeUnit = println(_)): Process[Task,SafeUnit] = {
+                log: String => SafeUnit): Process[Task,SafeUnit] = {
     parse(url).flatMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
       val k = pt.key.modifyName(localName)
@@ -129,16 +129,13 @@ trait Monitoring {
       breaker: Event)(
       url: URL, localName: String => String = identity)(
         implicit S: ExecutorService = Monitoring.serverPool,
-        log: String => SafeUnit = println(_)): Process[Task,SafeUnit] = {
-    val e = breaker(this)
-    val step: Process[Task, Throwable \/ SafeUnit] =
-      mirrorAll(parse)(url, localName)(S, log).attempt()
-    step.stripW ++ e.terminated.flatMap {
-      // on our last reconnect attempt, rethrow error
-      case None => step.flatMap(_.fold(Process.fail, Process.emit))
-      // on other attempts, ignore the exceptions
-      case Some(_) => step.stripW
+        log: String => SafeUnit): Process[Task,SafeUnit] = {
+    val report = (e: Throwable) => {
+      log("attemptMirrorAll.ERROR: "+e)
+      ()
     }
+    Monitoring.attemptRepeatedly(report)(
+      mirrorAll(parse)(url, localName))(breaker(this))
   }
 
   /**
@@ -174,7 +171,8 @@ trait Monitoring {
       decayFrequency: Event,
       aggregateFrequency: Event)(
       groupedUrls: Process[Task, (URL,String)],
-      health: Key[A])(f: String => Seq[A] => A): Task[SafeUnit] =
+      health: Key[A])(f: String => Seq[A] => A)(
+      implicit log: String => SafeUnit): Task[SafeUnit] =
     Task.delay {
       // use urls as the local names for keys
       var seen = Set[String]()
@@ -231,7 +229,7 @@ trait Monitoring {
    * within a 10 second window. See `Units.default`.
    */
   def decay(f: Key[Any] => Boolean)(e: Event)(
-            implicit log: String => SafeUnit = println(_)): Task[SafeUnit] = Task.delay {
+            implicit log: String => SafeUnit): Task[SafeUnit] = Task.delay {
     def reset = keys.continuous.once.map {
       _.foreach(k => k.default.foreach(update(k, _).run))
     }.run
@@ -377,7 +375,7 @@ object Monitoring {
    */
   def subscribe(M: Monitoring)(f: Key[Any] => Boolean)(
   implicit ES: ExecutorService = serverPool,
-           log: String => SafeUnit = println(_)):
+           log: String => SafeUnit):
       Process[Task, Datapoint[Any]] =
     Process.suspend { // don't actually do anything until we have a consumer
       val S = Strategy.Executor(ES)
@@ -452,6 +450,28 @@ object Monitoring {
     ((i: I) => hub ! i, signal)
   }
 
+  /**
+   * Try running the given process `p`, catching errors and reporting
+   * them with `maskedError`, using `schedule` to determine when further
+   * attempts are made. If `schedule` is exhausted, the error is raised.
+   * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
+   * will run `p`; if it encounters an error, it will print the error using `println`,
+   * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
+   * the error in the `Process`.
+   */
+  private[funnel] def attemptRepeatedly[A](
+    maskedError: Throwable => Unit)(
+    p: Process[Task,A])(
+    schedule: Process[Task,Unit]): Process[Task,A] = {
+    val step: Process[Task, Throwable \/ A] =
+      p.attempt(e => Process.eval { Task.delay { maskedError(e); e }})
+    step.stripW ++ schedule.terminated.flatMap {
+      // on our last reconnect attempt, rethrow error
+      case None => step.flatMap(_.fold(Process.fail, Process.emit))
+      // on other attempts, ignore the exceptions
+      case Some(_) => step.stripW
+    }
+  }
 
   private[funnel] def prettyURL(url: URL): String = {
     val host = url.getHost

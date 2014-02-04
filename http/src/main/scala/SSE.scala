@@ -122,7 +122,7 @@ object SSE {
    * in the event of an error, or if the given prefix does not
    * uniquely determine a `Key`.
    */
-  def readEvent[O](url: URL, prefix: String)(implicit R: Reportable[O], S: ExecutorService, log: String => Unit = println):
+  def readEvent[O](url: URL, prefix: String)(implicit R: Reportable[O], S: ExecutorService, log: String => SafeUnit):
       Task[(Key[O], Process[Task, Datapoint[O]])] =
     urlDecode[List[Key[Any]]](new URL(s"${url.toString}/keys/$prefix"))
     .map { ks =>
@@ -144,9 +144,9 @@ object SSE {
    */
   def readEvents(url: URL)(implicit S: ExecutorService = Monitoring.serverPool):
       Process[Task, Datapoint[Any]] =
-    urlLinesR(url)(S).pipe(blockParser).map {
+    urlLinesR(url)(S).attempt().pipeO(blockParser.map {
       case (_,data) => parseOrThrow[Datapoint[Any]](data)
-    }
+    }).flatMap(_.fold(Process.fail, Process.emit))
 
   // various helper functions
 
@@ -157,7 +157,10 @@ object SSE {
     urlFullR(url)(S).map(parseOrThrow[A])
 
   def urlLinesR(url: URL)(implicit S: ExecutorService = Monitoring.serverPool): Process[Task, String] =
-    Process.suspend { linesR(url.openStream)(S) }
+    Process.suspend {
+      try linesR(url.openStream)(S)
+      catch { case e: Throwable => Process.Halt(e) }
+    }
 
   def urlFullR(url: URL)(implicit S: ExecutorService = Monitoring.serverPool): Task[String] =
     urlLinesR(url)(S).chunkAll.map(_.mkString("\n")).runLastOr("")

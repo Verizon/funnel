@@ -7,6 +7,7 @@ import com.aphyr.riemann.client.RiemannClient
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scala.concurrent.duration._
+import org.slf4j.LoggerFactory
 
 /**
   * How to use:
@@ -41,8 +42,11 @@ object Utensil extends CLI {
   def main(args: Array[String]): Unit = {
     run(args){ options =>
 
+      val L = LoggerFactory.getLogger("utensil")
+      implicit val log: String => SafeUnit = s => L.info(s)
+
       val M = Monitoring.default
-      val S = MonitoringServer.start(M, options.funnelPort)
+      val S = MonitoringServer.start(M, options.funnelPort, log)
 
       val R = RiemannClient.tcp(options.riemann.host, options.riemann.port)
       try {
@@ -55,7 +59,7 @@ object Utensil extends CLI {
 
       S.mirroringSources.evalMap { case (url,bucket) =>
        Riemann.mirrorAndPublish(M, options.riemannTTL.toSeconds.toFloat)(R)(SSE.readEvents)(
-          Process.emit((url, bucket)))
+          Process.emit((url, bucket)))(log)
       }.run.runAsyncInterruptibly(println, stop)
 
       println

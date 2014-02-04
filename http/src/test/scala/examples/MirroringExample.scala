@@ -11,6 +11,8 @@ import scalaz.stream.Process
 
 object MirroringExample extends Properties("mirroring") {
 
+  implicit val log = (s: String) => { println(s); Safe }
+
   property("example") = secure {
 
     val health = Key[String]("now/health", Units.TrafficLight)
@@ -24,7 +26,7 @@ object MirroringExample extends Properties("mirroring") {
       val I = new Instruments(5 minutes, M)
       val ok = I.trafficLight("health")
       val reqs = I.counter("reqs")
-      val svr = MonitoringServer.start(M, port)
+      val svr = MonitoringServer.start(M, port, log)
       Process.awakeEvery(2 seconds).takeWhile(_ < (ttl seconds)).map { _ =>
         reqs.incrementBy((math.random * 10).toInt)
         ok.green
@@ -50,7 +52,7 @@ object MirroringExample extends Properties("mirroring") {
       }
 
     val M = Monitoring.instance
-    MonitoringServer.start(M, 8000)
+    MonitoringServer.start(M, 8000, log)
 
     M.mirrorAndAggregate(SSE.readEvents)(
       Events.takeEvery(1 minutes, 5),
