@@ -20,13 +20,12 @@ object Build extends Build {
       publishArtifact in (Compile, packageBin) := false,
       publish := (),
       publishLocal := ()
-    ) ++ ScctPlugin.mergeReportSettings
+    )
   ).aggregate(core, http, riemann, utensil)
 
   lazy val core = Project("core", file("core"))
     .settings(buildSettings:_*)
     .settings(name := "core")
-    .settings(resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases")
     .settings(libraryDependencies ++=
       compile(scalazstream) ++
       compile(algebird) ++
