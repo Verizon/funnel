@@ -85,14 +85,12 @@ trait Timer[K] extends Instrument[K] { self =>
              S2: ExecutorService = Monitoring.defaultPool): Timer[K] = {
     if (d < (100 microseconds))
       sys.error("buffer size be at least 100 microseconds, was: " + d)
-    val reading = new AtomicBoolean(false)
     val nonce = new AtomicLong(0)
     val n = new AtomicInteger(0)
     val totalNanos = new AtomicLong(0)
     val scheduled = new AtomicBoolean(false)
     val nanos = d.toNanos
     val later = Strategy.Executor(S2)
-    val pending = new ConcurrentLinkedQueue[Long]
     new Timer[K] {
       def recordNanos(delta: Long): Unit = {
         nonce.incrementAndGet
