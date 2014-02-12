@@ -1,5 +1,5 @@
 
-resolvers += "im.nexus" at "http://nexus.inf.premeditated.tv/nexus/content/groups/intel_media_maven/"
+resolvers += "im.nexus" at "http://nexus.svc.m.infra-host.com/nexus/content/groups/intel_media_maven/"
 
 addSbtPlugin("intelmedia.build" %% "sbt-imbuild" % "5.0.1")
 
