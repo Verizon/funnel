@@ -21,7 +21,8 @@ object Build extends Build {
       publish := (),
       publishLocal := ()
     )
-  ).aggregate(core, http, riemann, utensil)
+  )
+  .aggregate(core, http, riemann, utensil)
 
   lazy val core = Project("core", file("core"))
     .settings(buildSettings:_*)
