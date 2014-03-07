@@ -10,7 +10,7 @@ First up you need to add the dependency for the monitoring library to your `buil
 ````
 libraryDependencies += "intelmedia.ws.funnel" %% "http" % "x.y.z"
 ````
-(check for the latest release by [looking on the nexus](http://nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/repositories/releases/intelmedia/ws/funnel/http_2.10/))
+(check for the latest release by [looking on the nexus](http://nexus.svc.m.infra-host.com/nexus/content/repositories/releases/intelmedia/ws/funnel/http_2.10/))
 
 Current transitive dependencies this will introduce on your classpath:
 
@@ -38,7 +38,7 @@ object metrics {
 }
 ````
 
-The goal of this `metrics` object is to define your metrics up front, and force yourself to think about the metric requirements that your application has. All of your application metrics should be defined in the `metrics` object, and imported where they are needed by specific APIs. 
+The goal of this `metrics` object is to define your metrics up front, and force yourself to think about the metric requirements that your application has. All of your application metrics should be defined in the `metrics` object, and imported where they are needed by specific APIs.
 
 > **NOTE:** When it comes to naming metrics, always bucket your metrics using `/` as a delimiter, and try to logically order things as a "tree". For example:
 >
@@ -112,22 +112,22 @@ object metrics {
 
 ````
 
-Counters can then be incremented monotonically, or incremented by a given amount: 
+Counters can then be incremented monotonically, or incremented by a given amount:
 
 ````
 
 import metrics._
 
 trait SomeFun {
-  
+
   def foobar = {
-    // increment monotonically 
+    // increment monotonically
     NumberOfCacheHits.increment
-    
+
     // increment by a given amount
     NumberOfCacheHits.incrementBy(10)
   }
- 
+
 }
 
 ````
@@ -157,37 +157,37 @@ import scalaz.concurrent.Task
 import scala.concurrent.Future
 
 trait SomeFun {
-  
+
   private def getList: Future[Int] = …
   private def getListTask: Task[Int]
-  
+
   def foobar = {
-    
+
     // for timing strict values, just use the block syntax:
     GetUserList.time {
     	// expensive operation goes here
     }
-    
+
     // for timing async Future[A]
     GetUserList.timeFuture(getList)
-    
+
     // for timing scalaz.concurrent.Task[A]
     GetUserList.timeTask(getListTask)
-    
+
     // for anything else procedural, the side-effecting API
     val stopwatch = GetUserList.start()
     val x = // operation to be timed
     stopwatch() // stops the stopwatch and records the time taken
-    
+
   }
-  
+
 }
 
 ````
 
 ##### Gauges
 
-Gauges represent the current state of a value. The best way to visualise this is a checking the oil on a car; the dipstick is the gauge of how much oil the vehicle currently has, and this changes over time, moving both up and down, but it can only have a single value at any particular reading. 
+Gauges represent the current state of a value. The best way to visualise this is a checking the oil on a car; the dipstick is the gauge of how much oil the vehicle currently has, and this changes over time, moving both up and down, but it can only have a single value at any particular reading.
 
 ````
 package intelmedia.ws
@@ -197,7 +197,7 @@ import funnel.instruments._
 
 object metrics {
   // gauges require an initial value
-  val OilGauge = gauge("oil", 0d, Units.Count) 
+  val OilGauge = gauge("oil", 0d, Units.Count)
 }
 
 ````
@@ -221,7 +221,7 @@ By default, the following types are supported as values for gauges:
 	* `Int`
 	* `Double`
 	* `Float`
-	* `BigDecimal` 
+	* `BigDecimal`
 	* `Long`
 
 In addition to simply recording the value of the gauge, there is a specialised gauge that can also track numerical statistics like `mean`, `variance` etc. To use it, just adjust your `metrics` declaration like so:
@@ -234,7 +234,7 @@ import funnel.instruments._
 
 object metrics {
   // gauges require an initial value
-  val OilGauge = numericGauge("oil", 0d, Units.Count) 
+  val OilGauge = numericGauge("oil", 0d, Units.Count)
 }
 
 ````
@@ -257,7 +257,7 @@ package yourproject
 import funnel.instruments._
 
 object metrics {
-  val GeoLocationCircuit = trafficLight("circuit/geo") 
+  val GeoLocationCircuit = trafficLight("circuit/geo")
 }
 
 ````
@@ -270,9 +270,9 @@ trait SomeFun {
   def doGeoLocation = {
     // your logic for the function
 	  …
-	// if all went well, set the breaker accordingly 
+	// if all went well, set the breaker accordingly
    GeoLocationCircuit.green
-    
+
    /*
    Traffic lights can be set into red and amber states in a similar fashion:
    GeoLocationCircuit.amber
@@ -283,7 +283,7 @@ trait SomeFun {
 ````
 
 
-### Monitoring Server 
+### Monitoring Server
 
 All the metrics you define in your application, plus some additional platform metrics supplied by the monitoring library can be exposed via a baked in administration server. In order to use this server, one simply only needs to add the following line to the `main` of their application:
 
@@ -294,7 +294,7 @@ object Main {
   def def main(args: Array[String]): Unit = {
     MonitoringServer.start(Monitoring.default, 5775)
 
-    // your application code starts here 
+    // your application code starts here
   }
 }
 
@@ -302,5 +302,5 @@ object Main {
 
 **NOTE: By application `main`, this does not have to be the actual main, but rather, the end of the world for your application (which however, would usually be the main). For Play! applications, this means the Global object.**
 
-With this in your application, and assuming you are developing locally, once running you will be able to access [http://127.0.0.1:5775/](http://127.0.0.1:5775/) in your local web browser, where the index page will give you a list of available resources and descriptions of their function. 
+With this in your application, and assuming you are developing locally, once running you will be able to access [http://127.0.0.1:5775/](http://127.0.0.1:5775/) in your local web browser, where the index page will give you a list of available resources and descriptions of their function.
 
