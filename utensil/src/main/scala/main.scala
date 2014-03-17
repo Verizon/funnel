@@ -57,10 +57,8 @@ object Utensil extends CLI {
         }
       }
 
-      S.mirroringSources.evalMap { case (url,bucket) =>
-        Riemann.mirrorAndPublish(M, options.riemannTTL.toSeconds.toFloat)(R)(SSE.readEvents)(
-          Process.emit((url, bucket)))(log)
-      }.run.runAsyncInterruptibly(println, stop)
+      Riemann.mirrorAndPublish(M, options.riemannTTL.toSeconds.toFloat)(R)(SSE.readEvents)(S.mirroringSources)(log)
+      .runAsyncInterruptibly(println, stop)
 
       println
       println("Press [Enter] to quit...")
