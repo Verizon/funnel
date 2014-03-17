@@ -119,9 +119,8 @@ object Riemann {
 
   /**
    * Publish all datapoints from this `Monitoring` to the given
-   * `RiemannClient`. Returns a thunk that can be used to terminate.
-   * Uses `retries` to control the reconnect frequency if `RiemannClient`
-   * is unavailable.
+   * `RiemannClient`. Uses `retries` to control the reconnect frequency
+   * if `RiemannClient` is unavailable. This returns a blocking `Task`.
    */
   def publish(M: Monitoring, ttlInSeconds: Float = 20f,
              retries: Event = Events.every(1 minutes))(c: RiemannClient)(
@@ -180,8 +179,7 @@ object Riemann {
                }
                receivedIdempotent.run.runAsync(_.fold(err => log(err.getMessage), identity))
              }
-           }.run
-      _ <- publish(M, ttlInSeconds, reimannRetries)(c)
+           }.merge(Process.eval(publish(M, ttlInSeconds, reimannRetries)(c))).run // publish to Riemann concurrent to aggregating locally
       _ <- alive.close
     } yield ()
   }
