@@ -58,7 +58,7 @@ object Utensil extends CLI {
       }
 
       S.mirroringSources.evalMap { case (url,bucket) =>
-       Riemann.mirrorAndPublish(M, options.riemannTTL.toSeconds.toFloat)(R)(SSE.readEvents)(
+        Riemann.mirrorAndPublish(M, options.riemannTTL.toSeconds.toFloat)(R)(SSE.readEvents)(
           Process.emit((url, bucket)))(log)
       }.run.runAsyncInterruptibly(println, stop)
 
