@@ -25,7 +25,7 @@ object MonitoringServer {
    * `/stream/<keyid>`: stream of metrics for the given key
    * `/stream/<prefix>`: stream of metrics whose labels start with 'prefix'
    */
-  def start(M: Monitoring, port: Int = 8080, log: Log): MonitoringServer = {
+  def start(M: Monitoring, port: Int = 8080, log: Log = s => println(s)): MonitoringServer = {
     val svr = (new MonitoringServer(M, port, log))
     svr.start()
     svr
