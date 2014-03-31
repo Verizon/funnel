@@ -6,7 +6,7 @@ import scala.concurrent.duration._
 import scalaz.concurrent.Task
 
 object Main {
-  implicit val log = (s: String) => { println(s); Safe }
+  implicit val log = (s: String) => { println(s); SafeUnit.Safe }
   private def randomLight(tl: TrafficLight) =
     util.Random.nextInt(3) match {
       case 1 => tl.yellow

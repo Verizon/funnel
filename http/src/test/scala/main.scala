@@ -7,7 +7,7 @@ import scalaz.stream.Process
 import http.{MonitoringServer,SSE}
 
 object Main extends App {
-  implicit val log = (s: String) => { println(s); Safe }
+  implicit val log = (s: String) => { println(s); SafeUnit.Safe }
   MonitoringServer.start(Monitoring.default, 8081, log)
 
   import instruments._

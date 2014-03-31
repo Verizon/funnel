@@ -11,7 +11,7 @@ import scalaz.stream.Process
 
 object MirroringExample extends Properties("mirroring") {
 
-  implicit val log = (s: String) => { println(s); Safe }
+  implicit val log = (s: String) => { println(s); SafeUnit.Safe }
 
   property("example") = secure {
 

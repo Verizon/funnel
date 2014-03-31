@@ -2,13 +2,16 @@ import sbt._, Keys._
 
 object Build extends Build {
   import Dependencies._
+  import oncue.build._, OnCueKeys._
 
   lazy val buildSettings =
     Defaults.defaultSettings ++
-    ImBuildPlugin.imBuildSettings ++ Seq(
+    OnCue.baseSettings ++
+    ScalaCheck.settings ++ Seq(
+      ciRunCoverageReport := false,
       organization := "intelmedia.ws.funnel",
       scalaVersion := "2.10.3",
-      scalacOptions ++= Seq(
+      scalacOptions := Seq(
         "-feature",
         "-language:postfixOps",
         "-language:implicitConversions"))
@@ -21,22 +24,18 @@ object Build extends Build {
       publish := (),
       publishLocal := ()
     )
-  )
-  .aggregate(core, http, riemann, utensil)
+  ).aggregate(core, http, riemann, utensil)
 
   lazy val core = Project("core", file("core"))
     .settings(buildSettings:_*)
     .settings(name := "core")
     .settings(libraryDependencies ++=
       compile(scalazstream) ++
-      compile(algebird) ++
-      test(scalacheck) ++
-      test(scalatest))
+      compile(algebird))
 
   lazy val http = Project("http", file("http"))
     .settings(buildSettings:_*)
-    .settings(libraryDependencies ++=
-      compile(argonaut))
+    .settings(libraryDependencies ++= compile(argonaut))
     .dependsOn(core)
 
   lazy val riemann = Project("riemann", file("riemann"))
@@ -50,31 +49,17 @@ object Build extends Build {
   import com.typesafe.sbt.SbtNativePackager._
   import com.typesafe.sbt.packager.Keys._
 
-  lazy val bundleRpmSettings = Seq(
-    maintainer := "Timothy Perrett <timothy.m.perrett@intel.com>",
-    packageSummary := "Intel Media Monitoring Utensil",
-    packageDescription := """Testing description""",
-    name in Rpm := "utensil",
-    version in Rpm <<= version apply { sv => sv.split("[^\\d]").filterNot(_.isEmpty).mkString(".") },
-    rpmRelease := "1",
-    rpmVendor := "intelmedia",
-    rpmLicense := Some("Copyright Intel, 2013")
-  )
-
-  lazy val bundleZipSettings = Seq(
-    name in Universal := "utensil",
-    mappings in Universal += {
-      file("utensil/etc/logback.xml") -> "etc/logback.xml"
-    }
-  )
-
   lazy val utensil = Project("utensil", file("utensil"))
     .settings(buildSettings:_*)
-    .settings(crossPaths := false) // adding this because its an executable
-    .settings(libraryDependencies ++= compile(scopt) ++ compile(logs3))
-    .settings(deploymentSettings:_*)
-    .settings(packageArchetype.java_server:_*)
-    .settings(bundleRpmSettings:_*)
-    .settings(bundleZipSettings:_*)
-    .dependsOn(core, http, riemann)
+    .settings(Deployable.settings:_*)
+    .settings(RPM.settings:_*)
+    .settings(
+      libraryDependencies ++=
+        compile(scopt) ++
+        compile(logs3),
+      name in Universal := "utensil",
+      mappings in Universal += {
+        file("utensil/etc/logback.xml") -> "etc/logback.xml"
+      }
+    ).dependsOn(core, http, riemann)
 }

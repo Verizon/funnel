@@ -26,7 +26,7 @@ object JVM {
       val numCollections = numericGauge(s"jvm/gc/$name", 0, Units.Count)
       val collectionTime = numericGauge(s"jvm/gc/$name/time", 0, Units.Milliseconds)
       Process.awakeEvery(3 seconds)(ES,TS).map { _ =>
-        numCollections.set(gc.getCollectionCount)
+        numCollections.set(gc.getCollectionCount.toDouble)
         collectionTime.set(gc.getCollectionTime.toDouble)
       }.run.runAsync(_ => ())
     }

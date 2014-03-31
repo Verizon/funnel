@@ -116,7 +116,7 @@ object Buffers {
   /** Compute the smallest multiple of `step` which is `> d`. */
   def ceilingDuration(d: Duration, step: Duration): Duration = {
     val f = d / step
-    val d2 = step * math.ceil(f).toInt
+    val d2: Duration = step * math.ceil(f)
     if (math.ceil(f) == f) d2 + step
     else d2
   }
