@@ -53,7 +53,7 @@ object Riemann {
   private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any])(
                       implicit log: String => SafeUnit): SafeUnit = {
 
-    val e = c.event.service(pt.key.name)
+    val e = c.event
              .tags(tags(pt.key.name): _*)
              .description(s"${pt.key.typeOf} ${pt.key.units}")
              .time(System.currentTimeMillis / 1000L)
@@ -62,8 +62,8 @@ object Riemann {
     // bawws like side-effects as the underlying api is totally mutable.
     // GO JAVA!!
     pt.key.name.split(":::") match {
-      case Array(name,host) => e.host(host)
-      case _                => ()
+      case Array(name,host) => e.service(name).host(host)
+      case _                => e.service(pt.key.name) // not sure what this is, so use existing key name as service name
     }
 
     pt.value match {

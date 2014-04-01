@@ -11,8 +11,21 @@ object Units {
   // with a Stats metric, or a single-value metric, hence
   // the intersection type
 
-  case class Duration(granularity: TimeUnit) extends Units[Double with funnel.Stats]
-  case class Bytes(base: Base) extends Units[Double with funnel.Stats]
+  private def capitalize(s: String): String =
+    s.headOption.map(hd => hd.toString.toUpperCase + s.tail.toLowerCase).getOrElse(s)
+
+  case class Duration(granularity: TimeUnit) extends Units[Double with funnel.Stats] {
+    override def toString = capitalize(granularity.toString)
+  }
+  case class Bytes(base: Base) extends Units[Double with funnel.Stats] {
+    import Base._
+    override def toString = base match {
+      case Zero => "Bytes"
+      case Kilo => "Kilobytes"
+      case Mega => "Megabytes"
+      case Giga => "Gigabytes"
+    }
+  }
   case object Count extends Units[Double with funnel.Stats]
   case object Ratio extends Units[Double with funnel.Stats]
   case object TrafficLight extends Units[String] // "red", "yellow", "green"
