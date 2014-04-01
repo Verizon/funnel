@@ -39,8 +39,23 @@ trait Timer[K] extends Instrument[K] { self =>
   /** A bit of syntax for stopping a stopwatch returned from `start`. */
   def stop(stopwatch: () => Unit): Unit = stopwatch()
 
-  /** Evaluate `a` and record its evaluation time. */
+  /**
+   * Evaluate `a` and record its evaluation time if
+   * evaluation completes without an error. Use `timeRegardless`
+   * if you'd like to record a time in the event of exceptions.
+   */
   def time[A](a: => A): A = {
+    val stop = this.start
+    val result = a
+    stop()
+    result
+  }
+
+  /**
+   * Like `time`, but records a time even if evaluation of
+   * `a` throws an exception.
+   */
+  def timeRegardless[A](a: => A): A = {
     val stop = this.start
     try a
     finally stop()
@@ -49,19 +64,46 @@ trait Timer[K] extends Instrument[K] { self =>
   /**
    * Time a `Future` by registering a callback on its
    * `onComplete` method. The stopwatch begins now.
+   * This function does not record a time if the `Future`
+   * completes with an error. Use `timeFutureRegardless` or
+   * explicit calls to `start` and `stop` if you'd like to
+   * record a time even if the `Future` fails.
    */
   def timeFuture[A](f: Future[A])(implicit ctx: ExecutionContext = ExecutionContext.Implicits.global): Future[A] = {
+    timeAsync((cb: A => Unit) => f.onSuccess({ case a => cb(a) }))
+    f
+  }
+
+  /**
+   * Like `timeFuture`, but records a time even if `f` fails
+   * with an exception.
+   */
+  def timeFutureRegardless[A](f: Future[A])(implicit ctx: ExecutionContext = ExecutionContext.Implicits.global): Future[A] = {
     timeAsync(f.onComplete)
     f
   }
 
   /**
-   * Time an asynchronous `Task`. The stopwatch begins running
-   * when the returned `Task` is run.
+   * Time an asynchronous `Task`. The stopwatch begins running when
+   * the returned `Task` is run and a stop time is recorded if the
+   * `Task` completes successfully. Use `timeTaskRegardless` if you
+   * wish to record failure times as well.
    */
   def timeTask[A](a: Task[A]): Task[A] =
     Task.delay(start).flatMap { stopwatch =>
       a.map { a => stop(stopwatch); a }
+    }
+
+  /**
+   * Like `timeTask`, but records a time even if the `Task` completes
+   * with an error.
+   */
+  def timeTaskRegardless[A](a: Task[A]): Task[A] =
+    Task.delay(start).flatMap { stopwatch =>
+      a.attempt.flatMap { a =>
+        stop(stopwatch)
+        a.fold(Task.fail, Task.now)
+      }
     }
 
   /**
