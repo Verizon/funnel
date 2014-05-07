@@ -94,17 +94,16 @@ object Riemann {
    * the same, but only retry a total of five times before raising
    * the latest error.
    */
-  def retry[A](retries: Process[Task,Any])(p: Process[Task,A]):
-  Process[Task,A] = {
+  def retry[A](retries: Process[Task,Any])(p: Process[Task,A]): Process[Task,A] = {
     val alive = async.signal[SafeUnit]; alive.value.set(())
     val step: Process[Task,Throwable \/ A] =
       p.append(Process.eval_(alive.close)).attempt()
-    step.stripW ++ link(alive)(retries).terminated.flatMap {
+    step.flatMap(_.fold(_ => link(alive)(retries).terminated.flatMap {
       // on our last reconnect attempt, rethrow error
       case None => step.flatMap(_.fold(Process.fail, Process.emit))
       // on other attempts, ignore the exceptions
       case Some(_) => step.stripW
-    }
+    }, Process.emit))
   }
 
   /** Terminate `p` when the given `Signal` terminates. */
