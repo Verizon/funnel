@@ -2,13 +2,13 @@ import sbt._, Keys._
 
 object Build extends Build {
   import Dependencies._
-  import oncue.build._, OnCueKeys._
+  import oncue.build._
 
   lazy val buildSettings =
     Defaults.defaultSettings ++
     OnCue.baseSettings ++
     ScalaCheck.settings ++ Seq(
-      ciRunCoverageReport := false,
+      ContinuousIntegration.produceCoverageReport := false,
       organization := "intelmedia.ws.funnel",
       scalaVersion := "2.10.3",
       scalacOptions := Seq(
