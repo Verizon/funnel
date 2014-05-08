@@ -14,17 +14,12 @@ import Monitoring.prettyURL
 object Riemann {
 
   private def splitStats(key: Key[Any], s: Stats): List[Datapoint[Any]] = {
-    val (k, tl) = key.name.split(":::") match {
-      case Array(hd,tl) => (key.rename(hd), tl)
-      case _ => (key,"")
-    }
-    val tl2 = if (tl.isEmpty) "" else ":::"+tl
     List(
-      Datapoint(k.modifyName(_ + "/count" + tl2), s.count.toDouble),
-      Datapoint(k.modifyName(_ + "/variance" + tl2), s.variance),
-      Datapoint(k.modifyName(_ + "/mean" + tl2), s.mean),
-      Datapoint(k.modifyName(_ + "/last" + tl2), s.last.getOrElse(Double.NaN)),
-      Datapoint(k.modifyName(_ + "/standardDeviation" + tl2), s.standardDeviation)
+      Datapoint(key.modifyName(_ + "/count"), s.count.toDouble),
+      Datapoint(key.modifyName(_ + "/variance"), s.variance),
+      Datapoint(key.modifyName(_ + "/mean"), s.mean),
+      Datapoint(key.modifyName(_ + "/last"), s.last.getOrElse(Double.NaN)),
+      Datapoint(key.modifyName(_ + "/standardDeviation"), s.standardDeviation)
     )
   }
 
@@ -61,10 +56,7 @@ object Riemann {
 
     // bawws like side-effects as the underlying api is totally mutable.
     // GO JAVA!!
-    pt.key.name.split(":::") match {
-      case Array(name,host) => e.service(name).host(host)
-      case _                => e.service(pt.key.name) // not sure what this is, so use existing key name as service name
-    }
+    e.service(pt.key.name) // not sure what this is, so use existing key name as service name
 
     pt.value match {
       case a: Double => e.metric(a)
@@ -169,7 +161,7 @@ object Riemann {
                // and trim off the `localName`
                val localName = prettyURL(url)
                val received = link(alive) { M.attemptMirrorAll(parse)(nodeRetries)(
-                 url, m => s"$group/$m:::$localName"
+                 url, m => s"$group/$m"
                )}
                val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
                  if (urls.contains(url)) Process.halt // skip it, alread running
