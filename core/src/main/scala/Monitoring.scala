@@ -382,26 +382,16 @@ object Monitoring {
       val out = scalaz.stream.async.signal[Datapoint[Any]](S)
       val alive = scalaz.stream.async.signal[Boolean](S)
       val heartbeat = alive.continuous.takeWhile(identity)
+      def mkOut(ks: Process[Task, Key[Any]]): Process[Task, Datapoint[Any]] =
+        ks flatMap (k => dps(k).wye(mkOut(ks.filter(_.name != k.name)))(wye.merge))
+      def dps(k: Key[Any]): Process[Task, Datapoint[Any]] =
+        M.get(k).discrete.zip(heartbeat).map(v => Datapoint(k, v._1)).onComplete {
+          Process.eval_(Task.delay(log(s"unsubscribing: $k")))
+        }
       alive.value.set(true)
-      S { // in the background, populate the 'out' `Signal`
-        alive.discrete.map(!_).wye(M.distinctKeys)(wye.interrupt)
-        .filter(f)
-        .map { k =>
-          // asynchronously set the output
-          S { M.get(k).discrete
-               .map(v => out.value.set(Datapoint(k, v)))
-               .zip(heartbeat)
-               .onComplete { Process.eval_{ Task.delay(log("unsubscribing: " + k))} }
-               .run.run
-            }
-        }.run.run
-        log("killed producer for: " + f)
-      }
-      // kill the producers when the consumer completes
-      out.discrete onComplete {
+      alive.discrete.map(!_).wye(mkOut(M.distinctKeys))(wye.interrupt).onComplete {
         Process.eval_ { Task.delay {
           log("killing producers for: " + f)
-          out.close
           alive.value.set(false)
         }}
       }

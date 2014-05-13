@@ -156,10 +156,6 @@ object Riemann {
       _ <- alive.set(())
       _ <- link(alive)(groupedUrls).evalMap { case (url,group) =>
             Task.delay {
-               // adding the `localName` onto the string here so that later in the
-               // process its possible to find the key we're specifically looking for
-               // and trim off the `localName`
-               val localName = prettyURL(url)
                val received = link(alive) { M.attemptMirrorAll(parse)(nodeRetries)(
                  url, m => s"$group/$m"
                )}
