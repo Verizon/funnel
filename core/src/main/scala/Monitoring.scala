@@ -378,23 +378,14 @@ object Monitoring {
            log: String => SafeUnit):
       Process[Task, Datapoint[Any]] =
     Process.suspend { // don't actually do anything until we have a consumer
-      val S = Strategy.Executor(ES)
-      val out = scalaz.stream.async.signal[Datapoint[Any]](S)
-      val alive = scalaz.stream.async.signal[Boolean](S)
-      val heartbeat = alive.continuous.takeWhile(identity)
-      def mkOut(ks: Process[Task, Key[Any]]): Process[Task, Datapoint[Any]] =
-        ks flatMap (k => dps(k).wye(mkOut(ks.filter(_.name != k.name)))(wye.merge))
-      def dps(k: Key[Any]): Process[Task, Datapoint[Any]] =
-        M.get(k).discrete.zip(heartbeat).map(v => Datapoint(k, v._1)).onComplete {
+      def interleaveAll(ks: Process[Task, Key[Any]]): Process[Task, Datapoint[Any]] =
+        ks flatMap (k =>
+          points(k).wye(interleaveAll(ks.filter(_.name != k.name)))(wye.merge))
+      def points(k: Key[Any]): Process[Task, Datapoint[Any]] =
+        M.get(k).discrete.map(Datapoint(k, _)).onComplete {
           Process.eval_(Task.delay(log(s"unsubscribing: $k")))
         }
-      alive.value.set(true)
-      alive.discrete.map(!_).wye(mkOut(M.distinctKeys))(wye.interrupt).onComplete {
-        Process.eval_ { Task.delay {
-          log("killing producers for: " + f)
-          alive.value.set(false)
-        }}
-      }
+      interleaveAll(M.distinctKeys)
     }
 
   /**
