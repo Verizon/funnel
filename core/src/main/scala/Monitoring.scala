@@ -372,21 +372,26 @@ object Monitoring {
    *   b) The returned stream is 'use-once' and will
    *      halt the producer when completed. Just
    *      resubscribe if you need a fresh stream.
+   *   c) As of May 13, 2014, if the `f` predicate is too
+   *      broad and a key generates values too fast,
+   *      it crowds out the keys that come after it
+   *      and you will never see the values under those keys.
+   *      This is an issue with scalaz-stream merge and
+   *      is under investigation.
    */
   def subscribe(M: Monitoring)(f: Key[Any] => Boolean)(
   implicit ES: ExecutorService = serverPool,
            log: String => SafeUnit):
-      Process[Task, Datapoint[Any]] =
-    Process.suspend { // don't actually do anything until we have a consumer
-      def interleaveAll(ks: Process[Task, Key[Any]]): Process[Task, Datapoint[Any]] =
-        ks flatMap (k =>
-          points(k).wye(interleaveAll(ks.filter(_.name != k.name)))(wye.merge))
-      def points(k: Key[Any]): Process[Task, Datapoint[Any]] =
-        M.get(k).discrete.map(Datapoint(k, _)).onComplete {
-          Process.eval_(Task.delay(log(s"unsubscribing: $k")))
-        }
-      interleaveAll(M.distinctKeys)
-    }
+      Process[Task, Datapoint[Any]] = {
+   def interleaveAll(p: Key[Any] => Boolean): Process[Task, Datapoint[Any]] =
+     M.distinctKeys.filter(p) flatMap (k =>
+       points(k).wye(interleaveAll(k2 => k2.name != k.name && p(k2)))(wye.merge))
+   def points(k: Key[Any]): Process[Task, Datapoint[Any]] =
+     M.get(k).discrete.map(Datapoint(k, _)).onComplete {
+       Process.eval_(Task.delay(log(s"unsubscribing: $k")))
+     }
+   interleaveAll(f)
+  }
 
   /**
    * Obtain the latest values for all active metrics.

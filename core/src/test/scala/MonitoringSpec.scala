@@ -116,6 +116,34 @@ object MonitoringSpec extends Properties("monitoring") {
     true
   }
 
+  /*
+   * Check that subscribing and filtering is the same as
+   * filtering and subscribing.
+   */
+  property("subscribe") = forAll { (_: Unit) =>
+    implicit val log = (_:String) => SafeUnit.Safe
+    def listenFor[A](t: Duration)(p: Process[Task, A]): Vector[A] = {
+      val b = new java.util.concurrent.atomic.AtomicBoolean(false)
+      var v = Vector[A]()
+      p.evalMap(a => Task.delay {
+        v = v :+ a
+      }).run.runAsyncInterruptibly(_ => (), b)
+      Thread.sleep(t.toMillis)
+      b.set(true)
+      v
+    }
+    instruments.counter("foo")
+    val T = Nondeterminism[Task]
+    val b1 = Monitoring.subscribe(Monitoring.default)(_ => true).
+      filter(_.key.name.contains("previous/jvm/gc/ParNew/time"))
+    val b2 = Monitoring.subscribe(Monitoring.default)(
+      _.name.contains("previous/jvm/gc/ParNew/time"))
+    val (xs, ys) = T.mapBoth(Task(listenFor(5 minutes)(b1)),
+                             Task(listenFor(5 minutes)(b2)))((_, _)).run
+    val d = (xs.length - ys.length).abs
+    d <= 1
+  }
+
   /* Check that `distinct` combinator works. */
   property("distinct") = forAll(Gen.listOf1(Gen.choose(-10L,10L))) { xs =>
     val input: Process[Task,Long] = Process.emitAll(xs)

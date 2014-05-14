@@ -9,11 +9,11 @@ import scala.concurrent.duration._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
-object MirroringExample extends Properties("mirroring") {
+object MirroringExample {
 
   implicit val log = (s: String) => { println(s); SafeUnit.Safe }
 
-  property("example") = secure {
+  def main(args: Array[String]): Unit = {
 
     val health = Key[String]("now/health", Units.TrafficLight)
 
@@ -63,6 +63,5 @@ object MirroringExample extends Properties("mirroring") {
         case _          => sys.error("unknown group type")
       }.run
 
-    true
   }
 }
