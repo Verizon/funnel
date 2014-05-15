@@ -97,7 +97,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * window of values as well, see `numericGauge`.
    */
   def gauge[A:Reportable](label: String, init: A,
-                                units: Units[A] = Units.None): Gauge[Continuous[A],A] = {
+                          units: Units[A] = Units.None): Gauge[Continuous[A],A] = {
     val g = new Gauge[Continuous[A],A] {
       val (key, snk) = monitoring.topic(s"now/$label", units)(B.resetEvery(window)(B.variable(init)))
       def set(a: A) = snk(_ => a)
@@ -108,7 +108,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
     g.buffer(50 milliseconds)
   }
 
-  def trafficLight(label: String): TrafficLight = 
+  def trafficLight(label: String): TrafficLight =
     TrafficLight(gauge(label, TrafficLight.Red, Units.TrafficLight))
 
   /**

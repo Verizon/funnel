@@ -16,7 +16,8 @@ object JVM {
    */
   def instrument(I: Instruments)(
     implicit ES: ExecutorService = Monitoring.defaultPool,
-             TS: ScheduledExecutorService = Monitoring.schedulingPool): Unit = {
+             TS: ScheduledExecutorService = Monitoring.schedulingPool,
+             t: Duration = 3 seconds): Unit = {
     val mxBean = ManagementFactory.getMemoryMXBean
     val gcs = ManagementFactory.getGarbageCollectorMXBeans.toList
     val pools = ManagementFactory.getMemoryPoolMXBeans.toList
@@ -25,7 +26,7 @@ object JVM {
       val name = gc.getName.replace(' ', '-')
       val numCollections = numericGauge(s"jvm/gc/$name", 0, Units.Count)
       val collectionTime = numericGauge(s"jvm/gc/$name/time", 0, Units.Milliseconds)
-      Process.awakeEvery(3 seconds)(ES,TS).map { _ =>
+      Process.awakeEvery(t)(ES,TS).map { _ =>
         numCollections.set(gc.getCollectionCount.toDouble)
         collectionTime.set(gc.getCollectionTime.toDouble)
       }.run.runAsync(_ => ())
@@ -51,7 +52,7 @@ object JVM {
     val nonheapMax = MB("jvm/memory/nonheap/max")
     val nonheapCommitted = MB("jvm/memory/nonheap/committed")
 
-    Process.awakeEvery(3 seconds)(ES,TS).map { _ =>
+    Process.awakeEvery(t)(ES,TS).map { _ =>
       import mxBean.{getHeapMemoryUsage => heap, getNonHeapMemoryUsage => nonheap}
       totalInit.set(heap.getInit + nonheap.getInit)
       totalUsed.set(heap.getUsed + nonheap.getUsed)

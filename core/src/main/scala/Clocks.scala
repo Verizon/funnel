@@ -9,11 +9,12 @@ object Clocks {
   /** Add `now/elapsed`, `now/remaining`, and `uptime` metrics. */
   def instrument(I: Instruments)(
     implicit ES: ExecutorService = Monitoring.defaultPool,
-             TS: ScheduledExecutorService = Monitoring.schedulingPool): Unit = {
+             TS: ScheduledExecutorService = Monitoring.schedulingPool,
+             t: Duration = 2 seconds): Unit = {
     val elapsed = I.currentElapsed("now/elapsed")
     val remaining = I.currentRemaining("now/remaining")
     val uptime = I.uptime("uptime")
-    Process.awakeEvery(2 seconds)(ES,TS).map { _ =>
+    Process.awakeEvery(t)(ES,TS).map { _ =>
       elapsed.set(())
       remaining.set(())
       uptime.set(())
