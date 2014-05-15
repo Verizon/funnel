@@ -14,12 +14,17 @@ import Monitoring.prettyURL
 object Riemann {
 
   private def splitStats(key: Key[Any], s: Stats): List[Datapoint[Any]] = {
+    val (k, tl) = key.name.split(":::") match {
+      case Array(hd,tl) => (key.rename(hd), tl)
+      case _ => (key,"")
+    }
+    val tl2 = if (tl.isEmpty) "" else ":::"+tl
     List(
-      Datapoint(key.modifyName(_ + "/count"), s.count.toDouble),
-      Datapoint(key.modifyName(_ + "/variance"), s.variance),
-      Datapoint(key.modifyName(_ + "/mean"), s.mean),
-      Datapoint(key.modifyName(_ + "/last"), s.last.getOrElse(Double.NaN)),
-      Datapoint(key.modifyName(_ + "/standardDeviation"), s.standardDeviation)
+      Datapoint(k.modifyName(_ + "/count" + tl2), s.count.toDouble),
+      Datapoint(k.modifyName(_ + "/variance" + tl2), s.variance),
+      Datapoint(k.modifyName(_ + "/mean" + tl2), s.mean),
+      Datapoint(k.modifyName(_ + "/last" + tl2), s.last.getOrElse(Double.NaN)),
+      Datapoint(k.modifyName(_ + "/standardDeviation" + tl2), s.standardDeviation)
     )
   }
 
@@ -48,15 +53,21 @@ object Riemann {
   private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any])(
                       implicit log: String => SafeUnit): SafeUnit = {
 
+    val (name, host) = pt.key.name.split(":::") match {
+      case Array(n, h) => (n, Some(h))
+      case _ => (pt.key.name, None)
+    }
+
     val e = c.event
-             .tags(tags(pt.key.name): _*)
+             .tags(tags(name): _*)
              .description(s"${pt.key.typeOf} ${pt.key.units}")
              .time(System.currentTimeMillis / 1000L)
              .ttl(ttl)
 
-    // bawws like side-effects as the underlying api is totally mutable.
-    // GO JAVA!!
-    e.service(pt.key.name) // not sure what this is, so use existing key name as service name
+    e service name
+    host foreach { h =>
+      e host h
+    }
 
     pt.value match {
       case a: Double => e.metric(a)
@@ -67,7 +78,9 @@ object Riemann {
       case x => log("]]]]]]]]]]]]]]] "+x.getClass.getName); ???
     }
 
-    log("sending: " + pt)
+    val logPoint = pt.copy(key = pt.key.copy(name = name))
+
+    log("sending: " + logPoint)
 
     try e.send()
     catch { case err: Exception =>
@@ -75,7 +88,7 @@ object Riemann {
       log("waiting")
       throw err
     }
-    log("successfully sent " + pt)
+    log("successfully sent " + logPoint)
   }
 
   /**
@@ -161,7 +174,7 @@ object Riemann {
                // and trim off the `localName`
                val localName = prettyURL(url)
                val received = link(alive) { M.attemptMirrorAll(parse)(nodeRetries)(
-                 url, m => s"$group/$m"
+                 url, m => s"$group/$m:::$localName"
                )}
                val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
                  if (urls.contains(url)) Process.halt // skip it, alread running
