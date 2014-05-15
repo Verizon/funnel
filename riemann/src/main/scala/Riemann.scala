@@ -64,9 +64,9 @@ object Riemann {
              .time(System.currentTimeMillis / 1000L)
              .ttl(ttl)
 
-    e service name
-    host foreach { h =>
-      e host h
+    e.service(name)
+    host.foreach { h =>
+      e.host(h)
     }
 
     pt.value match {
