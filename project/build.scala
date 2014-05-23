@@ -43,8 +43,7 @@ object Build extends Build {
     .settings(resolvers += "clojars.org" at "http://clojars.org/repo")
     .settings(libraryDependencies ++=
       compile(riemannapi) ++
-      compile(logback) ++
-      compile(aws))
+      compile(logback))
     .dependsOn(core)
 
   import com.typesafe.sbt.SbtNativePackager._
@@ -58,6 +57,7 @@ object Build extends Build {
       libraryDependencies ++=
         compile(scopt) ++
         compile(logs3) ++
+        compile(aws) ++
         compile(knobs),
       name in Universal := "utensil",
       mappings in Universal += {
