@@ -46,3 +46,4 @@ object Events {
   // def exponentialBackoff(failure: Signal[Boolean], base: Duration): Event
   // def exponentialBackoff(failure: Key[Boolean], base: Duration): Event
 }
+

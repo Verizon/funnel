@@ -17,4 +17,6 @@ object Dependencies {
   val logback      = "ch.qos.logback"        % "logback-classic"     % "1.0.+"
   val scopt        = "com.github.scopt"     %% "scopt"               % "3.2.0"
   val logs3        = "intelmedia.ws.common" %% "s3-appender"         % "6.0.2"
+  val aws          = "com.amazonaws"         % "aws-java-sdk"        % "1.7.9"
+  val knobs        = "oncue.svc.knobs"      %% "core"                % "0.1.29"
 }

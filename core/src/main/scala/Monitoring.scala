@@ -374,7 +374,7 @@ object Monitoring {
    *      resubscribe if you need a fresh stream.
    *   c) As of May 13, 2014, if the `f` predicate is too
    *      broad and a key generates values too fast,
-   *      it crowds out the keys that come after it
+   *      it crowds out the keys that come after it,
    *      and you will never see the values under those keys.
    *      This is an issue with scalaz-stream merge and
    *      is under investigation.

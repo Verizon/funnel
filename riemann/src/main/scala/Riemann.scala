@@ -146,6 +146,10 @@ object Riemann {
     } yield ()
   }
 
+  def defaultRetries = Events.takeEvery(30 seconds, 6)
+
+  case class Names(kind: String, mine: String, theirs: String)
+
   /**
    * Mirror all datapoints from the given nodes into `M`, then publish
    * these datapoints to Riemann. `nodeRetries` controls how often we
@@ -154,10 +158,12 @@ object Riemann {
    * Riemann server in the event of an error.
    */
   def mirrorAndPublish[A](
-      M: Monitoring, ttlInSeconds: Float = 20f, nodeRetries: Event = Events.takeEvery(30 seconds, 6))(
-      c: RiemannClient, reimannRetries: Event = Events.takeEvery(30 seconds, 6))(
+      M: Monitoring, ttlInSeconds: Float = 20f, nodeRetries: Names => Event = _ => defaultRetries)(
+      c: RiemannClient,
+      riemannName: String,
+      riemannRetries: Names => Event = _ => defaultRetries)(
       parse: DatapointParser)(
-      groupedUrls: Process[Task, (URL,String)])(
+      groupedUrls: Process[Task, (URL,String)], myName: String = "Funnel Mirror")(
       implicit log: String => SafeUnit): Task[SafeUnit] = {
 
     val S = Strategy.Executor(Monitoring.defaultPool)
@@ -173,9 +179,10 @@ object Riemann {
                // process its possible to find the key we're specifically looking for
                // and trim off the `localName`
                val localName = prettyURL(url)
-               val received = link(alive) { M.attemptMirrorAll(parse)(nodeRetries)(
-                 url, m => s"$group/$m:::$localName"
-               )}
+               val received = link(alive) {
+                 M.attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
+                   url, m => s"$group/$m:::$localName")
+               }
                val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
                  if (urls.contains(url)) Process.halt // skip it, alread running
                  else Process.eval_(modifyActive(_ + url)) ++ // add to active at start
@@ -183,7 +190,9 @@ object Riemann {
                }
                receivedIdempotent.run.runAsync(_.fold(err => log(err.getMessage), identity))
              }
-           }.merge(Process.eval(publish(M, ttlInSeconds, reimannRetries)(c))).run // publish to Riemann concurrent to aggregating locally
+           }.merge(Process.eval(publish(M, ttlInSeconds,
+             riemannRetries(Names("Riemann", myName, riemannName)))(c))).run
+             // publish to Riemann concurrent to aggregating locally
       _ <- alive.close
     } yield ()
   }

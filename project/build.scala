@@ -43,7 +43,8 @@ object Build extends Build {
     .settings(resolvers += "clojars.org" at "http://clojars.org/repo")
     .settings(libraryDependencies ++=
       compile(riemannapi) ++
-      compile(logback))
+      compile(logback) ++
+      compile(aws))
     .dependsOn(core)
 
   import com.typesafe.sbt.SbtNativePackager._
@@ -56,7 +57,8 @@ object Build extends Build {
     .settings(
       libraryDependencies ++=
         compile(scopt) ++
-        compile(logs3),
+        compile(logs3) ++
+        compile(knobs),
       name in Universal := "utensil",
       mappings in Universal += {
         file("utensil/etc/logback.xml") -> "etc/logback.xml"
