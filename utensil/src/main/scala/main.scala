@@ -8,11 +8,14 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scala.concurrent.duration._
 import org.slf4j.LoggerFactory
-import knobs.{Config, Required, ClassPathResource}
+import java.io.File
+import knobs.{Config, Required, ClassPathResource, FileResource}
 
 /**
   * How to use: Modify oncue/utensil.cfg on the classpath
-  * and run from the command line
+  * and run from the command line.
+  *
+  * Or pass the location of the config file as a command line argument.
   */
 object Utensil extends CLI {
   private val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
@@ -118,8 +121,11 @@ trait CLI {
     transport: DatapointParser = SSE.readEvents _
   )
 
-  def run(args: Array[String])(f: (Options, Config) => Unit): Unit =
-    knobs.loadImmutable(List(Required(ClassPathResource("oncue/utensil.cfg")))).flatMap { cfg =>
+  def run(args: Array[String])(f: (Options, Config) => Unit): Unit = {
+    val cfgFile = args.headOption.map { a =>
+      FileResource(new File(a))
+    }.getOrElse(ClassPathResource("oncue/utensil.cfg"))
+    knobs.loadImmutable(List(Required(cfgFile))).flatMap { cfg =>
       val port = cfg.lookup[Int]("funnelPort").getOrElse(5775)
       val name = cfg.lookup[String]("funnelName").getOrElse("Funnel")
       val riemannHost = cfg.lookup[String]("riemannHost").getOrElse("localhost")
@@ -127,6 +133,6 @@ trait CLI {
       val ttl = cfg.lookup[Int]("riemannTTLMinutes").getOrElse(5).minutes
       Task(f(Options(RiemannHostPort(riemannHost, riemannPort), ttl, port), cfg))
     }.run
-
+  }
 }
 
