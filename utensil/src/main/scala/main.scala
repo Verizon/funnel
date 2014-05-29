@@ -8,16 +8,14 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scala.concurrent.duration._
 import org.slf4j.LoggerFactory
+import java.io.File
+import knobs.{Config, Required, ClassPathResource, FileResource}
 
 /**
-  * How to use:
+  * How to use: Modify oncue/utensil.cfg on the classpath
+  * and run from the command line.
   *
-  * utensil \
-  *   --riemann localhost:5555 \
-  *   --transport http-sse \
-  *   --port 5775
-  *
-  * utensil -r localhost:5555 -t http-sse -p 5775
+  * Or pass the location of the config file as a command line argument.
   */
 object Utensil extends CLI {
   private val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
@@ -28,6 +26,36 @@ object Utensil extends CLI {
     stop.set(true)
     R.disconnect
   }
+
+  import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
+  import com.amazonaws.services.sns.AmazonSNSClient
+  import com.amazonaws.regions.{Region, Regions}
+  import com.amazonaws.services.sns.model.{CreateTopicRequest, PublishRequest}
+  import Events.Event
+  import Riemann.Names
+
+  private def giveUp(names: Names, cfg: Config, log: String => SafeUnit) = Process.eval(for {
+   credsProvider <- Task(new AWSCredentialsProvider {
+     def getCredentials = new AWSCredentials {
+       def getAWSAccessKeyId = cfg.require[String]("aws.accessKey")
+       def getAWSSecretKey = cfg.require[String]("aws.secretKey")
+     }
+     val refresh = ()
+   })
+   creds <- Task(credsProvider.getCredentials).attempt
+   _ <- creds.fold(_ => Task(()),
+                   _ => Task {
+        val snsClient = new AmazonSNSClient
+        snsClient.setRegion(Region.getRegion(Regions.fromName(cfg.require[String]("aws.region"))))
+        val req = new CreateTopicRequest(cfg.require[String]("aws.snsTopic"))
+        val res = snsClient.createTopic(req)
+        val arn = res.getTopicArn
+        val msg = s"${names.mine} gave up on ${names.kind} server ${names.theirs}"
+        val preq = new PublishRequest(arn, msg)
+        val pres = snsClient.publish(preq)
+        log(s"Posted $pres to SNS $arn")
+      })
+    } yield ())
 
   private def errorAndQuit(options: Options, f: () => Unit): Unit = {
     val msg = s"# Riemann is not running at the specified location (${options.riemann.host}:${options.riemann.port}) #"
@@ -40,7 +68,7 @@ object Utensil extends CLI {
   }
 
   def main(args: Array[String]): Unit = {
-    run(args){ options =>
+    run(args){ (options, cfg) =>
 
       val L = LoggerFactory.getLogger("utensil")
       implicit val log: String => SafeUnit = s => L.info(s)
@@ -57,8 +85,15 @@ object Utensil extends CLI {
         }
       }
 
-      Riemann.mirrorAndPublish(M, options.riemannTTL.toSeconds.toFloat)(R)(SSE.readEvents)(S.mirroringSources)(log)
-      .runAsyncInterruptibly(println, stop)
+      def utensilRetries(names: Names): Event = Riemann.defaultRetries andThen (_ ++ giveUp(names, cfg, log))
+
+      val localhost = java.net.InetAddress.getLocalHost.toString
+
+      Riemann.mirrorAndPublish(
+        M, options.riemannTTL.toSeconds.toFloat, utensilRetries)(
+        R, s"${options.riemann.host}:${options.riemann.port}", utensilRetries)(SSE.readEvents)(
+        S.mirroringSources, cfg.lookup[String]("funnelName").getOrElse(localhost))(log).
+          runAsyncInterruptibly(println, stop)
 
       println
       println("Press [Enter] to quit...")
@@ -73,7 +108,6 @@ object Utensil extends CLI {
 }
 
 import java.net.URL
-import scopt.{OptionParser,Read}
 import scala.concurrent.duration._
 
 trait CLI {
@@ -87,46 +121,18 @@ trait CLI {
     transport: DatapointParser = SSE.readEvents _
   )
 
-  implicit val scoptReadUrl: Read[RiemannHostPort] =
-    Read.reads { str =>
-      str.split(':') match {
-        case Array(host,port) => RiemannHostPort(host,port.toInt) // ok to explode here
-        case _ => sys.error("The supplied host:port combination for the riemann server are not valid.")
-      }
-    }
-
-  implicit val scoptDpParser: Read[DatapointParser] =
-    Read.reads { str =>
-      str match {
-        case "http-sse" => SSE.readEvents _
-        case _ => sys.error(s"The supplied ($str) transport does not have a corrosponding parser.")
-      }
-    }
-
-  implicit val scoptReadDuration: Read[Duration] = Read.reads { Duration(_) }
-
-  protected val parser = new OptionParser[Options]("funnel"){
-    head("Funnel Utensil", "1.0")
-
-    opt[RiemannHostPort]('r',"riemann").action { (rs, opts) =>
-      opts.copy(riemann = rs)
-    }
-
-    opt[Duration]('e', "expiry").action { (e, opts) =>
-      opts.copy(riemannTTL = e)
-    }
-
-    opt[Int]('p', "port").action { (p, opts) =>
-      opts.copy(funnelPort = p)
-    }
-
-    /** provide flexibilty to swap out the sse stream later with something else **/
-    opt[DatapointParser]('t', "transport").action { (t, opts) =>
-      opts.copy(transport = t)
-    }
+  def run(args: Array[String])(f: (Options, Config) => Unit): Unit = {
+    val cfgFile = args.headOption.map { a =>
+      FileResource(new File(a))
+    }.getOrElse(ClassPathResource("oncue/utensil.cfg"))
+    knobs.loadImmutable(List(Required(cfgFile))).flatMap { cfg =>
+      val port = cfg.lookup[Int]("funnelPort").getOrElse(5775)
+      val name = cfg.lookup[String]("funnelName").getOrElse("Funnel")
+      val riemannHost = cfg.lookup[String]("riemannHost").getOrElse("localhost")
+      val riemannPort = cfg.lookup[Int]("riemannPort").getOrElse(5555)
+      val ttl = cfg.lookup[Int]("riemannTTLMinutes").getOrElse(5).minutes
+      Task(f(Options(RiemannHostPort(riemannHost, riemannPort), ttl, port), cfg))
+    }.run
   }
-
-  def run(args: Array[String])(f: Options => Unit): Unit =
-    parser.parse(args, Options()).map(f).getOrElse(())
 }
 

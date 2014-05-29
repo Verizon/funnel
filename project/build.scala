@@ -56,7 +56,9 @@ object Build extends Build {
     .settings(
       libraryDependencies ++=
         compile(scopt) ++
-        compile(logs3),
+        compile(logs3) ++
+        compile(aws) ++
+        compile(knobs),
       name in Universal := "utensil",
       mappings in Universal += {
         file("utensil/etc/logback.xml") -> "etc/logback.xml"
