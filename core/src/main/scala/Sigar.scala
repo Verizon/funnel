@@ -8,6 +8,17 @@ import scalaz.stream._
 
 /** Functions for adding various system metrics collected by SIGAR to a `Monitoring` instance. */
 object Sigar {
+  type G = Gauge[Periodic[Stats],Double]
+
+  case class CpuStats(user: G,
+                      idle: G,
+                      total: G,
+                      nice: G,
+                      irq: G,
+                      sys: G,
+                      waiting: G,
+                      softirq: G,
+                      stolen: G)
 
   def instrument(I: Instruments)(
     implicit ES: ExecutorService = Monitoring.defaultPool,
@@ -15,32 +26,31 @@ object Sigar {
              t: Duration = 3 seconds): Unit = {
     val sigar = new org.hyperic.sigar.Sigar
     import I._
-    type G = Gauge[Periodic[Stats],Double]
 
     Process.awakeEvery(t)(ES, TS).map { _ =>
       import org.hyperic.sigar.{Cpu, CpuPerc}
 
-      def cpuTime(cpu: Cpu, m: Map[String, G]) = {
-        m("user").set(cpu.getUser)
-        m("idle").set(cpu.getIdle)
-        m("total").set(cpu.getTotal)
-        m("nice").set(cpu.getNice)
-        m("irq").set(cpu.getIrq)
-        m("sys").set(cpu.getSys)
-        m("waiting").set(cpu.getWait)
-        m("softirq").set(cpu.getSoftIrq)
-        m("stolen").set(cpu.getStolen)
+      def cpuTime(cpu: Cpu, m: CpuStats): SafeUnit = {
+        m.user.set(cpu.getUser)
+        m.idle.set(cpu.getIdle)
+        m.total.set(cpu.getTotal)
+        m.nice.set(cpu.getNice)
+        m.irq.set(cpu.getIrq)
+        m.sys.set(cpu.getSys)
+        m.waiting.set(cpu.getWait)
+        m.softirq.set(cpu.getSoftIrq)
+        m.stolen.set(cpu.getStolen)
       }
-      def cpuUsage(cpu: CpuPerc, m: Map[String, G]) = {
-        m("user").set(cpu.getUser)
-        m("idle").set(cpu.getIdle)
-        m("combined").set(cpu.getCombined)
-        m("nice").set(cpu.getNice)
-        m("irq").set(cpu.getIrq)
-        m("sys").set(cpu.getSys)
-        m("waiting").set(cpu.getWait)
-        m("softirq").set(cpu.getSoftIrq)
-        m("stolen").set(cpu.getStolen)
+      def cpuUsage(cpu: CpuPerc, m: CpuStats) = {
+        m.user.set(cpu.getUser)
+        m.idle.set(cpu.getIdle)
+        m.total.set(cpu.getCombined)
+        m.nice.set(cpu.getNice)
+        m.irq.set(cpu.getIrq)
+        m.sys.set(cpu.getSys)
+        m.waiting.set(cpu.getWait)
+        m.softirq.set(cpu.getSoftIrq)
+        m.stolen.set(cpu.getStolen)
       }
 
       // Add aggregate CPU timings
@@ -59,37 +69,48 @@ object Sigar {
         cpuUsage(cpu, gauges)
       }
 
+      // Add memory stats
+      val mem = sigar.getMem
+      Mem.used.set(mem.getUsed)
+      Mem.actualUsed.set(mem.getActualUsed)
+      Mem.total.set(mem.getTotal)
+      Mem.usedPercent.set(mem.getUsedPercent)
+      Mem.free.set(mem.getFree)
+      Mem.actualFree.set(mem.getActualFree)
+      Mem.freePercent.set(mem.getFreePercent)
+      Mem.ram.set(mem.getRam)
+
     }.run.runAsync(_ => ())
 
     object CPU {
       def label(s: String) = s"system/cpu/$s"
 
-      def cpuTime(label: String => String): Map[String, G] = {
+      def cpuTime(label: String => String): CpuStats = {
         def ms(s: String) = numericGauge(label(s), 0.0, Units.Milliseconds)
 
-        Map("user" -> ms("user"),
-            "idle" -> ms("idle"),
-            "total" -> ms("total"),
-            "nice" -> ms("nice"),
-            "irq" -> ms("irq"),
-            "sys" -> ms("sys"),
-            "waiting" -> ms("wait"),
-            "softirq" -> ms("softirq"),
-            "stolen" -> ms("stolen"))
+        CpuStats(ms("user"),
+                 ms("idle"),
+                 ms("total"),
+                 ms("nice"),
+                 ms("irq"),
+                 ms("sys"),
+                 ms("wait"),
+                 ms("softirq"),
+                 ms("stolen"))
       }
 
-      def cpuUsage(label: String => String): Map[String, G] = {
+      def cpuUsage(label: String => String): CpuStats = {
         def pct(s: String) = numericGauge(label(s), 0.0, Units.Ratio)
 
-        Map("user" -> pct("user"),
-            "idle" -> pct("idle"),
-            "total" -> pct("combined"),
-            "nice" -> pct("nice"),
-            "irq" -> pct("irq"),
-            "sys" -> pct("sys"),
-            "waiting" -> pct("wait"),
-            "softirq" -> pct("softirq"),
-            "stolen" -> pct("stolen"))
+        CpuStats(pct("user"),
+                 pct("idle"),
+                 pct("combined"),
+                 pct("nice"),
+                 pct("irq"),
+                 pct("sys"),
+                 pct("wait"),
+                 pct("softirq"),
+                 pct("stolen"))
       }
 
       object Aggregate {
@@ -110,6 +131,22 @@ object Sigar {
           case (_, n) => cpuUsage(s => CPU.label(s"$n/$s"))
         }
       }
+    }
+
+    object Mem {
+      def label(s: String) = s"system/mem/$s"
+      def mem(s: String) = numericGauge(label(s), 0.0, Units.Bytes(Units.Base.Zero))
+      def MB(s: String) = numericGauge(label(s), 0.0, Units.Megabytes)
+      def pct(s: String) = numericGauge(label(s), 0.0, Units.Ratio)
+
+      val used = mem("used")
+      val actualUsed = mem("actualUsed")
+      val total = mem("total")
+      val usedPercent = pct("usedPercent")
+      val free = mem("free")
+      val actualFree = mem("actualFree")
+      val freePercent = pct("freePercent")
+      val ram = MB("ram")
     }
   }
 }

@@ -5,6 +5,7 @@ package intelmedia.ws.funnel {
   package object instruments extends Instruments(1 minute, Monitoring.default) with DefaultKeys {
     JVM.instrument(this)
     Clocks.instrument(this)
+    Sigar.instrument(this)
   }
 
 }
