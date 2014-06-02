@@ -11,7 +11,6 @@ import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
 
 object MonitoringServer {
-  type Log = String => SafeUnit
 
   /**
    * `/`: self-describing list of available resources
@@ -25,25 +24,23 @@ object MonitoringServer {
    * `/stream/<keyid>`: stream of metrics for the given key
    * `/stream/<prefix>`: stream of metrics whose labels start with 'prefix'
    */
-  def start(M: Monitoring, port: Int = 8080, log: Log = s => println(s)): MonitoringServer = {
-    val svr = (new MonitoringServer(M, port, log))
+  def start(M: Monitoring, port: Int = 8080): MonitoringServer = {
+    val svr = (new MonitoringServer(M, port))
     svr.start()
     svr
   }
 }
 
-class MonitoringServer(M: Monitoring, port: Int, log: MonitoringServer.Log) extends ControlServer {
-  import MonitoringServer.Log
-
+class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
   private[funnel] val (mirroringQueue,mirroringSources) = async.queue[(URL,String)]
 
   private val server = HttpServer.create(new InetSocketAddress(port), 0)
 
   def start(): Unit = {
     server.setExecutor(Monitoring.serverPool)
-    server.createContext("/", handleMetrics(M, log))
+    server.createContext("/", handleMetrics(M))
     server.start()
-    log("server started on port: " + port)
+    M.log("server started on port: " + port)
   }
 
   def stop(): Unit = server.stop(0)
@@ -53,16 +50,16 @@ class MonitoringServer(M: Monitoring, port: Int, log: MonitoringServer.Log) exte
     req.getResponseBody.write(helpHTML.getBytes)
   }
 
-  protected def handleStream(M: Monitoring, prefix: String, req: HttpExchange, l: Log): Unit = {
+  protected def handleStream(M: Monitoring, prefix: String, req: HttpExchange): Unit = {
     req.getResponseHeaders.set("Content-Type", "text/event-stream")
     req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
     req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
-    val events = Monitoring.subscribe(M)(Key.StartsWith(prefix))(log = l(_))
+    val events = Monitoring.subscribe(M)(Key.StartsWith(prefix))
     val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
     SSE.writeEvents(events, sink)
   }
 
-  protected def handleKeys(M: Monitoring, prefix: String, req: HttpExchange, log: Log): Unit = {
+  protected def handleKeys(M: Monitoring, prefix: String, req: HttpExchange): Unit = {
     import JSON._; import argonaut.EncodeJson._
     val ks = M.keys.continuous.once.runLastOr(List()).run.filter(_.startsWith(prefix))
     val respBytes = JSON.prettyEncode(ks).getBytes
@@ -72,7 +69,7 @@ class MonitoringServer(M: Monitoring, port: Int, log: MonitoringServer.Log) exte
     req.getResponseBody.write(respBytes)
   }
 
-  protected def handleKeysStream(M: Monitoring, req: HttpExchange, log: Log): Unit = {
+  protected def handleKeysStream(M: Monitoring, req: HttpExchange): Unit = {
     req.getResponseHeaders.set("Content-Type", "text/event-stream")
     req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
     req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
@@ -80,7 +77,7 @@ class MonitoringServer(M: Monitoring, port: Int, log: MonitoringServer.Log) exte
     SSE.writeKeys(M.distinctKeys, sink)
   }
 
-  protected def handleNow(M: Monitoring, label: String, req: HttpExchange, log: Log): Unit = {
+  protected def handleNow(M: Monitoring, label: String, req: HttpExchange): Unit = {
     import JSON._; import argonaut.EncodeJson._
     val m = Monitoring.snapshot(M).run
     val respBytes =
@@ -91,7 +88,7 @@ class MonitoringServer(M: Monitoring, port: Int, log: MonitoringServer.Log) exte
     req.getResponseBody.write(respBytes)
   }
 
-  protected def handleAddMirroringURLs(M: Monitoring, req: HttpExchange, log: Log): Unit = {
+  protected def handleAddMirroringURLs(M: Monitoring, req: HttpExchange): Unit = {
     import JSON._; import argonaut.Parse; import scala.io.Source
 
     if(req.getRequestMethod.toLowerCase == "post"){
@@ -117,24 +114,24 @@ class MonitoringServer(M: Monitoring, port: Int, log: MonitoringServer.Log) exte
     req.getResponseBody.write(body)
   }
 
-  protected def handleMetrics(M: Monitoring, log: Log) = new HttpHandler {
+  protected def handleMetrics(M: Monitoring) = new HttpHandler {
     def handle(req: HttpExchange): Unit = try {
-      log("path: " + req.getRequestURI.getPath)
+      M.log("path: " + req.getRequestURI.getPath)
       val path = req.getRequestURI.getPath match {
         case "/" => Nil
         case p   => p.split("/").toList.tail
       }
       path match {
         case Nil                       => handleIndex(req)
-        case "mirror" :: Nil           => handleAddMirroringURLs(M, req, log)
-        case "keys" :: tl              => handleKeys(M, tl.mkString("/"), req, log)
-        case "stream" :: "keys" :: Nil => handleKeysStream(M, req, log)
-        case "stream" :: tl            => handleStream(M, tl.mkString("/"), req, log)
-        case now                       => handleNow(M, now.mkString("/"), req, log)
+        case "mirror" :: Nil           => handleAddMirroringURLs(M, req)
+        case "keys" :: tl              => handleKeys(M, tl.mkString("/"), req)
+        case "stream" :: "keys" :: Nil => handleKeysStream(M, req)
+        case "stream" :: tl            => handleStream(M, tl.mkString("/"), req)
+        case now                       => handleNow(M, now.mkString("/"), req)
       }
     }
     catch {
-      case e: Exception => log("fatal error: " + e)
+      case e: Exception => M.log("fatal error: " + e)
     }
     finally req.close
   }

@@ -74,7 +74,7 @@ object Utensil extends CLI {
       implicit val log: String => SafeUnit = s => L.info(s)
 
       val M = Monitoring.default
-      val S = MonitoringServer.start(M, options.funnelPort, log)
+      val S = MonitoringServer.start(M, options.funnelPort)
 
       val R = RiemannClient.tcp(options.riemann.host, options.riemann.port)
       try {

@@ -31,7 +31,8 @@ object Build extends Build {
     .settings(name := "core")
     .settings(libraryDependencies ++=
       compile(scalazstream) ++
-      compile(algebird))
+      compile(algebird) ++
+      compile(sigar))
 
   lazy val http = Project("http", file("http"))
     .settings(buildSettings:_*)

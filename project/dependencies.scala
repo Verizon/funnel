@@ -19,4 +19,6 @@ object Dependencies {
   val logs3        = "intelmedia.ws.common" %% "s3-appender"         % "6.0.2"
   val aws          = "com.amazonaws"         % "aws-java-sdk"        % "1.7.9"
   val knobs        = "oncue.svc.knobs"      %% "core"                % "0.1.29"
+
+  val sigar = "org.fusesource" % "sigar" % "1.6.4" classifier("native") classifier("")
 }
