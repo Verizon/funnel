@@ -29,6 +29,16 @@ object MonitoringServer {
     svr.start()
     svr
   }
+
+  @deprecated("""MonitoringServer.start no longer takes a `log` argument.
+    Use Monitoring.instance to create your Monitoring instance
+    if you want to specify a logger.""")
+  def start(M: Monitoring, port: Int, log: String => SafeUnit): MonitoringServer = start(M, port)
+
+  @deprecated("""MonitoringServer.start no longer takes a `log` argument.
+    Use Monitoring.instance to create your Monitoring instance
+    if you want to specify a logger.""")
+  def start(M: Monitoring, log: String => SafeUnit): MonitoringServer = start(M)
 }
 
 class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {

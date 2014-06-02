@@ -315,9 +315,15 @@ object Monitoring {
   val schedulingPool: ScheduledExecutorService =
     Executors.newScheduledThreadPool(4, daemonThreads("monitoring-scheduled-tasks"))
 
-  val default: Monitoring = instance(defaultPool)
+  val default: Monitoring = instance(defaultPool, printLog)
 
-  def instance(implicit ES: ExecutorService = defaultPool): Monitoring = {
+  private val printLog: String => SafeUnit = { s =>
+    println(s)
+    SafeUnit.Safe
+  }
+
+  def instance(implicit ES: ExecutorService = defaultPool,
+               logger: String => SafeUnit = printLog): Monitoring = {
     import async.immutable.Signal
     import scala.collection.concurrent.TrieMap
 
@@ -336,11 +342,8 @@ object Monitoring {
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
     new Monitoring {
-      def log(s: String) = {
-        // TODO: Make this use the new logging lib
-        println(s)
-        SafeUnit.Safe
-      }
+      def log(s: String) =
+        logger(s)
 
       def keys = keys_
 
