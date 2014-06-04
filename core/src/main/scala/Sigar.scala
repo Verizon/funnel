@@ -112,7 +112,8 @@ object Sigar {
     object FileSystem {
       val fileSystems = sigar.getFileSystemList
       val usages = fileSystems.map { d =>
-        def label(s: String) = s"system/fileSystem/${d.getDirName}/$s"
+        val dirName = java.net.URLEncoder.encode(d.getDirName, "UTF-8")
+        def label(s: String) = s"system/fileSystem/${dirName}/$s"
         def mem(s: String) = numericGauge(label(s), 0.0, Units.Bytes(Units.Base.Zero))
         def pct(s: String) = numericGauge(label(s), 0.0, Units.Ratio)
         def num(s: String) = numericGauge(label(s), 0.0, Units.Count)
