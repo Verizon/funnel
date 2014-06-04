@@ -19,6 +19,8 @@ import Events.Event
 trait Monitoring {
   import Monitoring._
 
+  def log(s: String): SafeUnit
+
   /**
    * Create a new topic with the given name and units,
    * using a stream transducer to
@@ -99,18 +101,15 @@ trait Monitoring {
    */
   def mirrorAll(parse: DatapointParser)(
                 url: URL, localName: String => String = identity)(
-                implicit S: ExecutorService = Monitoring.serverPool,
-                log: String => SafeUnit): Process[Task,SafeUnit] = {
+                implicit S: ExecutorService = Monitoring.serverPool): Process[Task,SafeUnit] = {
     parse(url).flatMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
       val k = pt.key.modifyName(localName)
       if (exists(k).run) {
-        // log(s"$msg got $pt")
         Process.eval(update(k, pt.value))
       }
       else {
         log(s"$msg new key ${pt.key}")
-        // log(s"$msg got $pt")
         val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
         Process.emit(snk(pt.value))
       }
@@ -128,8 +127,7 @@ trait Monitoring {
       parse: DatapointParser)(
       breaker: Event)(
       url: URL, localName: String => String = identity)(
-        implicit S: ExecutorService = Monitoring.serverPool,
-        log: String => SafeUnit): Process[Task,SafeUnit] = {
+        implicit S: ExecutorService = Monitoring.serverPool): Process[Task,SafeUnit] = {
     val report = (e: Throwable) => {
       log("attemptMirrorAll.ERROR: "+e)
       ()
@@ -171,8 +169,7 @@ trait Monitoring {
       decayFrequency: Event,
       aggregateFrequency: Event)(
       groupedUrls: Process[Task, (URL,String)],
-      health: Key[A])(f: String => Seq[A] => A)(
-      implicit log: String => SafeUnit): Task[SafeUnit] =
+      health: Key[A])(f: String => Seq[A] => A): Task[SafeUnit] =
     Task.delay {
       // use urls as the local names for keys
       var seen = Set[String]()
@@ -207,8 +204,7 @@ trait Monitoring {
    * publishes the result of `f` to the output key `out`.
    */
   def aggregate[O,O2](family: Key[O], out: Key[O2])(e: Event)(
-                      f: Seq[O] => O2)(
-                      implicit log: String => SafeUnit = _ => ()): Task[Key[O2]] = Task.delay {
+                      f: Seq[O] => O2): Task[Key[O2]] = Task.delay {
     initialize(out)
     e(this).flatMap { _ =>
       log("Monitoring.aggregate: gathering values")
@@ -228,8 +224,7 @@ trait Monitoring {
    * `node1/health` metric(s) to `false` if no new values are published
    * within a 10 second window. See `Units.default`.
    */
-  def decay(f: Key[Any] => Boolean)(e: Event)(
-            implicit log: String => SafeUnit): Task[SafeUnit] = Task.delay {
+  def decay(f: Key[Any] => Boolean)(e: Event): Task[SafeUnit] = Task.delay {
     def reset = keys.continuous.once.map {
       _.foreach(k => k.default.foreach(update(k, _).run))
     }.run
@@ -320,9 +315,15 @@ object Monitoring {
   val schedulingPool: ScheduledExecutorService =
     Executors.newScheduledThreadPool(4, daemonThreads("monitoring-scheduled-tasks"))
 
-  val default: Monitoring = instance(defaultPool)
+  val default: Monitoring = instance(defaultPool, printLog)
 
-  def instance(implicit ES: ExecutorService = defaultPool): Monitoring = {
+  private lazy val printLog: String => SafeUnit = { s =>
+    println(s)
+    SafeUnit.Safe
+  }
+
+  def instance(implicit ES: ExecutorService = defaultPool,
+               logger: String => SafeUnit = printLog): Monitoring = {
     import async.immutable.Signal
     import scala.collection.concurrent.TrieMap
 
@@ -341,6 +342,9 @@ object Monitoring {
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
     new Monitoring {
+      def log(s: String) =
+        logger(s)
+
       def keys = keys_
 
       def topic[I,O](k: Key[O])(buf: Process1[(I,Duration),O]): I => SafeUnit = {
@@ -380,15 +384,14 @@ object Monitoring {
    *      is under investigation.
    */
   def subscribe(M: Monitoring)(f: Key[Any] => Boolean)(
-  implicit ES: ExecutorService = serverPool,
-           log: String => SafeUnit):
+  implicit ES: ExecutorService = serverPool):
       Process[Task, Datapoint[Any]] = {
    def interleaveAll(p: Key[Any] => Boolean): Process[Task, Datapoint[Any]] =
      M.distinctKeys.filter(p) flatMap (k =>
        points(k).wye(interleaveAll(k2 => k2.name != k.name && p(k2)))(wye.merge))
    def points(k: Key[Any]): Process[Task, Datapoint[Any]] =
      M.get(k).discrete.map(Datapoint(k, _)).onComplete {
-       Process.eval_(Task.delay(log(s"unsubscribing: $k")))
+       Process.eval_(Task.delay(M.log(s"unsubscribing: $k")))
      }
    interleaveAll(f)
   }
