@@ -100,12 +100,12 @@ object Sigar {
       def pct(s: String) = numericGauge(label(s), 0.0, Units.Ratio)
 
       val used = mem("used")
-      val actualUsed = mem("actualUsed")
+      val actualUsed = mem("actual_used")
       val total = mem("total")
-      val usedPercent = pct("usedPercent")
+      val usedPercent = pct("used_percent")
       val free = mem("free")
-      val actualFree = mem("actualFree")
-      val freePercent = pct("freePercent")
+      val actualFree = mem("actual_free")
+      val freePercent = pct("free_percent")
       val ram = MB("ram")
     }
 
@@ -113,7 +113,7 @@ object Sigar {
       val fileSystems = sigar.getFileSystemList
       val usages = fileSystems.map { d =>
         val dirName = java.net.URLEncoder.encode(d.getDirName, "UTF-8")
-        def label(s: String) = s"system/fileSystem/${dirName}/$s"
+        def label(s: String) = s"system/file_system/${dirName}/$s"
         def mem(s: String) = numericGauge(label(s), 0.0, Units.Bytes(Units.Base.Zero))
         def pct(s: String) = numericGauge(label(s), 0.0, Units.Ratio)
         def num(s: String) = numericGauge(label(s), 0.0, Units.Count)
@@ -121,26 +121,26 @@ object Sigar {
 
         (d.getDirName, FileSystemStats(
           avail = mem("avail"),
-          usePercent = pct("usePercent"),
-          diskQueue = num("diskQueue"),
+          usePercent = pct("use_percent"),
+          diskQueue = num("disk_queue"),
           free = mem("free"),
-          diskReadBytes = mem("diskReadBytes"),
-          diskServiceTime = ms("diskServicetime"),
-          diskWrites = num("diskWrites"),
+          diskReadBytes = mem("disk_read_bytes"),
+          diskServiceTime = ms("disk_service_time"),
+          diskWrites = num("disk_writes"),
           used = mem("used"),
-          diskWriteBytes = mem("diskWriteBytes"),
+          diskWriteBytes = mem("disk_write_bytes"),
           total = mem("total"),
           files = num("files"),
-          freeFiles = num("freeFiles"),
-          diskReads = num("diskReads")
+          freeFiles = num("free_files"),
+          diskReads = num("disk_reads")
         ))
       }.toMap
     }
 
     object LoadAverage {
-      val one = numericGauge("system/loadAverage/1", 0.0, Units.Count)
-      val five = numericGauge("system/loadAverage/5", 0.0, Units.Count)
-      val fifteen = numericGauge("system/loadAverage/15", 0.0, Units.Count)
+      val one = numericGauge("system/load_average/1", 0.0, Units.Count)
+      val five = numericGauge("system/load_average/5", 0.0, Units.Count)
+      val fifteen = numericGauge("system/load_average/15", 0.0, Units.Count)
     }
 
     val Uptime = numericGauge("system/uptime", 0.0, Units.Seconds)
@@ -148,15 +148,15 @@ object Sigar {
     object TCP {
       def label(s: String) = s"system/tcp/$s"
       def num(s: String) = numericGauge(label(s), 0.0, Units.Count)
-      val estabResets = num("estabResets")
+      val estabResets = num("estab_resets")
       val outSegs = num("outsegs")
-      val retransSegs = num("retransSegs")
-      val inErrs = num("inErrs")
-      val inSegs = num("inSegs")
-      val currEstab = num("currEstab")
-      val passiveOpens = num("passiveOpens")
-      val activeOpens = num("activeOpens")
-      val attemptFails = num("attemptFails")
+      val retransSegs = num("retrans_segs")
+      val inErrs = num("in_errs")
+      val inSegs = num("in_segs")
+      val currEstab = num("curr_estab")
+      val passiveOpens = num("passive_opens")
+      val activeOpens = num("active_opens")
+      val attemptFails = num("attempt_fails")
     }
 
     Process.awakeEvery(t)(ES, TS).map { _ =>
