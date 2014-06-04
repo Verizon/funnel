@@ -76,6 +76,12 @@ object Utensil extends CLI {
       val M = Monitoring.default
       val S = MonitoringServer.start(M, options.funnelPort)
 
+      // Determine whether to generate system statistics for the local host
+      cfg.lookup[Int]("localHostMonitorFrequencySeconds").foreach { t =>
+        implicit val duration = t.seconds
+        Sigar.instrument(new Instruments(1 minute, M))
+      }
+
       val R = RiemannClient.tcp(options.riemann.host, options.riemann.port)
       try {
         R.connect() // urgh. Give me stregth!
