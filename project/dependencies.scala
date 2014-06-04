@@ -21,5 +21,5 @@ object Dependencies {
 
   // SIGAR requires the log4j legacy API
   val log4jslf     = "org.slf4j"             % "log4j-over-slf4j"    % "1.7.+"
-  val sigar = "org.fusesource" % "sigar" % "1.6.4" classifier("native") classifier("") exclude("log4j", "log4j")
+  val sigar        = "org.fusesource"        % "sigar"               % "1.6.4" classifier("native") classifier("") exclude("log4j", "log4j")
 }
