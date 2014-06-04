@@ -317,7 +317,7 @@ object Monitoring {
 
   val default: Monitoring = instance(defaultPool, printLog)
 
-  private val printLog: String => SafeUnit = { s =>
+  private lazy val printLog: String => SafeUnit = { s =>
     println(s)
     SafeUnit.Safe
   }
