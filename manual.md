@@ -60,6 +60,22 @@ val I = new Instruments(2 minutes, Monitoring.default) with DefaultKeys {
 }
 ````
 
+### SIGAR metrics
+
+The default set of instruments (`intelmedia.ws.funnel.instruments`) will also automatically collect operating system statistics if the Hyperic SIGAR library is available on the `java.library.path` (by default on Linux systems this maps to the `LD_LIBRARY_PATH` environment variable).
+
+Download the library here: [http://sourceforge.net/projects/sigar/files/](http://sourceforge.net/projects/sigar/files/).
+
+SIGAR gathers a large set of metrics which will appear in Funnel under `:period/system`:
+
+* `:period/system/cpu/aggregate` - Aggregate CPU metrics.
+* `:period/system/cpu/:n` - Per-CPU metrics for individual CPU number `:n`.
+* `:period/system/tcp` - TCP/IP statistics.
+* `:period/system/file_system/:fs` Filesystem statistics where `:fs` is an individual filesystem mount point. The mount point name is URL-encoded.
+* `:period/system/mem` - Memory statistics.
+* `:period/system/load_average` - Load averages for 5, 10, and 15 minute intervals.
+* `system/uptime` - Amount of time the OS has been running.
+
 ### Units
 
 Any given metric has the notion of reporting the `Units` that the specific metric denotes. For example, simply seeing the value `18544` for, say, memory usage would not be specifically useful. Is it gigabytes, megabytes? If its the former, perhaps its running hot, if its the latter, there is plenty of headroom. In this frame, you can see how important it is to have an associated metric. At the time of writing the library supports the following `Units`:
