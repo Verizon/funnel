@@ -32,7 +32,8 @@ object Build extends Build {
     .settings(libraryDependencies ++=
       compile(scalazstream) ++
       compile(algebird) ++
-      compile(sigar))
+      compile(sigar) ++
+      compile(log4jslf))
 
   lazy val http = Project("http", file("http"))
     .settings(buildSettings:_*)
@@ -56,7 +57,6 @@ object Build extends Build {
     .settings(RPM.settings:_*)
     .settings(
       libraryDependencies ++=
-        compile(scopt) ++
         compile(logs3) ++
         compile(aws) ++
         compile(knobs),
