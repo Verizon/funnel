@@ -68,9 +68,24 @@ From an operational perspective the only thing that one should really care about
 This simple structure represents the "buckets" of nodes that one wishes to monitor. The expectation is that a given logical bucket (for example, accounts-2.1-us-east) there will be an associated set of nodes that are exposing metrics. This bucketing is entirely arbitrary, and you can construct whatever bucket/URL combinations you want, with the one restriction that a given stream can only be connected to a single bucket at any given time (on the basis that connecting over and over to the same machine is a needless drain on resources). However, it is fine to send the same URL multiple times. In the event that there is an existing connection to that node, the existing connection will be used instead of creating a new one.
 
 
-### Monitoring Server: Mirroring
+### Local system metrics
 
-TODO
+Utensil will also collect operating system statistics for the local machine if these two conditions are true:
 
+* The Hyperic SIGAR library is available on the `LD_LIBRARY_PATH`.
+* The Utensil configuration file contains the `localHostMonitorFrequencySeconds` setting.
 
+If your machine is a recently baked instance, it should already contain Hyperic SIGAR on the `LD_LIBRARY_PATH`.Otherwise download the library here: [http://sourceforge.net/projects/sigar/files/](http://sourceforge.net/projects/sigar/files/).
+
+Unzip the file and drop the appropriate `.so` file into your `LD_LIBRARY_PATH`.
+
+SIGAR gathers a large set of metrics for the local machine:
+
+* Aggregate CPU metrics.
+* Per-CPU metrics for individual CPUs.
+* TCP/IP statistics.
+* Filesystem statistics where `:fs` is an individual filesystem mount point. The mount point name is URL-encoded.
+* Memory statistics.
+* Load averages for 5, 10, and 15 minute intervals.
+* Operating system uptime.
 
