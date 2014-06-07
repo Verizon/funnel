@@ -37,7 +37,7 @@ object Sigar {
   def instrument(I: Instruments)(
     implicit ES: ExecutorService = Monitoring.defaultPool,
              TS: ScheduledExecutorService = Monitoring.schedulingPool,
-             t: Duration = 3 seconds,
+             t: Duration = 30 seconds,
              log: String => SafeUnit): SafeUnit = try {
     val sigar = new org.hyperic.sigar.Sigar
     import I._
