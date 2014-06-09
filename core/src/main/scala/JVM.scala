@@ -17,7 +17,7 @@ object JVM {
   def instrument(I: Instruments)(
     implicit ES: ExecutorService = Monitoring.defaultPool,
              TS: ScheduledExecutorService = Monitoring.schedulingPool,
-             t: Duration = 3 seconds): Unit = {
+             t: Duration = 30 seconds): Unit = {
     val mxBean = ManagementFactory.getMemoryMXBean
     val gcs = ManagementFactory.getGarbageCollectorMXBeans.toList
     val pools = ManagementFactory.getMemoryPoolMXBeans.toList
