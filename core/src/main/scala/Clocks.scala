@@ -10,7 +10,7 @@ object Clocks {
   def instrument(I: Instruments)(
     implicit ES: ExecutorService = Monitoring.defaultPool,
              TS: ScheduledExecutorService = Monitoring.schedulingPool,
-             t: Duration = 2 seconds): Unit = {
+             t: Duration = 5 seconds): Unit = {
     val elapsed = I.currentElapsed("now/elapsed")
     val remaining = I.currentRemaining("now/remaining")
     val uptime = I.uptime("uptime")
