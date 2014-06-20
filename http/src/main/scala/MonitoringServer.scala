@@ -33,12 +33,12 @@ object MonitoringServer {
   @deprecated("""MonitoringServer.start no longer takes a `log` argument.
     Use Monitoring.instance to create your Monitoring instance
     if you want to specify a logger.""")
-  def start(M: Monitoring, port: Int, log: String => SafeUnit): MonitoringServer = start(M, port)
+  def start(M: Monitoring, port: Int, log: String => Unit): MonitoringServer = start(M, port)
 
   @deprecated("""MonitoringServer.start no longer takes a `log` argument.
     Use Monitoring.instance to create your Monitoring instance
     if you want to specify a logger.""")
-  def start(M: Monitoring, log: String => SafeUnit): MonitoringServer = start(M)
+  def start(M: Monitoring, log: String => Unit): MonitoringServer = start(M)
 }
 
 class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
@@ -48,7 +48,7 @@ class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
 
   def start(): Unit = {
     server.setExecutor(Monitoring.serverPool)
-    server.createContext("/", handleMetrics(M))
+    val _ = server.createContext("/", handleMetrics(M))
     server.start()
     M.log("server started on port: " + port)
   }

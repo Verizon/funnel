@@ -27,18 +27,20 @@ trait Counter[K] extends Instrument[K] { self =>
     val later = Strategy.Executor(S2)
     new Counter[K] {
       def incrementBy(by: Int): Unit = {
-        delta.addAndGet(by)
+        val _ = delta.addAndGet(by)
         if (scheduled.compareAndSet(false,true)) {
           val task = new Runnable { def run = {
             scheduled.set(false)
             val d = delta.get
-            delta.addAndGet(-d)
+            val _ = delta.addAndGet(-d)
             // we don't want to hold up the scheduling thread,
             // as that could cause delays for other metrics,
             // so callback is run on `S2`
-            later { self.incrementBy(d) }
+            val __ = later { self.incrementBy(d) }
+            ()
           }}
-          S.schedule(task, nanos, TimeUnit.NANOSECONDS)
+          val _ = S.schedule(task, nanos, TimeUnit.NANOSECONDS)
+          ()
         }
       }
       def keys = self.keys

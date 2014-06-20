@@ -34,7 +34,7 @@ object Utensil extends CLI {
   import Events.Event
   import Riemann.Names
 
-  private def giveUp(names: Names, cfg: Config, log: String => SafeUnit) = Process.eval(for {
+  private def giveUp(names: Names, cfg: Config, log: String => Unit) = Process.eval(for {
    credsProvider <- Task(new AWSCredentialsProvider {
      def getCredentials = new AWSCredentials {
        def getAWSAccessKeyId = cfg.require[String]("aws.accessKey")
@@ -71,7 +71,7 @@ object Utensil extends CLI {
     run(args){ (options, cfg) =>
 
       val L = LoggerFactory.getLogger("utensil")
-      implicit val log: String => SafeUnit = s => L.info(s)
+      implicit val log: String => Unit = s => L.info(s)
 
       val M = Monitoring.default
       val S = MonitoringServer.start(M, options.funnelPort)
@@ -105,7 +105,7 @@ object Utensil extends CLI {
       println("Press [Enter] to quit...")
       println
 
-      readLine()
+      val _ = readLine()
 
       shutdown(S,R)
     }

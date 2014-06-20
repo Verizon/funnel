@@ -51,7 +51,7 @@ object Riemann {
     * C'est la vie!
     */
   private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any])(
-                      implicit log: String => SafeUnit): SafeUnit = {
+                      implicit log: String => Unit): Unit = {
 
     val (name, host) = pt.key.name.split(":::") match {
       case Array(n, h) => (n, Some(h))
@@ -64,12 +64,12 @@ object Riemann {
              .time(System.currentTimeMillis / 1000L)
              .ttl(ttl)
 
-    e.service(name)
+    val _1 = e.service(name)
     host.foreach { h =>
       e.host(h)
     }
 
-    pt.value match {
+    val _2 = pt.value match {
       case a: Double => e.metric(a)
       case a: String => e.state(trafficLightToRiemannState(pt).value.toString)
       case b: Boolean => e.state(b.toString)
@@ -100,19 +100,21 @@ object Riemann {
    * the latest error.
    */
   def retry[A](retries: Process[Task,Any])(p: Process[Task,A]): Process[Task,A] = {
-    val alive = async.signal[SafeUnit]; alive.value.set(())
-    val step: Process[Task,Throwable \/ A] =
-      p.append(Process.eval_(alive.close)).attempt()
-    step.flatMap(_.fold(_ => link(alive)(retries).terminated.flatMap {
-      // on our last reconnect attempt, rethrow error
-      case None => step.flatMap(_.fold(Process.fail, Process.emit))
-      // on other attempts, ignore the exceptions
-      case Some(_) => step.stripW
-    }, Process.emit))
+    val alive = async.signal[Unit]
+    Process.eval_(alive.set(())) ++ {
+      val step: Process[Task,Throwable \/ A] =
+        p.append(Process.eval_(alive.close)).attempt()
+      step.flatMap(_.fold(_ => link(alive)(retries).terminated.flatMap {
+        // on our last reconnect attempt, rethrow error
+        case None => step.flatMap(_.fold(Process.fail, Process.emit))
+        // on other attempts, ignore the exceptions
+        case Some(_) => step.stripW
+      }, Process.emit))
+    }
   }
 
   /** Terminate `p` when the given `Signal` terminates. */
-  def link[A](alive: Signal[SafeUnit])(p: Process[Task,A]): Process[Task,A] =
+  def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
     alive.continuous.zip(p).map(_._2)
 
   private def liftDatapointToStream(dp: Datapoint[Any]): Process[Task, Datapoint[Any]] =
@@ -128,10 +130,10 @@ object Riemann {
    */
   def publish(M: Monitoring, ttlInSeconds: Float = 20f,
              retries: Event = Events.every(1 minutes))(c: RiemannClient)(
-             implicit log: String => SafeUnit
-  ): Task[SafeUnit] = {
+             implicit log: String => Unit
+  ): Task[Unit] = {
     for {
-      alive <- Task(async.signal[SafeUnit](Strategy.Executor(Monitoring.defaultPool)))
+      alive <- Task(async.signal[Unit](Strategy.Executor(Monitoring.defaultPool)))
       _     <- alive.set(())
       _     <- link(alive){
                  Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream).flatMap { pt =>
@@ -164,14 +166,15 @@ object Riemann {
       riemannRetries: Names => Event = _ => defaultRetries)(
       parse: DatapointParser)(
       groupedUrls: Process[Task, (URL,String)], myName: String = "Funnel Mirror")(
-      implicit log: String => SafeUnit): Task[SafeUnit] = {
+      implicit log: String => Unit): Task[Unit] = {
 
     val S = Strategy.Executor(Monitoring.defaultPool)
-    val alive = async.signal[SafeUnit](S)
-    val active = async.signal[Set[URL]](S); active.value.set(Set())
-    def modifyActive(f: Set[URL] => Set[URL]): Task[SafeUnit] =
+    val alive = async.signal[Unit](S)
+    val active = async.signal[Set[URL]](S)
+    def modifyActive(f: Set[URL] => Set[URL]): Task[Unit] =
       active.compareAndSet(a => Some(f(a.getOrElse(Set())))).map(_ => ())
     for {
+      _ <- active.set(Set())
       _ <- alive.set(())
       _ <- link(alive)(groupedUrls).evalMap { case (url,group) =>
             Task.delay {

@@ -11,10 +11,14 @@ object Build extends Build {
       ContinuousIntegration.produceCoverageReport := false,
       organization := "intelmedia.ws.funnel",
       scalaVersion := "2.10.3",
+      addCompilerPlugin("org.brianmckenna" %% "wartremover" % "0.9"),
       scalacOptions := Seq(
         "-feature",
+        "-Ywarn-value-discard",
         "-language:postfixOps",
         "-language:implicitConversions"))
+      //scalacOptions in (Compile) += "-P:wartremover:traverser:org.brianmckenna.wartremover.warts.NonUnitStatements"
+
 
   lazy val root = Project(
     id = "funnel",

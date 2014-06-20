@@ -35,9 +35,11 @@ trait Gauge[K,A] extends Instrument[K] { self =>
             // we don't want to hold up the scheduling thread,
             // as that could cause delays for other metrics,
             // so callback is run on `S2`
-            later { self.set(a2) }
+            val _ = later { self.set(a2) }
+            ()
           }}
-          S.schedule(task, nanos, TimeUnit.NANOSECONDS)
+          val _ = S.schedule(task, nanos, TimeUnit.NANOSECONDS)
+          ()
         }
       }
       def keys = self.keys
