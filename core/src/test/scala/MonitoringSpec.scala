@@ -36,14 +36,14 @@ object MonitoringSpec extends Properties("monitoring") {
    * some hardcoded examples.
    */
   property("roundDuration") = secure {
-    B.ceilingDuration(0 minutes, 5 minutes) == (5 minutes) &&
-    B.ceilingDuration(14 seconds, 1 minutes) == (1 minutes) &&
-    B.ceilingDuration(60 seconds, 1 minutes) == (2 minutes) &&
-    B.ceilingDuration(61 seconds, 1 minutes) == (2 minutes) &&
-    B.ceilingDuration(59 seconds, 2 minutes) == (2 minutes) &&
-    B.ceilingDuration(119 seconds, 1 minutes) == (2 minutes) &&
-    B.ceilingDuration(120 seconds, 1 minutes) == (3 minutes) &&
-    B.ceilingDuration(190 milliseconds, 50 milliseconds) == (200 milliseconds)
+    B.ceilingDuration(0.minutes, 5.minutes) == (5.minutes) &&
+    B.ceilingDuration(14.seconds, 1.minutes) == (1.minutes) &&
+    B.ceilingDuration(60.seconds, 1.minutes) == (2.minutes) &&
+    B.ceilingDuration(61.seconds, 1.minutes) == (2.minutes) &&
+    B.ceilingDuration(59.seconds, 2.minutes) == (2.minutes) &&
+    B.ceilingDuration(119.seconds, 1.minutes) == (2.minutes) &&
+    B.ceilingDuration(120.seconds, 1.minutes) == (3.minutes) &&
+    B.ceilingDuration(190.milliseconds, 50.milliseconds) == (200.milliseconds)
   }
 
   /*
@@ -65,10 +65,10 @@ object MonitoringSpec extends Properties("monitoring") {
     val xs = h :: t
     // resetEvery -- we feed the same input twice, fast forwarding
     // the time; this should give the same output, duplicated
-    val c = B.resetEvery(5 minutes)(B.counter(0))
+    val c = B.resetEvery(5.minutes)(B.counter(0))
     val input: Process[Task,(Long,Duration)] =
-      Process.emitAll(xs.map((_, 0 minutes))) ++
-      Process.emitAll(xs.map((_, 5 minutes)))
+      Process.emitAll(xs.map((_, 0.minutes))) ++
+      Process.emitAll(xs.map((_, 5.minutes)))
     val out = input.pipe(c).runLog.run
     require(out.length % 2 == 0, "length of output should be even")
     val (now, later) = out.splitAt(out.length / 2)
@@ -76,17 +76,17 @@ object MonitoringSpec extends Properties("monitoring") {
 
     // emitEvery -- we should only emit two values, one at the
     // end of the first period, and one at the end of the second
-    val c2 = B.emitEvery(5 minutes)(c)
-    val input2 = input ++ Process(1L -> (11 minutes))
+    val c2 = B.emitEvery(5.minutes)(c)
+    val input2 = input ++ Process(1L -> (11.minutes))
     val out2 = input2.pipe(c2).runLog.run
     ok && out2.length === 2 && out2(0) === xs.sum && out2(1) === xs.sum
   }
 
   /* Check that if all events occur at same moment, `sliding` has no effect. */
-  property("sliding-id") = forAll(Gen.listOf1(Gen.choose(1,10))) { xs =>
-    val c = B.sliding(5 minutes)(identity[Int])(Group.intGroup)
+  property("sliding-id") = forAll(Gen.nonEmptyListOf(Gen.choose(1,10))) { xs =>
+    val c = B.sliding(5.minutes)(identity[Int])(Group.intGroup)
     val input: Process[Task,(Int,Duration)] =
-      Process.emitAll(xs.map((_, 1 minutes)))
+      Process.emitAll(xs.map((_, 1.minutes)))
     val output = input.pipe(c).runLog.run
     output == xs.scanLeft(0)(_ + _)
   }
@@ -94,9 +94,9 @@ object MonitoringSpec extends Properties("monitoring") {
   /* Example of sliding count. */
   property("sliding-example") = secure {
     val i1: Process[Task, (Int,Duration)] =
-      Process(1 -> (0 minutes), 1 -> (1 minutes), 2 -> (3 minutes), 2 -> (4 minutes))
+      Process(1 -> (0.minutes), 1 -> (1.minutes), 2 -> (3.minutes), 2 -> (4.minutes))
 
-    val c = B.sliding(2 minutes)(identity[Int])(Group.intGroup)
+    val c = B.sliding(2.minutes)(identity[Int])(Group.intGroup)
     val output = i1.pipe(c).runLog.run
     output == List(0, 1, 2, 3, 4)
   }
@@ -121,7 +121,7 @@ object MonitoringSpec extends Properties("monitoring") {
    * filtering and subscribing.
    */
   property("subscribe") = {
-    implicit val log = (_:String) => SafeUnit.Safe
+    implicit val log = (_:String) => ()
     def listenFor[A](t: Duration)(p: Process[Task, A]): Vector[A] = {
       val b = new java.util.concurrent.atomic.AtomicBoolean(false)
       var v = Vector[A]()
@@ -132,21 +132,21 @@ object MonitoringSpec extends Properties("monitoring") {
       b.set(true)
       v
     }
-    new Instruments(6 seconds) {
+    new Instruments(6.seconds) {
       JVM.instrument(this)
     }
     val b1 = Monitoring.subscribe(Monitoring.default)(_ => true).
       filter(_.key.name.contains("previous/jvm/gc/ParNew/time"))
     val b2 = Monitoring.subscribe(Monitoring.default)(
       _.name.contains("previous/jvm/gc/ParNew/time"))
-    val xs = listenFor(1 minute)(b1)
-    val ys = listenFor(1 minute)(b2)
+    val xs = listenFor(1.minute)(b1)
+    val ys = listenFor(1.minute)(b2)
     val d = (xs.length - ys.length).abs
     d <= 2 // Each of xs and ys could gain or lose one tick, for a total of 2
   }
 
   /* Check that `distinct` combinator works. */
-  property("distinct") = forAll(Gen.listOf1(Gen.choose(-10L,10L))) { xs =>
+  property("distinct") = forAll(Gen.nonEmptyListOf(Gen.choose(-10L,10L))) { xs =>
     val input: Process[Task,Long] = Process.emitAll(xs)
     input.pipe(B.distinct).runLog.run.toList == xs.distinct
   }
@@ -202,7 +202,7 @@ object MonitoringSpec extends Properties("monitoring") {
 
       // println("update time: " + updateTime.toNanos)
       // println("publishTime: " + publishTime.toNanos)
-      // I am seeing about 40 nanoseconds for update times,
+      // I am seeing about 40.nanoseconds for update times,
       // 100 nanos for publishing
       updateTime.toNanos < 1000 &&
       publishTime.toNanos < 2000 &&
@@ -231,12 +231,12 @@ object MonitoringSpec extends Properties("monitoring") {
       val t = timer("uno")
       val N = 1000000
       val t0 = System.nanoTime
-      val d = (50 milliseconds)
+      val d = (50.milliseconds)
       (0 until N).foreach { _ =>
         t.record(d)
       }
       val delta = System.nanoTime - t0
-      val updateTime = (delta nanoseconds) / N.toDouble
+      val updateTime = (delta.nanoseconds) / N.toDouble
       Thread.sleep(100)
       val m = Monitoring.default.latest(t.keys.now).run.mean
       // println("timer:updateTime: " + updateTime)
@@ -253,7 +253,7 @@ object MonitoringSpec extends Properties("monitoring") {
       val N = 100000
       val S = scalaz.concurrent.Strategy.DefaultStrategy
       val t0 = System.nanoTime
-      val d1 = (1 milliseconds); val d2 = (3 milliseconds)
+      val d1 = (1.milliseconds); val d2 = (3.milliseconds)
       val f1 = S { (0 until N).foreach { _ =>
         t.record(d1)
       }}
@@ -273,7 +273,7 @@ object MonitoringSpec extends Properties("monitoring") {
   }
 
   /** Check that when publishing, we get the count that was published. */
-  property("pub/sub") = forAll(Gen.listOf1(Gen.choose(1,10))) { a =>
+  property("pub/sub") = forAll(Gen.nonEmptyListOf(Gen.choose(1,10))) { a =>
     val M = Monitoring.default
     val (k, snk) = M.topic[Long,Double]("count", Units.Count)(B.ignoreTime(B.counter(0)))
     val count = M.get(k)
@@ -291,11 +291,11 @@ object MonitoringSpec extends Properties("monitoring") {
    * Feed a counter concurrently from two different threads, making sure
    * the final count is the same as if we summed sequentially.
    */
-  property("concurrent-counters-integration-test") = forAll(Gen.listOf1(Gen.choose(-10,10))) { ab =>
+  property("concurrent-counters-integration-test") = forAll(Gen.nonEmptyListOf(Gen.choose(-10,10))) { ab =>
     // this test takes about 45 seconds
     val (a,b) = ab.splitAt(ab.length / 2)
     val M = Monitoring.instance
-    val I = new Instruments(5 minutes, M)
+    val I = new Instruments(5.minutes, M)
     import I._
     val aN = counter("a")
     val bN = counter("b")
@@ -309,7 +309,7 @@ object MonitoringSpec extends Properties("monitoring") {
     val expectedB: Double = b.map(_.toDouble).sum
     val expectedAB: Double = ab.map(_.toDouble).sum
     @annotation.tailrec
-    def go: Unit = {
+    def go(): Unit = {
       val gotA: Double = M.latest(aN.keys.now).run
       val gotB: Double = M.latest(bN.keys.now).run
       val gotAB: Double = M.latest(abN.keys.now).run
@@ -317,10 +317,10 @@ object MonitoringSpec extends Properties("monitoring") {
         // println("sleeping")
         // println(s"a: $gotA, b: $gotB, ab: $gotAB")
         Thread.sleep(10)
-        go
+        go()
       }
     }
-    go
+    go()
     val t0 = System.currentTimeMillis
     val m = latest.run
     val millis = System.currentTimeMillis - t0
@@ -330,15 +330,15 @@ object MonitoringSpec extends Properties("monitoring") {
     (m(abN.keys.now).value.asInstanceOf[Double] === expectedAB)
   }
 
-  property("derived-metrics") = forAll(Gen.listOf1(Gen.choose(-10,10))) { ls0 =>
+  property("derived-metrics") = forAll(Gen.nonEmptyListOf(Gen.choose(-10,10))) { ls0 =>
     val ls = ls0.take(50)
     implicit val M = Monitoring.instance
-    val I = new Instruments(5 minutes, M); import I._
+    val I = new Instruments(5.minutes, M); import I._
     val a = counter("a")
     val b = counter("b")
 
     val ab = Metric.apply2(a.key, b.key)(_ + _)
-    val kab1 = ab.publishEvery(30 milliseconds)("sum:ab-1", Units.Count)
+    val kab1 = ab.publishEvery(30.milliseconds)("sum:ab-1", Units.Count)
     val kab2 = ab.publishOnChange(a.key)("sum:ab-2", Units.Count)
     val kab3 = ab.publishOnChanges(a.key, b.key)("sum:ab-3", Units.Count)
 
@@ -388,7 +388,7 @@ object MonitoringSpec extends Properties("monitoring") {
   property("aggregate") = secure {
     List(List(), List(1), List(-1,1), List.range(0,100)).forall { xs =>
       val M = Monitoring.instance
-      val I = new Instruments(5 minutes, M)
+      val I = new Instruments(5.minutes, M)
       val counters = xs.zipWithIndex.map { case (x,i) =>
         val c = I.counter(s"count/$i")
         c.incrementBy(x)
@@ -396,12 +396,12 @@ object MonitoringSpec extends Properties("monitoring") {
       }
       val family = Key[Double]("now/count", Units.Count)
       val out = Key[Double]("sum", Units.Count)
-      M.aggregate(family, out)(Events.takeEvery(15 milliseconds, 50))(_.sum).run
+      M.aggregate(family, out)(Events.takeEvery(15.milliseconds, 50))(_.sum).run
       Thread.sleep(1000)
       // println("xs: " + xs)
       val l = M.latest(out).run
       val r = xs.map(_.toDouble).sum
-      l === r || { println(l, r); false }
+      l === r || { println((l, r)); false }
     }
   }
 

@@ -6,7 +6,6 @@ import scala.concurrent.duration._
 import scalaz.concurrent.Task
 
 object Main {
-  implicit val log = (s: String) => { println(s); SafeUnit.Safe }
   private def randomLight(tl: TrafficLight) =
     util.Random.nextInt(3) match {
       case 1 => tl.yellow
@@ -28,14 +27,14 @@ object Main {
 
     val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
 
-    val t1 = Process.awakeEvery(2 seconds).map { _ =>
+    val t1 = Process.awakeEvery(2.seconds).map { _ =>
              c.increment
              t.time(Thread.sleep(100))
              randomLight(l)
            }.run.runAsyncInterruptibly(println, stop)
 
     val t2 = Riemann.publish(Monitoring.default, 10f,
-        Events.every(10 seconds))(R)(println(_)).runAsyncInterruptibly(println, stop)
+        Events.every(10.seconds))(R)(println(_)).runAsyncInterruptibly(println, stop)
 
     println
     println("Press [Enter] to quit...")
