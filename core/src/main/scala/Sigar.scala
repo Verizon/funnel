@@ -38,7 +38,7 @@ object Sigar {
     implicit ES: ExecutorService = Monitoring.defaultPool,
              TS: ScheduledExecutorService = Monitoring.schedulingPool,
              t: Duration = 30 seconds,
-             log: String => SafeUnit): SafeUnit = try {
+             log: String => Unit): Unit = try {
     val sigar = new org.hyperic.sigar.Sigar
     import I._
 
@@ -84,11 +84,11 @@ object Sigar {
         val cpus = sigar.getCpuList.zipWithIndex
 
         val times = cpus.map {
-          case (_, n) => cpuTime(s => CPU.label(s"$n/$s"))
+          case (_, n) => cpuTime(s => CPU.label(s"$n/time/$s"))
         }
 
         val usages = cpus.map {
-          case (_, n) => cpuUsage(s => CPU.label(s"$n/$s"))
+          case (_, n) => cpuUsage(s => CPU.label(s"$n/usage/$s"))
         }
       }
     }
@@ -159,10 +159,14 @@ object Sigar {
       val attemptFails = num("attempt_fails")
     }
 
+    // Make the side effects happen.
+    // Side effects FTL!
+    val _ = (TCP, LoadAverage, FileSystem, CPU.Aggregate, CPU.Individual, Mem)
+
     Process.awakeEvery(t)(ES, TS).map { _ =>
       import org.hyperic.sigar.{Cpu, CpuPerc}
 
-      def cpuTime(cpu: Cpu, m: CpuStats): SafeUnit = {
+      def cpuTime(cpu: Cpu, m: CpuStats): Unit = {
         m.user.set(cpu.getUser)
         m.idle.set(cpu.getIdle)
         m.total.set(cpu.getTotal)
@@ -202,7 +206,7 @@ object Sigar {
       }
 
       // Add per-filesystem usages
-      FileSystem.usages.map { case (k, v) =>
+      FileSystem.usages.foreach { case (k, v) =>
         try {
           // Getting the mounted file systems so we don't hang
           // if NFS volumes are unreachable

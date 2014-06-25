@@ -9,7 +9,7 @@ object Dependencies {
   def container (deps: ModuleID*): Seq[ModuleID] = deps map (_ % "container")
 
   val scalatest    = "org.scalatest"        %% "scalatest"           % "1.9.2"
-  val scalazstream = "org.scalaz.stream"    %% "scalaz-stream"       % "0.3"
+  val scalazstream = "org.scalaz.stream"    %% "scalaz-stream"       % "0.4.1"
   val algebird     = "com.twitter"          %% "algebird-core"       % "0.3.0"
   val scalacheck   = "org.scalacheck"       %% "scalacheck"          % "1.10.0"
   val argonaut     = "io.argonaut"          %% "argonaut"            % "6.0.1"

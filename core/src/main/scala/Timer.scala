@@ -135,10 +135,10 @@ trait Timer[K] extends Instrument[K] { self =>
     val later = Strategy.Executor(S2)
     new Timer[K] {
       def recordNanos(delta: Long): Unit = {
-        nonce.incrementAndGet
-        totalNanos.addAndGet(delta)
-        nonce.incrementAndGet
-        n.incrementAndGet
+        val _1 = nonce.incrementAndGet
+        val _2 = totalNanos.addAndGet(delta)
+        val _3 = nonce.incrementAndGet
+        val _4 = n.incrementAndGet
 
         if (scheduled.compareAndSet(false, true)) {
           val task = new Runnable { def run = {
@@ -149,19 +149,21 @@ trait Timer[K] extends Instrument[K] { self =>
               val snapshotN = n.get
               val snapshotT = totalNanos.get
               if (nonce.get == id) { // we got a consistent snapshot
-                n.addAndGet(-snapshotN)
-                totalNanos.addAndGet(-snapshotT)
+                val _1 = n.addAndGet(-snapshotN)
+                val _2 = totalNanos.addAndGet(-snapshotT)
                 val d = (snapshotT / snapshotN.toDouble).toLong
                 // we don't want to hold up the scheduling thread,
                 // as that could cause delays for other metrics,
                 // so callback is run on `S2`
-                later { self.recordNanos(d) }
+                val _ = later { self.recordNanos(d) }
+                ()
               }
               else go
             }
             go
           }}
-          S.schedule(task, nanos, TimeUnit.NANOSECONDS)
+          val _ = S.schedule(task, nanos, TimeUnit.NANOSECONDS)
+          ()
         }
       }
       def keys = self.keys
