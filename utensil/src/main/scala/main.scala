@@ -33,29 +33,34 @@ object Utensil extends CLI {
   import com.amazonaws.services.sns.model.{CreateTopicRequest, PublishRequest}
   import Events.Event
   import Riemann.Names
+  import scalaz.\/._
 
-  private def giveUp(names: Names, cfg: Config, log: String => Unit) = Process.eval(for {
-   credsProvider <- Task(new AWSCredentialsProvider {
-     def getCredentials = new AWSCredentials {
-       def getAWSAccessKeyId = cfg.require[String]("aws.accessKey")
-       def getAWSSecretKey = cfg.require[String]("aws.secretKey")
-     }
-     val refresh = ()
-   })
-   creds <- Task(credsProvider.getCredentials).attempt
-   _ <- creds.fold(_ => Task(()),
-                   _ => Task {
-        val snsClient = new AmazonSNSClient
-        snsClient.setRegion(Region.getRegion(Regions.fromName(cfg.require[String]("aws.region"))))
-        val req = new CreateTopicRequest(cfg.require[String]("aws.snsTopic"))
-        val res = snsClient.createTopic(req)
-        val arn = res.getTopicArn
-        val msg = s"${names.mine} gave up on ${names.kind} server ${names.theirs}"
-        val preq = new PublishRequest(arn, msg)
-        val pres = snsClient.publish(preq)
-        log(s"Posted $pres to SNS $arn")
-      })
-    } yield ())
+  private def giveUp(names: Names, cfg: Config, log: String => Unit) =
+   if (cfg.lookup[String]("aws.accessKey").isDefined) {
+     Process.eval(for {
+       credsProvider <- Task(new AWSCredentialsProvider {
+         def getCredentials = new AWSCredentials {
+           def getAWSAccessKeyId = cfg.require[String]("aws.accessKey")
+           def getAWSSecretKey = cfg.require[String]("aws.secretKey")
+         }
+         val refresh = ()
+       })
+       creds <- Task(credsProvider.getCredentials).attempt
+       ee <- creds.fold(_ => Task(right(())),
+                        _ => Task {
+            val snsClient = new AmazonSNSClient
+            snsClient.setRegion(Region.getRegion(Regions.fromName(cfg.require[String]("aws.region"))))
+            val req = new CreateTopicRequest(cfg.require[String]("aws.snsTopic"))
+            val res = snsClient.createTopic(req)
+            val arn = res.getTopicArn
+            val msg = s"${names.mine} gave up on ${names.kind} server ${names.theirs}"
+            val preq = new PublishRequest(arn, msg)
+            val pres = snsClient.publish(preq)
+            log(s"Posted $pres to SNS $arn")
+          }.attempt)
+       _ <- ee.fold(e => Task(log(s"Error posting to SNS: $e")), _ => Task(()))
+     } yield ())
+   } else Process.halt
 
   private def errorAndQuit(options: Options, f: () => Unit): Unit = {
     val msg = s"# Riemann is not running at the specified location (${options.riemann.host}:${options.riemann.port}) #"
