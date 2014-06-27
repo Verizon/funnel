@@ -15,6 +15,7 @@ import scalaz.syntax.monad._
 import scalaz.std.option._
 import scalaz.{\/, ~>, Monad}
 import Events.Event
+import scalaz.stream.async.immutable.Signal
 
 /**
  * A hub for publishing and subscribing to streams
@@ -44,7 +45,7 @@ trait Monitoring {
    * discrete stream of values for this key, updated only
    * when new values are produced.
    */
-  def get[O](k: Key[O]): async.immutable.Signal[O]
+  def get[O](k: Key[O]): SampledSignal[O]
 
   /** Convience function to publish a metric under a newly created key. */
   def publish[O:Reportable](name: String, units: Units[O])(e: Event)(
@@ -236,7 +237,7 @@ trait Monitoring {
     // we merge the `e` stream and the stream of datapoints for the
     // given prefix; if we ever encounter two ticks in a row from `e`,
     // we reset all matching keys back to their default
-    val alive = async.signal[Unit](Strategy.Sequential); alive.set(()).run
+    val alive = SampledSignal[Unit](Strategy.Sequential); alive.set(()).run
     val pts = Monitoring.subscribe(this)(f).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
         log(s"$msg no more data points for '$f', resetting...")
@@ -259,7 +260,7 @@ trait Monitoring {
     get(k).continuous.once.runLast.map(_.get)
 
   /** The time-varying set of keys. */
-  def keys: async.immutable.Signal[List[Key[Any]]]
+  def keys: SampledSignal[List[Key[Any]]]
 
   /** Returns `true` if the given key currently exists. */
   def exists[O](k: Key[O]): Task[Boolean] = keys.continuous.once.runLastOr(List()).map(_.contains(k))
@@ -326,18 +327,17 @@ object Monitoring {
 
   def instance(implicit ES: ExecutorService = defaultPool,
                logger: String => Unit = printLog): Monitoring = {
-    import async.immutable.Signal
     import scala.collection.concurrent.TrieMap
 
     val t0 = System.nanoTime
-    val S = Strategy.Executor(ES)
+    implicit val S = Strategy.Executor(ES)
     val P = Process
-    val keys_ = async.signal[List[Key[Any]]](S)
+    val keys_ = SampledSignal[List[Key[Any]]](S)
     keys_.set(List()).run
 
     case class Topic[I,O](
       publish: ((I,Duration)) => Unit,
-      current: async.mutable.Signal[O]
+      current: SampledSignal[O]
     )
     val topics = new TrieMap[Key[Any], Topic[Any,Any]]()
 
@@ -360,8 +360,8 @@ object Monitoring {
       protected def update[O](k: Key[O], v: O): Task[Unit] =
         topics.get(k).map(_.current.set(v)).getOrElse(Task(())).map(_ => ())
 
-      def get[O](k: Key[O]): Signal[O] =
-        topics.get(k).map(_.current.asInstanceOf[Signal[O]])
+      def get[O](k: Key[O]): SampledSignal[O] =
+        topics.get(k).map(_.current.asInstanceOf[SampledSignal[O]])
                      .getOrElse(sys.error("key not found: " + k))
 
       def elapsed: Duration = Duration.fromNanos(System.nanoTime - t0)
@@ -402,13 +402,13 @@ object Monitoring {
   def snapshot(M: Monitoring)(implicit ES: ExecutorService = defaultPool):
     Task[collection.Map[Key[Any], Datapoint[Any]]] = {
     val m = collection.concurrent.TrieMap[Key[Any], Datapoint[Any]]()
-    val S = Strategy.Executor(ES)
+    implicit val S = Strategy.Executor(ES)
     for {
-      ks <- M.keys.continuous.once.runLastOr(List())
+      ks <- M.keys.sample.map(_.getOrElse(List()))
       t <- Nondeterminism[Task].gatherUnordered {
-        ks.map(k => M.get(k).continuous.once.runLast.map(
+        ks.map(k => M.get(k).sample.map(
           _.map(v => k -> Datapoint(k, v))
-        ).timed(100L).attempt.map(_.toOption))
+        ).attempt.map(_.toOption))
       }
       _ <- Task { t.flatten.flatten.foreach(m += _) }
     } yield m
@@ -421,8 +421,8 @@ object Monitoring {
   private[funnel] def bufferedSignal[I,O](
       buf: Process1[I,O])(
       implicit ES: ExecutorService = defaultPool):
-      (I => Unit, async.mutable.Signal[O]) = {
-    val signal = async.signal[O](Strategy.Executor(ES))
+      (I => Unit, SampledSignal[O]) = {
+    val signal = SampledSignal[O](Strategy.Executor(ES))
     var cur = buf.unemit match {
       case (h, t) if h.nonEmpty => signal.set(h.last).run; t
       case (h, t) => t
@@ -435,7 +435,7 @@ object Monitoring {
         case Process.Halt(e) => signal.fail(e).run
         case _ => ()
       }
-    } (Strategy.Sequential)
+    }
     ((i: I) => hub ! i, signal)
   }
 
