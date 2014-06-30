@@ -103,7 +103,7 @@ object SampledSignal {
       def continuous: Process[Task,A] = Process.repeatEval(get)
       def discrete: Process[Task,A] = {
         val d = Task.async[A] { cb => actor ! Discrete(cb) }
-        Process.repeatEval(d)
+        Process.eval(sample).flatMap(_.map(Process.emit(_)).getOrElse(Process.halt)) ++ Process.repeatEval(d)
       }
     }
   }

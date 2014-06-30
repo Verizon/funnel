@@ -56,16 +56,15 @@ trait Monitoring {
    * Like `publish`, but if `key` is preexisting, sends updates
    * to it rather than throwing an exception.
    */
-  def republish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = Task.delay {
+  def republish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = Task.suspend {
     val refresh: Task[O] = eval(f)
     // Whenever `event` generates a new value, refresh the signal
     val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(refresh))
     // Republish these values to a new topic
-    val snk =
-      if (!exists(key).run) topic[O,O](key)(Buffers.ignoreTime(process1.id))
-      else (o: O) => update(key, o).runAsync(_ => ())
-    proc.map(snk).run.runAsync(_ => ()) // nonblocking
-    key
+    for {
+      b <- exists(key)
+      _ <- proc.evalMap((o: O) => if (b) Task.fork(update(key, o)) else Task(topic[O,O](key)(Buffers.ignoreTime(process1.id)))).run
+    } yield key
   }
 
   /**
@@ -78,10 +77,11 @@ trait Monitoring {
    * throws an error if the key already exists. Use `republish` if
    * preexisting `key` is not an error condition.
    */
-  def publish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = Task.suspend {
-    if (exists(key).run) sys.error("key not unique, use republish if this is intended: " + key)
-    else republish(key)(e)(f)
-  }
+  def publish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = for {
+    b <- exists(key)
+    k <- if (b) Task.fail(new Exception(s"key not unique, use republish if this is indented: $key"))
+         else republish(key)(e)(f)
+  } yield k
 
   /** Compute the current value for the given `Metric`. */
   def eval[A](f: Metric[A]): Task[A] = {
@@ -107,17 +107,20 @@ trait Monitoring {
   def mirrorAll(parse: DatapointParser)(
                 url: URL, localName: String => String = identity)(
                 implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
-    parse(url).flatMap { pt =>
+    parse(url).evalMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
       val k = pt.key.modifyName(localName)
-      if (exists(k).run) {
-        Process.eval(update(k, pt.value))
-      }
-      else {
-        log(s"$msg new key ${pt.key}")
-        val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
-        Process.emit(snk(pt.value))
-      }
+      for {
+        b <- exists(k)
+        _ <- if (b) {
+          log(s"updating key ${pt.key}")
+          update(k, pt.value)
+        } else Task {
+               log(s"$msg new key ${pt.key}")
+               val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
+               snk(pt.value)
+             }
+      } yield ()
     }
   }
 
@@ -377,12 +380,6 @@ object Monitoring {
    *   b) The returned stream is 'use-once' and will
    *      halt the producer when completed. Just
    *      resubscribe if you need a fresh stream.
-   *   c) As of May 13, 2014, if the `f` predicate is too
-   *      broad and a key generates values too fast,
-   *      it crowds out the keys that come after it,
-   *      and you will never see the values under those keys.
-   *      This is an issue with scalaz-stream merge and
-   *      is under investigation.
    */
   def subscribe(M: Monitoring)(f: Key[Any] => Boolean)(
   implicit ES: ExecutorService = serverPool):

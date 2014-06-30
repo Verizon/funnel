@@ -8,7 +8,6 @@ import scala.concurrent.duration._
 import scalaz.\/
 import scalaz.concurrent.{Strategy,Task}
 import scalaz.stream.{async,Process}
-import scalaz.stream.async.immutable.Signal
 import Monitoring.prettyURL
 
 object Riemann {
@@ -80,8 +79,6 @@ object Riemann {
 
     val logPoint = pt.copy(key = pt.key.copy(name = name))
 
-    log("sending: " + logPoint)
-
     try e.send()
     catch { case err: Exception =>
       log("unable to send datapoint to Reimann server due to: " + e)
@@ -100,7 +97,7 @@ object Riemann {
    * the latest error.
    */
   def retry[A](retries: Process[Task,Any])(p: Process[Task,A]): Process[Task,A] = {
-    val alive = async.signal[Unit]
+    val alive = SampledSignal[Unit]
     Process.eval_(alive.set(())) ++ {
       val step: Process[Task,Throwable \/ A] =
         p.append(Process.eval_(alive.close)).attempt()
@@ -114,7 +111,7 @@ object Riemann {
   }
 
   /** Terminate `p` when the given `Signal` terminates. */
-  def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
+  def link[A](alive: SampledSignal[Unit])(p: Process[Task,A]): Process[Task,A] =
     alive.continuous.zip(p).map(_._2)
 
   private def liftDatapointToStream(dp: Datapoint[Any]): Process[Task, Datapoint[Any]] =
@@ -133,7 +130,7 @@ object Riemann {
              implicit log: String => Unit
   ): Task[Unit] = {
     for {
-      alive <- Task(async.signal[Unit](Strategy.Executor(Monitoring.defaultPool)))
+      alive <- Task(SampledSignal[Unit](Strategy.Executor(Monitoring.defaultPool)))
       _     <- alive.set(())
       _     <- link(alive){
                  Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream).flatMap { pt =>
@@ -169,8 +166,8 @@ object Riemann {
       implicit log: String => Unit): Task[Unit] = {
 
     val S = Strategy.Executor(Monitoring.defaultPool)
-    val alive = async.signal[Unit](S)
-    val active = async.signal[Set[URL]](S)
+    val alive = SampledSignal[Unit](S)
+    val active = SampledSignal[Set[URL]](S)
     def modifyActive(f: Set[URL] => Set[URL]): Task[Unit] =
       active.compareAndSet(a => Some(f(a.getOrElse(Set())))).map(_ => ())
     for {
