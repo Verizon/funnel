@@ -75,8 +75,12 @@ object Utensil extends CLI {
   def main(args: Array[String]): Unit = {
     run(args){ (options, cfg) =>
 
-      val L = LoggerFactory.getLogger("utensil")
-      implicit val log: String => Unit = s => L.info(s)
+      import scalaz.concurrent._
+      val logger = LoggerFactory.getLogger("utensil")
+      implicit val logPool = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
+      val L = Actor.actor((s: String) => logger.info(s))
+
+      implicit val log: String => Unit = s => L(s)
 
       val M = Monitoring.default
       val S = MonitoringServer.start(M, options.funnelPort)
