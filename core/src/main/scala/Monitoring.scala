@@ -113,7 +113,6 @@ trait Monitoring {
       for {
         b <- exists(k)
         _ <- if (b) {
-          log(s"updating key ${pt.key}")
           update(k, pt.value)
         } else Task {
                log(s"$msg new key ${pt.key}")
