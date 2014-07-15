@@ -13,7 +13,7 @@ object Dependencies {
   val algebird     = "com.twitter"          %% "algebird-core"       % "0.3.0"
   val scalacheck   = "org.scalacheck"       %% "scalacheck"          % "1.10.0"
   val argonaut     = "io.argonaut"          %% "argonaut"            % "6.0.1"
-  val riemannapi   = "com.aphyr"             % "riemann-java-client" % "0.2.8" exclude("com.yammer.metrics","metrics-core")
+  val riemannapi   = "com.aphyr"             % "riemann-java-client" % "0.2.9" exclude("com.yammer.metrics","metrics-core")
   val logback      = "ch.qos.logback"        % "logback-classic"     % "1.0.+"
   val logs3        = "intelmedia.ws.common" %% "s3-appender"         % "6.0.2"
   val aws          = "com.amazonaws"         % "aws-java-sdk"        % "1.7.9"

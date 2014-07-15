@@ -91,7 +91,7 @@ object Utensil extends CLI {
         Sigar.instrument(new Instruments(1 minute, M))
       }
 
-      val R = RiemannClient.tcp(options.riemann.host, options.riemann.port)
+      val R = RiemannClient.udp(options.riemann.host, options.riemann.port)
       try {
         R.connect() // urgh. Give me stregth!
       } catch {
