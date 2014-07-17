@@ -7,7 +7,8 @@ object Build extends Build {
   lazy val buildSettings =
     Defaults.defaultSettings ++
     OnCue.baseSettings ++
-    ScalaCheck.settings ++ Seq(
+    ScalaCheck.settings ++
+    ScalaTest.settings ++ Seq(
       ContinuousIntegration.produceCoverageReport := false,
       organization := "intelmedia.ws.funnel",
       scalaVersion := "2.10.3",
@@ -41,7 +42,10 @@ object Build extends Build {
 
   lazy val http = Project("http", file("http"))
     .settings(buildSettings:_*)
-    .settings(libraryDependencies ++= compile(argonaut))
+    .settings(
+      libraryDependencies ++= compile(argonaut),
+      fork in (run in Test) := true
+    )
     .dependsOn(core)
 
   lazy val riemann = Project("riemann", file("riemann"))
