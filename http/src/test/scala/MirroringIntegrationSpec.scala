@@ -10,13 +10,12 @@ class MirroringIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfte
 
   private def addInstruments(i: Instruments): Unit = {
     Clocks.instrument(i)
-    Sigar.instrument(i)
     JVM.instrument(i)
   }
 
   private def mirrorFrom(port: Int): Unit =
     MI.mirrorAll(SSE.readEvents)(
-      new URL(s"http://localhost:$port/stream"),
+      new URL(s"http://localhost:$port/stream/previous"),
       s"node-$port/" + _
     ).run.runAsync(_ => ())
 
@@ -65,16 +64,15 @@ class MirroringIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfte
     KMI.stop()
   }
 
-
   // never do stuff like this in production code.
   // this is a dirty hack to make some assertions about
   // the monitoring instances
   private def countKeys(m: Monitoring): Int =
-    m.keys.sample.run.get.length
+    m.keys.sample.run.get.filter(_.startsWith("previous")).length
 
-  it should "foo" in {
+  it should "be able to mirror all the keys from the other instances into the current state of 'MI'" in {
     (countKeys(M1) +
     countKeys(M2) +
-    countKeys(M3)) should equal (countKeys(MI))
+    countKeys(M3)) should equal (MI.keys.sample.run.get.length)
   }
 }
