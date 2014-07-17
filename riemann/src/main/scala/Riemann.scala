@@ -27,7 +27,7 @@ object Riemann {
       case Hold(e) => store = (e :: store)
       case Flush   => {
         R.sendEvents(store.asJava)
-        log("successfully sent: "+store.mkString(", "))
+        log("successfully sent batch of ${store.length}")
         store = Nil
       }
     }(Strategy.Executor(Monitoring.serverPool))
@@ -99,15 +99,6 @@ object Riemann {
 
     // lifts the EventDSL into an REvent
     e.build()
-    // val logPoint = pt.copy(key = pt.key.copy(name = name))
-
-    // try e.send()
-    // catch { case err: Exception =>
-    //   log("unable to send datapoint to Reimann server due to: " + e)
-    //   log("waiting")
-    //   throw err
-    // }
-    // log("successfully sent " + logPoint)
   }
 
   private def liftDatapointToStream(dp: Datapoint[Any]): Process[Task, Datapoint[Any]] =
@@ -175,7 +166,7 @@ object Riemann {
     M: Monitoring,
     ttlInSeconds: Float = 20f,
     nodeRetries: Names => Event = _ => defaultRetries
-  )(c: RiemannClient,
+  )(riemannClient: RiemannClient,
     riemannName: String,
     riemannRetries: Names => Event = _ => defaultRetries)(
     parse: DatapointParser)(
@@ -183,7 +174,7 @@ object Riemann {
     myName: String = "Funnel Mirror"
   )(implicit log: String => Unit): Task[Unit] = {
 
-    val w = writer(c)
+    val w = writer(riemannClient)
 
     groupedUrls.evalMap { case (url,group) =>
       Task.delay {
@@ -193,6 +184,6 @@ object Riemann {
       }
     }.run.runAsync(_ => ())
 
-    publish(M, ttlInSeconds, riemannRetries(Names("Riemann", myName, riemannName)))(c, w)
+    publish(M, ttlInSeconds, riemannRetries(Names("Riemann", myName, riemannName)))(riemannClient, w)
   }
 }
