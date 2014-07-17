@@ -20,14 +20,14 @@ object Riemann {
 
   @volatile private var store: List[REvent] = Nil
 
-  private[riemann] def writer(
+  private[riemann] def collector(
     R: RiemannClient
   )(implicit log: String => Unit): Actor[Pusher] =
     Actor.actor[Pusher] {
       case Hold(e) => store = (e :: store)
       case Flush   => {
         R.sendEvents(store.asJava)
-        log("successfully sent batch of ${store.length}")
+        log(s"successfully sent batch of ${store.length}")
         store = Nil
       }
     }(Strategy.Executor(Monitoring.serverPool))
@@ -108,8 +108,8 @@ object Riemann {
     }
 
   /** Terminate `p` when the given `Signal` terminates. */
-  // def link[A](alive: SampledSignal[Unit])(p: Process[Task,A]): Process[Task,A] =
-  //   alive.continuous.zip(p).map(_._2)
+  def link[A](alive: SampledSignal[Unit])(p: Process[Task,A]): Process[Task,A] =
+    alive.continuous.zip(p).map(_._2)
 
   /**
    * Try running the process `p`, retrying in the event of failure.
@@ -174,16 +174,50 @@ object Riemann {
     myName: String = "Funnel Mirror"
   )(implicit log: String => Unit): Task[Unit] = {
 
-    val w = writer(riemannClient)
+    val S = Strategy.Executor(Monitoring.defaultPool)
+    val alive = SampledSignal[Unit](S)
+    val active = SampledSignal[Set[URL]](S)
 
-    groupedUrls.evalMap { case (url,group) =>
-      Task.delay {
-        M.mirrorAll(parse)(url, _ + url.toString.replaceAll("/", "_")
-          ).run.attempt.runAsync(_.fold(println, println))
-        println("Recieved URL: " + group + "/" + url)
-      }
-    }.run.runAsync(_ => ())
+    def modifyActive(f: Set[URL] => Set[URL]): Task[Unit] =
+      active.compareAndSet(a => Some(f(a.getOrElse(Set())))).map(_ => ())
 
-    publish(M, ttlInSeconds, riemannRetries(Names("Riemann", myName, riemannName)))(riemannClient, w)
+    val actor = collector(riemannClient)
+
+    (for {
+      // initilize the signal for the current running set of
+      // urls being monitored
+      _ <- active.set(Set.empty)
+      _ <- alive.set(())
+      _ <- groupedUrls.evalMap { case (url,group) =>
+        Task.delay {
+          log("recieved url: " + group + " / " + url)
+          log("existing urls: " + active.get.run)
+
+          // adding the `localName` onto the string here so that later in the
+          // process its possible to find the key we're specifically looking for
+          // and trim off the `localName`
+          val localName = prettyURL(url)
+
+          val received = link(alive){
+            M.attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
+              url, m => s"$group/$m:::$localName")
+          }
+
+          val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
+            println("URLS ::::::::::: " + urls.size)
+            println(s"URLS contains $url - " + urls.contains(url))
+
+            if (urls.contains(url)) Process.halt // skip it, alread running
+            else Process.eval_(modifyActive(_ + url)) ++ // add to active at start
+                received.onComplete(Process.eval_(modifyActive(_ - url))) // and remove it when done
+          }
+
+          receivedIdempotent.run.runAsync(_.fold(err => log(err.getMessage), identity))
+        }
+      }.run
+      _ <- alive.close
+    } yield ()).runAsync(_ => ())
+
+    publish(M, ttlInSeconds, riemannRetries(Names("Riemann", myName, riemannName)))(riemannClient, actor)
   }
 }
