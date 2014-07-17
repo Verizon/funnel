@@ -115,7 +115,7 @@ trait Monitoring {
         _ <- if (b) {
           update(k, pt.value)
         } else Task {
-               // log(s"$msg new key ${pt.key}")
+               log(s"$msg new key ${pt.key}")
                val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
                snk(pt.value)
              }
