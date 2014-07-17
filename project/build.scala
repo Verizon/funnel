@@ -61,16 +61,12 @@ object Build extends Build {
 
   lazy val utensil = Project("utensil", file("utensil"))
     .settings(buildSettings:_*)
-    .settings(Deployable.settings:_*)
-    .settings(RPM.settings:_*)
+    .settings(Bundle.settings:_*)
     .settings(
       libraryDependencies ++=
         compile(logs3) ++
         compile(aws) ++
         compile(knobs),
-      name in Universal := "utensil",
-      mappings in Universal += {
-        file("utensil/etc/logback.xml") -> "etc/logback.xml"
-      }
+      name in Universal := "utensil"
     ).dependsOn(core, http, riemann)
 }
