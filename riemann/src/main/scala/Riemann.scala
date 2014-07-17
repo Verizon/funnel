@@ -2,15 +2,35 @@ package intelmedia.ws.funnel
 package riemann
 
 import com.aphyr.riemann.client.RiemannClient
+import com.aphyr.riemann.Proto.{Event => REvent}
 import intelmedia.ws.funnel.Events.Event
 import java.net.URL
 import scala.concurrent.duration._
 import scalaz.\/
-import scalaz.concurrent.{Strategy,Task}
+import scalaz.concurrent.{Strategy,Task,Actor}
 import scalaz.stream.{async,Process}
 import Monitoring.prettyURL
+import scala.collection.JavaConverters._
 
 object Riemann {
+
+  sealed trait Pusher
+  final case class Hold(e: REvent) extends Pusher
+  final case object Flush extends Pusher
+
+  @volatile private var store: List[REvent] = Nil
+
+  private[riemann] def writer(
+    R: RiemannClient
+  )(implicit log: String => Unit): Actor[Pusher] =
+    Actor.actor[Pusher] {
+      case Hold(e) => store = (e :: store)
+      case Flush   => {
+        R.sendEvents(store.asJava)
+        log("successfully sent: "+store.mkString(", "))
+        store = Nil
+      }
+    }(Strategy.Executor(Monitoring.serverPool))
 
   private def splitStats(key: Key[Any], s: Stats): List[Datapoint[Any]] = {
     val (k, tl) = key.name.split(":::") match {
@@ -50,7 +70,7 @@ object Riemann {
     * C'est la vie!
     */
   private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any]
-    )(implicit log: String => Unit): Unit = {
+    )(implicit log: String => Unit): REvent = {
 
     val (name, host) = pt.key.name.split(":::") match {
       case Array(n, h) => (n, Some(h))
@@ -77,15 +97,17 @@ object Riemann {
       case x => log("]]]]]]]]]]]]]]] "+x.getClass.getName); ???
     }
 
-    val logPoint = pt.copy(key = pt.key.copy(name = name))
+    // lifts the EventDSL into an REvent
+    e.build()
+    // val logPoint = pt.copy(key = pt.key.copy(name = name))
 
-    try e.send()
-    catch { case err: Exception =>
-      log("unable to send datapoint to Reimann server due to: " + e)
-      log("waiting")
-      throw err
-    }
-    log("successfully sent " + logPoint)
+    // try e.send()
+    // catch { case err: Exception =>
+    //   log("unable to send datapoint to Reimann server due to: " + e)
+    //   log("waiting")
+    //   throw err
+    // }
+    // log("successfully sent " + logPoint)
   }
 
   private def liftDatapointToStream(dp: Datapoint[Any]): Process[Task, Datapoint[Any]] =
@@ -95,8 +117,8 @@ object Riemann {
     }
 
   /** Terminate `p` when the given `Signal` terminates. */
-  def link[A](alive: SampledSignal[Unit])(p: Process[Task,A]): Process[Task,A] =
-    alive.continuous.zip(p).map(_._2)
+  // def link[A](alive: SampledSignal[Unit])(p: Process[Task,A]): Process[Task,A] =
+  //   alive.continuous.zip(p).map(_._2)
 
   /**
    * Try running the process `p`, retrying in the event of failure.
@@ -106,20 +128,20 @@ object Riemann {
    * the same, but only retry a total of five times before raising
    * the latest error.
    */
-  def retry[A](retries: Process[Task,Any])(p: Process[Task,A]): Process[Task,A] = {
-    val alive = SampledSignal[Unit]
-    Process.eval_(alive.set(())) ++ {
-      val step: Process[Task,Throwable \/ A] =
-        p.append(Process.eval_(alive.close)).attempt()
+  // def retry[A](retries: Process[Task,Any])(p: Process[Task,A]): Process[Task,A] = {
+  //   val alive = SampledSignal[Unit]
+  //   Process.eval_(alive.set(())) ++ {
+  //     val step: Process[Task,Throwable \/ A] =
+  //       p.append(Process.eval_(alive.close)).attempt()
 
-      step.flatMap(_.fold(_ => link(alive)(retries).terminated.flatMap {
-        // on our last reconnect attempt, rethrow error
-        case None => step.flatMap(_.fold(Process.fail, Process.emit))
-        // on other attempts, ignore the exceptions
-        case Some(_) => step.stripW
-      }, Process.emit))
-    }
-  }
+  //     step.flatMap(_.fold(_ => link(alive)(retries).terminated.flatMap {
+  //       // on our last reconnect attempt, rethrow error
+  //       case None => step.flatMap(_.fold(Process.fail, Process.emit))
+  //       // on other attempts, ignore the exceptions
+  //       case Some(_) => step.stripW
+  //     }, Process.emit))
+  //   }
+  // }
 
   /**
    * Publish all datapoints from this `Monitoring` to the given
@@ -130,13 +152,16 @@ object Riemann {
     M: Monitoring,
     ttlInSeconds: Float = 20f,
     retries: Event = Events.every(1 minutes)
-  )(c: RiemannClient
+  )(c: RiemannClient, a: Actor[Pusher]
   )(implicit log: String => Unit
   ): Task[Unit] = {
-    Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream).evalMap { pt =>
-      // retry(retries(M))(Process.eval_(
+    Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream
+      ).zipWithIndex.evalMap { case (pt,i) =>
         Task {
-          toEvent(c, ttlInSeconds)(pt)
+          a ! Hold(toEvent(c, ttlInSeconds)(pt))
+          if(i % 1000 == 0)
+            a ! Flush
+          else ()
         }(Monitoring.defaultPool)
       // )
     }.run
@@ -158,6 +183,8 @@ object Riemann {
     myName: String = "Funnel Mirror"
   )(implicit log: String => Unit): Task[Unit] = {
 
+    val w = writer(c)
+
     groupedUrls.evalMap { case (url,group) =>
       Task.delay {
         M.mirrorAll(parse)(url, _ + url.toString.replaceAll("/", "_")
@@ -166,12 +193,6 @@ object Riemann {
       }
     }.run.runAsync(_ => ())
 
-    // M.distinctKeys.zipWithIndex.evalMap(x => Task(println("~~~~ " + x))).run.runAsync(_ => ())
-
-    publish(M, ttlInSeconds, riemannRetries(Names("Riemann", myName, riemannName)))(c)
-
-    // Monitoring.subscribe(M)(_ => true).zipWithIndex.evalMap(
-    //    )).run
-
+    publish(M, ttlInSeconds, riemannRetries(Names("Riemann", myName, riemannName)))(c, w)
   }
 }
