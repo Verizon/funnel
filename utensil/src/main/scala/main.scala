@@ -124,6 +124,7 @@ object Utensil extends CLI {
 
 import java.net.URL
 import scala.concurrent.duration._
+import java.io.File
 
 trait CLI {
 
@@ -137,10 +138,12 @@ trait CLI {
   )
 
   def run(args: Array[String])(f: (Options, Config) => Unit): Unit = {
-    val cfgFile = args.headOption.map { a =>
-      FileResource(new File(a))
-    }.getOrElse(ClassPathResource("oncue/utensil.cfg"))
-    knobs.loadImmutable(List(Required(cfgFile))).flatMap { cfg =>
+
+    val config =
+      knobs.loadImmutable(List(Required(FileResource(new File("/usr/share/oncue/etc/utensil.cfg"))))) or
+      knobs.loadImmutable(List(Required(ClassPathResource("oncue/utensil.cfg"))))
+
+    config.flatMap { cfg =>
       val port = cfg.lookup[Int]("funnelPort").getOrElse(5775)
       val name = cfg.lookup[String]("funnelName").getOrElse("Funnel")
       val riemannHost = cfg.lookup[String]("riemannHost").getOrElse("localhost")
