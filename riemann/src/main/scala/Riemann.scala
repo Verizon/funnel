@@ -204,9 +204,6 @@ object Riemann {
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
-            println("URLS ::::::::::: " + urls.size)
-            println(s"URLS contains $url - " + urls.contains(url))
-
             if (urls.contains(url)) Process.halt // skip it, alread running
             else Process.eval_(modifyActive(_ + url)) ++ // add to active at start
                 received.onComplete(Process.eval_(modifyActive(_ - url))) // and remove it when done

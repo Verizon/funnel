@@ -18,12 +18,12 @@ import knobs.{Config, Required, ClassPathResource, FileResource}
   * Or pass the location of the config file as a command line argument.
   */
 object Utensil extends CLI {
-  private val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
+  // private val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
   private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
     server.stop()
     // nice little hack to get make it easy to just hit return and shutdown
     // this running example
-    stop.set(true)
+    // stop.set(true)
     R.disconnect
   }
 
@@ -107,16 +107,16 @@ object Utensil extends CLI {
       Riemann.mirrorAndPublish(
         M, options.riemannTTL.toSeconds.toFloat, utensilRetries)(
         R, s"${options.riemann.host}:${options.riemann.port}", utensilRetries)(SSE.readEvents)(
-        S.mirroringSources, cfg.lookup[String]("funnelName").getOrElse(localhost))(log).
-          runAsyncInterruptibly(println, stop)
+        S.mirroringSources, cfg.lookup[String]("funnelName").getOrElse(localhost))(log
+          ).runAsync(_.fold(e => log(s"[ERROR] ${e.getMessage}"), identity _))
 
-      println
-      println("Press [Enter] to quit...")
-      println
+      // println
+      // println("Press [Enter] to quit...")
+      // println
 
-      val _ = readLine()
+      // val _ = readLine()
 
-      shutdown(S,R)
+      // shutdown(S,R)
     }
   }
 
