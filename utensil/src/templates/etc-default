@@ -24,5 +24,3 @@
 -J-XX:+UseParallelOldGC
 
 -Dlogback.configurationFile=${{chdir}}/etc/logback.xml
-
--Dconfig.file=${{chdir}}/etc/utensil.cfg
