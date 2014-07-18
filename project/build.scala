@@ -67,6 +67,9 @@ object Build extends Build {
         compile(logs3) ++
         compile(aws) ++
         compile(knobs),
-      name in Universal := "utensil"
+      name in Universal := "utensil",
+      mappings in Universal ++= Seq(
+        file("utensil/etc/utensil.cfg") -> "etc/utensil.cfg"
+      )
     ).dependsOn(core, http, riemann)
 }
