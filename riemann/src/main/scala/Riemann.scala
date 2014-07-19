@@ -22,8 +22,8 @@ object Riemann {
 
   private[riemann] def collector(
     R: RiemannClient
-  )(implicit log: String => Unit): Actor[Pusher] =
-    Actor.actor[Pusher] {
+  )(implicit log: String => Unit): Actor[Pusher] = {
+    val a = Actor.actor[Pusher] {
       case Hold(e) => store = (e :: store)
       case Flush   => {
         R.sendEvents(store.asJava)
@@ -31,6 +31,13 @@ object Riemann {
         store = Nil
       }
     }(Strategy.Executor(Monitoring.serverPool))
+
+    Process.awakeEvery(1.minute).evalMap {_ =>
+      Task(a(Flush))
+    }.run.runAsync(_ => ())
+
+    a
+  }
 
   private def splitStats(key: Key[Any], s: Stats): List[Datapoint[Any]] = {
     val (k, tl) = key.name.split(":::") match {
