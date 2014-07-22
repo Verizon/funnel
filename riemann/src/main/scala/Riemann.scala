@@ -82,6 +82,7 @@ object Riemann {
              .description(s"${pt.key.typeOf} ${pt.key.units}")
              .time(System.currentTimeMillis / 1000L)
              .ttl(ttl)
+             .attribute("service-revision", name)
 
     val _1 = e.service(name)
     host.foreach { h =>
