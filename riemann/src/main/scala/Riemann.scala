@@ -77,12 +77,14 @@ object Riemann {
       case _ => (pt.key.name, None)
     }
 
+    val t = tags(name)
+
     val e = c.event
-             .tags(tags(name): _*)
+             .tags(t: _*)
              .description(s"${pt.key.typeOf} ${pt.key.units}")
              .time(System.currentTimeMillis / 1000L)
              .ttl(ttl)
-             .attribute("service-revision", name)
+             .attribute("service-revision", t.headOption.getOrElse("unknown"))
 
     val _1 = e.service(name)
     host.foreach { h =>
