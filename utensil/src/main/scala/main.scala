@@ -88,7 +88,7 @@ object Utensil extends CLI {
       // Determine whether to generate system statistics for the local host
       cfg.lookup[Int]("localHostMonitorFrequencySeconds").foreach { t =>
         implicit val duration = t.seconds
-        Sigar.instrument(new Instruments(1 minute, M))
+        Sigar.instrument(new Instruments(1.minute, M))
       }
 
       val R = RiemannClient.tcp(options.riemann.host, options.riemann.port)
