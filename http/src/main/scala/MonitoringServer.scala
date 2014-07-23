@@ -32,12 +32,12 @@ object MonitoringServer {
 
   @deprecated("""MonitoringServer.start no longer takes a `log` argument.
     Use Monitoring.instance to create your Monitoring instance
-    if you want to specify a logger.""")
+    if you want to specify a logger.""", "1.3")
   def start(M: Monitoring, port: Int, log: String => Unit): MonitoringServer = start(M, port)
 
   @deprecated("""MonitoringServer.start no longer takes a `log` argument.
     Use Monitoring.instance to create your Monitoring instance
-    if you want to specify a logger.""")
+    if you want to specify a logger.""", "1.3")
   def start(M: Monitoring, log: String => Unit): MonitoringServer = start(M)
 }
 
