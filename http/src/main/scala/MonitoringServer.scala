@@ -42,11 +42,8 @@ object MonitoringServer {
 }
 
 class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
-  private[funnel] val (mirroringQueue,sourcesToMirror) =
+  private[funnel] val (mirroringQueue,mirroringSources) =
     async.queue[(URL,String)](Strategy.Executor(Monitoring.serverPool))
-
-  private[funnel] val (terminatingQueue,sourcesToTerminate) =
-    async.queue[URL](Strategy.Executor(Monitoring.serverPool))
 
   private val server = HttpServer.create(new InetSocketAddress(port), 0)
 
