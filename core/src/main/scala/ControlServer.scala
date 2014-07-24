@@ -5,5 +5,6 @@ trait ControlServer {
   import scalaz.concurrent.Task
   import java.net.URL
 
-  private[funnel] def mirroringSources: Process[Task, (URL, String)]
+  private[funnel] def sourcesToMirror: Process[Task, (URL, String)]
+  private[funnel] def sourcesToTerminate: Process[Task, URL]
 }
