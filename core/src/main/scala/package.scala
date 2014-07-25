@@ -19,6 +19,7 @@ package intelmedia.ws {
 
   package object funnel {
     type DatapointParser = java.net.URL => Process[Task,Datapoint[Any]]
+    type BucketName = String
   }
 
 }

@@ -42,11 +42,8 @@ object MonitoringServer {
 }
 
 class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
-  private[funnel] val (mirroringQueue,sourcesToMirror) =
-    async.queue[(URL,String)](Strategy.Executor(Monitoring.serverPool))
-
-  private[funnel] val (terminatingQueue,sourcesToTerminate) =
-    async.queue[URL](Strategy.Executor(Monitoring.serverPool))
+  private[funnel] val (mirroringQueue,commands) =
+    async.queue[Command](Strategy.Executor(Monitoring.serverPool))
 
   private val server = HttpServer.create(new InetSocketAddress(port), 0)
 
@@ -111,7 +108,7 @@ class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
       Parse.decodeEither[List[Bucket]](json).fold(
         error => flush(400, error.toString, req),
         blist => {
-          blist.flatMap(b => b.urls.map(u => new URL(u) -> b.label)
+          blist.flatMap(b => b.urls.map(u => Mirror(new URL(u), b.label))
             ).foreach(mirroringQueue.enqueue)
 
           flush(202, Array.empty[Byte], req)

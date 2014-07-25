@@ -1,10 +1,14 @@
 package intelmedia.ws.funnel
 
+import java.net.URL
+
+sealed trait Command
+case class Mirror(url: URL, bucket: BucketName) extends Command
+case class Discard(url: URL) extends Command
+
 trait ControlServer {
   import scalaz.stream.Process
   import scalaz.concurrent.Task
-  import java.net.URL
 
-  private[funnel] def sourcesToMirror: Process[Task, (URL, String)]
-  private[funnel] def sourcesToTerminate: Process[Task, URL]
+  private[funnel] def commands: Process[Task, Command]
 }
