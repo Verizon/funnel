@@ -236,8 +236,6 @@ object Riemann {
           receivedIdempotent.run.runAsync(_.fold(err => log(err.getMessage), identity))
         }
         case Discard(url) => Task.delay {
-          println(">>>> " + Option(urlSignals.get(url)))
-
           Option(urlSignals.get(url)).foreach(_.close.runAsync(_ => ()))
         }
       }.run
