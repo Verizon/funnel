@@ -194,7 +194,7 @@ object Riemann {
   )(implicit log: String => Unit): Task[Unit] = {
 
     val S = Strategy.Executor(Monitoring.defaultPool)
-    // val alive = SampledSignal[Unit](S)
+    val alive = SampledSignal[Unit](S)
     val active = SampledSignal[Set[URL]](S)
 
     def modifyActive(f: Set[URL] => Set[URL]): Task[Unit] =
@@ -206,13 +206,14 @@ object Riemann {
       // initilize the signal for the current running set of
       // urls being monitored
       _ <- active.set(Set.empty)
-      // _ <- alive.set(())
+      _ <- alive.set(())
       _ <- groupedUrls.evalMap {
         case Mirror(url,group) => Task.delay {
           log("recieved url: " + group + " / " + url)
           log("existing urls: " + active.get.run)
 
           val hook = SampledSignal[Unit](S)
+          hook.set(()).runAsync(_ => ())
 
           urlSignals.put(url, hook)
 
@@ -235,10 +236,12 @@ object Riemann {
           receivedIdempotent.run.runAsync(_.fold(err => log(err.getMessage), identity))
         }
         case Discard(url) => Task.delay {
-          Option(urlSignals.get(url)).foreach(_.close)
+          println(">>>> " + Option(urlSignals.get(url)))
+
+          Option(urlSignals.get(url)).foreach(_.close.runAsync(_ => ()))
         }
       }.run
-      // _ <- alive.close
+      _ <- alive.close
     } yield ()).runAsync(_ => ())
 
     publish(M, ttlInSeconds, riemannRetries(Names("Riemann", myName, riemannName)))(riemannClient, actor)
