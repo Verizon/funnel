@@ -107,7 +107,7 @@ object Utensil extends CLI {
       Riemann.mirrorAndPublish(
         M, options.riemannTTL.toSeconds.toFloat, utensilRetries)(
         R, s"${options.riemann.host}:${options.riemann.port}", utensilRetries)(SSE.readEvents)(
-        S.mirroringSources, cfg.lookup[String]("funnelName").getOrElse(localhost))(log
+        S.commands, cfg.lookup[String]("funnelName").getOrElse(localhost))(log
           ).runAsync(_.fold(e => log(s"[ERROR] $e - ${e.getMessage}"), identity _))
 
       // println

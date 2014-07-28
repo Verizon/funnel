@@ -172,6 +172,15 @@ object Riemann {
 
   case class Names(kind: String, mine: String, theirs: String)
 
+  private val urlSignals = new java.util.concurrent.ConcurrentHashMap[URL, SampledSignal[Unit]]
+
+
+  /**
+   * Mirror the supplied funnel servers into the local monitoring instance
+   * and publish the values to riemann in batches. This function also controls
+   * the halting of stream consumption (e.g. in the event of failure and
+   * explicit termination by the administraton `ControlServer`)
+   */
   def mirrorAndPublish[A](
     M: Monitoring,
     ttlInSeconds: Float = 20f,
@@ -180,7 +189,7 @@ object Riemann {
     riemannName: String,
     riemannRetries: Names => Event = _ => defaultRetries)(
     parse: DatapointParser)(
-    groupedUrls: Process[Task, (URL,String)],
+    groupedUrls: Process[Task, Command],
     myName: String = "Funnel Mirror"
   )(implicit log: String => Unit): Task[Unit] = {
 
@@ -198,17 +207,22 @@ object Riemann {
       // urls being monitored
       _ <- active.set(Set.empty)
       _ <- alive.set(())
-      _ <- groupedUrls.evalMap { case (url,group) =>
-        Task.delay {
+      _ <- groupedUrls.evalMap {
+        case Mirror(url,group) => Task.delay {
           log("recieved url: " + group + " / " + url)
           log("existing urls: " + active.get.run)
+
+          val hook = SampledSignal[Unit](S)
+          hook.set(()).runAsync(_ => ())
+
+          urlSignals.put(url, hook)
 
           // adding the `localName` onto the string here so that later in the
           // process its possible to find the key we're specifically looking for
           // and trim off the `localName`
           val localName = prettyURL(url)
 
-          val received = link(alive){
+          val received: Process[Task,Unit] = link(hook){
             M.attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
               url, m => s"$group/$m:::$localName")
           }
@@ -220,6 +234,9 @@ object Riemann {
           }
 
           receivedIdempotent.run.runAsync(_.fold(err => log(err.getMessage), identity))
+        }
+        case Discard(url) => Task.delay {
+          Option(urlSignals.get(url)).foreach(_.close.runAsync(_ => ()))
         }
       }.run
       _ <- alive.close
