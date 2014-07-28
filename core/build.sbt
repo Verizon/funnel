@@ -9,6 +9,8 @@ ScalaCheck.settings
 
 ScalaTest.settings
 
+ContinuousIntegration.produceCoverageReport := false
+
 scalacOptions := Compilation.flags.filterNot(_ == "-Xlint") ++ Seq(
   "-language:postfixOps"
 )
