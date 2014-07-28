@@ -31,9 +31,9 @@ trait Monitoring {
    * using a stream transducer to
    */
   def topic[I, O:Reportable](
-      name: String, units: Units[O])(
+      name: String, units: Units[O], description: String)(
       buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
-    val k = Key[O](name, units)
+    val k = Key[O](name, units, description)
     (k, topic(k)(buf))
   }
 
@@ -283,8 +283,8 @@ trait Monitoring {
 
   /** Create a new topic with the given name and discard the key. */
   def topic_[I, O:Reportable](
-    name: String, units: Units[O])(
-    buf: Process1[(I,Duration),O]): I => Unit = topic(name, units)(buf)._2
+    name: String, units: Units[O], description: String,
+    buf: Process1[(I,Duration),O]): I => Unit = topic(name, units, description)(buf)._2
 
   def filterKeys(f: Key[Any] => Boolean): Process[Task, List[Key[Any]]] =
     keys.continuous.map(_.filter(f))

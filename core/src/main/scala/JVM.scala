@@ -32,25 +32,39 @@ object JVM {
       }.run.runAsync(_ => ())
     }
 
-    def MB(lbl: String): Gauge[Periodic[Stats], Double] =
-      Gauge.scale(1/1e6)(numericGauge(lbl, 0.0, Units.Megabytes))
+    def MB(lbl: String, desc: String): Gauge[Periodic[Stats], Double] =
+      Gauge.scale(1/1e6)(numericGauge(lbl, 0.0, Units.Megabytes, desc))
 
-    val totalInit = MB("jvm/memory/total/init")
-    val totalUsed = MB("jvm/memory/total/used")
-    val totalMax = MB("jvm/memory/total/max")
-    val totalCommitted = MB("jvm/memory/total/committed")
+    val totalInit = MB("jvm/memory/total/init",
+                       "The amount of memory that the JVM initially requests from the operating system for memory management.")
+    val totalUsed = MB("jvm/memory/total/used",
+                       "The amount of used memory.")
+    val totalMax = MB("jvm/memory/total/max",
+                      "The maximum amount of memory that can be used for memory management.")
+    val totalCommitted = MB("jvm/memory/total/committed",
+                            "The amount of memory that is committed for the JVM to use.")
 
-    val heapInit = MB("jvm/memory/heap/init")
-    val heapUsed = MB("jvm/memory/heap/used")
-    val heapUsage = numericGauge("jvm/memory/heap/usage", 0.0, Units.Ratio)
-    val heapMax = MB("jvm/memory/heap/max")
-    val heapCommitted = MB("jvm/memory/heap/committed")
+    val heapInit = MB("jvm/memory/heap/init",
+                      "The amount of heap memory that the JVM initially requests from the operating system.")
+    val heapUsed = MB("jvm/memory/heap/used",
+                      "The amount of used heap memory.")
+    val heapUsage = numericGauge("jvm/memory/heap/usage", 0.0, Units.Ratio,
+                                 "Ratio of heap memory in use.")
+    val heapMax = MB("jvm/memory/heap/max",
+                     "The maximum amount of heap memory that can be used for memory management.")
+    val heapCommitted = MB("jvm/memory/heap/committed",
+                           "The amount of heap memory that is committed for the JVM to use.")
 
-    val nonheapInit = MB("jvm/memory/nonheap/init")
-    val nonheapUsed = MB("jvm/memory/nonheap/used")
-    val nonheapUsage = numericGauge("jvm/memory/nonheap/usage", 0.0, Units.Ratio)
-    val nonheapMax = MB("jvm/memory/nonheap/max")
-    val nonheapCommitted = MB("jvm/memory/nonheap/committed")
+    val nonheapInit = MB("jvm/memory/nonheap/init",
+                         "The amount of nonheap memory that the JVM initially requests from the operating system for memory management.")
+    val nonheapUsed = MB("jvm/memory/nonheap/used",
+                         "The amount of used nonheap memory.")
+    val nonheapUsage = numericGauge("jvm/memory/nonheap/usage", 0.0, Units.Ratio,
+                                    "Ratio of nonheap memory in use.")
+    val nonheapMax = MB("jvm/memory/nonheap/max",
+                         "The maximum amount of nonheap memory that can be used for memory management.")
+    val nonheapCommitted = MB("jvm/memory/nonheap/committed",
+                              "The amount of nonheap memory that is committed for the JVM to use.")
 
     Process.awakeEvery(t)(ES,TS).map { _ =>
       import mxBean.{getHeapMemoryUsage => heap, getNonHeapMemoryUsage => nonheap}
