@@ -92,7 +92,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
 
   /**
    * Return a `Gauge` with the given starting value.
-   * This gauge only updates the key `now/$label`.
+   * This gauge only updates the key `now/\$label`.
    * For a historical gauge that summarizes an entire
    * window of values as well, see `numericGauge`.
    */
