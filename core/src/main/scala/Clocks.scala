@@ -11,8 +11,10 @@ object Clocks {
     implicit ES: ExecutorService = Monitoring.defaultPool,
              TS: ScheduledExecutorService = Monitoring.schedulingPool,
              t: Duration = 5 seconds): Unit = {
-    val elapsed = I.currentElapsed("now/elapsed")
-    val remaining = I.currentRemaining("now/remaining")
+    val elapsed =
+      I.currentElapsed("now/elapsed", "Time since the last period of ${I.window} ended")
+    val remaining =
+      I.currentRemaining("now/remaining", "Time until the next period of ${I.window} begins")
     val uptime = I.uptime("uptime")
     Process.awakeEvery(t)(ES,TS).map { _ =>
       elapsed.set(())

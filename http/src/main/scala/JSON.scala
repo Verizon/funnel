@@ -106,12 +106,14 @@ object JSON {
   }
 
   implicit def EncodeKey[A]: EncodeJson[Key[A]] =
-    jencode3L((k: Key[A]) => (k.name, k.typeOf, k.units))("name", "type", "units")
+    jencode4L((k: Key[A]) => (k.name, k.typeOf, k.units, k.description))(
+      "name", "type", "units", "description")
   implicit def DecodeKey: DecodeJson[Key[Any]] = DecodeJson { c => for {
     name   <- (c --\ "name").as[String]
     typeOf <- (c --\ "type").as[Reportable[Any]]
     u      <- (c --\ "units").as[Units[Any]]
-  } yield Key(name, typeOf, u) }
+    desc   <- (c --\ "description").as[String].option
+  } yield Key(name, typeOf, u, desc getOrElse "") }
 
   implicit def EncodeStats: EncodeJson[funnel.Stats] =
     jencode7L((s: funnel.Stats) =>
