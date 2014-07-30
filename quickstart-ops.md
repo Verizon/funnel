@@ -15,7 +15,7 @@ For operations staff, the funnel system has a binary called `utensil` that simpl
 
 ### Manual Installation 
 
-If you would like to simply download the binary and run it manually using your shell, TGZ and ZIP packages are available on the nexus. Download the [.zip or .tgz](http://nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/repositories/releases/intelmedia/ws/funnel/utensil/) files and expand them into the directory of your choice. 
+If you would like to simply download the binary and run it manually using your shell, TGZ and ZIP packages are available on the nexus. Download the [.zip](http://nexus.svc.oncue.com/nexus/content/repositories/releases/intelmedia/ws/funnel/oncue/) files and expand them into the directory of your choice. 
 
 On unix systems, make the `./bin/utensil` shell executable (`chmod 755 ./bin/utensil`) and then execute the same file. This will boot up a local funnel instance that is ready to receive monitoring instructions. 
 

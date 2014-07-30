@@ -10,7 +10,7 @@ First up you need to add the dependency for the monitoring library to your `buil
 ````
 libraryDependencies += "intelmedia.ws.funnel" %% "http" % "x.y.z"
 ````
-(check for the latest release by [looking on the nexus](http://nexus.svc.m.infra-host.com/nexus/content/repositories/releases/intelmedia/ws/funnel/http_2.10/))
+(check for the latest release by [looking on the nexus](http://nexus.svc.oncue.com/nexus/content/repositories/releases/intelmedia/ws/funnel/http_2.10/))
 
 Current transitive dependencies this will introduce on your classpath:
 
@@ -25,15 +25,18 @@ You will likely never touch these dependencies directly, but its important to be
 With the dependency setup complete, you can now start instrumenting your code. The first thing you need to do is create a `metrics.scala` file, which should look something like this:
 
 ````
-package intelmedia.ws
+package oncue.svc
 package myproject
 
 import funnel.instruments._
 
 object metrics {
-  val HttpReadWidgets = timer("http/get/widgets")
-  val HttpReadWidget  = timer("http/get/widgets/:id")
-  val FooCount        = counter("domain/foocount")
+  val HttpReadWidgets = timer("http/get/widgets", 
+    "time taken to read and display the list of widgets")
+  val HttpReadWidget  = timer("http/get/widgets/:id", 
+    "time taken to read and display a given widget")
+  val FooCount        = counter("domain/foocount", 
+    "the number of foos that have been seen")
   // more metrics here
 }
 ````
@@ -45,13 +48,12 @@ The goal of this `metrics` object is to define your metrics up front, and force 
 > * When implementing timers for HTTP resources, use the idiom: `http/<verb>/<resource>`. If parts of the resource are variable, then use `:yourvar`, or whatever parameter name makes most sense. The reason for structure HTTP metrics like this is that it is easily consumable by operations and that it makes it easy to quickly compare different resources for a given HTTP verb (for example)
 > * As a rule of thumb, try to logically order your metrics in order of component coarseness. For example, anything starting with "db" for database operations can all be compared together in a convenient fashion, so it would make sense to bucket all database operations together, and then perhaps bucket all the *read* operations together, versus the *write* operations (see below for a more complete example)
 
-At first blush, clearly having a single namespace for the entire world of application metrics could become unwieldy, so it is recommended to organise your metrics with nested objects, based on logical application layering. Here's a more complete example from the SU3 service that illustrates this pattern:
+At first blush, clearly having a single namespace for the entire world of application metrics could become unwieldy, so it is recommended to organise your metrics with nested objects, based on logical application layering. Here's a more complete example from the SU service that illustrates this pattern:
 
 ````
-package intelmedia.ws
-package su
+package oncue.svc.su
 
-import funnel.instruments._
+import intelmedia.ws.funnel.instruments._
 
 object metrics {
 
@@ -59,35 +61,52 @@ object metrics {
     * Instruments for everything related to the HTTP stack.
     */
   object http {
-    val ReadUpdates       = timer("http/post/updates")
-    val CreateAllocations = timer("http/post/allocations")
-    val ReadAllocations   = timer("http/get/allocations/:key")
-    val DeleteAllocation  = timer("http/delete/:key")
-    val ReadGroups        = timer("http/get/groups")
-    val CreateGroup       = timer("http/post/groups")
-    val ReadGroup         = timer("http/get/groups/:key")
-    val UpdateGroup       = timer("http/put/groups/:key")
-    val DeleteGroup       = timer("http/delete/groups/:key")
+    val ReadUpdates       = timer("http/post/updates", 
+      "time taken to determine if the supplied device profile needs any software updated")
+    val CreateAllocations = timer("http/post/allocations", 
+      "time taken to make new allocations")
+    val ReadAllocations   = timer("http/get/allocations/:key", 
+      "time taken to read a specified allocation")
+    val DeleteAllocation  = timer("http/delete/allocations/:key", 
+      "time taken to delete an allocation")
+    val ReadGroups        = timer("http/get/groups", 
+      "time taken to load and present all defined groups as json")
+    val CreateGroup       = timer("http/post/groups", 
+      "time taken to add a new group")
+    val ReadGroup         = timer("http/get/groups/:key", 
+      "time taken to read a group definition and display as json")
+    val UpdateGroup       = timer("http/put/groups/:key", 
+      "time taken to replace the definition of a group")
+    val DeleteGroup       = timer("http/delete/groups/:key", 
+      "time taken to delete a group with a given key")
   }
 
   /**
     * Instruments for the database access operations
     */
   object db {
-    val ReadLatency       = timer("db/read/single/latency")
-    val ReadBatchLatency  = timer("db/read/batch/latency")
-    val ReadListLatency   = timer("db/read/list/latency")
-    val ReadScanLatency   = timer("db/read/scan/latency")
-    val WriteLatency      = timer("db/write/single/latency")
-    val WriteBatchLatency = timer("db/write/batch/latency")
-    val DeleteLatency     = timer("db/delete/batch/latency")
+    val ReadLatency       = timer("db/read/single/latency", 
+      "time taken to read a single entry from the database")
+    val ReadBatchLatency  = timer("db/read/batch/latency", 
+      "time taken to read a batch of items from the database with a specified set of keys")
+    val ReadListLatency   = timer("db/read/list/latency", 
+      "time taken to list items from the database with a given hash+range combination")
+    val ReadScanLatency   = timer("db/read/scan/latency", 
+      "time taken to scan the specified database table")
+    val WriteLatency      = timer("db/write/single/latency", 
+      "time taken to write a single entry into the database")
+    val WriteBatchLatency = timer("db/write/batch/latency", 
+      "time taken to write a batch to the database")
+    val DeleteLatency     = timer("db/delete/batch/latency", 
+      "time taken to delete a batch from the database")
   }
 
   /**
-    * Instruments for the domain-specific operations contained within SU
-    */
-  object domain {
-    val ResolverLatency   = timer("domain/resolver/latency")
+   * Instruments that record latencies for talking to other services
+   */
+  object s2s {
+    val ArtifactSyncLatency = timer("s2s/artifacts/latency", 
+      "time taken to request all the artifacts from inventory service")
   }
 }
 
@@ -302,5 +321,9 @@ object Main {
 
 **NOTE: By application `main`, this does not have to be the actual main, but rather, the end of the world for your application (which however, would usually be the main). For Play! applications, this means the Global object.**
 
-With this in your application, and assuming you are developing locally, once running you will be able to access [http://127.0.0.1:5775/](http://127.0.0.1:5775/) in your local web browser, where the index page will give you a list of available resources and descriptions of their function.
+With this in your application, and assuming you are developing locally, once running you will be able to access [http://127.0.0.1:5775/](http://127.0.0.1:5775/) in your local web browser, where the index page will give you a list of available resources and descriptions of their function:
+
+![image]({{ site.baseurl }}/img/control-panel.png)
+
+
 
