@@ -1,12 +1,19 @@
 package oncue.svc.funnel.aws
 
 import com.amazonaws.services.sqs.AmazonSQSClient
-import com.amazonaws.services.sqs.model.AddPermissionRequest
+import com.amazonaws.services.sqs.model.{
+  AddPermissionRequest,
+  CreateQueueRequest,
+  GetQueueAttributesRequest,
+  Message}
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.auth.BasicAWSCredentials
 import scalaz.concurrent.Task
 import scala.collection.JavaConverters._
+import concurrent.duration._
+import intelmedia.ws.funnel.Monitoring
+import java.util.concurrent.{ExecutorService,ScheduledExecutorService}
 
 object SQS {
   private val accounts = List(
@@ -27,6 +34,8 @@ object SQS {
     "DeleteMessage",
     "ChangeMessageVisibility")
 
+  private val readInterval = 12.seconds
+
   def client(
     credentials: BasicAWSCredentials,
     region: Region = Region.getRegion(Regions.fromName("us-east-1"))
@@ -36,15 +45,47 @@ object SQS {
     client
   }
 
-  def create(queue: String)(client: AmazonSQSClient): Task[ARN] =
+  def arnForQueue(url: String)(client: AmazonSQSClient): Task[ARN] = {
+    Task {
+      val attrs = client.getQueueAttributes(
+        new GetQueueAttributesRequest(url, List("QueueArn").asJava)).getAttributes.asScala
+      attrs.get("QueueArn")
+    }.flatMap {
+      case None => Task.fail(new RuntimeException("The specified URL did not have an associated SQS ARN in the specified region."))
+      case Some(m) => Task.now(m)
+    }
+  }
+
+  // http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-long-polling.html
+  def create(queueName: String)(client: AmazonSQSClient): Task[ARN] = {
+    val req = (new CreateQueueRequest(queueName)).withAttributes(
+      Map("MaximumMessageSize"            -> "64000",
+          "MessageRetentionPeriod"        -> "1800",
+          "ReceiveMessageWaitTimeSeconds" -> (readInterval.toSeconds - 2).toString).asJava)
+
     for {
-      u <- Task(client.createQueue(queue).getQueueUrl)
-      p  = new AddPermissionRequest(u, queue, accounts.asJava, permissions.asJava)
+      u <- Task(client.createQueue(req).getQueueUrl)
+      a <- arnForQueue(u)(client)
+      p  = new AddPermissionRequest(u, queueName, accounts.asJava, permissions.asJava)
       _ <- Task(client.addPermission(p))
-    } yield u
+    } yield a
+  }
 
-  def subscribe(queue: String)(client: AmazonSQSClient) = {
+  import scalaz.stream.Process
 
+  def subscribe(
+    queue: ARN,
+    wait: Duration = readInterval
+  )(client: AmazonSQSClient)(
+    implicit pool: ExecutorService = Monitoring.defaultPool,
+    schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool
+  ): Process[Task, Message] = {
+    Process.awakeEvery(wait)(Monitoring.schedulingPool).evalMap { _ =>
+      Task {
+        val msgs: List[Message] = client.receiveMessage(queue).getMessages.asScala.toList
+        msgs.head
+      }(Monitoring.defaultPool)
+    }
   }
 
 }

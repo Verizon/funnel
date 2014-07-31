@@ -18,14 +18,17 @@ object SNS {
     client
   }
 
-  def publish(snsTopic: String, payload: String)(client: AmazonSNSClient): Task[Unit] = {
-    Task {
-      val req = new CreateTopicRequest(snsTopic) // cfg.require[String]("aws.snsTopic")
-      val res = client.createTopic(req) // idempotent operation
-      val arn = res.getTopicArn
+  def create(topicName: String)(client: AmazonSNSClient): Task[ARN] = Task {
+    val req = new CreateTopicRequest(topicName) // cfg.require[String]("aws.snsTopic")
+    client.createTopic(req).getTopicArn // idempotent operation
+  }
 
-      val preq = new PublishRequest(arn, payload)
-      val pres = client.publish(preq)
+  def publish(topicName: String, payload: String)(client: AmazonSNSClient): Task[Unit] = {
+    create(topicName)(client).flatMap { arn =>
+      Task {
+        val preq = new PublishRequest(arn, payload)
+        val pres = client.publish(preq)
+      }
     }
   }
 
