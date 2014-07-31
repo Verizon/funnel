@@ -1,5 +1,5 @@
 package intelmedia.ws.funnel
-package sink
+package flask
 
 import riemann.Riemann
 import http.{MonitoringServer,SSE}
@@ -17,7 +17,7 @@ import knobs.{Config, Required, ClassPathResource, FileResource}
   *
   * Or pass the location of the config file as a command line argument.
   */
-object Sink extends CLI {
+object Main extends CLI {
   // private val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
   private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
     server.stop()

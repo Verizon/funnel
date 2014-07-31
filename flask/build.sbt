@@ -18,10 +18,10 @@ libraryDependencies ++= Seq(
   "oncue.svc.knobs"      %% "core"         % "0.1.29"
 )
 
-name in Universal := "utensil"
+name in Universal := "flask"
 
 mappings in Universal ++= Seq(
-  file("utensil/etc/utensil.cfg") -> "etc/utensil.cfg"
+  file("utensil/etc/flask.cfg") -> "etc/flask.cfg"
 )
 
-mainClass in Revolver.reStart := Some("intelmedia.ws.funnel.utensil.Utensil")
+mainClass in Revolver.reStart := Some("intelmedia.ws.funnel.flask.Main")

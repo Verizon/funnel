@@ -13,7 +13,9 @@ lazy val http = project.dependsOn(core)
 
 lazy val riemann = project.dependsOn(core)
 
-lazy val sink = project.dependsOn(core, http, riemann)
+lazy val flask = project.dependsOn(core, http, riemann)
+
+lazy val technician = project(http)
 
 OnCue.baseSettings
 
