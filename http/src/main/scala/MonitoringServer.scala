@@ -130,6 +130,20 @@ class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
     }
   }
 
+  private def handleAudit(M: Monitoring, req: HttpExchange): Unit = {
+    import JSON._; import argonaut._, Argonaut._;
+
+    M.audit.attemptRun.fold(
+      err => {
+        val respBytes = err.getMessage.toString.getBytes("UTF-8")
+        req.sendResponseHeaders(500, respBytes.length)
+        req.getResponseBody.write(respBytes)
+      },
+      list => flush(200,
+        list.map(t => Audit(t._1, t._2)).asJson.nospaces.getBytes, req)
+    )
+  }
+
   private def post(req: HttpExchange)(f: String => Unit): Unit = {
     import scala.io.Source
     if(req.getRequestMethod.toLowerCase == "post"){
@@ -156,6 +170,7 @@ class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
       }
       path match {
         case Nil                       => handleIndex(req)
+        case "audit"  :: Nil           => handleAudit(M, req)
         case "halt"   :: Nil           => handleHaltMirroringURLs(M, req)
         case "mirror" :: Nil           => handleAddMirroringURLs(M, req)
         case "keys"   :: tl            => handleKeys(M, tl.mkString("/"), req)
