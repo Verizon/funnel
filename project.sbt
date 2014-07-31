@@ -13,7 +13,7 @@ lazy val http = project.dependsOn(core)
 
 lazy val riemann = project.dependsOn(core)
 
-lazy val utensil = project.dependsOn(core, http, riemann)
+lazy val sink = project.dependsOn(core, http, riemann)
 
 OnCue.baseSettings
 
