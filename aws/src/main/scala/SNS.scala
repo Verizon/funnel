@@ -18,9 +18,9 @@ object SNS {
     client
   }
 
-  def publish(regionName: String, payload: String)(client: AmazonSNSClient): Task[Unit] = {
+  def publish(regionName: String, snsTopic: String, payload: String)(client: AmazonSNSClient): Task[Unit] = {
     Task {
-      val req = new CreateTopicRequest // cfg.require[String]("aws.snsTopic")
+      val req = new CreateTopicRequest(snsTopic) // cfg.require[String]("aws.snsTopic")
       val res = client.createTopic(req) // idempotent operation
       val arn = res.getTopicArn
 
@@ -28,4 +28,10 @@ object SNS {
       val pres = client.publish(preq)
     }
   }
+
+  def subscribe(topic: String, arn: ARN, protocol: String = "sqs")(client: AmazonSNSClient): Task[ARN] =
+    for {
+      a <- Task(client.subscribe(topic, protocol, arn).getSubscriptionArn)
+      b <- Task(client.setSubscriptionAttributes(a, "RawMessageDelivery", "true"))
+    } yield a
 }
