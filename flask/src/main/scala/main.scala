@@ -76,7 +76,7 @@ object Main extends CLI {
         t <- cfg.lookup[Int]("flask.local-metric-frequency")
       }{
         implicit val duration = t.seconds
-        Sigar.instrument(new Instruments(1.minute, M))
+        Sigar(new Instruments(1.minute, M)).foreach {_.instrument}
       }
 
       val R = RiemannClient.tcp(options.riemann.host, options.riemann.port)
