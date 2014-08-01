@@ -3,12 +3,7 @@ package funnel
 package http
 
 import argonaut.{DecodeResult => D, _}
-import argonaut.EncodeJson.{
-  BooleanEncodeJson, StringEncodeJson, Tuple2EncodeJson,
-  jencode1, jencode2L, jencode3L, jencode4L, jencode6L, jencode7L
-}
-import argonaut.DecodeJson.jdecode6L
-import argonaut.CodecJson.casecodec2
+import argonaut._, Argonaut._
 
 import java.io.InputStream
 import java.util.concurrent.{ExecutorService, TimeUnit}
@@ -84,6 +79,7 @@ object JSON {
       case None => "None"
     }
   }
+
   implicit def DecodeUnits: DecodeJson[Units[Any]] = DecodeJson { c =>
     import Units._; import Units.Base._
     c.as[String] flatMap {
@@ -108,6 +104,7 @@ object JSON {
   implicit def EncodeKey[A]: EncodeJson[Key[A]] =
     jencode4L((k: Key[A]) => (k.name, k.typeOf, k.units, k.description))(
       "name", "type", "units", "description")
+
   implicit def DecodeKey: DecodeJson[Key[Any]] = DecodeJson { c => for {
     name   <- (c --\ "name").as[String]
     typeOf <- (c --\ "type").as[Reportable[Any]]
@@ -119,6 +116,7 @@ object JSON {
     jencode7L((s: funnel.Stats) =>
       (s.last, s.mean, s.count.toDouble, s.variance, s.standardDeviation, s.skewness, s.kurtosis))(
        "last", "mean", "count", "variance", "standardDeviation", "skewness", "kurtosis")
+
   implicit def DecodeStats: DecodeJson[funnel.Stats] =
     jdecode6L((last: Option[Double], mean: Double, count: Double, variance: Double,
                skewness: Double, kurtosis: Double) => {
@@ -166,6 +164,15 @@ object JSON {
     k <- (c --\ "key").as[Key[Any]]
     v <- (c --\ "value").as[Any](DecodeReportable(k.typeOf))
   } yield Datapoint(k, v) }
+
+  case class Audit(prefix: String, count: Int)
+
+  implicit def EncodeAudit: EncodeJson[Audit] =
+    EncodeJson((b: Audit) =>
+      ("prefix"    := b.prefix) ->:
+      ("count"     := b.count) ->:
+      jEmptyObject
+    )
 
 }
 

@@ -253,7 +253,6 @@ trait Monitoring {
            .run.runAsync { _ => () }
   }
 
-
   /** Return the elapsed time since this instance was started. */
   def elapsed: Duration
 
@@ -263,6 +262,18 @@ trait Monitoring {
 
   /** The time-varying set of keys. */
   def keys: SampledSignal[List[Key[Any]]]
+
+  /** get a count of all metric keys in the system broken down by their logical prefix **/
+  def audit: Task[List[(String, Int)]] =
+    keys.sample.map { k =>
+      val ks = k.toList.flatMap(identity)
+      val prefixes: List[String] = ks.flatMap(_.name.split('/').headOption).distinct
+
+      prefixes.foldLeft(List.empty[(String, Int)]){ (a,step) =>
+        val items = ks.filter(_.startsWith(step))
+        (step, items.length) :: a
+      }
+    }
 
   /** Returns `true` if the given key currently exists. */
   def exists[O](k: Key[O]): Task[Boolean] = keys.continuous.once.runLastOr(List()).map(_.contains(k))
