@@ -1,5 +1,5 @@
 package intelmedia.ws.funnel
-package utensil
+package flask
 
 import riemann.Riemann
 import http.{MonitoringServer,SSE}
@@ -12,55 +12,30 @@ import java.io.File
 import knobs.{Config, Required, ClassPathResource, FileResource}
 
 /**
-  * How to use: Modify oncue/utensil.cfg on the classpath
+  * How to use: Modify oncue/flask.cfg on the classpath
   * and run from the command line.
   *
   * Or pass the location of the config file as a command line argument.
   */
-object Utensil extends CLI {
-  // private val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
+object Main extends CLI {
   private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
     server.stop()
-    // nice little hack to get make it easy to just hit return and shutdown
-    // this running example
-    // stop.set(true)
     R.disconnect
   }
 
   import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
   import com.amazonaws.services.sns.AmazonSNSClient
+  import com.amazonaws.auth.BasicAWSCredentials
   import com.amazonaws.regions.{Region, Regions}
-  import com.amazonaws.services.sns.model.{CreateTopicRequest, PublishRequest}
   import Events.Event
   import Riemann.Names
   import scalaz.\/._
+  import oncue.svc.funnel.aws.SNS
 
-  private def giveUp(names: Names, cfg: Config, log: String => Unit) =
-   if (cfg.lookup[String]("aws.accessKey").isDefined) {
-     Process.eval(for {
-       credsProvider <- Task(new AWSCredentialsProvider {
-         def getCredentials = new AWSCredentials {
-           def getAWSAccessKeyId = cfg.require[String]("aws.accessKey")
-           def getAWSSecretKey = cfg.require[String]("aws.secretKey")
-         }
-         val refresh = ()
-       })
-       creds <- Task(credsProvider.getCredentials).attempt
-       ee <- creds.fold(_ => Task(right(())),
-                        _ => Task {
-            val snsClient = new AmazonSNSClient
-            snsClient.setRegion(Region.getRegion(Regions.fromName(cfg.require[String]("aws.region"))))
-            val req = new CreateTopicRequest(cfg.require[String]("aws.snsTopic"))
-            val res = snsClient.createTopic(req)
-            val arn = res.getTopicArn
-            val msg = s"${names.mine} gave up on ${names.kind} server ${names.theirs}"
-            val preq = new PublishRequest(arn, msg)
-            val pres = snsClient.publish(preq)
-            log(s"Posted $pres to SNS $arn")
-          }.attempt)
-       _ <- ee.fold(e => Task(log(s"Error posting to SNS: $e")), _ => Task(()))
-     } yield ())
-   } else Process.halt
+  private def giveUp(names: Names, cfg: Config, sns: AmazonSNSClient, log: String => Unit) = {
+    val msg = s"${names.mine} gave up on ${names.kind} server ${names.theirs}"
+    Process.eval(SNS.publish(cfg.require[String]("flask.sns-error-topic"), msg)(sns))
+  }
 
   private def errorAndQuit(options: Options, f: () => Unit): Unit = {
     val msg = s"# Riemann is not running at the specified location (${options.riemann.host}:${options.riemann.port}) #"
@@ -76,17 +51,30 @@ object Utensil extends CLI {
     run(args){ (options, cfg) =>
 
       import scalaz.concurrent._
-      val logger = LoggerFactory.getLogger("utensil")
+      val logger = LoggerFactory.getLogger("flask")
       implicit val logPool = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
       val L = Actor.actor((s: String) => logger.info(s))
 
       implicit val log: String => Unit = s => L(s)
 
+      val Q = SNS.client(
+        new BasicAWSCredentials(
+          cfg.require[String]("aws.access-key"),
+          cfg.require[String]("aws.secret-key")),
+        cfg.lookup[String]("aws.proxy-host"),
+        cfg.lookup[Int]("aws.proxy-port"),
+        cfg.lookup[String]("aws.proxy-protocol"),
+        Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
+      )
+
       val M = Monitoring.default
       val S = MonitoringServer.start(M, options.funnelPort)
 
       // Determine whether to generate system statistics for the local host
-      cfg.lookup[Int]("localHostMonitorFrequencySeconds").foreach { t =>
+      for {
+        b <- cfg.lookup[Boolean]("flask.collect-local-metrics") if b == true
+        t <- cfg.lookup[Int]("flask.local-metric-frequency")
+      }{
         implicit val duration = t.seconds
         Sigar.instrument(new Instruments(1.minute, M))
       }
@@ -100,7 +88,8 @@ object Utensil extends CLI {
         }
       }
 
-      def utensilRetries(names: Names): Event = Riemann.defaultRetries andThen (_ ++ giveUp(names, cfg, log))
+      def utensilRetries(names: Names): Event =
+        Riemann.defaultRetries andThen (_ ++ giveUp(names, cfg, Q, log))
 
       val localhost = java.net.InetAddress.getLocalHost.toString
 
@@ -109,14 +98,6 @@ object Utensil extends CLI {
         R, s"${options.riemann.host}:${options.riemann.port}", utensilRetries)(SSE.readEvents)(
         S.commands, cfg.lookup[String]("funnelName").getOrElse(localhost))(log
           ).runAsync(_.fold(e => log(s"[ERROR] $e - ${e.getMessage}"), identity _))
-
-      // println
-      // println("Press [Enter] to quit...")
-      // println
-
-      // val _ = readLine()
-
-      // shutdown(S,R)
     }
   }
 
@@ -140,15 +121,15 @@ trait CLI {
   def run(args: Array[String])(f: (Options, Config) => Unit): Unit = {
 
     val config =
-      knobs.loadImmutable(List(Required(FileResource(new File("/usr/share/oncue/etc/utensil.cfg"))))) or
-      knobs.loadImmutable(List(Required(ClassPathResource("oncue/utensil.cfg"))))
+      knobs.loadImmutable(List(Required(FileResource(new File("/usr/share/oncue/etc/flask.cfg"))))) or
+      knobs.loadImmutable(List(Required(ClassPathResource("oncue/flask.cfg"))))
 
     config.flatMap { cfg =>
-      val port = cfg.lookup[Int]("funnelPort").getOrElse(5775)
-      val name = cfg.lookup[String]("funnelName").getOrElse("Funnel")
-      val riemannHost = cfg.lookup[String]("riemannHost").getOrElse("localhost")
-      val riemannPort = cfg.lookup[Int]("riemannPort").getOrElse(5555)
-      val ttl = cfg.lookup[Int]("riemannTTLMinutes").getOrElse(5).minutes
+      val port        = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
+      val name        = cfg.lookup[String]("flask.name").getOrElse("flask")
+      val riemannHost = cfg.lookup[String]("flask.riemann.host").getOrElse("localhost")
+      val riemannPort = cfg.lookup[Int]("flask.riemann.port").getOrElse(5555)
+      val ttl         = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").getOrElse(5).minutes
       Task(f(Options(RiemannHostPort(riemannHost, riemannPort), ttl, port), cfg))
     }.run
   }
