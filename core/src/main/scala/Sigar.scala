@@ -7,8 +7,11 @@ import scalaz.concurrent.Strategy
 import scalaz.stream._
 
 /** Functions for adding various system metrics collected by SIGAR to a `Monitoring` instance. */
-object Sigar {
+class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
+
   type G = Gauge[Periodic[Stats], Double]
+
+  import I._
 
   case class CpuStats(user: G,
                       idle: G,
@@ -34,130 +37,128 @@ object Sigar {
                              freeFiles: G,
                              diskReads: G)
 
-  def instrument(I: Instruments)(
+  object CPU {
+    def label(s: String) = s"system/cpu/$s"
+
+    def cpuTime(label: String => String): CpuStats = {
+      def ms(s: String) = numericGauge(label(s), 0.0, Units.Milliseconds)
+
+      CpuStats(ms("user"),
+               ms("idle"),
+               ms("total"),
+               ms("nice"),
+               ms("irq"),
+               ms("sys"),
+               ms("wait"),
+               ms("softirq"),
+               ms("stolen"))
+    }
+
+    def cpuUsage(label: String => String): CpuStats = {
+      def pct(s: String) = numericGauge(label(s), 0.0, Units.Ratio)
+
+      CpuStats(pct("user"),
+               pct("idle"),
+               pct("combined"),
+               pct("nice"),
+               pct("irq"),
+               pct("sys"),
+               pct("wait"),
+               pct("softirq"),
+               pct("stolen"))
+    }
+
+    object Aggregate {
+      def label(s: String) = CPU.label(s"aggregate/$s")
+
+      val time = cpuTime(s => label(s"time/$s"))
+      val usage = cpuUsage(s => label(s"usage/$s"))
+    }
+
+    object Individual {
+      val cpus = sigar.getCpuList.zipWithIndex
+
+      val times = cpus.map {
+        case (_, n) => cpuTime(s => CPU.label(s"$n/time/$s"))
+      }
+
+      val usages = cpus.map {
+        case (_, n) => cpuUsage(s => CPU.label(s"$n/usage/$s"))
+      }
+    }
+  }
+
+  object Mem {
+    def label(s: String) = s"system/mem/$s"
+    def mem(s: String) = numericGauge(label(s), 0.0, Units.Bytes(Units.Base.Zero))
+    def MB(s: String) = numericGauge(label(s), 0.0, Units.Megabytes)
+    def pct(s: String) = numericGauge(label(s), 0.0, Units.Ratio)
+
+    val used = mem("used")
+    val actualUsed = mem("actual_used")
+    val total = mem("total")
+    val usedPercent = pct("used_percent")
+    val free = mem("free")
+    val actualFree = mem("actual_free")
+    val freePercent = pct("free_percent")
+    val ram = MB("ram")
+  }
+
+  object FileSystem {
+    val fileSystems = sigar.getFileSystemList
+    val usages = fileSystems.map { d =>
+      val dirName = java.net.URLEncoder.encode(d.getDirName, "UTF-8")
+      def label(s: String) = s"system/file_system/${dirName}/$s"
+      def mem(s: String) = numericGauge(label(s), 0.0, Units.Bytes(Units.Base.Zero))
+      def pct(s: String) = numericGauge(label(s), 0.0, Units.Ratio)
+      def num(s: String) = numericGauge(label(s), 0.0, Units.Count)
+      def ms(s: String) = numericGauge(label(s), 0.0, Units.Milliseconds)
+
+      (d.getDirName, FileSystemStats(
+        avail = mem("avail"),
+        usePercent = pct("use_percent"),
+        diskQueue = num("disk_queue"),
+        free = mem("free"),
+        diskReadBytes = mem("disk_read_bytes"),
+        diskServiceTime = ms("disk_service_time"),
+        diskWrites = num("disk_writes"),
+        used = mem("used"),
+        diskWriteBytes = mem("disk_write_bytes"),
+        total = mem("total"),
+        files = num("files"),
+        freeFiles = num("free_files"),
+        diskReads = num("disk_reads")
+      ))
+    }.toMap
+  }
+
+  object LoadAverage {
+    val one = numericGauge("system/load_average/1", 0.0, Units.Count)
+    val five = numericGauge("system/load_average/5", 0.0, Units.Count)
+    val fifteen = numericGauge("system/load_average/15", 0.0, Units.Count)
+  }
+
+  val Uptime = numericGauge("system/uptime", 0.0, Units.Seconds)
+
+  object TCP {
+    def label(s: String) = s"system/tcp/$s"
+    def num(s: String) = numericGauge(label(s), 0.0, Units.Count)
+    val estabResets = num("estab_resets")
+    val outSegs = num("outsegs")
+    val retransSegs = num("retrans_segs")
+    val inErrs = num("in_errs")
+    val inSegs = num("in_segs")
+    val currEstab = num("curr_estab")
+    val passiveOpens = num("passive_opens")
+    val activeOpens = num("active_opens")
+    val attemptFails = num("attempt_fails")
+  }
+
+  def instrument(
     implicit ES: ExecutorService = Monitoring.defaultPool,
              TS: ScheduledExecutorService = Monitoring.schedulingPool,
              t: Duration = 30 seconds,
-             log: String => Unit): Unit = try {
-    val sigar = new org.hyperic.sigar.Sigar
-    import I._
-
-    object CPU {
-      def label(s: String) = s"system/cpu/$s"
-
-      def cpuTime(label: String => String): CpuStats = {
-        def ms(s: String) = numericGauge(label(s), 0.0, Units.Milliseconds)
-
-        CpuStats(ms("user"),
-                 ms("idle"),
-                 ms("total"),
-                 ms("nice"),
-                 ms("irq"),
-                 ms("sys"),
-                 ms("wait"),
-                 ms("softirq"),
-                 ms("stolen"))
-      }
-
-      def cpuUsage(label: String => String): CpuStats = {
-        def pct(s: String) = numericGauge(label(s), 0.0, Units.Ratio)
-
-        CpuStats(pct("user"),
-                 pct("idle"),
-                 pct("combined"),
-                 pct("nice"),
-                 pct("irq"),
-                 pct("sys"),
-                 pct("wait"),
-                 pct("softirq"),
-                 pct("stolen"))
-      }
-
-      object Aggregate {
-        def label(s: String) = CPU.label(s"aggregate/$s")
-
-        val time = cpuTime(s => label(s"time/$s"))
-        val usage = cpuUsage(s => label(s"usage/$s"))
-      }
-
-      object Individual {
-        val cpus = sigar.getCpuList.zipWithIndex
-
-        val times = cpus.map {
-          case (_, n) => cpuTime(s => CPU.label(s"$n/time/$s"))
-        }
-
-        val usages = cpus.map {
-          case (_, n) => cpuUsage(s => CPU.label(s"$n/usage/$s"))
-        }
-      }
-    }
-
-    object Mem {
-      def label(s: String) = s"system/mem/$s"
-      def mem(s: String) = numericGauge(label(s), 0.0, Units.Bytes(Units.Base.Zero))
-      def MB(s: String) = numericGauge(label(s), 0.0, Units.Megabytes)
-      def pct(s: String) = numericGauge(label(s), 0.0, Units.Ratio)
-
-      val used = mem("used")
-      val actualUsed = mem("actual_used")
-      val total = mem("total")
-      val usedPercent = pct("used_percent")
-      val free = mem("free")
-      val actualFree = mem("actual_free")
-      val freePercent = pct("free_percent")
-      val ram = MB("ram")
-    }
-
-    object FileSystem {
-      val fileSystems = sigar.getFileSystemList
-      val usages = fileSystems.map { d =>
-        val dirName = java.net.URLEncoder.encode(d.getDirName, "UTF-8")
-        def label(s: String) = s"system/file_system/${dirName}/$s"
-        def mem(s: String) = numericGauge(label(s), 0.0, Units.Bytes(Units.Base.Zero))
-        def pct(s: String) = numericGauge(label(s), 0.0, Units.Ratio)
-        def num(s: String) = numericGauge(label(s), 0.0, Units.Count)
-        def ms(s: String) = numericGauge(label(s), 0.0, Units.Milliseconds)
-
-        (d.getDirName, FileSystemStats(
-          avail = mem("avail"),
-          usePercent = pct("use_percent"),
-          diskQueue = num("disk_queue"),
-          free = mem("free"),
-          diskReadBytes = mem("disk_read_bytes"),
-          diskServiceTime = ms("disk_service_time"),
-          diskWrites = num("disk_writes"),
-          used = mem("used"),
-          diskWriteBytes = mem("disk_write_bytes"),
-          total = mem("total"),
-          files = num("files"),
-          freeFiles = num("free_files"),
-          diskReads = num("disk_reads")
-        ))
-      }.toMap
-    }
-
-    object LoadAverage {
-      val one = numericGauge("system/load_average/1", 0.0, Units.Count)
-      val five = numericGauge("system/load_average/5", 0.0, Units.Count)
-      val fifteen = numericGauge("system/load_average/15", 0.0, Units.Count)
-    }
-
-    val Uptime = numericGauge("system/uptime", 0.0, Units.Seconds)
-
-    object TCP {
-      def label(s: String) = s"system/tcp/$s"
-      def num(s: String) = numericGauge(label(s), 0.0, Units.Count)
-      val estabResets = num("estab_resets")
-      val outSegs = num("outsegs")
-      val retransSegs = num("retrans_segs")
-      val inErrs = num("in_errs")
-      val inSegs = num("in_segs")
-      val currEstab = num("curr_estab")
-      val passiveOpens = num("passive_opens")
-      val activeOpens = num("active_opens")
-      val attemptFails = num("attempt_fails")
-    }
+             log: String => Unit): Unit = {
 
     // Make the side effects happen.
     // Side effects FTL!
@@ -264,11 +265,20 @@ object Sigar {
       TCP.attemptFails.set(tcp.getAttemptFails)
 
     }.run.runAsync(_ => ())
+  }
+}
 
+object Sigar {
+  def apply(I: Instruments)(implicit log: String => Unit): Option[Sigar] = try {
+    val sigar = new org.hyperic.sigar.Sigar
+    Some(new Sigar(I, sigar))
   } catch {
     case e: LinkageError =>
       log(e.getMessage)
       log(s"java.library.path is set to: " +
         System.getProperty("java.library.path"))
+      None
   }
+  def instrument(I: Instruments)(implicit log: String => Unit): Unit =
+    apply(I).foreach(_.instrument)
 }
