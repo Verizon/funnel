@@ -39,9 +39,14 @@ object SQS {
 
   def client(
     credentials: BasicAWSCredentials,
+    awsProxyHost: Option[String] = None,
+    awsProxyPort: Option[Int] = None,
+    awsProxyProtocol: Option[String] = None,
     region: Region = Region.getRegion(Regions.fromName("us-east-1"))
   ): AmazonSQSClient = { //cfg.require[String]("aws.region"))
-    val client = new AmazonSQSClient()
+    val client = new AmazonSQSClient(
+      credentials,
+      proxy.configuration(awsProxyHost, awsProxyPort, awsProxyProtocol))
     client.setRegion(region)
     client
   }

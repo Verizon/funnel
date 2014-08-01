@@ -11,9 +11,14 @@ object SNS {
 
   def client(
     credentials: BasicAWSCredentials,
+    awsProxyHost: Option[String] = None,
+    awsProxyPort: Option[Int] = None,
+    awsProxyProtocol: Option[String] = None,
     region: Region = Region.getRegion(Regions.fromName("us-east-1"))
   ): AmazonSNSClient = { //cfg.require[String]("aws.region"))
-    val client = new AmazonSNSClient()
+    val client = new AmazonSNSClient(
+      credentials,
+      proxy.configuration(awsProxyHost, awsProxyPort, awsProxyProtocol))
     client.setRegion(region)
     client
   }
