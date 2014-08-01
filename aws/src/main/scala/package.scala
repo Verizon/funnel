@@ -4,12 +4,13 @@ package object aws {
 
   import com.amazonaws.services.sns.AmazonSNSClient
   import com.amazonaws.services.sqs.AmazonSQSClient
+  import scalaz.concurrent.Task
 
   def createTopicWithSubscribedQueue(name: String
-    )(sns: AmazonSNSClient, sqs: AmazonSQSClient) = {
+    )(sns: AmazonSNSClient, sqs: AmazonSQSClient): Task[ARN] = {
     for {
-      q <- SQS.create("testingq")(sqs)
-      t <- SNS.create("testing")(sns)
+      q <- SQS.create(name)(sqs)
+      t <- SNS.create(name)(sns)
       x <- SNS.subscribe(t,q,"sqs")(sns)
     } yield x
   }

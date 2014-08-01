@@ -13,7 +13,7 @@ lazy val http = project.dependsOn(core)
 
 lazy val riemann = project.dependsOn(core)
 
-lazy val flask = project.dependsOn(core, http, riemann)
+lazy val flask = project.dependsOn(core, http, riemann, aws)
 
 lazy val chemist = project.dependsOn(http)
 

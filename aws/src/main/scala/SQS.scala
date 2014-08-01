@@ -16,6 +16,7 @@ import intelmedia.ws.funnel.Monitoring
 import java.util.concurrent.{ExecutorService,ScheduledExecutorService}
 
 object SQS {
+  // hard-coded for now as these are so slow moving.
   private val accounts = List(
     "447570741169",
     "460423777025",

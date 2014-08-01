@@ -12,7 +12,7 @@ import java.io.File
 import knobs.{Config, Required, ClassPathResource, FileResource}
 
 /**
-  * How to use: Modify oncue/utensil.cfg on the classpath
+  * How to use: Modify oncue/flask.cfg on the classpath
   * and run from the command line.
   *
   * Or pass the location of the config file as a command line argument.

@@ -4,8 +4,6 @@ import com.amazonaws.{ClientConfiguration,Protocol}
 
 object proxy {
   def configuration(
-    awsAccessKey: Option[String],
-    awsSecretKey: Option[String],
     awsProxyHost: Option[String] = None,
     awsProxyPort: Option[Int] = None,
     awsProxyProtocol: Option[String] = None
