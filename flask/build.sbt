@@ -21,7 +21,7 @@ libraryDependencies ++= Seq(
 name in Universal := "flask"
 
 mappings in Universal ++= Seq(
-  file("utensil/etc/flask.cfg") -> "etc/flask.cfg"
+  file("flask/src/main/resources/oncue/flask.cfg") -> "etc/flask.cfg"
 )
 
 mainClass in Revolver.reStart := Some("intelmedia.ws.funnel.flask.Main")
