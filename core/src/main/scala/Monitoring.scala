@@ -62,8 +62,11 @@ trait Monitoring {
     val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(refresh))
     // Republish these values to a new topic
     for {
-      b <- exists(key)
-      _ <- proc.evalMap((o: O) => if (b) Task.fork(update(key, o)) else Task(topic[O,O](key)(Buffers.ignoreTime(process1.id)))).run
+      _ <- proc.evalMap((o: O) => for {
+        b <- exists(key)
+        _ <- if (b) Task.fork(update(key, o))
+             else Task(topic[O,O](key)(Buffers.ignoreTime(process1.id)))
+      } yield ()).run
     } yield key
   }
 
@@ -77,11 +80,12 @@ trait Monitoring {
    * throws an error if the key already exists. Use `republish` if
    * preexisting `key` is not an error condition.
    */
-  def publish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = for {
-    b <- exists(key)
-    k <- if (b) Task.fail(new Exception(s"key not unique, use republish if this is indented: $key"))
-         else republish(key)(e)(f)
-  } yield k
+  def publish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] =
+    for {
+      b <- exists(key)
+      k <- if (b) Task.fail(new Exception(s"key not unique, use republish if this is indented: $key"))
+           else republish(key)(e)(f)
+    } yield k
 
   /** Compute the current value for the given `Metric`. */
   def eval[A](f: Metric[A]): Task[A] = {
@@ -276,7 +280,8 @@ trait Monitoring {
     }
 
   /** Returns `true` if the given key currently exists. */
-  def exists[O](k: Key[O]): Task[Boolean] = keys.continuous.once.runLastOr(List()).map(_.contains(k))
+  def exists[O](k: Key[O]): Task[Boolean] =
+    keys.continuous.once.runLastOr(List()).map(_.contains(k))
 
   /** Attempt to uniquely resolve `name` to a key of some expected type. */
   def lookup[O](name: String)(implicit R: Reportable[O]): Task[Key[O]] =
