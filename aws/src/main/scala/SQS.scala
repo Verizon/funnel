@@ -5,7 +5,10 @@ import com.amazonaws.services.sqs.model.{
   AddPermissionRequest,
   CreateQueueRequest,
   GetQueueAttributesRequest,
-  Message}
+  Message,
+  ReceiveMessageRequest,
+  DeleteMessageBatchRequestEntry,
+  DeleteMessageBatchResult}
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.auth.BasicAWSCredentials
@@ -80,18 +83,44 @@ object SQS {
   import scalaz.stream.Process
 
   def subscribe(
-    queue: ARN,
-    wait: Duration = readInterval
+    url: String,
+    tick: Duration = readInterval,
+    visibilityTimeout: Duration = 20.seconds
   )(client: AmazonSQSClient)(
     implicit pool: ExecutorService = Monitoring.defaultPool,
     schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool
-  ): Process[Task, Message] = {
-    Process.awakeEvery(wait)(Monitoring.schedulingPool).evalMap { _ =>
+  ): Process[Task, List[Message]] = {
+    Process.awakeEvery(tick)(Monitoring.schedulingPool).evalMap { _ =>
       Task {
-        val msgs: List[Message] = client.receiveMessage(queue).getMessages.asScala.toList
-        msgs.head
+        val req = (new ReceiveMessageRequest
+          ).withQueueUrl(url
+          ).withVisibilityTimeout(visibilityTimeout.toSeconds.toInt)
+
+        val msgs: List[Message] =
+          client.receiveMessage(req).getMessages.asScala.toList
+
+        // println(">>>>>>>>> " + msgs)
+        msgs
       }(Monitoring.defaultPool)
     }
+  }
+
+  case class FailedDeletions(messageIds: List[String]) extends RuntimeException
+
+  def deleteMessages(queue: String, msgs: List[Message])(sqs: AmazonSQSClient): Process[Task, Unit] = {
+    val result: Task[Unit] = Task {
+      val req = msgs.map(m => new DeleteMessageBatchRequestEntry(m.getMessageId, m.getReceiptHandle))
+      val res = sqs.deleteMessageBatch(queue, req.asJava)
+
+      res.getFailed.asScala.toList match {
+        case Nil    => Task.now(())
+        case errors => Task.fail(FailedDeletions(errors.map(_.getId)))
+      }
+
+      ()
+    }
+
+    Process.eval(result)
   }
 
 }

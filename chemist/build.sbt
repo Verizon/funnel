@@ -20,8 +20,8 @@ libraryDependencies ++= Seq(
 
 name in Universal := "chemist"
 
-// mappings in Universal ++= Seq(
-//   file("utensil/etc/flask.cfg") -> "etc/flask.cfg"
-// )
+mainClass in Revolver.reStart := Some("intelmedia.ws.funnel.chemist.Main")
 
-// mainClass in Revolver.reStart := Some("intelmedia.ws.funnel.flask.Main")
+scalacOptions := Compilation.flags.filterNot(_ == "-Xlint") ++ Seq(
+  "-language:postfixOps"
+)
