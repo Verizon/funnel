@@ -62,8 +62,11 @@ trait Monitoring {
     val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(refresh))
     // Republish these values to a new topic
     for {
-      b <- exists(key)
-      _ <- proc.evalMap((o: O) => if (b) Task.fork(update(key, o)) else Task(topic[O,O](key)(Buffers.ignoreTime(process1.id)))).run
+      _ <- proc.evalMap((o: O) => for {
+        b <- exists(key)
+        _ <- if (b) Task.fork(update(key, o))
+             else Task(topic[O,O](key)(Buffers.ignoreTime(process1.id)))
+      } yield ()).run
     } yield key
   }
 
@@ -80,7 +83,6 @@ trait Monitoring {
   def publish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] =
     for {
       b <- exists(key)
-      _ = println(s">>>>>> $b, $key")
       k <- if (b) Task.fail(new Exception(s"key not unique, use republish if this is indented: $key"))
            else republish(key)(e)(f)
     } yield k
