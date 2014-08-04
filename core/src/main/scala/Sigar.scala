@@ -269,16 +269,26 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
 }
 
 object Sigar {
-  def apply(I: Instruments)(implicit log: String => Unit): Option[Sigar] = try {
-    val sigar = new org.hyperic.sigar.Sigar
-    Some(new Sigar(I, sigar))
-  } catch {
-    case e: LinkageError =>
-      log(e.getMessage)
-      log(s"java.library.path is set to: " +
-        System.getProperty("java.library.path"))
-      None
+  def apply(I: Instruments)(implicit log: String => Unit): Option[Sigar] = {
+    try {
+      val sigar = new org.hyperic.sigar.Sigar
+      // internals of sigar seem to be lazy, so lets force a
+      // LinkageError if there is going to be one.
+      // Did I mention that I *hate* native libraries....
+      sigar.getPid
+
+      Option(new Sigar(I, sigar))
+    } catch {
+      case e: LinkageError =>
+        log("Unable to load native Sigar library, it may not be installed?")
+        log(s"The following error was encountered: $e")
+        log("java.library.path is set to: " +
+          System.getProperty("java.library.path"))
+        None
+    }
   }
+
   def instrument(I: Instruments)(implicit log: String => Unit): Unit =
     apply(I).foreach(_.instrument)
+
 }
