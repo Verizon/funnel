@@ -13,9 +13,9 @@ object Flask {
         mem = m.last.getOrElse(1.0d)
         c <- CPU.Aggregate.usage.total.key
         cpu = c.last.getOrElse(1.0d)
-      } yield mem < 0.8 && cpu < 0.8
+      } yield mem < 85.0 && cpu < 0.8
 
-    capacityAvalible.publishEvery(15.seconds)("status")
+    capacityAvalible.publishEvery(10.seconds)("capacity-avalible")
     ()
   }
 }
