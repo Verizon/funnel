@@ -9,6 +9,7 @@ final case object LaunchError extends AutoScalingEventKind("autoscaling:EC2_INST
 final case object Terminate extends AutoScalingEventKind("autoscaling:EC2_INSTANCE_TERMINATE")
 final case object TerminateError extends AutoScalingEventKind("autoscaling:EC2_INSTANCE_TERMINATE_ERROR")
 final case object TestNotification extends AutoScalingEventKind("autoscaling:TEST_NOTIFICATION")
+final case object Unknown extends AutoScalingEventKind("unknown")
 object AutoScalingEventKind {
   val list: List[AutoScalingEventKind] =
     List(Launch, LaunchError, Terminate, TerminateError, TestNotification)
@@ -35,6 +36,14 @@ case class AutoScalingEvent(
 object JSON {
   import argonaut._, Argonaut._
   import javax.xml.bind.DatatypeConverter // hacky, but saves the extra dependencies
+
+  implicit val JsonToAutoScalingEventKind: DecodeJson[AutoScalingEventKind] =
+    DecodeJson(c => for {
+      a <- (c --\ "Event").as[String]
+    } yield AutoScalingEventKind.find(a).getOrElse(Unknown))
+
+  implicit def JsonToJavaDate(name: String): DecodeJson[Date] =
+    DecodeJson(c => (c --\ name).as[String].map(DatatypeConverter.parseDateTime(_).getTime))
 
   /**
    * {
@@ -65,7 +74,7 @@ object JSON {
       b <- JsonToAutoScalingEventKind(input)
       c <- (input --\ "AutoScalingGroupName").as[String]
       d <- (input --\ "AutoScalingGroupARN").as[String]
-      e <- (input --\ "Availability Zone").as[String]
+      e <- (input --\ "Details" --\ "Availability Zone").as[String]
       f <- (input --\ "Description").as[String]
       g <- (input --\ "Cause").as[String]
       h <- (input --\ "Progress").as[Int]
@@ -87,13 +96,5 @@ object JSON {
       startTime       = k,
       endTime         = l
     ))
-
-  implicit val JsonToAutoScalingEventKind: DecodeJson[AutoScalingEventKind] = null
-    DecodeJson(c => for {
-      a <- (c --\ "Event").as[String]
-    } yield AutoScalingEventKind.find(a))
-
-  implicit def JsonToJavaDate(name: String): DecodeJson[Date] =
-    DecodeJson(c => (c --\ name).as[String].map(DatatypeConverter.parseDateTime(_).getTime))
 
 }

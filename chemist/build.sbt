@@ -10,6 +10,8 @@ Bundle.settings
 
 Revolver.settings
 
+ScalaTest.settings
+
 fork in (run in Test) := true
 
 libraryDependencies ++= Seq(
