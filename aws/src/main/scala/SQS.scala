@@ -110,14 +110,15 @@ object SQS {
   def deleteMessages(queue: String, msgs: List[Message])(sqs: AmazonSQSClient): Process[Task, Unit] = {
     val result: Task[Unit] = Task {
       val req = msgs.map(m => new DeleteMessageBatchRequestEntry(m.getMessageId, m.getReceiptHandle))
-      val res = sqs.deleteMessageBatch(queue, req.asJava)
 
-      res.getFailed.asScala.toList match {
-        case Nil    => Task.now(())
-        case errors => Task.fail(FailedDeletions(errors.map(_.getId)))
-      }
-
-      ()
+      if(msgs.nonEmpty){
+        val res = sqs.deleteMessageBatch(queue, req.asJava)
+        res.getFailed.asScala.toList match {
+          case Nil    => Task.now(())
+          case errors => Task.fail(FailedDeletions(errors.map(_.getId)))
+        }
+        ()
+      } else ()
     }
 
     Process.eval(result)
