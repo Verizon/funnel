@@ -100,7 +100,11 @@ object Main extends CLI {
         M, options.riemannTTL.toSeconds.toFloat, utensilRetries)(
         R, s"${options.riemann.host}:${options.riemann.port}", utensilRetries)(SSE.readEvents)(
         S.commands, cfg.lookup[String]("funnelName").getOrElse(localhost))(log
-          ).runAsync(_.fold(e => log(s"[ERROR] $e - ${e.getMessage}"), identity _))
+          ).runAsync(_.fold(e => {
+            e.printStackTrace()
+            log(s"[ERROR] $e - ${e.getMessage}")
+            log(e.getStackTrace.toString)
+          }, identity _))
     }
   }
 

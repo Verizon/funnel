@@ -9,6 +9,6 @@ class JSONSpec extends FlatSpec with Matchers {
   import argonaut._, Argonaut._
 
   it should "foo bar" in {
-    println(Parse.decodeOption[AutoScalingEvent](Fixtures.asgEventJson1))
+    Parse.decodeOption[AutoScalingEvent](Fixtures.asgEventJson1) should equal (false)
   }
 }
