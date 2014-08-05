@@ -37,13 +37,18 @@ object JSON {
   import argonaut._, Argonaut._
   import javax.xml.bind.DatatypeConverter // hacky, but saves the extra dependencies
 
+  implicit class AsDate(in: String){
+    def asDate: java.util.Date =
+      javax.xml.bind.DatatypeConverter.parseDateTime(in).getTime
+  }
+
   implicit val JsonToAutoScalingEventKind: DecodeJson[AutoScalingEventKind] =
     DecodeJson(c => for {
       a <- (c --\ "Event").as[String]
     } yield AutoScalingEventKind.find(a).getOrElse(Unknown))
 
   implicit def JsonToJavaDate(name: String): DecodeJson[Date] =
-    DecodeJson(c => (c --\ name).as[String].map(DatatypeConverter.parseDateTime(_).getTime))
+    DecodeJson(c => (c --\ name).as[String].map(_.asDate))
 
   /**
    * {
