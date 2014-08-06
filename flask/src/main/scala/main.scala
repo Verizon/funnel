@@ -103,7 +103,7 @@ object Main extends CLI {
           ).runAsync(_.fold(e => {
             e.printStackTrace()
             log(s"[ERROR] $e - ${e.getMessage}")
-            log(e.getStackTrace.toString)
+            log(e.getStackTrace.toList.mkString("\n","\t\n",""))
           }, identity _))
     }
   }
