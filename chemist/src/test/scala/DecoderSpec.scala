@@ -5,7 +5,7 @@ import org.scalatest.{FlatSpec,Matchers}
 import scalaz.\/
 
 class JSONSpec extends FlatSpec with Matchers {
-  import JSON._
+  import Decoder._
   import argonaut._, Argonaut._
 
   it should "correctly parse the incoming JSON from AWS ASG notifications" in {

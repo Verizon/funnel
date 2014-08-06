@@ -1,0 +1,34 @@
+package intelmedia.ws.funnel
+package chemist
+
+import java.util.Date
+
+sealed abstract class AutoScalingEventKind(val notification: String)
+final case object Launch extends AutoScalingEventKind("autoscaling:EC2_INSTANCE_LAUNCH")
+final case object LaunchError extends AutoScalingEventKind("autoscaling:EC2_INSTANCE_LAUNCH_ERROR")
+final case object Terminate extends AutoScalingEventKind("autoscaling:EC2_INSTANCE_TERMINATE")
+final case object TerminateError extends AutoScalingEventKind("autoscaling:EC2_INSTANCE_TERMINATE_ERROR")
+final case object TestNotification extends AutoScalingEventKind("autoscaling:TEST_NOTIFICATION")
+final case object Unknown extends AutoScalingEventKind("unknown")
+object AutoScalingEventKind {
+  val list: List[AutoScalingEventKind] =
+    List(Launch, LaunchError, Terminate, TerminateError, TestNotification)
+
+  def find(in: String): Option[AutoScalingEventKind] =
+    list.find(_.notification.toLowerCase.trim == in.toLowerCase.trim)
+}
+
+case class AutoScalingEvent(
+  activityId: String,
+  event: AutoScalingEventKind,
+  asgName: String,
+  asgARN: String,
+  avalibilityZone: String,
+  description: String,
+  cause: String,
+  progress: Int,
+  accountId: String,
+  time: Date,
+  startTime: Date,
+  endTime: Date
+)

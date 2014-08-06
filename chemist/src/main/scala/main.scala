@@ -1,27 +1,48 @@
 package intelmedia.ws.funnel
 package chemist
 
-import oncue.svc.funnel.aws.{SQS,SNS}
+import java.io.File
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.regions.{Regions,Region}
-import scalaz.concurrent.Task
-import scalaz.stream.Process
 import com.amazonaws.services.sns.AmazonSNSClient
 import com.amazonaws.services.sqs.AmazonSQSClient
-import java.io.File
+import com.amazonaws.services.sqs.model.Message
+import oncue.svc.funnel.aws.{SQS,SNS}
+import scalaz.concurrent.Task
+import scalaz.stream.Process
+import scalaz.{\/, -\/, \/-}
+
+object Lifecycle {
+  import Decoder._
+  import argonaut._, Argonaut._
+
+  case class MessageParseException(override val getMessage: String) extends RuntimeException
+
+  type Processor = List[Message] => AutoScalingEvent => Action
+
+  def parseWireMessage(msg: Message): Throwable \/ AutoScalingEvent =
+    Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException(_))
+
+  def eventToAction(asg: AutoScalingEvent): Action = asg.event match {
+    case Launch                       => Foo
+    case LaunchError | TerminateError => Foo
+    case _ => Foo
+  }
+}
 
 object Chemist {
-  def incomingEventStream(url: String)(sqs: AmazonSQSClient): Process[Task,Unit] =
+
+  def flaskLifecycleStream(queueName: String)(sqs: AmazonSQSClient): Process[Task,Unit] =
     for {
-      a <- SQS.subscribe(url)(sqs)
-      _ <- Process.eval(myFunc(a.map(_.getMessageId)))
-      b <- SQS.deleteMessages(url, a)(sqs)
+      a <- SQS.subscribe(queueName)(sqs)
+      // _ <- Process.eval(myFunc(a.map(_.getMessageId)))
+      b <- SQS.deleteMessages(queueName, a)(sqs)
     } yield ()
 
-  def setup(streamName: String)(sns: AmazonSNSClient, sqs: AmazonSQSClient): Task[Unit] = {
+  def setup(topicName: String, queueName: String)(sns: AmazonSNSClient, sqs: AmazonSQSClient): Task[Unit] = {
     for {
-      a <- SNS.create(streamName)(sns)
-      b <- SQS.create(streamName)(sqs)
+      a <- SNS.create(topicName)(sns)
+      b <- SQS.create(queueName)(sqs)
       c <- SNS.subscribe(a, b)(sns)
     } yield ()
   }
@@ -31,6 +52,7 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     import knobs._
+    import Chemist._
 
     val cfg =
       (knobs.loadImmutable(List(Required(FileResource(new File("/usr/share/oncue/etc/chemist.cfg"))))) or
@@ -57,17 +79,20 @@ object Main {
     )
 
     // val url = "https://sqs.us-east-1.amazonaws.com/465404450664/ops-chemist"
-    val url = cfg.require[String]("chemist.stream-name")
 
-    Chemist.incomingEventStream(url)(sqs)
+    flaskLifecycleStream(cfg.require[String]("chemist.sqs-queue-name"))(sqs)
+
+    setup(
+      cfg.require[String]("chemist.sns-topic-name"),
+      cfg.require[String]("chemist.sqs-queue-name"))(sns, sqs)
 
     // exe.run.run
   }
 
-  def myFunc(m: List[String]): Task[Unit] =
-    Task {
-      println(s"<<< $m >>>>")
-    }
+  // def myFunc(m: List[String]): Task[Unit] =
+  //   Task {
+  //     println(s"<<< $m >>>>")
+  //   }
 
   def init(): Unit = {
     //
