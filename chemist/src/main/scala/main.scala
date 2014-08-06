@@ -24,9 +24,10 @@ object Lifecycle {
     Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException(_))
 
   def eventToAction(asg: AutoScalingEvent): Action = asg.event match {
-    case Launch                       => Foo
-    case LaunchError | TerminateError => Foo
-    case _ => Foo
+    case Launch                       => AddCapacity
+    case Terminate                    => DistributeLoad
+    case LaunchError | TerminateError => NoOp
+    case TestNotification | Unknown   => NoOp
   }
 }
 
