@@ -25,12 +25,6 @@ object Lifecycle {
   }
 
   def stream(queueName: String)(sqs: AmazonSQS): Process[Task, Throwable \/ Action] = {
-    // def go(m: Message): Sink[Task, Action] =
-      // match {
-      //   case -\/(fail) => Process.halt
-      //   case \/-(win)  => runAction(win)(shards)
-      // }
-
     for {
       a <- SQS.subscribe(queueName)(sqs)
       b <- Process.emitSeq(a)
