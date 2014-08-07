@@ -24,12 +24,34 @@ object Lifecycle {
     case TestNotification | Unknown   => NoOp
   }
 
-  def runAction(act: Action)(shards: Shards): Sink[Task, Action] =
+  def stream(queueName: String)(sqs: AmazonSQS): Process[Task, Throwable \/ Action] = {
+    // def go(m: Message): Sink[Task, Action] =
+      // match {
+      //   case -\/(fail) => Process.halt
+      //   case \/-(win)  => runAction(win)(shards)
+      // }
+
+    for {
+      a <- SQS.subscribe(queueName)(sqs)
+      b <- Process.emitSeq(a)
+      c <- Process.emit(parseMessage(b).map(eventToAction))  //Process.emitSeq(List(1,2,3))  //Process.eval(myFunc(a.map(_.getMessageId)))
+      _ <- SQS.deleteMessages(queueName, a)(sqs)
+    } yield c
+  }
+
+  def toSink(act: Action)(shards: Shards): Sink[Task, Action] =
     Process.emit {
       case AddCapacity(id)  => Task.delay { shards.putIfAbsent(id, Set.empty); () }
       case Redistribute(id) => Task.delay { reshard(id)(shards) }
       case NoOp             => Task.now( () )
     }
+
+  def run(queueName: String, sqs: AmazonSQS, shards: Shards): Sink[Task, Action] = {
+    stream(queueName)(sqs).flatMap {
+      case -\/(fail) => Process.halt
+      case \/-(win)  => toSink(win)(shards)
+    }
+  }
 
   private def reshard(id: InstanceID)(shards: Shards): Unit =
     for {
@@ -37,20 +59,7 @@ object Lifecycle {
       _    <- Option(shards.remove(id))
     } yield distributeWorkToShards(urls)(shards)
 
-  def stream(queueName: String)(sqs: AmazonSQS, shards: Shards): Sink[Task, Action] = {
-    def go(m: Message): Sink[Task, Action] =
-      parseMessage(m).map(eventToAction) match {
-        case -\/(fail) => Process.halt
-        case \/-(win)  => runAction(win)(shards)
-      }
 
-    for {
-      a <- SQS.subscribe(queueName)(sqs)
-      b <- Process.emitSeq(a)
-      c <- go(b)  //Process.emitSeq(List(1,2,3))  //Process.eval(myFunc(a.map(_.getMessageId)))
-      _ <- SQS.deleteMessages(queueName, a)(sqs)
-    } yield c
-  }
 
   // import collection.JavaConversions._
 

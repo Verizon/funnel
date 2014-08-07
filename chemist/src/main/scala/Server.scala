@@ -2,7 +2,7 @@ package oncue.svc.funnel.chemist
 
 import java.net.URL
 import com.amazonaws.services.sqs.model.Message
-import scalaz.stream.Process
+import scalaz.stream.{Process,Sink}
 import scalaz.concurrent.Task
 import scalaz.{~>,Free,Functor,\/,-\/,\/-}, Free.Return, Free.Suspend
 
@@ -17,8 +17,8 @@ object Server {
   case class Watch[A](urls: Set[URL], k: A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = Watch(urls, g(k))
   }
-  case class Listen[A](k: Process[Task, List[Message]] => A) extends ServerF[A]{
-    def map[B](g: A => B): ServerF[B] = Listen(k andThen g)
+  case class Listen[A](k: A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = Listen(g(k))
   }
 
   /////// free monad plumbing ///////
@@ -34,8 +34,8 @@ object Server {
   def watch(urls: Set[URL]): Server[Unit] =
     liftF(Watch(urls, ()))
 
-  def listen: Server[Process[Task, List[Message]]] =
-    liftF(Listen(identity))
+  // def listen: Server[Sink[Task, Action]] =
+  //   liftF(Listen(identity))
 }
 
 import java.io.File
@@ -50,9 +50,16 @@ trait Server extends Interpreter[Server.ServerF] {
   import knobs._
   import Server._
 
+  /////// configuration resolution ////////
+
   val cfg =
     (knobs.loadImmutable(List(Required(FileResource(new File("/usr/share/oncue/etc/chemist.cfg"))))) or
     knobs.loadImmutable(List(Required(ClassPathResource("oncue/chemist.cfg"))))).run
+
+  val topic = cfg.require[String]("chemist.sns-topic-name")
+  val queue = cfg.require[String]("chemist.sqs-queue-name")
+
+  /////// queues and event streaming ////////
 
   val sns = SNS.client(
       new BasicAWSCredentials(
@@ -74,12 +81,18 @@ trait Server extends Interpreter[Server.ServerF] {
     Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
   )
 
-  val topic = cfg.require[String]("chemist.sns-topic-name")
-  val queue = cfg.require[String]("chemist.sqs-queue-name")
+  /////// in-memory data storage ////////
+
+  val shards = new Shards
+
+  /////// interpreter implementation ////////
 
   protected def op[A](r: ServerF[A]): Task[A] = r match {
-    case Watch(urls, k) => Task.now( k )
-    case Listen(k)      => sys.error("tbd") //k(Lifecycle.stream(queue)(sqs)) //Operations.flaskLifecycleStream
+    case Watch(urls, k) =>
+      Task.now( k )
+
+    case Listen(k) =>
+      Lifecycle.run(queue, sqs, shards).run.map(_ => k)
   }
 
   protected def init(): Task[Unit] =
