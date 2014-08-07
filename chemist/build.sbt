@@ -12,7 +12,7 @@ Revolver.settings
 
 ScalaTest.settings
 
-fork in (run in Test) := true
+fork in test := true
 
 libraryDependencies ++= Seq(
   "intelmedia.ws.common" %% "s3-appender"  % "6.0.2",

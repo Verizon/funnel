@@ -2,7 +2,7 @@ package oncue.svc.funnel.chemist
 
 import com.amazonaws.services.sns.AmazonSNS
 
-class FakeAmazonSNS extends AmazonSNS {
+class TestAmazonSNS extends AmazonSNS {
   def addPermission(x$1: String,x$2: String,x$3: java.util.List[String],x$4: java.util.List[String]): Unit = ???
   def addPermission(x$1: com.amazonaws.services.sns.model.AddPermissionRequest): Unit = ???
   def confirmSubscription(x$1: String,x$2: String): com.amazonaws.services.sns.model.ConfirmSubscriptionResult = ???
@@ -43,14 +43,14 @@ class FakeAmazonSNS extends AmazonSNS {
   def setEndpoint(x$1: String): Unit = ???
   def setEndpointAttributes(x$1: com.amazonaws.services.sns.model.SetEndpointAttributesRequest): Unit = ???
   def setPlatformApplicationAttributes(x$1: com.amazonaws.services.sns.model.SetPlatformApplicationAttributesRequest): Unit = ???
-  def setRegion(x$1: com.amazonaws.regions.Region): Unit = ???
+  def setRegion(x$1: com.amazonaws.regions.Region): Unit = ()
   def setSubscriptionAttributes(x$1: String,x$2: String,x$3: String): Unit = ???
   def setSubscriptionAttributes(x$1: com.amazonaws.services.sns.model.SetSubscriptionAttributesRequest): Unit = ???
   def setTopicAttributes(x$1: String,x$2: String,x$3: String): Unit = ???
   def setTopicAttributes(x$1: com.amazonaws.services.sns.model.SetTopicAttributesRequest): Unit = ???
-  def shutdown(): Unit = ???
+  def shutdown(): Unit = ()
   def subscribe(x$1: String,x$2: String,x$3: String): com.amazonaws.services.sns.model.SubscribeResult = ???
   def subscribe(x$1: com.amazonaws.services.sns.model.SubscribeRequest): com.amazonaws.services.sns.model.SubscribeResult = ???
-  def unsubscribe(x$1: String): Unit = ???
+  def unsubscribe(x$1: String): Unit = ()
   def unsubscribe(x$1: com.amazonaws.services.sns.model.UnsubscribeRequest): Unit = ???
 }

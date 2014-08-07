@@ -92,6 +92,8 @@ object SQS {
   ): Process[Task, List[Message]] = {
     Process.awakeEvery(tick)(Monitoring.schedulingPool).evalMap { _ =>
       Task {
+        println(">>>>>>>>> ")
+
         val req = (new ReceiveMessageRequest
           ).withQueueUrl(url
           ).withVisibilityTimeout(visibilityTimeout.toSeconds.toInt)
@@ -99,7 +101,8 @@ object SQS {
         val msgs: List[Message] =
           client.receiveMessage(req).getMessages.asScala.toList
 
-        // println(">>>>>>>>> " + msgs)
+        println("{{{{{{ " + msgs)
+
         msgs
       }(Monitoring.defaultPool)
     }

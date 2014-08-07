@@ -1,8 +1,20 @@
 package oncue.svc.funnel.chemist
 
 import com.amazonaws.services.sqs.AmazonSQS
+import com.amazonaws.services.sqs.model._
+import scala.collection.JavaConversions._
 
-class FakeAmazonSQS extends AmazonSQS {
+class TestAmazonSQS extends AmazonSQS {
+  // methods we use
+  def deleteMessageBatch(x$1: String,x$2: java.util.List[com.amazonaws.services.sqs.model.DeleteMessageBatchRequestEntry]): com.amazonaws.services.sqs.model.DeleteMessageBatchResult = {
+    new DeleteMessageBatchResult().withSuccessful(new DeleteMessageBatchResultEntry().withId("foo"))
+  }
+  def receiveMessage(x$1: com.amazonaws.services.sqs.model.ReceiveMessageRequest): com.amazonaws.services.sqs.model.ReceiveMessageResult = {
+    new ReceiveMessageResult().withMessages(new Message().withMessageId("foo").withBody(Fixtures.asgEventJson1))
+  }
+
+  // erroneous methods
+
   def addPermission(x$1: String,x$2: String,x$3: java.util.List[String],x$4: java.util.List[String]): Unit = ???
   def addPermission(x$1: com.amazonaws.services.sqs.model.AddPermissionRequest): Unit = ???
   def changeMessageVisibility(x$1: String,x$2: String,x$3: Integer): Unit = ???
@@ -13,7 +25,6 @@ class FakeAmazonSQS extends AmazonSQS {
   def createQueue(x$1: com.amazonaws.services.sqs.model.CreateQueueRequest): com.amazonaws.services.sqs.model.CreateQueueResult = ???
   def deleteMessage(x$1: String,x$2: String): Unit = ???
   def deleteMessage(x$1: com.amazonaws.services.sqs.model.DeleteMessageRequest): Unit = ???
-  def deleteMessageBatch(x$1: String,x$2: java.util.List[com.amazonaws.services.sqs.model.DeleteMessageBatchRequestEntry]): com.amazonaws.services.sqs.model.DeleteMessageBatchResult = ???
   def deleteMessageBatch(x$1: com.amazonaws.services.sqs.model.DeleteMessageBatchRequest): com.amazonaws.services.sqs.model.DeleteMessageBatchResult = ???
   def deleteQueue(x$1: String): Unit = ???
   def deleteQueue(x$1: com.amazonaws.services.sqs.model.DeleteQueueRequest): Unit = ???
@@ -27,7 +38,6 @@ class FakeAmazonSQS extends AmazonSQS {
   def listQueues(): com.amazonaws.services.sqs.model.ListQueuesResult = ???
   def listQueues(x$1: com.amazonaws.services.sqs.model.ListQueuesRequest): com.amazonaws.services.sqs.model.ListQueuesResult = ???
   def receiveMessage(x$1: String): com.amazonaws.services.sqs.model.ReceiveMessageResult = ???
-  def receiveMessage(x$1: com.amazonaws.services.sqs.model.ReceiveMessageRequest): com.amazonaws.services.sqs.model.ReceiveMessageResult = ???
   def removePermission(x$1: String,x$2: String): Unit = ???
   def removePermission(x$1: com.amazonaws.services.sqs.model.RemovePermissionRequest): Unit = ???
   def sendMessage(x$1: String,x$2: String): com.amazonaws.services.sqs.model.SendMessageResult = ???
@@ -37,6 +47,6 @@ class FakeAmazonSQS extends AmazonSQS {
   def setEndpoint(x$1: String): Unit = ???
   def setQueueAttributes(x$1: String,x$2: java.util.Map[String,String]): Unit = ???
   def setQueueAttributes(x$1: com.amazonaws.services.sqs.model.SetQueueAttributesRequest): Unit = ???
-  def setRegion(x$1: com.amazonaws.regions.Region): Unit = ???
-  def shutdown(): Unit = ???
+  def setRegion(x$1: com.amazonaws.regions.Region): Unit = ()
+  def shutdown(): Unit = ()
 }

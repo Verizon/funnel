@@ -27,8 +27,11 @@ object Lifecycle {
   def stream(queueName: String)(sqs: AmazonSQS): Process[Task, Throwable \/ Action] = {
     for {
       a <- SQS.subscribe(queueName)(sqs)
+      _ = println("stream.a = " + a)
       b <- Process.emitSeq(a)
-      c <- Process.emit(parseMessage(b).map(eventToAction))  //Process.emitSeq(List(1,2,3))  //Process.eval(myFunc(a.map(_.getMessageId)))
+      _ = println("stream.b = " + b)
+      c <- Process.emit(parseMessage(b).map(eventToAction))
+      _ = println("stream.c = " + c)
       _ <- SQS.deleteMessages(queueName, a)(sqs)
     } yield c
   }
@@ -52,10 +55,6 @@ object Lifecycle {
       urls <- Option(shards.get(id))
       _    <- Option(shards.remove(id))
     } yield distributeWorkToShards(urls)(shards)
-
-
-
-  // import collection.JavaConversions._
 
   def distributeWorkToShards(work: Set[URL])(shards: Shards) = {
     println("::::::::::::::::::::::::::: DISTRIBUTING")
