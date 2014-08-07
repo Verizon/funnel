@@ -1,6 +1,6 @@
 package oncue.svc.funnel.aws
 
-import com.amazonaws.services.sqs.AmazonSQSClient
+import com.amazonaws.services.sqs.{AmazonSQS,AmazonSQSClient}
 import com.amazonaws.services.sqs.model.{
   AddPermissionRequest,
   CreateQueueRequest,
@@ -46,7 +46,7 @@ object SQS {
     awsProxyPort: Option[Int] = None,
     awsProxyProtocol: Option[String] = None,
     region: Region = Region.getRegion(Regions.fromName("us-east-1"))
-  ): AmazonSQSClient = { //cfg.require[String]("aws.region"))
+  ): AmazonSQS = { //cfg.require[String]("aws.region"))
     val client = new AmazonSQSClient(
       credentials,
       proxy.configuration(awsProxyHost, awsProxyPort, awsProxyProtocol))
@@ -54,7 +54,7 @@ object SQS {
     client
   }
 
-  def arnForQueue(url: String)(client: AmazonSQSClient): Task[ARN] = {
+  def arnForQueue(url: String)(client: AmazonSQS): Task[ARN] = {
     Task {
       val attrs = client.getQueueAttributes(
         new GetQueueAttributesRequest(url, List("QueueArn").asJava)).getAttributes.asScala
@@ -66,7 +66,7 @@ object SQS {
   }
 
   // http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-long-polling.html
-  def create(queueName: String)(client: AmazonSQSClient): Task[ARN] = {
+  def create(queueName: String)(client: AmazonSQS): Task[ARN] = {
     val req = (new CreateQueueRequest(queueName)).withAttributes(
       Map("MaximumMessageSize"            -> "64000",
           "MessageRetentionPeriod"        -> "1800",
@@ -86,7 +86,7 @@ object SQS {
     url: String,
     tick: Duration = readInterval,
     visibilityTimeout: Duration = 20.seconds
-  )(client: AmazonSQSClient)(
+  )(client: AmazonSQS)(
     implicit pool: ExecutorService = Monitoring.defaultPool,
     schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool
   ): Process[Task, List[Message]] = {
@@ -107,7 +107,7 @@ object SQS {
 
   case class FailedDeletions(messageIds: List[String]) extends RuntimeException
 
-  def deleteMessages(queue: String, msgs: List[Message])(sqs: AmazonSQSClient): Process[Task, Unit] = {
+  def deleteMessages(queue: String, msgs: List[Message])(sqs: AmazonSQS): Process[Task, Unit] = {
     val result: Task[Unit] = Task {
       val req = msgs.map(m => new DeleteMessageBatchRequestEntry(m.getMessageId, m.getReceiptHandle))
 

@@ -5,8 +5,7 @@ import scalaz.{\/,-\/,\/-}
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Sink}
 import com.amazonaws.services.sqs.model.Message
-import com.amazonaws.services.sns.AmazonSNSClient
-import com.amazonaws.services.sqs.AmazonSQSClient
+import com.amazonaws.services.sqs.AmazonSQS
 import oncue.svc.funnel.aws.{SQS,SNS}
 
 object Lifecycle {
@@ -38,7 +37,7 @@ object Lifecycle {
       _    <- Option(shards.remove(id))
     } yield distributeWorkToShards(urls)(shards)
 
-  def stream(queueName: String)(sqs: AmazonSQSClient, shards: Shards): Sink[Task, Action] = {
+  def stream(queueName: String)(sqs: AmazonSQS, shards: Shards): Sink[Task, Action] = {
     def go(m: Message): Sink[Task, Action] =
       parseMessage(m).map(eventToAction) match {
         case -\/(fail) => Process.halt

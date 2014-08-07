@@ -1,7 +1,7 @@
 package oncue.svc.funnel.aws
 
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
-import com.amazonaws.services.sns.AmazonSNSClient
+import com.amazonaws.services.sns.{AmazonSNS,AmazonSNSClient}
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.services.sns.model.{CreateTopicRequest, PublishRequest}
 import com.amazonaws.auth.BasicAWSCredentials
@@ -15,7 +15,7 @@ object SNS {
     awsProxyPort: Option[Int] = None,
     awsProxyProtocol: Option[String] = None,
     region: Region = Region.getRegion(Regions.fromName("us-east-1"))
-  ): AmazonSNSClient = { //cfg.require[String]("aws.region"))
+  ): AmazonSNS = { //cfg.require[String]("aws.region"))
     val client = new AmazonSNSClient(
       credentials,
       proxy.configuration(awsProxyHost, awsProxyPort, awsProxyProtocol))
@@ -23,12 +23,12 @@ object SNS {
     client
   }
 
-  def create(topicName: String)(client: AmazonSNSClient): Task[ARN] = Task {
+  def create(topicName: String)(client: AmazonSNS): Task[ARN] = Task {
     val req = new CreateTopicRequest(topicName) // cfg.require[String]("aws.snsTopic")
     client.createTopic(req).getTopicArn // idempotent operation
   }
 
-  def publish(topicName: String, payload: String)(client: AmazonSNSClient): Task[Unit] = {
+  def publish(topicName: String, payload: String)(client: AmazonSNS): Task[Unit] = {
     create(topicName)(client).flatMap { arn =>
       Task {
         val preq = new PublishRequest(arn, payload)
@@ -37,7 +37,7 @@ object SNS {
     }
   }
 
-  def subscribe(snsArn: ARN, targetArn: ARN, protocol: String = "sqs")(client: AmazonSNSClient): Task[ARN] =
+  def subscribe(snsArn: ARN, targetArn: ARN, protocol: String = "sqs")(client: AmazonSNS): Task[ARN] =
     for {
       a <- Task(client.subscribe(snsArn, protocol, targetArn).getSubscriptionArn)
       b <- Task(client.setSubscriptionAttributes(a, "RawMessageDelivery", "true"))
