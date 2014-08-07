@@ -12,7 +12,7 @@ object Lifecycle {
 
   case class MessageParseException(override val getMessage: String) extends RuntimeException
 
-  def parseWireMessage(msg: Message): Throwable \/ AutoScalingEvent =
+  def parseMessage(msg: Message): Throwable \/ AutoScalingEvent =
     Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException(_))
 
   def eventToAction(event: AutoScalingEvent): Action = event.kind match {
@@ -22,8 +22,9 @@ object Lifecycle {
     case TestNotification | Unknown   => NoOp
   }
 
-  def processor: Message => Throwable \/ Action =
-    m => parseWireMessage(m).map(eventToAction)
+  def processor: Message => Action =
+    m => parseMessage(m).map(eventToAction
+          ).fold(err => NoOp, a => runAction(a))
 
   def runAction(act: Action)(shards: Shards): Sink[Task, Action] =
     Process.emit {
