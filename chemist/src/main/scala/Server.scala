@@ -1,7 +1,10 @@
 package oncue.svc.funnel.chemist
 
-import scalaz.{~>,Free,Functor,\/,-\/,\/-}, Free.Return, Free.Suspend
 import java.net.URL
+import com.amazonaws.services.sqs.model.Message
+import scalaz.stream.Process
+import scalaz.concurrent.Task
+import scalaz.{~>,Free,Functor,\/,-\/,\/-}, Free.Return, Free.Suspend
 
 object Server {
   type Server[A] = Free[ServerF, A]
@@ -13,6 +16,9 @@ object Server {
 
   case class Watch[A](urls: Set[URL], k: A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = Watch(urls, g(k))
+  }
+  case class Listen[A](k: Process[Task, List[Message]] => A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = Listen(k andThen g)
   }
 
   /////// free monad plumbing ///////
@@ -27,6 +33,9 @@ object Server {
 
   def watch(urls: Set[URL]): Server[Unit] =
     liftF(Watch(urls, ()))
+
+  def listen: Server[Process[Task, List[Message]]] =
+    liftF(Listen(identity))
 }
 
 import java.io.File
@@ -65,14 +74,22 @@ trait Server extends Interpreter[Server.ServerF] {
     Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
   )
 
+  val topic = cfg.require[String]("chemist.sns-topic-name")
+  val queue = cfg.require[String]("chemist.sqs-queue-name")
+
   protected def op[A](r: ServerF[A]): Task[A] = r match {
     case Watch(urls, k) => Task.now( k )
+    case Listen(k)      => sys.error("tbd") //k(Lifecycle.stream(queue)(sqs)) //Operations.flaskLifecycleStream
   }
 
   protected def init(): Task[Unit] =
-    Operations.setup(
-      cfg.require[String]("chemist.sns-topic-name"),
-      cfg.require[String]("chemist.sqs-queue-name"))(sns,sqs)
+    for {
+      a <- SNS.create(topic)(sns)
+      b <- SQS.create(queue)(sqs)
+      c <- SNS.subscribe(a, b)(sns)
+      // _ <- collateExistingWork
+    } yield ()
+
 }
 
 object Server0 extends Server {

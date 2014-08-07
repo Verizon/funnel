@@ -1,10 +1,13 @@
 package oncue.svc.funnel.chemist
 
 import java.net.URL
-import scalaz.\/
+import scalaz.{\/,-\/,\/-}
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Sink}
 import com.amazonaws.services.sqs.model.Message
+import com.amazonaws.services.sns.AmazonSNSClient
+import com.amazonaws.services.sqs.AmazonSQSClient
+import oncue.svc.funnel.aws.{SQS,SNS}
 
 object Lifecycle {
   import Decoder._
@@ -22,10 +25,6 @@ object Lifecycle {
     case TestNotification | Unknown   => NoOp
   }
 
-  def processor: Message => Action =
-    m => parseMessage(m).map(eventToAction
-          ).fold(err => NoOp, a => runAction(a))
-
   def runAction(act: Action)(shards: Shards): Sink[Task, Action] =
     Process.emit {
       case AddCapacity(id)  => Task.delay { shards.putIfAbsent(id, Set.empty); () }
@@ -39,10 +38,25 @@ object Lifecycle {
       _    <- Option(shards.remove(id))
     } yield distributeWorkToShards(urls)(shards)
 
-  import collection.JavaConversions._
+  def stream(queueName: String)(sqs: AmazonSQSClient, shards: Shards): Sink[Task, Action] = {
+    def go(m: Message): Sink[Task, Action] =
+      parseMessage(m).map(eventToAction) match {
+        case -\/(fail) => Process.halt
+        case \/-(win)  => runAction(win)(shards)
+      }
+
+    for {
+      a <- SQS.subscribe(queueName)(sqs)
+      b <- Process.emitSeq(a)
+      c <- go(b)  //Process.emitSeq(List(1,2,3))  //Process.eval(myFunc(a.map(_.getMessageId)))
+      _ <- SQS.deleteMessages(queueName, a)(sqs)
+    } yield c
+  }
+
+  // import collection.JavaConversions._
 
   def distributeWorkToShards(work: Set[URL])(shards: Shards) = {
-    ()
+    println("::::::::::::::::::::::::::: DISTRIBUTING")
     // val flasks = shards.keySet.toSet
 
     // Stream.continually(instances).flatten.zip(
