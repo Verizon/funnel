@@ -1,5 +1,4 @@
-package intelmedia.ws.funnel
-package chemist
+package oncue.svc.funnel.chemist
 
 import java.util.Date
 
@@ -20,7 +19,7 @@ object AutoScalingEventKind {
 
 case class AutoScalingEvent(
   activityId: String,
-  event: AutoScalingEventKind,
+  kind: AutoScalingEventKind,
   asgName: String,
   asgARN: String,
   avalibilityZone: String,
@@ -30,5 +29,6 @@ case class AutoScalingEvent(
   accountId: String,
   time: Date,
   startTime: Date,
-  endTime: Date
+  endTime: Date,
+  instanceId: String
 )

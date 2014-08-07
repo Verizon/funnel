@@ -1,5 +1,4 @@
-package intelmedia.ws.funnel
-package chemist
+package oncue.svc.funnel.chemist
 
 object Fixtures {
   val asgEventJson1 = """

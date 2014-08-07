@@ -1,104 +1,92 @@
-package intelmedia.ws.funnel
-package chemist
+// package intelmedia.ws.funnel
+// package chemist
 
-import java.io.File
-import com.amazonaws.auth.BasicAWSCredentials
-import com.amazonaws.regions.{Regions,Region}
-import com.amazonaws.services.sns.AmazonSNSClient
-import com.amazonaws.services.sqs.AmazonSQSClient
-import com.amazonaws.services.sqs.model.Message
-import oncue.svc.funnel.aws.{SQS,SNS}
-import scalaz.concurrent.Task
-import scalaz.stream.Process
-import scalaz.{\/, -\/, \/-}
+// import java.io.File
+// import java.net.URL
+// import com.amazonaws.auth.BasicAWSCredentials
+// import com.amazonaws.regions.{Regions,Region}
+// import com.amazonaws.services.sns.AmazonSNSClient
+// import com.amazonaws.services.sqs.AmazonSQSClient
+// import com.amazonaws.services.sqs.model.Message
+// import oncue.svc.funnel.aws.{SQS,SNS}
+// import scalaz.concurrent.Task
+// import scalaz.stream.{Process,Sink}
+// import scalaz.{\/, -\/, \/-}
 
-object Lifecycle {
-  import Decoder._
-  import argonaut._, Argonaut._
+// object Chemist {
 
-  case class MessageParseException(override val getMessage: String) extends RuntimeException
+//   def flaskLifecycleStream(queueName: String)(sqs: AmazonSQSClient): Process[Task,Unit] =
+//     for {
+//       a <- SQS.subscribe(queueName)(sqs)
+//       // _ <- Process.eval(myFunc(a.map(_.getMessageId)))
+//       b <- SQS.deleteMessages(queueName, a)(sqs)
+//     } yield ()
 
-  type Processor = List[Message] => AutoScalingEvent => Action
+//   def setup(topicName: String, queueName: String)(sns: AmazonSNSClient, sqs: AmazonSQSClient): Task[Unit] = {
+//     for {
+//       a <- SNS.create(topicName)(sns)
+//       b <- SQS.create(queueName)(sqs)
+//       c <- SNS.subscribe(a, b)(sns)
+//       _ <- collateExistingWork
+//     } yield ()
+//   }
 
-  def parseWireMessage(msg: Message): Throwable \/ AutoScalingEvent =
-    Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException(_))
+//   // TODO: Upon startup the system should ask all the flasks what they
+//   // are already monitoring so that the chemist has a full view on any
+//   // previously issued work.
+//   private def collateExistingWork: Task[Unit] = Task.now(())
+// }
 
-  def eventToAction(asg: AutoScalingEvent): Action = asg.event match {
-    case Launch                       => AddCapacity
-    case Terminate                    => DistributeLoad
-    case LaunchError | TerminateError => NoOp
-    case TestNotification | Unknown   => NoOp
-  }
-}
+// object Main {
 
-object Chemist {
+//   def main(args: Array[String]): Unit = {
+//     import knobs._
+//     import Chemist._
 
-  def flaskLifecycleStream(queueName: String)(sqs: AmazonSQSClient): Process[Task,Unit] =
-    for {
-      a <- SQS.subscribe(queueName)(sqs)
-      // _ <- Process.eval(myFunc(a.map(_.getMessageId)))
-      b <- SQS.deleteMessages(queueName, a)(sqs)
-    } yield ()
+//     val cfg =
+//       (knobs.loadImmutable(List(Required(FileResource(new File("/usr/share/oncue/etc/chemist.cfg"))))) or
+//       knobs.loadImmutable(List(Required(ClassPathResource("oncue/chemist.cfg"))))).run
 
-  def setup(topicName: String, queueName: String)(sns: AmazonSNSClient, sqs: AmazonSQSClient): Task[Unit] = {
-    for {
-      a <- SNS.create(topicName)(sns)
-      b <- SQS.create(queueName)(sqs)
-      c <- SNS.subscribe(a, b)(sns)
-    } yield ()
-  }
-}
+//     val sns = SNS.client(
+//       new BasicAWSCredentials(
+//         cfg.require[String]("aws.access-key"),
+//         cfg.require[String]("aws.secret-key")),
+//       cfg.lookup[String]("aws.proxy-host"),
+//       cfg.lookup[Int]("aws.proxy-port"),
+//       cfg.lookup[String]("aws.proxy-protocol"),
+//       Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
+//     )
 
-object Main {
+//     val sqs = SQS.client(
+//       new BasicAWSCredentials(
+//         cfg.require[String]("aws.access-key"),
+//         cfg.require[String]("aws.secret-key")),
+//       cfg.lookup[String]("aws.proxy-host"),
+//       cfg.lookup[Int]("aws.proxy-port"),
+//       cfg.lookup[String]("aws.proxy-protocol"),
+//       Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
+//     )
 
-  def main(args: Array[String]): Unit = {
-    import knobs._
-    import Chemist._
+//     // val url = "https://sqs.us-east-1.amazonaws.com/465404450664/ops-chemist"
 
-    val cfg =
-      (knobs.loadImmutable(List(Required(FileResource(new File("/usr/share/oncue/etc/chemist.cfg"))))) or
-      knobs.loadImmutable(List(Required(ClassPathResource("oncue/chemist.cfg"))))).run
+//     flaskLifecycleStream(cfg.require[String]("chemist.sqs-queue-name"))(sqs)
 
-    val sns = SNS.client(
-      new BasicAWSCredentials(
-        cfg.require[String]("aws.access-key"),
-        cfg.require[String]("aws.secret-key")),
-      cfg.lookup[String]("aws.proxy-host"),
-      cfg.lookup[Int]("aws.proxy-port"),
-      cfg.lookup[String]("aws.proxy-protocol"),
-      Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
-    )
+//     setup(
+//       cfg.require[String]("chemist.sns-topic-name"),
+//       cfg.require[String]("chemist.sqs-queue-name"))(sns, sqs)
 
-    val sqs = SQS.client(
-      new BasicAWSCredentials(
-        cfg.require[String]("aws.access-key"),
-        cfg.require[String]("aws.secret-key")),
-      cfg.lookup[String]("aws.proxy-host"),
-      cfg.lookup[Int]("aws.proxy-port"),
-      cfg.lookup[String]("aws.proxy-protocol"),
-      Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
-    )
+//     // exe.run.run
+//   }
 
-    // val url = "https://sqs.us-east-1.amazonaws.com/465404450664/ops-chemist"
+//   // def myFunc(m: List[String]): Task[Unit] =
+//   //   Task {
+//   //     println(s"<<< $m >>>>")
+//   //   }
 
-    flaskLifecycleStream(cfg.require[String]("chemist.sqs-queue-name"))(sqs)
-
-    setup(
-      cfg.require[String]("chemist.sns-topic-name"),
-      cfg.require[String]("chemist.sqs-queue-name"))(sns, sqs)
-
-    // exe.run.run
-  }
-
-  // def myFunc(m: List[String]): Task[Unit] =
-  //   Task {
-  //     println(s"<<< $m >>>>")
-  //   }
-
-  def init(): Unit = {
-    //
-  }
-}
+//   def init(): Unit = {
+//     //
+//   }
+// }
 
 
 

@@ -1,5 +1,4 @@
-package intelmedia.ws.funnel
-package chemist
+package oncue.svc.funnel.chemist
 
 object Decoder {
   import argonaut._, Argonaut._
@@ -55,9 +54,10 @@ object Decoder {
       j <- JsonToJavaDate("Time")(input)
       k <- JsonToJavaDate("StartTime")(input)
       l <- JsonToJavaDate("EndTime")(input)
+      m <- (input --\ "EC2InstanceId").as[String]
     } yield AutoScalingEvent(
       activityId      = a,
-      event           = b,
+      kind            = b,
       asgName         = c,
       asgARN          = d,
       avalibilityZone = e,
@@ -67,7 +67,8 @@ object Decoder {
       accountId       = i,
       time            = j,
       startTime       = k,
-      endTime         = l
+      endTime         = l,
+      instanceId      = m
     ))
 
 }
