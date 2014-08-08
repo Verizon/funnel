@@ -27,11 +27,8 @@ object Lifecycle {
   def stream(queueName: String)(sqs: AmazonSQS): Process[Task, Throwable \/ Action] = {
     for {
       a <- SQS.subscribe(queueName)(sqs)
-      _ = println("stream.a = " + a)
       b <- Process.emitSeq(a)
-      _ = println("stream.b = " + b)
       c <- Process.emit(parseMessage(b).map(eventToAction))
-      _ = println("stream.c = " + c)
       _ <- SQS.deleteMessages(queueName, a)(sqs)
     } yield c
   }

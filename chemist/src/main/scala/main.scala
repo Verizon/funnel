@@ -5,9 +5,10 @@ object Main {
     val I = Server0
     val S = Server
 
-    // val exe = S.listen()
+    val exe = S.listen
 
-    // I.run()
+    // block at the edge of the world
+    I.run(exe).run
 
   }
 }

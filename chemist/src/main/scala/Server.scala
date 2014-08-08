@@ -34,8 +34,8 @@ object Server {
   def watch(urls: Set[URL]): Server[Unit] =
     liftF(Watch(urls, ()))
 
-  // def listen: Server[Sink[Task, Action]] =
-  //   liftF(Listen(identity))
+  def listen: Server[Unit] =
+    liftF(Listen( () ))
 }
 
 import java.io.File
@@ -48,7 +48,10 @@ import oncue.svc.funnel.aws.{SQS,SNS}
 
 trait Server extends Interpreter[Server.ServerF] {
   import knobs._
+  import journal.Logger
   import Server._
+
+  val log = Logger("chemist")
 
   /////// configuration resolution ////////
 
@@ -98,8 +101,11 @@ trait Server extends Interpreter[Server.ServerF] {
   protected def init(): Task[Unit] =
     for {
       a <- SNS.create(topic)(sns)
+      _  = log.debug(s"created sns topic with arn = $a")
       b <- SQS.create(queue)(sqs)
+      _  = log.debug(s"created sqs queue with arn = $a")
       c <- SNS.subscribe(a, b)(sns)
+      _  = log.debug(s"subscribed sqs queue to the sns topic")
       // _ <- collateExistingWork
     } yield ()
 
