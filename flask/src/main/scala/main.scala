@@ -19,7 +19,7 @@ import knobs.{Config, Required, ClassPathResource, FileResource}
   */
 object Main {
   import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
-  import com.amazonaws.services.sns.AmazonSNSClient
+  import com.amazonaws.services.sns.{AmazonSNSClient,AmazonSNS}
   import com.amazonaws.auth.BasicAWSCredentials
   import com.amazonaws.regions.{Region, Regions}
   import Events.Event
@@ -41,7 +41,7 @@ object Main {
     R.disconnect
   }
 
-  private def giveUp(names: Names, cfg: Config, sns: AmazonSNSClient, log: String => Unit) = {
+  private def giveUp(names: Names, cfg: Config, sns: AmazonSNS, log: String => Unit) = {
     val msg = s"${names.mine} gave up on ${names.kind} server ${names.theirs}"
     Process.eval(SNS.publish(cfg.require[String]("flask.sns-error-topic"), msg)(sns))
   }

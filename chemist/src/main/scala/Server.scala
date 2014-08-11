@@ -34,6 +34,9 @@ object Server {
   def watch(urls: Set[URL]): Server[Unit] =
     liftF(Watch(urls, ()))
 
+  // TODO: probally move this into the init of the interpreter
+  // as starting to listen on the queue is an infinite Task that
+  // will never "compelte"
   def listen: Server[Unit] =
     liftF(Listen( () ))
 }
