@@ -444,7 +444,7 @@ object Monitoring {
       if (h.nonEmpty) signal.set(h.last).run
       cur = t
       cur match {
-        case Process.Halt(e) => signal.fail(e).run
+        case Process.Halt(e) => signal.fail(e.asThrowable).run
         case _ => ()
       }
     }
