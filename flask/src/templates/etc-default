@@ -15,12 +15,16 @@
 # -------------------------------------------------
 
 # Setting -Xmx and -Xms in Megabyte
--mem 4096
+-mem 10240
 
 -J-server
 
+-J-XX:+HeapDumpOnOutOfMemoryError
+
+-J-XX:+UseNUMA
+
 -J-XX:SurvivorRatio=2
 
--J-XX:+UseParallelOldGC
+-J-XX:+UseParallelGC
 
 -Dlogback.configurationFile=${{chdir}}/etc/logback.xml

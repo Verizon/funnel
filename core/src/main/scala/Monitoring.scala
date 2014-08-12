@@ -140,7 +140,7 @@ trait Monitoring {
       url: URL, localName: String => String = identity)(
         implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
     val report = (e: Throwable) => {
-      log("attemptMirrorAll.ERROR: "+e)
+      log(s"attemptMirrorAll.ERROR: url: $url, error: $e")
       ()
     }
     Monitoring.attemptRepeatedly(report)(
