@@ -11,6 +11,8 @@ import scalaz.concurrent.{Strategy,Task,Actor}
 import scalaz.stream.{async,Process}
 import Monitoring.prettyURL
 import scala.collection.JavaConverters._
+import scalaz.stream.async.mutable.Signal
+import scalaz.stream.async.signal
 
 object Riemann {
 
@@ -23,6 +25,8 @@ object Riemann {
   private[riemann] def collector(
     R: RiemannClient
   )(implicit log: String => Unit): Actor[Pusher] = {
+    implicit val S = Strategy.Executor(Monitoring.serverPool)
+    implicit val P = Monitoring.schedulingPool
     val a = Actor.actor[Pusher] {
       case Hold(e) => store = (e :: store)
       case Flush   => {
@@ -30,7 +34,7 @@ object Riemann {
         log(s"successfully sent batch of ${store.length}")
         store = Nil
       }
-    }(Strategy.Executor(Monitoring.serverPool))
+    }
 
     Process.awakeEvery(1.minute).evalMap {_ =>
       Task(a(Flush))
@@ -113,12 +117,12 @@ object Riemann {
 
   private def liftDatapointToStream(dp: Datapoint[Any]): Process[Task, Datapoint[Any]] =
     dp.value match {
-      case s: Stats => Process.emitSeq(splitStats(dp.key, s))
+      case s: Stats => Process.emitAll(splitStats(dp.key, s))
       case _        => Process.emit(dp)
     }
 
   /** Terminate `p` when the given `Signal` terminates. */
-  def link[A](alive: SampledSignal[Unit])(p: Process[Task,A]): Process[Task,A] =
+  def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
     alive.continuous.zip(p).map(_._2)
 
   /**
@@ -130,7 +134,7 @@ object Riemann {
    * the latest error.
    */
   // def retry[A](retries: Process[Task,Any])(p: Process[Task,A]): Process[Task,A] = {
-  //   val alive = SampledSignal[Unit]
+  //   val alive = Signal[Unit]
   //   Process.eval_(alive.set(())) ++ {
   //     val step: Process[Task,Throwable \/ A] =
   //       p.append(Process.eval_(alive.close)).attempt()
@@ -172,7 +176,7 @@ object Riemann {
 
   case class Names(kind: String, mine: String, theirs: String)
 
-  private val urlSignals = new java.util.concurrent.ConcurrentHashMap[URL, SampledSignal[Unit]]
+  private val urlSignals = new java.util.concurrent.ConcurrentHashMap[URL, Signal[Unit]]
 
 
   /**
@@ -194,8 +198,8 @@ object Riemann {
   )(implicit log: String => Unit): Task[Unit] = {
 
     val S = Strategy.Executor(Monitoring.defaultPool)
-    val alive = SampledSignal[Unit](S)
-    val active = SampledSignal[Set[URL]](S)
+    val alive = signal[Unit](S)
+    val active = signal[Set[URL]](S)
 
     def modifyActive(f: Set[URL] => Set[URL]): Task[Unit] =
       active.compareAndSet(a => Some(f(a.getOrElse(Set())))).map(_ => ())
@@ -212,7 +216,7 @@ object Riemann {
           log("recieved url: " + group + " / " + url)
           log("existing urls: " + active.get.run)
 
-          val hook = SampledSignal[Unit](S)
+          val hook = signal[Unit](S)
           hook.set(()).runAsync(_ => ())
 
           urlSignals.put(url, hook)
@@ -233,7 +237,7 @@ object Riemann {
                 received.onComplete(Process.eval_(modifyActive(_ - url))) // and remove it when done
           }
 
-          receivedIdempotent.run.runAsync(_.fold(err => log(err.getMessage), identity))
+          Task.fork(receivedIdempotent.run).runAsync(_.fold(err => log(err.getMessage), identity))
         }
         case Discard(url) => Task.delay {
           Option(urlSignals.get(url)).foreach(_.close.runAsync(_ => ()))
