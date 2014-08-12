@@ -2,11 +2,11 @@ package oncue.svc.funnel.aws
 
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.auth.{AWSCredentials,BasicAWSCredentials}
-import com.amazonaws.services.autoscaling.{AmazonAutoScaling,AmazonAutoScalingClient}
-import com.amazonaws.services.autoscaling.model.AutoScalingGroup
+import com.amazonaws.services.ec2.{AmazonEC2,AmazonEC2Client}
+// import com.amazonaws.services.ec2.model.AutoScalingGroup
 import scalaz.concurrent.Task
 
-object ASG {
+object EC2 {
 
   def client(
     credentials: BasicAWSCredentials,
@@ -22,7 +22,9 @@ object ASG {
     client
   }
 
-  def list(client: AmazonAutoScaling): Task[Seq[AutoScalingGroup]] =
-    Task(client.describeAutoScalingGroups.getAutoScalingGroups)
+  def instance()
+
+  // def list(client: AmazonAutoScaling): Task[Seq[AutoScalingGroup]] =
+  //   Task(client.describeAutoScalingGroups.getAutoScalingGroups)
 
 }
