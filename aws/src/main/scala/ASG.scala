@@ -9,17 +9,29 @@ import com.amazonaws.services.autoscaling.model.{AutoScalingGroup,Instance => AS
 import scalaz.concurrent.Task
 import scala.collection.JavaConverters._
 
+case class Group(
+  name: String,
+  instances: Seq[Instance] = Nil,
+  tags: Map[String,String] = Map.empty){
+  def application: Option[String] =
+    tags.get("AppName")
+
+  def applicationWithRevision: Option[String] =
+    for {
+      n <- application
+      v <- tags.get("revision")
+    } yield s"$n-$v"
+
+  def servicename: Option[String] =
+    tags.get("servicename")
+}
+
+case class Instance(
+  id: String,
+  internalHostname: Option[String] = None,
+  externalHostname: Option[String] = None)
+
 object ASG {
-
-  case class Group(
-    name: String,
-    instances: Seq[Instance] = Nil,
-    tags: Map[String,String] = Map.empty)
-
-  case class Instance(
-    id: String,
-    internalHostname: Option[String] = None,
-    externalHostname: Option[String] = None)
 
   def client(
     credentials: BasicAWSCredentials,
@@ -35,28 +47,12 @@ object ASG {
     client
   }
 
-  def list(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Group]] = {
-    def addresses(g: List[Group]): Task[Seq[Address]] = {
-      val x: Seq[Task[Seq[Address]]] = g.flatMap(_.instances.map(i => EC2.instanceHostnames(i.id)(ec2)))
-      Task.gatherUnordered(x).map(_.flatMap(identity))
-    }
-
-    def groups = Task {
-      asg.describeAutoScalingGroups.getAutoScalingGroups.asScala.toList.map(g =>
-        Group(name = g.getAutoScalingGroupName,
-              instances = instances(g),
-              tags = tags(g))
+  def list(asg: AmazonAutoScaling): Task[Seq[Group]] = Task {
+    asg.describeAutoScalingGroups.getAutoScalingGroups.asScala.toList.map(g =>
+      Group(name = g.getAutoScalingGroupName,
+            instances = instances(g),
+            tags = tags(g))
       )
-    }
-
-    for {
-      g <- groups
-      a <- addresses(g)
-    } yield {
-      println(">>>> " + a)
-
-      g
-    }
   }
 
   private def tags(g: AutoScalingGroup): Map[String,String] =

@@ -7,13 +7,14 @@ import com.amazonaws.services.ec2.model.{
   DescribeAddressesRequest,
   DescribeAddressesResult,
   Filter,
-  Address}
+  Address,
+  DescribeInstancesRequest,
+  DescribeInstancesResult,
+  Reservation}
 import scalaz.concurrent.Task
 import scala.collection.JavaConverters._
 
 object EC2 {
-
-  case class Hostnames(external: Option[String], internal: Option[String])
 
   def client(
     credentials: BasicAWSCredentials,
@@ -29,13 +30,8 @@ object EC2 {
     client
   }
 
-  def instanceHostnames(id: String)(ec2: AmazonEC2): Task[Seq[Address]] = Task {
-    ec2.describeAddresses(new DescribeAddressesRequest()).getAddresses.asScala
+  def reservations(ids: Seq[String])(ec2: AmazonEC2): Task[Seq[Reservation]] = Task {
+    ec2.describeInstances(new DescribeInstancesRequest().withInstanceIds(ids:_*)
+      ).getReservations.asScala.toSeq
   }
-
-  private def filter(n: String) = new Filter().withName(n)
-
-  // def list(client: AmazonAutoScaling): Task[Seq[AutoScalingGroup]] =
-  //   Task(client.describeAutoScalingGroups.getAutoScalingGroups)
-
 }
