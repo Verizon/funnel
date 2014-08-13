@@ -17,7 +17,7 @@ object Events {
   def every(d: Duration)(
     implicit pool: ExecutorService = Monitoring.defaultPool,
     schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool):
-    Event = _ => Process.awakeEvery(d)(pool, schedulingPool).map(_ => ())
+    Event = _ => Process.awakeEvery(d)(Strategy.Executor(pool), schedulingPool).map(_ => ())
 
   /**
    * The first `n` ticks of an event which fires at the supplied

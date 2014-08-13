@@ -164,7 +164,7 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
     // Side effects FTL!
     val _ = (TCP, LoadAverage, FileSystem, CPU.Aggregate, CPU.Individual, Mem)
 
-    Process.awakeEvery(t)(ES, TS).map { _ =>
+    Process.awakeEvery(t)(Strategy.Executor(ES), TS).map { _ =>
       import org.hyperic.sigar.{Cpu, CpuPerc}
 
       def cpuTime(cpu: Cpu, m: CpuStats): Unit = {
