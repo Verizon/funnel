@@ -5,14 +5,18 @@ import com.amazonaws.auth.{AWSCredentials,BasicAWSCredentials}
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.Address
 import com.amazonaws.services.autoscaling.{AmazonAutoScaling,AmazonAutoScalingClient}
-import com.amazonaws.services.autoscaling.model.{AutoScalingGroup,Instance => ASGInstance}
+import com.amazonaws.services.autoscaling.model.{
+  DescribeAutoScalingGroupsRequest,
+  AutoScalingGroup,Instance => ASGInstance}
 import scalaz.concurrent.Task
 import scala.collection.JavaConverters._
 
 case class Group(
   name: String,
   instances: Seq[Instance] = Nil,
-  tags: Map[String,String] = Map.empty){
+  tags: Map[String,String] = Map.empty,
+  securityGroups: Seq[String] = Nil){
+
   def application: Option[String] =
     tags.get("AppName")
 
@@ -47,12 +51,27 @@ object ASG {
     client
   }
 
-  def list(asg: AmazonAutoScaling): Task[Seq[Group]] = Task {
-    asg.describeAutoScalingGroups.getAutoScalingGroups.asScala.toList.map(g =>
-      Group(name = g.getAutoScalingGroupName,
-            instances = instances(g),
-            tags = tags(g))
-      )
+  import annotation.tailrec
+
+  def list(asg: AmazonAutoScaling): Task[Seq[Group]] = {
+    @tailrec def fetch(result: => Seq[AutoScalingGroup], token: Option[String] = None): Seq[AutoScalingGroup] = {
+      val req = new DescribeAutoScalingGroupsRequest().withMaxRecords(100)
+      val r = token.map(t => asg.describeAutoScalingGroups(req.withNextToken(t))
+          ).getOrElse(asg.describeAutoScalingGroups(req))
+      val l = r.getAutoScalingGroups.asScala.toList
+
+      val aggregated = l ++ result
+
+      if(r.getNextToken != null) fetch(aggregated, Option(r.getNextToken))
+      else aggregated
+    }
+
+    Task(fetch(Nil).map(g =>
+      Group(
+        name      = g.getAutoScalingGroupName,
+        instances = instances(g),
+        tags      = tags(g))
+      ))
   }
 
   private def tags(g: AutoScalingGroup): Map[String,String] =

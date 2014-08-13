@@ -22,6 +22,7 @@ object OperationalMachines {
         grp.copy(
           instances = grp.instances.map { i =>
             val found = instances.get(i.id)
+            // val sgs = found.toList.flatMap(_.getSecurityGroups.asScala.toList).map(_.getGroupName)
             i.copy(
               internalHostname = found.map(_.getPrivateDnsName),
               externalHostname = found.map(_.getPublicDnsName)
@@ -30,6 +31,8 @@ object OperationalMachines {
         )
       }
     }
+
+  // def filter
 
   // def periodic(delay: Duration)(asg: AmazonAutoScaling) =
   //   Process.awakeEvery(delay).evalMap(_ => list(asg))
