@@ -14,8 +14,10 @@ import scala.collection.JavaConverters._
 case class Group(
   name: String,
   instances: Seq[Instance] = Nil,
-  tags: Map[String,String] = Map.empty,
-  securityGroups: Seq[String] = Nil){
+  tags: Map[String,String] = Map.empty){
+
+  def securityGroups: Seq[String] =
+    instances.headOption.toList.flatMap(_.securityGroups)
 
   def application: Option[String] =
     tags.get("AppName")
@@ -33,7 +35,8 @@ case class Group(
 case class Instance(
   id: String,
   internalHostname: Option[String] = None,
-  externalHostname: Option[String] = None)
+  externalHostname: Option[String] = None,
+  securityGroups: Seq[String] = Nil)
 
 object ASG {
 
