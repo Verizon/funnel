@@ -90,7 +90,7 @@ object SQS {
     implicit pool: ExecutorService = Monitoring.defaultPool,
     schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool
   ): Process[Task, List[Message]] = {
-    Process.awakeEvery(tick)(Monitoring.schedulingPool).evalMap { _ =>
+    Process.awakeEvery(tick)(Strategy.Executor(Monitoring.defaultPool), Monitoring.schedulingPool).evalMap { _ =>
       Task {
         val req = (new ReceiveMessageRequest
           ).withQueueUrl(url
