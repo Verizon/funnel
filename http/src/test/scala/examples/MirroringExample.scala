@@ -17,6 +17,8 @@ object MirroringExample {
 
     val health = Key[String]("now/health", Units.TrafficLight)
 
+    implicit val P = Monitoring.schedulingPool
+
     /**
      * Generate some bogus activity for a `Monitoring` instance,
      * and die off after about 5.minutes.
@@ -27,6 +29,7 @@ object MirroringExample {
       val ok = I.trafficLight("health")
       val reqs = I.counter("reqs")
       val svr = MonitoringServer.start(M, port)
+
       Process.awakeEvery(2.seconds).takeWhile(_ < (ttl.seconds)).map { _ =>
         reqs.incrementBy((math.random * 10).toInt)
         ok.green
@@ -46,7 +49,7 @@ object MirroringExample {
     }
 
     val urls: Process[Task, (URL,String)] = // cluster comes online gradually
-      Process.emitSeq(accountCluster ++ decodingCluster).flatMap {
+      Process.emitAll(accountCluster ++ decodingCluster).flatMap {
         case (url,group) => Process.sleep(2.seconds) ++
                             Process.emit(new URL(url) -> group)
       }

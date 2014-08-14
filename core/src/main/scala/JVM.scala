@@ -21,12 +21,15 @@ object JVM {
     val mxBean = ManagementFactory.getMemoryMXBean
     val gcs = ManagementFactory.getGarbageCollectorMXBeans.toList
     val pools = ManagementFactory.getMemoryPoolMXBeans.toList
+
+    val ST = Strategy.Executor(ES)
+
     import I._
     gcs.foreach { gc =>
       val name = gc.getName.replace(' ', '-')
       val numCollections = numericGauge(s"jvm/gc/$name", 0, Units.Count)
       val collectionTime = numericGauge(s"jvm/gc/$name/time", 0, Units.Milliseconds)
-      Process.awakeEvery(t)(ES,TS).map { _ =>
+      Process.awakeEvery(t)(ST,TS).map { _ =>
         numCollections.set(gc.getCollectionCount.toDouble)
         collectionTime.set(gc.getCollectionTime.toDouble)
       }.run.runAsync(_ => ())
@@ -66,7 +69,7 @@ object JVM {
     val nonheapCommitted = MB("jvm/memory/nonheap/committed",
                               "The amount of nonheap memory that is committed for the JVM to use.")
 
-    Process.awakeEvery(t)(ES,TS).map { _ =>
+    Process.awakeEvery(t)(ST,TS).map { _ =>
       import mxBean.{getHeapMemoryUsage => heap, getNonHeapMemoryUsage => nonheap}
       totalInit.set(heap.getInit + nonheap.getInit)
       totalUsed.set(heap.getUsed + nonheap.getUsed)

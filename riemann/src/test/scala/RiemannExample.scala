@@ -27,6 +27,8 @@ object Main {
 
     val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
 
+    implicit val P = Monitoring.schedulingPool
+
     val t1 = Process.awakeEvery(2.seconds).map { _ =>
              c.increment
              t.time(Thread.sleep(100))

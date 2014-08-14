@@ -25,7 +25,7 @@ object SSE {
                   sink: java.io.Writer): Unit =
     events.map(kv => s"event: reportable\n${dataEncode(kv)(EncodeDatapoint[Any])}\n")
           .intersperse("\n")
-          .map(writeTo(sink))
+          .flatMap(writeTo(sink))
           .run.run
 
   /**
@@ -39,19 +39,19 @@ object SSE {
           .map(writeTo(sink))
           .run.run
 
-  private def writeTo(sink: java.io.Writer): String => Unit =
-    line => try {
+  private def writeTo(sink: java.io.Writer): String => Process[Task, Unit] =
+    line => Process.eval(Task {
       sink.write(line)
       sink.flush // this is a line-oriented protocol,
                  // so we flush after each line, otherwise
                  // consumer may get delayed messages
-    }
-    catch { case e: java.io.IOException =>
+    }.attempt).flatMap(_.fold(e => e match {
+      case x: java.io.IOException =>
       // when client disconnects we'll get a broken pipe
       // IOException from the above `sink.write`. This
       // gets translated to normal termination
-      throw Process.End
-    }
+      Process.halt
+    }, x => Process.emit(x)))
 
   /// parsing
 
@@ -159,7 +159,7 @@ object SSE {
   def urlLinesR(url: URL)(implicit S: ExecutorService = Monitoring.serverPool): Process[Task, String] =
     Process.suspend {
       try linesR(url.openStream)(S)
-      catch { case e: Throwable => Process.Halt(e) }
+      catch { case e: Throwable => Process.fail(e) }
     }
 
   def urlFullR(url: URL)(implicit S: ExecutorService = Monitoring.serverPool): Task[String] =
@@ -172,6 +172,6 @@ object SSE {
     io.resource(Task(scala.io.Source.fromInputStream(in))(S))(
              src => Task(src.close)(S)) { src =>
       lazy val lines = src.getLines // A stateful iterator
-      Task { if (lines.hasNext) lines.next else throw Process.End } (S)
+      Task { if (lines.hasNext) lines.next else throw Cause.Terminated(Cause.End) } (S)
     }
 }

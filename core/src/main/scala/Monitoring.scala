@@ -15,7 +15,8 @@ import scalaz.syntax.monad._
 import scalaz.std.option._
 import scalaz.{\/, ~>, Monad}
 import Events.Event
-import scalaz.stream.async.immutable.Signal
+import scalaz.stream.async.mutable.Signal
+import scalaz.stream.async.signal
 
 /**
  * A hub for publishing and subscribing to streams
@@ -45,7 +46,7 @@ trait Monitoring {
    * discrete stream of values for this key, updated only
    * when new values are produced.
    */
-  def get[O](k: Key[O]): SampledSignal[O]
+  def get[O](k: Key[O]): Signal[O]
 
   /** Convience function to publish a metric under a newly created key. */
   def publish[O:Reportable](name: String, units: Units[O])(e: Event)(
@@ -243,7 +244,7 @@ trait Monitoring {
     // we merge the `e` stream and the stream of datapoints for the
     // given prefix; if we ever encounter two ticks in a row from `e`,
     // we reset all matching keys back to their default
-    val alive = SampledSignal[Unit](Strategy.Sequential); alive.set(()).run
+    val alive = signal[Unit](Strategy.Sequential); alive.set(()).run
     val pts = Monitoring.subscribe(this)(f).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
         log(s"$msg no more data points for '$f', resetting...")
@@ -265,12 +266,12 @@ trait Monitoring {
     get(k).continuous.once.runLast.map(_.get)
 
   /** The time-varying set of keys. */
-  def keys: SampledSignal[List[Key[Any]]]
+  def keys: Signal[List[Key[Any]]]
 
   /** get a count of all metric keys in the system broken down by their logical prefix **/
   def audit: Task[List[(String, Int)]] =
-    keys.sample.map { k =>
-      val ks = k.toList.flatMap(identity)
+    keys.compareAndSet(identity).map { k =>
+      val ks = k.toList.flatten
       val prefixes: List[String] = ks.flatMap(_.name.split('/').headOption).distinct
 
       prefixes.foldLeft(List.empty[(String, Int)]){ (a,step) =>
@@ -350,12 +351,12 @@ object Monitoring {
     val t0 = System.nanoTime
     implicit val S = Strategy.Executor(ES)
     val P = Process
-    val keys_ = SampledSignal[List[Key[Any]]](S)
+    val keys_ = signal[List[Key[Any]]](S)
     keys_.set(List()).run
 
     case class Topic[I,O](
       publish: ((I,Duration)) => Unit,
-      current: SampledSignal[O]
+      current: Signal[O]
     )
     val topics = new TrieMap[Key[Any], Topic[Any,Any]]()
 
@@ -378,8 +379,8 @@ object Monitoring {
       protected def update[O](k: Key[O], v: O): Task[Unit] =
         topics.get(k).map(_.current.set(v)).getOrElse(Task(())).map(_ => ())
 
-      def get[O](k: Key[O]): SampledSignal[O] =
-        topics.get(k).map(_.current.asInstanceOf[SampledSignal[O]])
+      def get[O](k: Key[O]): Signal[O] =
+        topics.get(k).map(_.current.asInstanceOf[Signal[O]])
                      .getOrElse(sys.error("key not found: " + k))
 
       def elapsed: Duration = Duration.fromNanos(System.nanoTime - t0)
@@ -416,9 +417,9 @@ object Monitoring {
     val m = collection.concurrent.TrieMap[Key[Any], Datapoint[Any]]()
     implicit val S = Strategy.Executor(ES)
     for {
-      ks <- M.keys.sample.map(_.getOrElse(List()))
+      ks <- M.keys.compareAndSet(identity).map(_.getOrElse(List()))
       t <- Nondeterminism[Task].gatherUnordered {
-        ks.map(k => M.get(k).sample.map(
+        ks.map(k => M.get(k).compareAndSet(identity).map(
           _.map(v => k -> Datapoint(k, v))
         ).attempt.map(_.toOption))
       }
@@ -433,8 +434,8 @@ object Monitoring {
   private[funnel] def bufferedSignal[I,O](
       buf: Process1[I,O])(
       implicit ES: ExecutorService = defaultPool):
-      (I => Unit, SampledSignal[O]) = {
-    val signal = SampledSignal[O](Strategy.Executor(ES))
+      (I => Unit, Signal[O]) = {
+    val signal = scalaz.stream.async.signal[O](Strategy.Executor(ES))
     var cur = buf.unemit match {
       case (h, t) if h.nonEmpty => signal.set(h.last).run; t
       case (h, t) => t
@@ -444,7 +445,7 @@ object Monitoring {
       if (h.nonEmpty) signal.set(h.last).run
       cur = t
       cur match {
-        case Process.Halt(e) => signal.fail(e).run
+        case Process.Halt(e) => signal.fail(e.asThrowable).run
         case _ => ()
       }
     }

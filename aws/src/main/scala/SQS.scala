@@ -12,7 +12,7 @@ import com.amazonaws.services.sqs.model.{
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.auth.BasicAWSCredentials
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Strategy,Task}
 import scala.collection.JavaConverters._
 import concurrent.duration._
 import intelmedia.ws.funnel.Monitoring

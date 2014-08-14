@@ -42,8 +42,10 @@ object MonitoringServer {
 }
 
 class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
-  private[funnel] val (mirroringQueue,commands) =
-    async.queue[Command](Strategy.Executor(Monitoring.serverPool))
+  private[funnel] val mirroringQueue =
+    async.unboundedQueue[Command](Strategy.Executor(Monitoring.serverPool))
+
+  private[funnel] val commands = mirroringQueue.dequeue
 
   private val server = HttpServer.create(new InetSocketAddress(port), 0)
 
@@ -106,8 +108,10 @@ class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
       Parse.decodeEither[List[Bucket]](json).fold(
         error => flush(400, error.toString, req),
         blist => {
-          blist.flatMap(b => b.urls.map(u => Mirror(new URL(u), b.label))
-            ).foreach(mirroringQueue.enqueue)
+          val cs: List[Command] = blist.flatMap(b => b.urls.map(u => Mirror(new URL(u), b.label)))
+          val p0: Process[Task, Command] = Process.emitAll(cs)
+          val p = p0 to mirroringQueue.enqueue
+          p.run.run
 
           flush(202, Array.empty[Byte], req)
         }
@@ -122,8 +126,10 @@ class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
       Parse.decodeEither[List[String]](json).fold(
         error => flush(400, error.toString, req),
         list => {
-          list.map(u => Discard(new URL(u))
-            ).foreach(mirroringQueue.enqueue)
+          val p0: Process[Task, Command] = Process.emitAll(list.map(u => Discard(new URL(u))))
+          val p = p0 to mirroringQueue.enqueue
+          p.run.run
+
           flush(202, Array.empty[Byte], req)
         }
       )
