@@ -16,12 +16,8 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
   case class CpuStats(user: G,
                       idle: G,
                       total: G,
-                      nice: G,
-                      irq: G,
                       sys: G,
-                      waiting: G,
-                      softirq: G,
-                      stolen: G)
+                      waiting: G)
 
   case class FileSystemStats(avail: G,
                              usePercent: G,
@@ -46,12 +42,8 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
       CpuStats(ms("user"),
                ms("idle"),
                ms("total"),
-               ms("nice"),
-               ms("irq"),
                ms("sys"),
-               ms("wait"),
-               ms("softirq"),
-               ms("stolen"))
+               ms("wait"))
     }
 
     def cpuUsage(label: String => String): CpuStats = {
@@ -60,12 +52,8 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
       CpuStats(pct("user"),
                pct("idle"),
                pct("combined"),
-               pct("nice"),
-               pct("irq"),
                pct("sys"),
-               pct("wait"),
-               pct("softirq"),
-               pct("stolen"))
+               pct("wait"))
     }
 
     object Aggregate {
@@ -75,17 +63,6 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
       val usage = cpuUsage(s => label(s"usage/$s"))
     }
 
-    object Individual {
-      val cpus = sigar.getCpuList.zipWithIndex
-
-      val times = cpus.map {
-        case (_, n) => cpuTime(s => CPU.label(s"$n/time/$s"))
-      }
-
-      val usages = cpus.map {
-        case (_, n) => cpuUsage(s => CPU.label(s"$n/usage/$s"))
-      }
-    }
   }
 
   object Mem {
@@ -162,7 +139,7 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
 
     // Make the side effects happen.
     // Side effects FTL!
-    val _ = (TCP, LoadAverage, FileSystem, CPU.Aggregate, CPU.Individual, Mem)
+    val _ = (TCP, LoadAverage, FileSystem, CPU.Aggregate, Mem)
 
     Process.awakeEvery(t)(Strategy.Executor(ES), TS).map { _ =>
       import org.hyperic.sigar.{Cpu, CpuPerc}
@@ -171,23 +148,15 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
         m.user.set(cpu.getUser)
         m.idle.set(cpu.getIdle)
         m.total.set(cpu.getTotal)
-        m.nice.set(cpu.getNice)
-        m.irq.set(cpu.getIrq)
         m.sys.set(cpu.getSys)
         m.waiting.set(cpu.getWait)
-        m.softirq.set(cpu.getSoftIrq)
-        m.stolen.set(cpu.getStolen)
       }
       def cpuUsage(cpu: CpuPerc, m: CpuStats) = {
         m.user.set(cpu.getUser)
         m.idle.set(cpu.getIdle)
         m.total.set(cpu.getCombined)
-        m.nice.set(cpu.getNice)
-        m.irq.set(cpu.getIrq)
         m.sys.set(cpu.getSys)
         m.waiting.set(cpu.getWait)
-        m.softirq.set(cpu.getSoftIrq)
-        m.stolen.set(cpu.getStolen)
       }
 
       // Add aggregate CPU timings
@@ -195,16 +164,6 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
 
       // Add aggregate CPU usage
       cpuUsage(sigar.getCpuPerc, CPU.Aggregate.usage)
-
-      // Add per-CPU timings
-      sigar.getCpuList.zip(CPU.Individual.times).foreach { case (cpu, gauges) =>
-        cpuTime(cpu, gauges)
-      }
-
-      // Add per-CPU usages
-      sigar.getCpuPercList.zip(CPU.Individual.usages).foreach { case (cpu, gauges) =>
-        cpuUsage(cpu, gauges)
-      }
 
       // Add per-filesystem usages
       FileSystem.usages.foreach { case (k, v) =>
