@@ -8,6 +8,14 @@ import com.amazonaws.services.sqs.model.Message
 import com.amazonaws.services.sqs.AmazonSQS
 import oncue.svc.funnel.aws.{SQS,SNS}
 
+/**
+ * The purpose of this object is to manage all the "lifecycle" events
+ * associated with subordinate Flask instances. Whenever they start,
+ * stop, etc the SQS event will come in and be presented on the stream.
+ *
+ * The design here is that incoming events are translated into a lifecycle
+ * algebra which is then acted upon. This is essentially interpreter pattern.
+ */
 object Lifecycle {
   import Decoder._
   import argonaut._, Argonaut._
