@@ -10,8 +10,6 @@ import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
 import oncue.svc.funnel.aws._
 
-
-
 object Machines {
   def listAll(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[URL]] =
     instances(g => true)(asg,ec2)
@@ -19,12 +17,24 @@ object Machines {
   def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[URL]] =
     instances(filter.funnels)(asg,ec2)
 
-  def instances(f: Group => Boolean)(asg: AmazonAutoScaling, ec2: AmazonEC2) =
+  def listFlasks(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[URL]] =
+    instances(filter.flasks)(asg,ec2)
+
+  // def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[URL]] =
+    // instances(filter.funnels)(asg,ec2)
+
+  private def instances(f: Group => Boolean)(asg: AmazonAutoScaling, ec2: AmazonEC2) =
+    for {
+      a <- readAutoScallingGroups(asg, ec2)
+      b <- a.map(g => checkGroupInstances())
+    }
+
+
     readAutoScallingGroups(asg, ec2).map(
-      _.filter(f).flatMap(_.instances).map(toUrl)
+      _.filter(checkGroupInstances).filter(f).flatMap(_.instances).map(toUrl)
     )
 
-  def readAutoScallingGroups(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Group]] =
+  private def readAutoScallingGroups(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Group]] =
     for {
       g <- ASG.list(asg)
       x <- EC2.reservations(g.flatMap(_.instances.map(_.id)))(ec2)
@@ -65,11 +75,33 @@ object Machines {
     new URL("http://${i.externalHostname}:5775/audit")
 
   import scala.io.Source
+  import scalaz.\/
 
-  private def fetch(url: URL): Task[String] = Task {
-    val c = url.openConnection
-    c.setConnectTimeout(500) // timeout in 500ms to keep the overhead reasonable
-    Source.fromInputStream(c.getInputStream).mkString
+  private def fetch(url: URL): Throwable \/ String =
+    \/.fromTryCatch {
+      val c = url.openConnection
+      c.setConnectTimeout(500) // timeout in 500ms to keep the overhead reasonable
+      Source.fromInputStream(c.getInputStream).mkString
+    }
+
+  /**
+   * Goal of this function is to validate that the machine instances specified
+   * by the supplied group `g`, are in fact running a funnel instance and it is
+   * ready to start sending metrics if we connect to its `/stream` function.
+   */
+  private def checkGroupInstances(g: Group): Task[List[Instance]] = {
+    val fetches: Seq[Task[Throwable \/ Instance]] = g.instances.map { i =>
+      (for {
+        a <- Task(fetch(toUrl(i)))
+        b <- a.fold(e => Task.fail(e), o => Task.now(o))
+      } yield i).attempt
+    }
+
+    def discardProblematicInstances(l: List[Throwable \/ Instance]): List[Instance] =
+      l.foldLeft(List.empty[Instance]){ (a,b) =>
+        b.fold(e => a, i => a :+ i)
+      }
+
+    Task.gatherUnordered(fetches).map(discardProblematicInstances(_))
   }
-
 }
