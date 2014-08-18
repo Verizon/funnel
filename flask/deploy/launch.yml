@@ -4,4 +4,4 @@
   connection: local
   gather_facts: false
   roles:
-    - { role: launcher, amazon_cf_template: su.template, amazon_instance_type: m3.large }
+    - { role: launcher, amazon_instance_type: m3.large }
