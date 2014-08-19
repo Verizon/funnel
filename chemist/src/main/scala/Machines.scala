@@ -44,6 +44,10 @@ object Machines {
       b <- Task.gatherUnordered(y)
     } yield b.filter(_._2.nonEmpty).toMap
 
+  /**
+   * This is kind of horrible, but it is what it is. The AWS api's really do not help here at all.
+   * Sorry!
+   */
   private def readAutoScallingGroups(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Group]] =
     for {
       g <- ASG.list(asg)
@@ -53,9 +57,6 @@ object Machines {
                       .groupBy(_.getInstanceId).mapValues(_.head)
 
       g.map { grp =>
-
-        println(">>>>> " + grp.instances)
-
         grp.copy(
           instances = grp.instances.map { i =>
             val found = instances.get(i.id)

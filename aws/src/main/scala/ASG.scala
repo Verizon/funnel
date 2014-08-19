@@ -28,11 +28,14 @@ case class Group(
       v <- tags.get("revision")
     } yield s"$n-$v"
 
-  def servicename: Option[String] =
+  def serviceName: Option[String] =
     tags.get("servicename")
 
+  def stackName: Option[String] =
+    tags.get("aws:cloudformation:stack-name")
+
   def bucket: String =
-    applicationWithRevision.getOrElse("unknown")
+    applicationWithRevision orElse stackName orElse application getOrElse name
 }
 
 case class Instance(
@@ -45,7 +48,7 @@ case class Instance(
   import java.net.URL
   import scalaz.{\/,-\/,\/-}
 
-  def isInternalOnly: Boolean = externalHostname.isEmpty
+  def inVPC: Boolean = externalHostname.isEmpty && internalHostname.nonEmpty
 
   def asURL: Throwable \/ URL = asURL()
 
