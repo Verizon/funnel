@@ -11,13 +11,13 @@ import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
 import oncue.svc.funnel.aws._
 
 object Machines {
-  def listAll(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[URL])]] =
+  def listAll(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[Instance])]] =
     instances(g => true)(asg,ec2)
 
-  def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[URL])]] =
+  def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[Instance])]] =
     instances(filter.funnels)(asg,ec2)
 
-  def listFlasks(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[URL])]] =
+  def listFlasks(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[Instance])]] =
     instances(filter.flasks)(asg,ec2)
 
   // def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[URL]] =
@@ -25,7 +25,7 @@ object Machines {
 
   private def instances(f: Group => Boolean
     )(asg: AmazonAutoScaling, ec2: AmazonEC2
-    ): Task[List[(String, List[URL])]] =
+    ): Task[List[(String, List[Instance])]] =
     for {
       a <- readAutoScallingGroups(asg, ec2)
       x  = a.filter(f)
@@ -79,10 +79,6 @@ object Machines {
   // def periodic(delay: Duration)(asg: AmazonAutoScaling) =
   //   Process.awakeEvery(delay).evalMap(_ => list(asg))
 
-  private def toUrl(i: Instance): URL =
-    i.externalHostname.map(u =>
-      new URL(s"http://$u:5775/audit")).getOrElse(sys.error("Invalid hostname."))
-
   import scala.io.Source
   import scalaz.\/
 
@@ -93,27 +89,30 @@ object Machines {
       Source.fromInputStream(c.getInputStream).mkString
     }
 
+
+
   /**
    * Goal of this function is to validate that the machine instances specified
    * by the supplied group `g`, are in fact running a funnel instance and it is
    * ready to start sending metrics if we connect to its `/stream` function.
    */
-  private def checkGroupInstances(g: Group): Task[List[URL]] = {
+  def checkGroupInstances(g: Group): Task[List[Instance]] = {
     val fetches: Seq[Task[Throwable \/ Instance]] = g.instances.map { i =>
+      println("**************************")
+      println(i)
+      println(i.asURL)
+      println("**************************")
+
       (for {
-        a <- Task(fetch(toUrl(i)))
-        _  = println("**************************")
-        _  = println(i)
-        _  = println(toUrl(i))
-        _  = println("**************************")
+        a <- Task(i.asURL.flatMap(fetch))
         _  = println(":::::  " + a)
         b <- a.fold(e => Task.fail(e), o => Task.now(o))
       } yield i).attempt
     }
 
-    def discardProblematicInstances(l: List[Throwable \/ Instance]): List[URL] =
-      l.foldLeft(List.empty[URL]){ (a,b) =>
-        b.fold(e => a, i => a :+ toUrl(i))
+    def discardProblematicInstances(l: List[Throwable \/ Instance]): List[Instance] =
+      l.foldLeft(List.empty[Instance]){ (a,b) =>
+        b.fold(e => a, i => a :+ i)
       }
 
     Task.gatherUnordered(fetches).map(discardProblematicInstances(_))

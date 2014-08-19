@@ -41,7 +41,19 @@ case class Instance(
   externalHostname: Option[String] = None,
   securityGroups: Seq[String] = Nil,
   zone: String){
+
+  import java.net.URL
+  import scalaz.{\/,-\/,\/-}
+
   def isInternalOnly: Boolean = externalHostname.isEmpty
+
+  def asURL: Throwable \/ URL = asURL()
+
+  def asURL(port: Int = 5775, path: String = "audit"): Throwable \/ URL =
+    externalHostname match {
+      case Some(h) if h.nonEmpty => \/-(new URL(s"http://$h:$port/$path"))
+      case _ => -\/(new RuntimeException(s"No external hostname is specified for $id"))
+    }
 }
 
 object ASG {
