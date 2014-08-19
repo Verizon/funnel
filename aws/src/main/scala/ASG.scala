@@ -30,6 +30,9 @@ case class Group(
 
   def servicename: Option[String] =
     tags.get("servicename")
+
+  def bucket: String =
+    applicationWithRevision.getOrElse("unknown")
 }
 
 case class Instance(

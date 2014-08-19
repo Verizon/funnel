@@ -11,28 +11,32 @@ import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
 import oncue.svc.funnel.aws._
 
 object Machines {
-  def listAll(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[URL]] =
+  def listAll(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[URL])]] =
     instances(g => true)(asg,ec2)
 
-  def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[URL]] =
+  def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[URL])]] =
     instances(filter.funnels)(asg,ec2)
 
-  def listFlasks(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[URL]] =
+  def listFlasks(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[URL])]] =
     instances(filter.flasks)(asg,ec2)
 
   // def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[URL]] =
     // instances(filter.funnels)(asg,ec2)
 
-  private def instances(f: Group => Boolean)(asg: AmazonAutoScaling, ec2: AmazonEC2) =
+  private def instances(f: Group => Boolean
+    )(asg: AmazonAutoScaling, ec2: AmazonEC2
+    ): Task[List[(String, List[URL])]] =
     for {
       a <- readAutoScallingGroups(asg, ec2)
-      b <- a.map(g => checkGroupInstances())
-    }
+      x  = a.filter(f)
+      // _ = println(">>>> " +x)
+      y  = x.map(g => checkGroupInstances(g).map(g.bucket -> _))
+      b <- Task.gatherUnordered(y)
+    } yield b
 
-
-    readAutoScallingGroups(asg, ec2).map(
-      _.filter(checkGroupInstances).filter(f).flatMap(_.instances).map(toUrl)
-    )
+    // readAutoScallingGroups(asg, ec2).map(
+    //   _.filter(checkGroupInstances).filter(f).flatMap(_.instances).map(toUrl)
+    // )
 
   private def readAutoScallingGroups(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Group]] =
     for {
@@ -72,7 +76,8 @@ object Machines {
   //   Process.awakeEvery(delay).evalMap(_ => list(asg))
 
   private def toUrl(i: Instance): URL =
-    new URL("http://${i.externalHostname}:5775/audit")
+    i.externalHostname.map(u => 
+      new URL(s"http://$u:5775/keys")).getOrElse(sys.error("Invalid hostname."))
 
   import scala.io.Source
   import scalaz.\/
@@ -89,17 +94,19 @@ object Machines {
    * by the supplied group `g`, are in fact running a funnel instance and it is
    * ready to start sending metrics if we connect to its `/stream` function.
    */
-  private def checkGroupInstances(g: Group): Task[List[Instance]] = {
+  private def checkGroupInstances(g: Group): Task[List[URL]] = {
     val fetches: Seq[Task[Throwable \/ Instance]] = g.instances.map { i =>
       (for {
         a <- Task(fetch(toUrl(i)))
+        _  = println(toUrl(i))
+        _  = println(":::::  " + a)
         b <- a.fold(e => Task.fail(e), o => Task.now(o))
       } yield i).attempt
     }
 
-    def discardProblematicInstances(l: List[Throwable \/ Instance]): List[Instance] =
-      l.foldLeft(List.empty[Instance]){ (a,b) =>
-        b.fold(e => a, i => a :+ i)
+    def discardProblematicInstances(l: List[Throwable \/ Instance]): List[URL] =
+      l.foldLeft(List.empty[URL]){ (a,b) =>
+        b.fold(e => a, i => a :+ toUrl(i))
       }
 
     Task.gatherUnordered(fetches).map(discardProblematicInstances(_))
