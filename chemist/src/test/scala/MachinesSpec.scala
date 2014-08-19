@@ -33,7 +33,7 @@ class MachinesSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     S1.stop()
   }
 
-  it must "return two instances 2/2 can be reached" in {
+  it must "return two instances if 2/2 can be reached" in {
     Machines.checkGroupInstances(G1).run.sortBy(_.id) should equal (List(I1,I2))
   }
   it must "return one instance if 1/2 cannot be reached reached" in {

@@ -39,6 +39,25 @@ object Server {
   // will never "compelte"
   def listen: Server[Unit] =
     liftF(Listen( () ))
+
+
+  /////// threading ////////
+  import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
+
+  private def daemonThreads(name: String) = new ThreadFactory {
+    def newThread(r: Runnable) = {
+      val t = Executors.defaultThreadFactory.newThread(r)
+      t.setDaemon(true)
+      t.setName(name)
+      t
+    }
+  }
+
+  val defaultPool: ExecutorService =
+    Executors.newFixedThreadPool(8, daemonThreads("chemist-thread"))
+
+  val schedulingPool: ScheduledExecutorService =
+    Executors.newScheduledThreadPool(4, daemonThreads("chemist-scheduled-tasks"))
 }
 
 import java.io.File

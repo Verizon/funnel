@@ -11,32 +11,38 @@ import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
 import oncue.svc.funnel.aws._
 
 object Machines {
-  def listAll(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[Instance])]] =
-    instances(g => true)(asg,ec2)
+  private val defaultResources = Set(
+    "stream/previous",
+    "stream/sliding",
+    "stream/uptime"
+  )
 
-  def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[Instance])]] =
-    instances(filter.funnels)(asg,ec2)
+  def listAll(asg: AmazonAutoScaling, ec2: AmazonEC2, resources: Set[String] = defaultResources): Task[Map[String, Seq[URL]]] =
+    instances(g => true)(asg,ec2).map(urlsForInstances(_, resources))
 
-  def listFlasks(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[(String, Seq[Instance])]] =
-    instances(filter.flasks)(asg,ec2)
+  def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2, resources: Set[String] = defaultResources): Task[Map[String, Seq[URL]]] =
+    instances(filter.funnels)(asg,ec2).map(urlsForInstances(_, resources))
 
-  // def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[URL]] =
-    // instances(filter.funnels)(asg,ec2)
+  def listFlasks(asg: AmazonAutoScaling, ec2: AmazonEC2, resources: Set[String] = defaultResources): Task[Map[String, Seq[URL]]] =
+    instances(filter.flasks)(asg,ec2).map(urlsForInstances(_, resources))
+
+  def urlsForInstances(m: Map[String, Seq[Instance]], resources: Set[String]): Map[String,Seq[URL]] =
+    m.map {
+      case (k,v) => k -> v.flatMap(i => resources.flatMap(p => i.asURL(path = p).toList ))
+    }
 
   private def instances(f: Group => Boolean
     )(asg: AmazonAutoScaling, ec2: AmazonEC2
-    ): Task[List[(String, List[Instance])]] =
+    ): Task[Map[String, Seq[Instance]]] =
     for {
       a <- readAutoScallingGroups(asg, ec2)
+      // apply the specified filter if we want to remove specific groups for a reason
       x  = a.filter(f)
-      // _ = println(">>>> " +x)
+      // actually reach out to all the discovered hosts and check that their port is reachable
       y  = x.map(g => checkGroupInstances(g).map(g.bucket -> _))
+      // run the tasks on the specified thread pool (Server.defaultPool)
       b <- Task.gatherUnordered(y)
-    } yield b
-
-    // readAutoScallingGroups(asg, ec2).map(
-    //   _.filter(checkGroupInstances).filter(f).flatMap(_.instances).map(toUrl)
-    // )
+    } yield b.filter(_._2.nonEmpty).toMap
 
   private def readAutoScallingGroups(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Group]] =
     for {
@@ -56,7 +62,7 @@ object Machines {
             val sgs = found.toList.flatMap(_.getSecurityGroups.asScala.toList).map(_.getGroupName)
             i.copy(
               internalHostname = found.map(_.getPrivateDnsName),
-              // serioulsy hate APIs that return '""' as their result.
+              // serioulsy hate APIs that return emtpy string as their result.
               externalHostname = found.flatMap(x => if(x.getPublicDnsName.nonEmpty) Option(x.getPublicDnsName) else None),
               securityGroups   = sgs
             )
@@ -82,14 +88,13 @@ object Machines {
   import scala.io.Source
   import scalaz.\/
 
-  private def fetch(url: URL): Throwable \/ String =
+  private def fetch(url: URL): Throwable \/ Unit =
     \/.fromTryCatch {
       val c = url.openConnection
-      c.setConnectTimeout(500) // timeout in 500ms to keep the overhead reasonable
-      Source.fromInputStream(c.getInputStream).mkString
+      c.setConnectTimeout(300) // timeout in 300ms to keep the overhead reasonable
+      c.setReadTimeout(300)
+      c.connect()
     }
-
-
 
   /**
    * Goal of this function is to validate that the machine instances specified
@@ -98,13 +103,8 @@ object Machines {
    */
   def checkGroupInstances(g: Group): Task[List[Instance]] = {
     val fetches: Seq[Task[Throwable \/ Instance]] = g.instances.map { i =>
-      println("**************************")
-      println(i)
-      println(i.asURL)
-      println("**************************")
-
       (for {
-        a <- Task(i.asURL.flatMap(fetch))
+        a <- Task(i.asURL.flatMap(fetch))(Server.defaultPool)
         _  = println(":::::  " + a)
         b <- a.fold(e => Task.fail(e), o => Task.now(o))
       } yield i).attempt

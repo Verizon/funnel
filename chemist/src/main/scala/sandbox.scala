@@ -3,7 +3,7 @@ package oncue.svc.funnel.chemist
 import oncue.svc.funnel.aws._
 import com.amazonaws.auth.{AWSCredentials,BasicAWSCredentials}
 import scala.collection.JavaConverters._
-import com.amazonaws.services.ec2.model.Instance
+import scalaz.concurrent.Task
 
 object Sandbox {
   def main(args: Array[String]): Unit = {
@@ -17,8 +17,10 @@ object Sandbox {
 
     // val exe = listAll(C,E).map(_.filter(filters.funnels))
 
-    val exe = listAll(C,E)
+    val exe = listFunnels(C,E)
 
     exe.run.foreach(println)
+
+    println("END")
   }
 }
