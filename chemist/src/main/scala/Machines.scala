@@ -47,13 +47,17 @@ object Machines {
                       .groupBy(_.getInstanceId).mapValues(_.head)
 
       g.map { grp =>
+
+        println(">>>>> " + grp.instances)
+
         grp.copy(
           instances = grp.instances.map { i =>
             val found = instances.get(i.id)
             val sgs = found.toList.flatMap(_.getSecurityGroups.asScala.toList).map(_.getGroupName)
             i.copy(
               internalHostname = found.map(_.getPrivateDnsName),
-              externalHostname = found.map(_.getPublicDnsName),
+              // serioulsy hate APIs that return '""' as their result.
+              externalHostname = found.flatMap(x => if(x.getPublicDnsName.nonEmpty) Option(x.getPublicDnsName) else None),
               securityGroups   = sgs
             )
           }.toList
@@ -76,8 +80,8 @@ object Machines {
   //   Process.awakeEvery(delay).evalMap(_ => list(asg))
 
   private def toUrl(i: Instance): URL =
-    i.externalHostname.map(u => 
-      new URL(s"http://$u:5775/keys")).getOrElse(sys.error("Invalid hostname."))
+    i.externalHostname.map(u =>
+      new URL(s"http://$u:5775/audit")).getOrElse(sys.error("Invalid hostname."))
 
   import scala.io.Source
   import scalaz.\/
@@ -98,7 +102,10 @@ object Machines {
     val fetches: Seq[Task[Throwable \/ Instance]] = g.instances.map { i =>
       (for {
         a <- Task(fetch(toUrl(i)))
+        _  = println("**************************")
+        _  = println(i)
         _  = println(toUrl(i))
+        _  = println("**************************")
         _  = println(":::::  " + a)
         b <- a.fold(e => Task.fail(e), o => Task.now(o))
       } yield i).attempt

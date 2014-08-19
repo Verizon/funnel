@@ -39,7 +39,10 @@ case class Instance(
   id: String,
   internalHostname: Option[String] = None,
   externalHostname: Option[String] = None,
-  securityGroups: Seq[String] = Nil)
+  securityGroups: Seq[String] = Nil,
+  zone: String){
+  def isInternalOnly: Boolean = externalHostname.isEmpty
+}
 
 object ASG {
 
@@ -84,9 +87,7 @@ object ASG {
     g.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
 
   private def instances(g: AutoScalingGroup): Seq[Instance] =
-    g.getInstances.asScala.map(i => Instance(i.getInstanceId))
-
-  // private def hostnames(i: ASGInstance) = EC2.instance(i.getInstanceId)
-
+    g.getInstances.asScala.map(i =>
+      Instance(id = i.getInstanceId, zone = i.getAvailabilityZone))
 
 }
