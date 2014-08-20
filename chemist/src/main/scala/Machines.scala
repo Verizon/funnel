@@ -10,6 +10,7 @@ import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
 import oncue.svc.funnel.aws._
 
+// for what follows, im sorry!
 object Machines {
   private val defaultResources = Set(
     "stream/previous",
@@ -106,7 +107,6 @@ object Machines {
     val fetches: Seq[Task[Throwable \/ Instance]] = g.instances.map { i =>
       (for {
         a <- Task(i.asURL.flatMap(fetch))(Server.defaultPool)
-        _  = println(":::::  " + a)
         b <- a.fold(e => Task.fail(e), o => Task.now(o))
       } yield i).attempt
     }
