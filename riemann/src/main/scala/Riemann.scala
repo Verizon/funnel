@@ -1,7 +1,6 @@
 package intelmedia.ws.funnel
 package riemann
 
-import intelmedia.ws.funnel.Names
 import com.aphyr.riemann.client.RiemannClient
 import com.aphyr.riemann.Proto.{Event => REvent}
 import intelmedia.ws.funnel.Events.Event

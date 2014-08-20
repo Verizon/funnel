@@ -82,14 +82,14 @@ object Main extends CLI {
         }
       }
 
-      def utensilRetries(names: Names): Event =
+      def retries(names: Names): Event =
         Monitoring.defaultRetries andThen (_ ++ giveUp(names, cfg, Q, log))
 
-      runAsync(M.processMirroringEvents(
-        SSE.readEvents,
-        "Flask",
-        utensilRetries
-      ))
+      val localhost = java.net.InetAddress.getLocalHost.toString
+
+      val myName = cfg.lookup[String]("flask.name").getOrElse(localhost)
+
+      runAsync(M.processMirroringEvents(SSE.readEvents, myName, retries))
 
       options.riemann.foreach { riemann =>
         val R = RiemannClient.tcp(riemann.host, riemann.port)
@@ -101,12 +101,9 @@ object Main extends CLI {
           }
         }
 
-        val localhost = java.net.InetAddress.getLocalHost.toString
-
         runAsync(Riemann.publishToRiemann(
           M, options.riemannTTL.toSeconds.toFloat)(
-          R, s"${riemann.host}:${riemann.port}", utensilRetries)(
-          cfg.lookup[String]("funnelName").getOrElse(localhost)))
+          R, s"${riemann.host}:${riemann.port}", retries)(myName))
       }
     }
   }
