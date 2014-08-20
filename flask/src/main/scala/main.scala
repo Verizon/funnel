@@ -28,7 +28,6 @@ object Main extends CLI {
   import com.amazonaws.auth.BasicAWSCredentials
   import com.amazonaws.regions.{Region, Regions}
   import Events.Event
-  import Riemann.Names
   import scalaz.\/._
   import oncue.svc.funnel.aws.SNS
 
@@ -37,8 +36,8 @@ object Main extends CLI {
     Process.eval(SNS.publish(cfg.require[String]("flask.sns-error-topic"), msg)(sns))
   }
 
-  private def errorAndQuit(options: Options, f: () => Unit): Unit = {
-    val msg = s"# Riemann is not running at the specified location (${options.riemann.host}:${options.riemann.port}) #"
+  private def riemannErrorAndQuit(rm: RiemannHostPort, f: () => Unit): Unit = {
+    val msg = s"# Riemann is not running at the specified location (${rm.host}:${rm.port}) #"
     val padding = (for(_ <- 1 to msg.length) yield "#").mkString
     Console.err.println(padding)
     Console.err.println(msg)
@@ -52,7 +51,8 @@ object Main extends CLI {
 
       import scalaz.concurrent._
       val logger = LoggerFactory.getLogger("flask")
-      implicit val logPool = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
+      implicit val logPool =
+        Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
       val L = Actor.actor((s: String) => logger.info(s))
 
       implicit val log: String => Unit = s => L(s)
@@ -82,31 +82,40 @@ object Main extends CLI {
         }
       }
 
-      val R = RiemannClient.tcp(options.riemann.host, options.riemann.port)
-      try {
-        R.connect() // urgh. Give me stregth!
-      } catch {
-        case e: java.io.IOException => {
-          errorAndQuit(options,() => shutdown(S,R))
-        }
-      }
-
       def utensilRetries(names: Names): Event =
-        Riemann.defaultRetries andThen (_ ++ giveUp(names, cfg, Q, log))
+        Monitoring.defaultRetries andThen (_ ++ giveUp(names, cfg, Q, log))
 
-      val localhost = java.net.InetAddress.getLocalHost.toString
+      runAsync(M.processMirroringEvents(
+        SSE.readEvents,
+        "Flask",
+        utensilRetries
+      ))
 
-      Riemann.mirrorAndPublish(
-        M, options.riemannTTL.toSeconds.toFloat, utensilRetries)(
-        R, s"${options.riemann.host}:${options.riemann.port}", utensilRetries)(SSE.readEvents)(
-        S.commands, cfg.lookup[String]("funnelName").getOrElse(localhost))(log
-          ).runAsync(_.fold(e => {
-            e.printStackTrace()
-            log(s"[ERROR] $e - ${e.getMessage}")
-            log(e.getStackTrace.toList.mkString("\n","\t\n",""))
-          }, identity _))
+      options.riemann.foreach { riemann =>
+        val R = RiemannClient.tcp(riemann.host, riemann.port)
+        try {
+          R.connect() // urgh. Give me stregth!
+        } catch {
+          case e: java.io.IOException => {
+            riemannErrorAndQuit(riemann, () => shutdown(S,R))
+          }
+        }
+
+        val localhost = java.net.InetAddress.getLocalHost.toString
+
+        runAsync(Riemann.publishToRiemann(
+          M, options.riemannTTL.toSeconds.toFloat)(
+          R, s"${riemann.host}:${riemann.port}", utensilRetries)(
+          cfg.lookup[String]("funnelName").getOrElse(localhost)))
+      }
     }
   }
+
+  def runAsync(p: Task[Unit])(implicit log: String => Unit): Unit = p.runAsync(_.fold(e => {
+    e.printStackTrace()
+    log(s"[ERROR] $e - ${e.getMessage}")
+    log(e.getStackTrace.toList.mkString("\n","\t\n",""))
+  }, identity _))
 
 }
 
@@ -119,7 +128,7 @@ trait CLI {
   case class RiemannHostPort(host: String, port: Int)
 
   case class Options(
-    riemann: RiemannHostPort = RiemannHostPort("localhost", 5555),
+    riemann: Option[RiemannHostPort] = None,
     riemannTTL: Duration = 5 minutes,
     funnelPort: Int = 5775,
     transport: DatapointParser = SSE.readEvents _
@@ -128,16 +137,21 @@ trait CLI {
   def run(args: Array[String])(f: (Options, Config) => Unit): Unit = {
 
     val config =
-      knobs.loadImmutable(List(Required(FileResource(new File("/usr/share/oncue/etc/flask.cfg"))))) or
-      knobs.loadImmutable(List(Required(ClassPathResource("oncue/flask.cfg"))))
+      knobs.loadImmutable(List(Required(
+        FileResource(new File("/usr/share/oncue/etc/flask.cfg")) or
+        ClassPathResource("oncue/flask.cfg"))))
+
+    import scalaz.syntax.applicative._
+    import scalaz.std.option._
 
     config.flatMap { cfg =>
       val port        = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
       val name        = cfg.lookup[String]("flask.name").getOrElse("flask")
-      val riemannHost = cfg.lookup[String]("flask.riemann.host").getOrElse("localhost")
-      val riemannPort = cfg.lookup[Int]("flask.riemann.port").getOrElse(5555)
+      val riemannHost = cfg.lookup[String]("flask.riemann.host")
+      val riemannPort = cfg.lookup[Int]("flask.riemann.port")
       val ttl         = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").getOrElse(5).minutes
-      Task(f(Options(RiemannHostPort(riemannHost, riemannPort), ttl, port), cfg))
+      val riemann = (riemannHost |@| riemannPort)(RiemannHostPort)
+      Task(f(Options(riemann, ttl, port), cfg))
     }.run
   }
 }
