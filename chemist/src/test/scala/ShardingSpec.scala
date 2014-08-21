@@ -26,7 +26,7 @@ class ShardingSpec extends FlatSpec with Matchers {
     Sharding.sorted(d1).keySet should equal (Set("a", "c", "b", "d"))
   }
 
-  it must "foo" in {
+  it must "correctly remove urls that are already being monitored" in {
     val s = Set(
       ("test", SafeURL("http://fuzz.com")),
       ("test", SafeURL("http://bar2.com")),
@@ -36,11 +36,11 @@ class ShardingSpec extends FlatSpec with Matchers {
       ("ggg", SafeURL("http://rrrr.com"))
     )
 
-    println {
-      Sharding.deduplicate(s)(d1)
-    }
-
-
+    Sharding.deduplicate(s)(d1) should equal ( Set(
+      SafeURL("http://eeee.com"),
+      SafeURL("http://rrrr.com"),
+      SafeURL("http://wwww.com"),
+      SafeURL("http://bar2.com")) )
   }
 
 }
