@@ -66,7 +66,7 @@ object Sharding {
     // having computed the targets that we actually care about,
     // rehydrae a `Set[Target]` from the given `Set[SafeURL]`
     delta.foldLeft(Set.empty[Target]){ (a,b) =>
-      next.filter(_.url == b)
+      a ++ next.filter(_.url == b)
     }
   }
 
