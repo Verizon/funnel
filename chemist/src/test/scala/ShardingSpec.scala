@@ -5,42 +5,45 @@ import intelmedia.ws.funnel.Monitoring
 import intelmedia.ws.funnel.http.MonitoringServer
 import oncue.svc.funnel.aws.{Group,Instance}
 import scalaz.==>>
-// import java.net.URL
-import Sharding.Distribution
 
 class ShardingSpec extends FlatSpec with Matchers {
 
+  import Sharding.{Distribution,Target}
 
-  val d1: Distribution = ==>>(
-    ("a", Set(SafeURL("http://fuzz.com"))),
-    ("d", Set(SafeURL("http://goo.com"), SafeURL("http://foo.com"), SafeURL("http://quz.com"))),
-    ("c", Set(SafeURL("http://doo.com"))),
-    ("b", Set(SafeURL("http://goo.com"), SafeURL("http://foo.com")))
-  )
+  implicit def tuple2target(in: (String,String)): Target =
+    Target(in._1, SafeURL(in._2))
 
-  it must "correctly sort the map and return the flasks in order of their set length" in {
-    Sharding.flasks(d1) should equal (Set("a", "c", "b", "d"))
-  }
+  // val d1: Distribution = ==>>(
+  //   ("a", Set(("http://fuzz.com"))),
+  //   ("d", Set(("http://goo.com"), ("http://foo.com"), ("http://quz.com"))),
+  //   ("c", Set(("http://doo.com"))),
+  //   ("b", Set(("http://goo.com"), ("http://foo.com")))
+  // )
 
-  it must "snapshot the exsiting shard distribution" in {
-    Sharding.sorted(d1).keySet should equal (Set("a", "c", "b", "d"))
-  }
+  // it must "correctly sort the map and return the flasks in order of their set length" in {
+  //   Sharding.flasks(d1) should equal (Set("a", "c", "b", "d"))
+  // }
+
+  // it must "snapshot the exsiting shard distribution" in {
+  //   Sharding.sorted(d1).keySet should equal (Set("a", "c", "b", "d"))
+  // }
 
   it must "correctly remove urls that are already being monitored" in {
-    val s = Set(
-      ("test", SafeURL("http://fuzz.com")),
-      ("test", SafeURL("http://bar2.com")),
-      ("fuuu", SafeURL("http://eeee.com")),
-      ("ggg", SafeURL("http://goo.com")),
-      ("ggg", SafeURL("http://wwww.com")),
-      ("ggg", SafeURL("http://rrrr.com"))
+    val s: Set[Target] = Set(
+      ("test", "http://fuzz.com"),
+      ("test", "http://bar2.com"),
+      ("fuuu", "http://eeee.com"),
+      ("ggg", "http://goo.com"),
+      ("ggg", "http://wwww.com"),
+      ("ggg", "http://rrrr.com")
     )
 
-    Sharding.deduplicate(s)(d1) should equal ( Set(
-      SafeURL("http://eeee.com"),
-      SafeURL("http://rrrr.com"),
-      SafeURL("http://wwww.com"),
-      SafeURL("http://bar2.com")) )
+    Sharding.deduplicate(s)(d1) should equal ( Set[Target](
+      ("x", "http://eeee.com"),
+      ("x", "http://rrrr.com"),
+      ("x", "http://wwww.com"),
+      ("x", "http://bar2.com"))
+    )
   }
 
 }
