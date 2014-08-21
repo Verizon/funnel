@@ -15,7 +15,7 @@ fork in (run in Test) := true
 libraryDependencies ++= Seq(
   "intelmedia.ws.common" %% "s3-appender"  % "6.0.2",
   "com.amazonaws"         % "aws-java-sdk" % "1.7.9",
-  "oncue.svc.knobs"      %% "core"         % "0.1.29"
+  "oncue.svc.knobs"      %% "core"         % "1.1.+"
 )
 
 name in Universal := "flask"
