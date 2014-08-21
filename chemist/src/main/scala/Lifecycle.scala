@@ -1,6 +1,6 @@
 package oncue.svc.funnel.chemist
 
-import java.net.URL
+// import java.net.URL
 import scalaz.{\/,-\/,\/-}
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Sink}
@@ -55,20 +55,20 @@ object Lifecycle {
     }
   }
 
-  private def reshard(id: InstanceID)(shards: Shards): Unit =
-    for {
-      urls <- Option(shards.get(id))
-      _    <- Option(shards.remove(id))
-    } yield distributeWorkToShards(urls)(shards)
+  private def reshard(id: InstanceID)(shards: Shards): Unit = ()
+    // for {
+    //   urls <- Option(shards.get(id))
+    //   _    <- Option(shards.remove(id))
+    // } yield distributeWorkToShards(urls)(shards)
 
-  def distributeWorkToShards(work: Set[URL])(shards: Shards) = {
-    println("::::::::::::::::::::::::::: DISTRIBUTING")
-    // val flasks = shards.keySet.toSet
+  // def distributeWorkToShards(work: Set[URL])(shards: Shards) = {
+  //   println("::::::::::::::::::::::::::: DISTRIBUTING")
+  //   // val flasks = shards.keySet.toSet
 
-    // Stream.continually(instances).flatten.zip(
-    //   Stream.continually(work).flatten).take(
-    //     work.size.max(instances.size)).toList
-  }
+  //   // Stream.continually(instances).flatten.zip(
+  //   //   Stream.continually(work).flatten).take(
+  //   //     work.size.max(instances.size)).toList
+  // }
 
 
 
