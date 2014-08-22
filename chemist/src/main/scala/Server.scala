@@ -67,11 +67,13 @@ import com.amazonaws.regions.{Regions,Region}
 import com.amazonaws.services.sns.AmazonSNSClient
 import com.amazonaws.services.sqs.AmazonSQSClient
 import oncue.svc.funnel.aws.{SQS,SNS}
+import java.util.concurrent.atomic.AtomicReference
 
 trait Server extends Interpreter[Server.ServerF] {
   import knobs._
   import journal.Logger
   import Server._
+  import Sharding.Distribution
 
   val log = Logger("chemist")
 
@@ -108,7 +110,7 @@ trait Server extends Interpreter[Server.ServerF] {
 
   /////// in-memory data storage ////////
 
-  val shards = new Shards
+  val distribution = new Ref[Distribution]
 
   /////// interpreter implementation ////////
 
@@ -117,11 +119,12 @@ trait Server extends Interpreter[Server.ServerF] {
       Task.now( k )
 
     case Listen(k) =>
-      Lifecycle.run(queue, sqs, shards).run.map(_ => k)
+      Lifecycle.run(queue, sqs, distribution).run.map(_ => k)
   }
 
   protected def init(): Task[Unit] =
     for {
+      // z <- 
       a <- SNS.create(topic)(sns)
       _  = log.debug(s"created sns topic with arn = $a")
       b <- SQS.create(queue)(sqs)

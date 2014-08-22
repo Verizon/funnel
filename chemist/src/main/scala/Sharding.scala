@@ -3,11 +3,10 @@ package oncue.svc.funnel.chemist
 
 object Sharding {
   import scalaz.==>>
-  // import java.net.URL
   import intelmedia.ws.funnel.BucketName
 
   type Flask = InstanceID
-  type Distribution = InstanceID ==>> Set[Target]
+  type Distribution = Flask ==>> Set[Target]
 
   case class Target(bucket: BucketName, url: SafeURL)
 
@@ -45,10 +44,15 @@ object Sharding {
    * Given the new set of urls to monitor, compute how said urls
    * should be distributed over the known flask instances
    */
-  def calculate(s: Set[(BucketName, SafeURL)])(d: Distribution) = {
-    val f = flasks(d)
-    Stream.continually(s).flatten.zip(
-      Stream.continually(f).flatten).take(s.size.max(f.size)).toList
+  def calculate(s: Set[Target])(d: Distribution) = {
+    val servers = flasks(d)
+    val input   = deduplicate(s)(d)
+    val is      = input.size // caching operations as its O(n)
+    val foo = if(is < servers.size) servers.take(is) else servers
+    // interleave the input with the known flask servers ordered by the
+    // flask that currently has the least amount of work assigned.
+    Stream.continually(input).flatten.zip(
+      Stream.continually(foo).flatten).take(is.max(foo.size)).toList
   }
 
   /**

@@ -14,31 +14,62 @@ class ShardingSpec extends FlatSpec with Matchers {
     Target(in._1, SafeURL(in._2))
 
   val d1: Distribution = ==>>(
-    ("a", Set(("z","http://one.com"))),
-    ("d", Set(("y","http://two.com"), ("w","http://three.com"), ("v","http://four.com"))),
-    ("c", Set(("x","http://five.com"))),
-    ("b", Set(("z","http://two.com"), ("u","http://six.com")))
+    ("a", Set(("z","http://one.internal"))),
+    ("d", Set(("y","http://two.internal"), ("w","http://three.internal"), ("v","http://four.internal"))),
+    ("c", Set(("x","http://five.internal"))),
+    ("b", Set(("z","http://two.internal"), ("u","http://six.internal")))
   )
 
-  it must "correctly sort the map and return the flasks in order of their set length" in {
+  val i1: Set[Target] = Set(
+    ("w", "http://three.internal"),
+    ("u", "http://eight.internal"),
+    ("v", "http://nine.internal"),
+    ("z", "http://two.internal")
+  )
+
+  val i2: Set[Target] = Set(
+    ("w", "http://alpha.internal"),
+    ("u", "http://beta.internal"),
+    ("v", "http://omega.internal"),
+    ("z", "http://gamma.internal"),
+    ("p", "http://zeta.internal"),
+    ("r", "http://epsilon.internal"),
+    ("r", "http://theta.internal"),
+    ("r", "http://kappa.internal"),
+    ("z", "http://omicron.internal")
+  )
+
+  it should "correctly sort the map and return the flasks in order of their set length" in {
     Sharding.flasks(d1) should equal (Set("a", "c", "b", "d"))
   }
 
-  it must "snapshot the exsiting shard distribution" in {
+  it should "snapshot the exsiting shard distribution" in {
     Sharding.sorted(d1).keySet should equal (Set("a", "c", "b", "d"))
   }
 
-  it must "correctly remove urls that are already being monitored" in {
-    val s: Set[Target] = Set(
-      ("w", "http://three.com"),
-      ("u", "http://eight.com"),
-      ("v", "http://nine.com"),
-      ("z", "http://two.com")
+  it should "correctly remove urls that are already being monitored" in {
+    Sharding.deduplicate(i1)(d1) should equal ( Set[Target](
+      ("v", "http://nine.internal"),
+      ("u", "http://eight.internal"))
+    )
+  }
+
+  it should "correctly calculate how the new request should be sharded over known flasks" in {
+    Sharding.calculate(i1)(d1) should equal (
+      (Target("u",SafeURL("http://eight.internal")),"a") ::
+      (Target("v",SafeURL("http://nine.internal")),"c") :: Nil
     )
 
-    Sharding.deduplicate(s)(d1) should equal ( Set[Target](
-      ("v", "http://nine.com"),
-      ("u", "http://eight.com"))
+    Sharding.calculate(i2)(d1) should equal (
+      (Target("v",SafeURL("http://omega.internal")),"a") ::
+      (Target("w",SafeURL("http://alpha.internal")),"c") ::
+      (Target("r",SafeURL("http://epsilon.internal")),"b") ::
+      (Target("z",SafeURL("http://gamma.internal")),"d") ::
+      (Target("u",SafeURL("http://beta.internal")),"a") ::
+      (Target("z",SafeURL("http://omicron.internal")),"c") ::
+      (Target("r",SafeURL("http://kappa.internal")),"b") ::
+      (Target("r",SafeURL("http://theta.internal")),"d") ::
+      (Target("p",SafeURL("http://zeta.internal")),"a") :: Nil
     )
   }
 

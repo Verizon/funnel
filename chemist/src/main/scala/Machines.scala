@@ -11,26 +11,28 @@ import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
 import oncue.svc.funnel.aws._
 
 // for what follows, im sorry!
-object Machines {
-  private val defaultResources = Set(
-    "stream/previous",
-    "stream/sliding",
-    "stream/uptime"
-  )
+object Deployed {
+  // private val defaultResources = Set(
+  //   "stream/previous",
+  //   "stream/sliding",
+  //   "stream/uptime"
+  // )
 
-  def listAll(asg: AmazonAutoScaling, ec2: AmazonEC2, resources: Set[String] = defaultResources): Task[Map[String, Seq[URL]]] =
-    instances(g => true)(asg,ec2).map(urlsForInstances(_, resources))
+  type ServiceAndRevision = String
 
-  def listFunnels(asg: AmazonAutoScaling, ec2: AmazonEC2, resources: Set[String] = defaultResources): Task[Map[String, Seq[URL]]] =
-    instances(filter.funnels)(asg,ec2).map(urlsForInstances(_, resources))
+  def list(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Map[ServiceAndRevision, Seq[Instance]]] =
+    instances(g => true)(asg,ec2)//.map(urlsForInstances(_, resources))
 
-  def listFlasks(asg: AmazonAutoScaling, ec2: AmazonEC2, resources: Set[String] = defaultResources): Task[Map[String, Seq[URL]]] =
-    instances(filter.flasks)(asg,ec2).map(urlsForInstances(_, resources))
+  def funnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Map[ServiceAndRevision, Seq[Instance]]] =
+    instances(filter.funnels)(asg,ec2)//.map(urlsForInstances(_, resources))
 
-  def urlsForInstances(m: Map[String, Seq[Instance]], resources: Set[String]): Map[String,Seq[URL]] =
-    m.map {
-      case (k,v) => k -> v.flatMap(i => resources.flatMap(p => i.asURL(path = p).toList ))
-    }
+  def flasks(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
+    instances(filter.flasks)(asg,ec2).map(_.flatMap(_._2).toSeq)
+
+  // private def urlsForInstances(m: Map[String, Seq[Instance]], resources: Set[String]): Map[String,Seq[URL]] =
+  //   m.map {
+  //     case (k,v) => k -> v.flatMap(i => resources.flatMap(p => i.asURL(path = p).toList ))
+  //   }
 
   private def instances(f: Group => Boolean
     )(asg: AmazonAutoScaling, ec2: AmazonEC2

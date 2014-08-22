@@ -41,21 +41,30 @@ object Lifecycle {
     } yield c
   }
 
-  def toSink(act: Action)(shards: Shards): Sink[Task, Action] =
+  //////////////////////////// I/O Actions ////////////////////////////
+
+  def toSink(act: Action)(ref: Ref[Sharding.Distribution]): Sink[Task, Action] =
     Process.emit {
-      case AddCapacity(id)  => Task.delay { shards.putIfAbsent(id, Set.empty); () }
-      case Redistribute(id) => Task.delay { reshard(id)(shards) }
+      case AddCapacity(id)  => Task.delay {
+        // d.putIfAbsent(id, Set.empty); ()
+        ref.update(_.insert(id, Set.empty))
+      }
+      case Redistribute(id) => Task.delay {
+        ()
+      }
       case NoOp             => Task.now( () )
     }
 
-  def run(queueName: String, sqs: AmazonSQS, shards: Shards): Sink[Task, Action] = {
+  def run(queueName: String, sqs: AmazonSQS, d: Ref[Sharding.Distribution]): Sink[Task, Action] = {
     stream(queueName)(sqs).flatMap {
       case -\/(fail) => Process.halt
-      case \/-(win)  => toSink(win)(shards)
+      case \/-(win)  => toSink(win)(d)
     }
   }
 
-  private def reshard(id: InstanceID)(shards: Shards): Unit = ()
+  private def reshard(id: InstanceID)(shards: Sharding.Distribution): Unit = ()
+
+
     // for {
     //   urls <- Option(shards.get(id))
     //   _    <- Option(shards.remove(id))

@@ -13,11 +13,9 @@ object Sandbox {
     val C = ASG.client(new BasicAWSCredentials(K, S))
     val E = EC2.client(new BasicAWSCredentials(K, S))
 
-    import Machines._
-
     // val exe = listAll(C,E).map(_.filter(filters.funnels))
 
-    val exe = listFunnels(C,E)
+    val exe = Deployed.funnels(C,E)
 
     exe.run.foreach(println)
 
