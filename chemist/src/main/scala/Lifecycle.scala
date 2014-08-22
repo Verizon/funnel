@@ -43,22 +43,31 @@ object Lifecycle {
 
   //////////////////////////// I/O Actions ////////////////////////////
 
-  def toSink(act: Action)(ref: Ref[Sharding.Distribution]): Sink[Task, Action] =
+  def toSink(ref: Ref[Sharding.Distribution]): Sink[Task, Action] = {
     Process.emit {
       case AddCapacity(id)  => Task.delay {
-        // d.putIfAbsent(id, Set.empty); ()
+        println("xxxxx "+ id)
         ref.update(_.insert(id, Set.empty))
       }
       case Redistribute(id) => Task.delay {
-        ()
+        println("+++++ " + id)
+
+        ref.get.lookup(id).foreach { set =>
+          val next = ref.update(_.delete(id))
+
+          println(">>>> " + next)
+
+          Sharding.calculate(set)(next)
+        }
       }
       case NoOp             => Task.now( () )
     }
+  }
 
   def run(queueName: String, sqs: AmazonSQS, d: Ref[Sharding.Distribution]): Sink[Task, Action] = {
     stream(queueName)(sqs).flatMap {
       case -\/(fail) => Process.halt
-      case \/-(win)  => toSink(win)(d)
+      case \/-(win)  => toSink(d)
     }
   }
 

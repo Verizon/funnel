@@ -5,7 +5,7 @@ import intelmedia.ws.funnel.Monitoring
 import intelmedia.ws.funnel.http.MonitoringServer
 import oncue.svc.funnel.aws.{Group,Instance}
 
-class MachinesSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
+class DeployedSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   val S1 = MonitoringServer.start(Monitoring.default, 5775)
 
@@ -34,10 +34,10 @@ class MachinesSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   it must "return two instances if 2/2 can be reached" in {
-    Machines.checkGroupInstances(G1).run.sortBy(_.id) should equal (List(I1,I2))
+    Deployed.checkGroupInstances(G1).run.sortBy(_.id) should equal (List(I1,I2))
   }
   it must "return one instance if 1/2 cannot be reached reached" in {
-    Machines.checkGroupInstances(G2).run.sortBy(_.id) should equal (List(I1))
+    Deployed.checkGroupInstances(G2).run.sortBy(_.id) should equal (List(I1))
   }
 
 }
