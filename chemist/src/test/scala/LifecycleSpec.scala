@@ -17,11 +17,11 @@ class LifecycleSpec extends FlatSpec with Matchers {
     stream.to(s).run.run
   }
 
-  // it should "Lifecycle.stream should process the ASG event JSON into the right algebra" in {
-  //   Lifecycle.stream("doesntexist")(sqs)
-  //     .until(Process.emit(false)).runLast.run should equal (
-  //       Some(\/-(Redistribute("i-dd947af7"))))
-  // }
+  it should "Lifecycle.stream should process the ASG event JSON into the right algebra" in {
+    Lifecycle.stream("doesntexist")(sqs)
+      .until(Process.emit(false)).runLast.run should equal (
+        Some(\/-(Redistribute("i-dd947af7"))))
+  }
 
   ///// as we're testing effects in sinks, keep these in this order (urgh!) //////
 

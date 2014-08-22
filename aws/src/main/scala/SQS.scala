@@ -99,8 +99,8 @@ object SQS {
         val msgs: List[Message] =
           client.receiveMessage(req).getMessages.asScala.toList
 
-        println("sqs messages recieved count: " + msgs.length)
-        println("sqs messages: " + msgs)
+        // println("sqs messages recieved count: " + msgs.length)
+        // println("sqs messages: " + msgs)
 
         msgs
       }(Monitoring.defaultPool)
