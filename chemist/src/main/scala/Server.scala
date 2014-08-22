@@ -124,7 +124,7 @@ trait Server extends Interpreter[Server.ServerF] {
 
   protected def init(): Task[Unit] =
     for {
-      // z <- 
+      // z <-
       a <- SNS.create(topic)(sns)
       _  = log.debug(s"created sns topic with arn = $a")
       b <- SQS.create(queue)(sqs)

@@ -76,7 +76,8 @@ object Sharding {
       // interleave the input with the known flask servers ordered by the
       // flask that currently has the least amount of work assigned.
       Stream.continually(input).flatten.zip(
-        Stream.continually(foo).flatten).take(is.max(foo.size)).toList.map(t => (t._2, t._1))
+        Stream.continually(foo).flatten).take(is.max(foo.size)
+          ).toList.map(t => (t._2, t._1))
     }
   }
 
