@@ -75,7 +75,7 @@ object Sharding {
 
     val tasks = a.map { case (f,t) =>
       val host = i.get.lookup(f).flatMap(_.host).getOrElse("localhost")
-      send(to = host)
+      send(to = host, "testing")
     }
 
     for {
@@ -84,9 +84,9 @@ object Sharding {
     } yield ()
   }
 
-  private def send(to: Host): Task[String] = {
+  private def send(to: Host, body: String): Task[String] = {
     import dispatch._, Defaults._
-    val svc = url("http://$to:5775/mirror")
+    val svc = url("http://$to:5775/mirror") << body
     fromScalaFuture(Http(svc OK as.String))
   }
 
