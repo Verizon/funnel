@@ -46,18 +46,14 @@ object Lifecycle {
   def toSink(ref: Ref[Sharding.Distribution]): Sink[Task, Action] = {
     Process.emit {
       case AddCapacity(id)  => Task.delay {
-        println("xxxxx "+ id)
         ref.update(_.insert(id, Set.empty))
       }
       case Redistribute(id) => Task.delay {
-        println("+++++ " + id)
-
         ref.get.lookup(id).foreach { set =>
           val next = ref.update(_.delete(id))
-
-          println(">>>> " + next)
-
-          Sharding.calculate(set)(next)
+          Sharding.calculate(set)(next).foreach { case (flask, target) =>
+            ref.update(_.adjust(flask, _ + target))
+          }
         }
       }
       case NoOp             => Task.now( () )

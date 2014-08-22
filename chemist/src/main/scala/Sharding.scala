@@ -38,21 +38,29 @@ object Sharding {
    * distributed world of urls.
    */
   def targets(d: Distribution): Set[Target] =
-    d.values.reduceLeft(_ ++ _)
+    d.values match {
+      case Nil   => Set.empty[Target]
+      case other => other.reduceLeft(_ ++ _)
+    }
 
   /**
    * Given the new set of urls to monitor, compute how said urls
    * should be distributed over the known flask instances
    */
-  def calculate(s: Set[Target])(d: Distribution) = {
+  def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
     val servers = flasks(d)
+    val ss      = servers.size
     val input   = deduplicate(s)(d)
     val is      = input.size // caching operations as its O(n)
-    val foo = if(is < servers.size) servers.take(is) else servers
-    // interleave the input with the known flask servers ordered by the
-    // flask that currently has the least amount of work assigned.
-    Stream.continually(input).flatten.zip(
-      Stream.continually(foo).flatten).take(is.max(foo.size)).toList
+    val foo = if(is < ss) servers.take(is) else servers
+
+    if(ss == 0) Nil // needed for when there are no Flask's in-memory; causes SOE.
+    else {
+      // interleave the input with the known flask servers ordered by the
+      // flask that currently has the least amount of work assigned.
+      Stream.continually(input).flatten.zip(
+        Stream.continually(foo).flatten).take(is.max(foo.size)).toList.map(t => (t._2, t._1))
+    }
   }
 
   /**
