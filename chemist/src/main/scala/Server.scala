@@ -5,6 +5,7 @@ import com.amazonaws.services.sqs.model.Message
 import scalaz.stream.{Process,Sink}
 import scalaz.concurrent.Task
 import scalaz.{~>,Free,Functor,\/,-\/,\/-}, Free.Return, Free.Suspend
+import Sharding.{Target,Distribution}
 
 object Server {
   type Server[A] = Free[ServerF, A]
@@ -14,14 +15,15 @@ object Server {
     def map[B](f: A => B): ServerF[B]
   }
 
-  case class Watch[A](urls: Set[URL], k: A) extends ServerF[A]{
+  case class Watch[A](urls: Set[Target], k: A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = Watch(urls, g(k))
   }
   case class Listen[A](k: A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = Listen(g(k))
   }
 
-  /////// free monad plumbing ///////
+  ////////////// free monad plumbing //////////////
+
   private def liftF[A](srv: ServerF[A]): Free[ServerF,A] =
     Suspend[ServerF, A](Functor[ServerF].map(srv)(a => Return[ServerF, A](a)))
 
@@ -29,9 +31,9 @@ object Server {
     def map[A,B](fa: ServerF[A])(f: A => B): ServerF[B] = fa.map(f)
   }
 
-  /////// public api / syntax ////////
+  ////////////// public api / syntax ///////////////
 
-  def watch(urls: Set[URL]): Server[Unit] =
+  def watch(urls: Set[Target]): Server[Unit] =
     liftF(Watch(urls, ()))
 
   // TODO: probally move this into the init of the interpreter
@@ -41,7 +43,8 @@ object Server {
     liftF(Listen( () ))
 
 
-  /////// threading ////////
+  ////////////// threading ///////////////
+
   import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 
   private def daemonThreads(name: String) = new ThreadFactory {
@@ -61,6 +64,7 @@ object Server {
 }
 
 import java.io.File
+import scalaz.==>>
 import scalaz.concurrent.Task
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.regions.{Regions,Region}
@@ -73,7 +77,6 @@ trait Server extends Interpreter[Server.ServerF] {
   import knobs._
   import journal.Logger
   import Server._
-  import Sharding.Distribution
 
   val log = Logger("chemist")
 
@@ -89,14 +92,14 @@ trait Server extends Interpreter[Server.ServerF] {
   /////// queues and event streaming ////////
 
   val sns = SNS.client(
-      new BasicAWSCredentials(
-        cfg.require[String]("aws.access-key"),
-        cfg.require[String]("aws.secret-key")),
-      cfg.lookup[String]("aws.proxy-host"),
-      cfg.lookup[Int]("aws.proxy-port"),
-      cfg.lookup[String]("aws.proxy-protocol"),
-      Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
-    )
+    new BasicAWSCredentials(
+      cfg.require[String]("aws.access-key"),
+      cfg.require[String]("aws.secret-key")),
+    cfg.lookup[String]("aws.proxy-host"),
+    cfg.lookup[Int]("aws.proxy-port"),
+    cfg.lookup[String]("aws.proxy-protocol"),
+    Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
+  )
 
   val sqs = SQS.client(
     new BasicAWSCredentials(
@@ -110,16 +113,25 @@ trait Server extends Interpreter[Server.ServerF] {
 
   /////// in-memory data storage ////////
 
-  val distribution = new Ref[Distribution]
+  /**
+   * stores the mapping between flasks and their assigned workload
+   */
+  val dref = new Ref[Distribution]
+
+  /**
+   * stores a key-value map of instance-id -> host
+   */
+  val instances = new Ref[InstanceID ==>> Host]
 
   /////// interpreter implementation ////////
 
   protected def op[A](r: ServerF[A]): Task[A] = r match {
-    case Watch(urls, k) =>
-      Task.now( k )
+    case Watch(targets, k) =>
+      Task(dref.update(d =>
+        Sharding.distribution(targets)(d) )).map(_ => k)
 
     case Listen(k) =>
-      Lifecycle.run(queue, sqs, distribution).run.map(_ => k)
+      Lifecycle.run(queue, sqs, dref).run.map(_ => k)
   }
 
   protected def init(): Task[Unit] =

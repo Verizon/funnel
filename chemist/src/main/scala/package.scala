@@ -5,7 +5,8 @@ package object chemist {
   import annotation.tailrec
 
   type InstanceID = String
-  type Ref[A] = AtomicReference[A]
+  type Host       = String
+  type Ref[A]     = AtomicReference[A]
 
   implicit class Atomic[A](val atomic: AtomicReference[A]){
     @tailrec final def update(f: A => A): A = {

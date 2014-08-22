@@ -13,51 +13,8 @@ import scala.collection.JavaConverters._
 
 case class Group(
   name: String,
-  instances: Seq[Instance] = Nil,
-  tags: Map[String,String] = Map.empty){
-
-  def securityGroups: Seq[String] =
-    instances.headOption.toList.flatMap(_.securityGroups)
-
-  def application: Option[String] =
-    tags.get("AppName")
-
-  def applicationWithRevision: Option[String] =
-    for {
-      n <- application
-      v <- tags.get("revision")
-    } yield s"$n-$v"
-
-  def serviceName: Option[String] =
-    tags.get("servicename")
-
-  def stackName: Option[String] =
-    tags.get("aws:cloudformation:stack-name")
-
-  def bucket: String =
-    applicationWithRevision orElse stackName orElse application getOrElse name
-}
-
-case class Instance(
-  id: String,
-  internalHostname: Option[String] = None,
-  externalHostname: Option[String] = None,
-  securityGroups: Seq[String] = Nil,
-  zone: String){
-
-  import java.net.URL
-  import scalaz.{\/,-\/,\/-}
-
-  def inVPC: Boolean = externalHostname.isEmpty && internalHostname.nonEmpty
-
-  def asURL: Throwable \/ URL = asURL()
-
-  def asURL(port: Int = 5775, path: String = "audit"): Throwable \/ URL =
-    externalHostname match {
-      case Some(h) if h.nonEmpty => \/-(new URL(s"http://$h:$port/$path"))
-      case _ => -\/(new RuntimeException(s"No external hostname is specified for $id"))
-    }
-}
+  instances: Seq[ASGInstance] = Nil,
+  tags: Map[String,String] = Map.empty)
 
 object ASG {
 
@@ -93,16 +50,12 @@ object ASG {
     Task(fetch(Nil).map(g =>
       Group(
         name      = g.getAutoScalingGroupName,
-        instances = instances(g),
+        instances = g.getInstances.asScala.toSeq,
         tags      = tags(g))
       ))
   }
 
   private def tags(g: AutoScalingGroup): Map[String,String] =
     g.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
-
-  private def instances(g: AutoScalingGroup): Seq[Instance] =
-    g.getInstances.asScala.map(i =>
-      Instance(id = i.getInstanceId, zone = i.getAvailabilityZone))
 
 }

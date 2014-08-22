@@ -15,7 +15,7 @@ object Sandbox {
 
     // val exe = listAll(C,E).map(_.filter(filters.funnels))
 
-    val exe = Deployed.funnels(C,E)
+    val exe = Deployed.list(C,E)
 
     exe.run.foreach(println)
 

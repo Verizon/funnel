@@ -3,7 +3,6 @@ package oncue.svc.funnel.chemist
 import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterAll}
 import intelmedia.ws.funnel.Monitoring
 import intelmedia.ws.funnel.http.MonitoringServer
-import oncue.svc.funnel.aws.{Group,Instance}
 import scalaz.==>>
 
 class ShardingSpec extends FlatSpec with Matchers {

@@ -1,6 +1,5 @@
 package oncue.svc.funnel.chemist
 
-// import java.net.URL
 import scalaz.{\/,-\/,\/-}
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Sink}
