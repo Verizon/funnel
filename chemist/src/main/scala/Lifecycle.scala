@@ -66,24 +66,4 @@ object Lifecycle {
       case \/-(win)  => toSink(d)
     }
   }
-
-  private def reshard(id: InstanceID)(shards: Sharding.Distribution): Unit = ()
-
-
-    // for {
-    //   urls <- Option(shards.get(id))
-    //   _    <- Option(shards.remove(id))
-    // } yield distributeWorkToShards(urls)(shards)
-
-  // def distributeWorkToShards(work: Set[URL])(shards: Shards) = {
-  //   println("::::::::::::::::::::::::::: DISTRIBUTING")
-  //   // val flasks = shards.keySet.toSet
-
-  //   // Stream.continually(instances).flatten.zip(
-  //   //   Stream.continually(work).flatten).take(
-  //   //     work.size.max(instances.size)).toList
-  // }
-
-
-
 }
