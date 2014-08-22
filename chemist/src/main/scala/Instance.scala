@@ -27,6 +27,9 @@ case class Instance(
       b <- tags.get("revision")
     } yield Application(a,b)
 
+  def host: Option[Host] =
+    location.dns
+
   def asURL: Throwable \/ URL = asURL()
 
   def asURL(port: Int = 5775, path: String = ""): Throwable \/ URL =

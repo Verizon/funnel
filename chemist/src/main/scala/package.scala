@@ -20,5 +20,14 @@ package object chemist {
     def get: A = atomic.get
   }
 
+  import scalaz.\/
+  import scalaz.concurrent.Task
+  import concurrent.{Future,ExecutionContext}
+
+  implicit def fromScalaFuture[A](a: Future[A])(implicit e: ExecutionContext): Task[A] =
+    Task async { k =>
+      a.onComplete {
+        t => k(\/.fromTryCatch(t.get)) }}
+
 }
 

@@ -66,8 +66,6 @@ object Sharding {
     (work, dist)
   }
 
-  private def send: Task[Unit] = Task.now( () )
-
   /**
    * Compute the shard distribution for the given targets, update the in-memroy
    * state and actually call the flasks issuing the command to monitor said targets
@@ -76,10 +74,8 @@ object Sharding {
     val (a,b) = distribution(s)(d.get)
 
     val tasks = a.map { case (f,t) =>
-      Task {
-        // call the flask
-        send
-      }(Server.defaultPool)
+      val host = i.get.lookup(f).flatMap(_.host).getOrElse("localhost")
+      send(to = host)
     }
 
     for {
@@ -88,6 +84,11 @@ object Sharding {
     } yield ()
   }
 
+  private def send(to: Host): Task[String] = {
+    import dispatch._, Defaults._
+    val svc = url("http://$to:5775/mirror")
+    fromScalaFuture(Http(svc OK as.String))
+  }
 
   /**
    * Given the new set of urls to monitor, compute how said urls
@@ -97,7 +98,7 @@ object Sharding {
     val servers = flasks(d)
     val ss      = servers.size
     val input   = deduplicate(s)(d)
-    val is      = input.size // caching operations as its O(n)
+    val is      = input.size // caching operation as its O(n)
     val foo = if(is < ss) servers.take(is) else servers
 
     if(ss == 0) Nil // needed for when there are no Flask's in-memory; causes SOE.
