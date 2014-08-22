@@ -8,6 +8,10 @@ object Sharding {
   type Flask = InstanceID
   type Distribution = Flask ==>> Set[Target]
 
+  object Distribution {
+    def empty: Distribution = ==>>()
+  }
+
   case class Target(bucket: BucketName, url: SafeURL)
 
   /**
@@ -44,10 +48,23 @@ object Sharding {
     }
 
   /**
+   * provide the new distribution based on the result of calculating
+   * how the new set should actually be distributed. main benifit here
+   * is simply making the operations opaque (handling missing key cases)
+   */
+  def distribution(s: Set[Target])(d: Distribution): Distribution =
+    calculate(s)(d).foldLeft(Distribution.empty){ (a,b) =>
+      if(a.member(b._1))
+        a.adjust(b._1, _ + b._2)
+      else
+        a.insert(b._1, Set(b._2))
+    }
+
+  /**
    * Given the new set of urls to monitor, compute how said urls
    * should be distributed over the known flask instances
    */
-  def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
+  private[chemist] def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
     val servers = flasks(d)
     val ss      = servers.size
     val input   = deduplicate(s)(d)
@@ -68,7 +85,7 @@ object Sharding {
    * that we're not already monitoring the inputs (thus ensuring that
    * the cluster is not having duplicated monitoring items)
    */
-  def deduplicate(next: Set[Target])(d: Distribution): Set[Target] = {
+  private[chemist] def deduplicate(next: Set[Target])(d: Distribution): Set[Target] = {
     // get the full list of targets we currently know about
     val existing = targets(d)
 
