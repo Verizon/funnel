@@ -56,20 +56,20 @@ class ShardingSpec extends FlatSpec with Matchers {
 
   it should "correctly calculate how the new request should be sharded over known flasks" in {
     Sharding.calculate(i1)(d1) should equal (
-      (Target("u",SafeURL("http://eight.internal")),"a") ::
-      (Target("v",SafeURL("http://nine.internal")),"c") :: Nil
+      ("a", Target("u",SafeURL("http://eight.internal"))) ::
+      ("c", Target("v",SafeURL("http://nine.internal"))) :: Nil
     )
 
     Sharding.calculate(i2)(d1) should equal (
-      (Target("v",SafeURL("http://omega.internal")),"a") ::
-      (Target("w",SafeURL("http://alpha.internal")),"c") ::
-      (Target("r",SafeURL("http://epsilon.internal")),"b") ::
-      (Target("z",SafeURL("http://gamma.internal")),"d") ::
-      (Target("u",SafeURL("http://beta.internal")),"a") ::
-      (Target("z",SafeURL("http://omicron.internal")),"c") ::
-      (Target("r",SafeURL("http://kappa.internal")),"b") ::
-      (Target("r",SafeURL("http://theta.internal")),"d") ::
-      (Target("p",SafeURL("http://zeta.internal")),"a") :: Nil
+      ("a", Target("v",SafeURL("http://omega.internal"))) ::
+      ("c", Target("w",SafeURL("http://alpha.internal"))) ::
+      ("b", Target("r",SafeURL("http://epsilon.internal"))) ::
+      ("d", Target("z",SafeURL("http://gamma.internal"))) ::
+      ("a", Target("u",SafeURL("http://beta.internal"))) ::
+      ("c", Target("z",SafeURL("http://omicron.internal"))) ::
+      ("b", Target("r",SafeURL("http://kappa.internal"))) ::
+      ("d", Target("r",SafeURL("http://theta.internal"))) ::
+      ("a", Target("p",SafeURL("http://zeta.internal"))) :: Nil
     )
   }
 
