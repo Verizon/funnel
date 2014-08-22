@@ -105,6 +105,66 @@ trait Monitoring {
    */
   protected def update[O](k: Key[O], v: O): Task[Unit]
 
+  private[funnel] val mirroringQueue =
+    async.unboundedQueue[Command](Strategy.Executor(Monitoring.serverPool))
+
+  private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue
+
+  private val urlSignals = new java.util.concurrent.ConcurrentHashMap[URL, Signal[Unit]]
+
+  /** Terminate `p` when the given `Signal` terminates. */
+  def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
+    alive.continuous.zip(p).map(_._2)
+
+  private[funnel] def processMirroringEvents(
+    parse: DatapointParser,
+    myName: String = "Funnel Mirror",
+    nodeRetries: Names => Event = _ => defaultRetries
+  )(implicit log: String => Unit): Task[Unit] = {
+    val S = Strategy.Executor(Monitoring.defaultPool)
+    val alive = signal[Unit](S)
+    val active = signal[Set[URL]](S)
+    def modifyActive(f: Set[URL] => Set[URL]): Task[Unit] =
+      active.compareAndSet(a => Some(f(a.getOrElse(Set())))).map(_ => ())
+    for {
+      _ <- active.set(Set.empty)
+      _ <- alive.set(())
+      _ <- mirroringCommands.evalMap {
+        case Mirror(url,group) => Task.delay {
+          val S = Strategy.Executor(Monitoring.serverPool)
+          val hook = signal[Unit](S)
+          hook.set(()).runAsync(_ => ())
+
+          urlSignals.put(url, hook)
+
+          // adding the `localName` onto the string here so that later in the
+          // process its possible to find the key we're specifically looking for
+          // and trim off the `localName`
+          val localName = prettyURL(url)
+
+          val received: Process[Task,Unit] = link(hook) {
+            attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
+              url, m => s"$group/$m:::$localName")
+          }
+
+          val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
+            if (urls.contains(url)) Process.halt // skip it, alread running
+            else Process.eval_(modifyActive(_ + url)) ++ // add to active at start
+              // and remove it when done
+              received.onComplete(Process.eval_(modifyActive(_ - url)))
+          }
+
+          Task.fork(receivedIdempotent.run).runAsync(_.fold(
+            err => log(err.getMessage), identity))
+        }
+        case Discard(url) => Task.delay {
+          Option(urlSignals.get(url)).foreach(_.close.runAsync(_ => ()))
+        }
+      }.run
+      _ <- alive.close
+    } yield ()
+  }
+
   /**
    * Mirror all metrics from the given URL, adding `localPrefix` onto the front of
    * all loaded keys. `url` is assumed to be a stream of datapoints in SSE format.
@@ -319,6 +379,8 @@ trait Monitoring {
 }
 
 object Monitoring {
+
+  def defaultRetries = Events.takeEvery(30 seconds, 6)
 
   private def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {

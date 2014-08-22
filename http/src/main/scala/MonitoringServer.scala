@@ -9,8 +9,14 @@ import java.net.{InetSocketAddress, URL}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
+import scalaz.stream.async.mutable.Signal
+import scalaz.stream.async.signal
+import intelmedia.ws.funnel.Events.Event
+import Monitoring.prettyURL
 
 object MonitoringServer {
+
+  def defaultRetries = Events.takeEvery(30.seconds, 6)
 
   /**
    * `/`: self-describing list of available resources
@@ -41,11 +47,8 @@ object MonitoringServer {
   def start(M: Monitoring, log: String => Unit): MonitoringServer = start(M)
 }
 
-class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
-  private[funnel] val mirroringQueue =
-    async.unboundedQueue[Command](Strategy.Executor(Monitoring.serverPool))
-
-  private[funnel] val commands = mirroringQueue.dequeue
+class MonitoringServer(M: Monitoring, port: Int) {
+  import MonitoringServer._
 
   private val server = HttpServer.create(new InetSocketAddress(port), 0)
 
@@ -110,7 +113,7 @@ class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
         blist => {
           val cs: List[Command] = blist.flatMap(b => b.urls.map(u => Mirror(new URL(u), b.label)))
           val p0: Process[Task, Command] = Process.emitAll(cs)
-          val p = p0 to mirroringQueue.enqueue
+          val p = p0 to M.mirroringQueue.enqueue
           p.run.run
 
           flush(202, Array.empty[Byte], req)
@@ -127,7 +130,7 @@ class MonitoringServer(M: Monitoring, port: Int) extends ControlServer {
         error => flush(400, error.toString, req),
         list => {
           val p0: Process[Task, Command] = Process.emitAll(list.map(u => Discard(new URL(u))))
-          val p = p0 to mirroringQueue.enqueue
+          val p = p0 to M.mirroringQueue.enqueue
           p.run.run
 
           flush(202, Array.empty[Byte], req)
