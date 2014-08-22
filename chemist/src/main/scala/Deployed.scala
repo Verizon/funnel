@@ -32,7 +32,6 @@ object Deployed {
   def flasks(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
     instances(filter.flasks)(asg,ec2)
 
-
   private def instances(f: Instance => Boolean
     )(asg: AmazonAutoScaling, ec2: AmazonEC2
     ): Task[Seq[Instance]] =

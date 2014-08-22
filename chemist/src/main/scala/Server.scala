@@ -70,7 +70,7 @@ import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.regions.{Regions,Region}
 import com.amazonaws.services.sns.AmazonSNSClient
 import com.amazonaws.services.sqs.AmazonSQSClient
-import oncue.svc.funnel.aws.{SQS,SNS}
+import oncue.svc.funnel.aws.{SQS,SNS,EC2,ASG}
 import java.util.concurrent.atomic.AtomicReference
 
 trait Server extends Interpreter[Server.ServerF] {
@@ -111,32 +111,56 @@ trait Server extends Interpreter[Server.ServerF] {
     Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
   )
 
+  val ec2 = EC2.client(
+    new BasicAWSCredentials(
+      cfg.require[String]("aws.access-key"),
+      cfg.require[String]("aws.secret-key")),
+    cfg.lookup[String]("aws.proxy-host"),
+    cfg.lookup[Int]("aws.proxy-port"),
+    cfg.lookup[String]("aws.proxy-protocol"),
+    Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
+  )
+
+  val asg = ASG.client(
+    new BasicAWSCredentials(
+      cfg.require[String]("aws.access-key"),
+      cfg.require[String]("aws.secret-key")),
+    cfg.lookup[String]("aws.proxy-host"),
+    cfg.lookup[Int]("aws.proxy-port"),
+    cfg.lookup[String]("aws.proxy-protocol"),
+    Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
+  )
+
   /////// in-memory data storage ////////
 
   /**
    * stores the mapping between flasks and their assigned workload
    */
-  val dref = new Ref[Distribution]
+  val D = new Ref[Distribution]
 
   /**
    * stores a key-value map of instance-id -> host
    */
-  val instances = new Ref[InstanceID ==>> Host]
+  val I = new Ref[InstanceM]
 
   /////// interpreter implementation ////////
 
   protected def op[A](r: ServerF[A]): Task[A] = r match {
     case Watch(targets, k) =>
-      Task(dref.update(d =>
-        Sharding.distribution(targets)(d) )).map(_ => k)
+      for(_ <- Sharding.distribute(targets)(D, I)
+        ) yield k
 
     case Listen(k) =>
-      Lifecycle.run(queue, sqs, dref).run.map(_ => k)
+      Lifecycle.run(queue, sqs, D).run.map(_ => k)
   }
 
   protected def init(): Task[Unit] =
     for {
-      // z <-
+      // read the list of all deployed machines
+      z <- Deployed.list(asg, ec2)
+      // set the result to an in-memory list of "the world"
+      _  = I.update(_ => ==>>(z.map(i => i.id -> i):_*))
+      // start to wire up the topics and subscriptions to queues
       a <- SNS.create(topic)(sns)
       _  = log.debug(s"created sns topic with arn = $a")
       b <- SQS.create(queue)(sqs)

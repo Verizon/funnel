@@ -1,9 +1,10 @@
 package oncue.svc.funnel.chemist
 
+import scalaz.==>>
+import scalaz.concurrent.Task
+import intelmedia.ws.funnel.BucketName
 
 object Sharding {
-  import scalaz.==>>
-  import intelmedia.ws.funnel.BucketName
 
   type Flask = InstanceID
   type Distribution = Flask ==>> Set[Target]
@@ -52,13 +53,41 @@ object Sharding {
    * how the new set should actually be distributed. main benifit here
    * is simply making the operations opaque (handling missing key cases)
    */
-  def distribution(s: Set[Target])(d: Distribution): Distribution =
-    calculate(s)(d).foldLeft(Distribution.empty){ (a,b) =>
+  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution) = {
+    val work = calculate(s)(d)
+
+    val dist = work.foldLeft(Distribution.empty){ (a,b) =>
       if(a.member(b._1))
         a.adjust(b._1, _ + b._2)
       else
         a.insert(b._1, Set(b._2))
     }
+
+    (work, dist)
+  }
+
+  private def send: Task[Unit] = Task.now( () )
+
+  /**
+   * Compute the shard distribution for the given targets, update the in-memroy
+   * state and actually call the flasks issuing the command to monitor said targets
+   */
+  def distribute(s: Set[Target])(d: Ref[Distribution], i: Ref[InstanceM]): Task[Unit] = {
+    val (a,b) = distribution(s)(d.get)
+
+    val tasks = a.map { case (f,t) =>
+      Task {
+        // call the flask
+        send
+      }(Server.defaultPool)
+    }
+
+    for {
+      _ <- Task.gatherUnordered(tasks)
+      _ <- Task.now(d.update(_.union(b)))
+    } yield ()
+  }
+
 
   /**
    * Given the new set of urls to monitor, compute how said urls

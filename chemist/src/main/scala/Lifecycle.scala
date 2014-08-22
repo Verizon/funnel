@@ -50,7 +50,7 @@ object Lifecycle {
       case Redistribute(id) => Task.delay {
         ref.get.lookup(id).foreach { set =>
           val next = ref.update(_.delete(id))
-          ref.update(x => Sharding.distribution(set)(x))
+          ref.update(x => Sharding.distribution(set)(x)._2)
         }
       }
       case NoOp             => Task.now( () )
