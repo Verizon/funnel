@@ -136,12 +136,12 @@ trait Server extends Interpreter[Server.ServerF] {
   /**
    * stores the mapping between flasks and their assigned workload
    */
-  val D = new Ref[Distribution]
+  val D = new Ref[Distribution](Distribution.empty)
 
   /**
    * stores a key-value map of instance-id -> host
    */
-  val I = new Ref[InstanceM]
+  val I = new Ref[InstanceM](==>>())
 
   /////// interpreter implementation ////////
 
