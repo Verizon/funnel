@@ -29,8 +29,10 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
   val distribution = new Ref[Distribution](Distribution.empty)
 
   val T1 = Set(
-    Target("test1",SafeURL("http://127.0.0.1:8080")),
-    Target("test1",SafeURL("http://127.0.0.1:8081"))
+    Target("test1",SafeURL("http://127.0.0.1:8080/stream/uptime")),
+    Target("test1",SafeURL("http://127.0.0.1:8080/stream/now")),
+    Target("test1",SafeURL("http://127.0.0.1:8081/stream/uptime")),
+    Target("test1",SafeURL("http://127.0.0.1:8081/stream/now"))
   )
 
   override def beforeAll(){
@@ -39,11 +41,11 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
     addInstruments(I2)
     Thread.sleep(100)
     addFlask("i-123", 9090)
-    Thread.sleep(100)
+    Thread.sleep(1000)
   }
 
   override def afterAll(){
-    Thread.sleep(W.toMillis * 2) // wait for 5 seconds
+    Thread.sleep(W.toMillis * 2) // wait for 2 window periods
     MS1.stop()
     MS2.stop()
     FS1.stop()
@@ -67,10 +69,12 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
     JVM.instrument(i)
   }
 
-  it should "foo" in {
-    println {
-      Sharding.distribute(T1)(distribution, instances).run
-    }
+  it should "sucsessfully be able to stream events from two local monitoring instances to a local flask" in {
+    F1.processMirroringEvents(
+      intelmedia.ws.funnel.http.SSE.readEvents,
+      "intspec")(println).runAsync(println)
+
+    Sharding.distribute(T1)(distribution, instances).run
   }
 
 
