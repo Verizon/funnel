@@ -10,5 +10,8 @@ object Main {
     // block at the edge of the world
     I.run(exe).run
 
+    // this should probally be called to release
+    // the underlying resources.
+    // dispatch.Http.shutdown()
   }
 }

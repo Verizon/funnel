@@ -3,6 +3,7 @@ package oncue.svc.funnel.chemist
 import scalaz.==>>
 import scalaz.concurrent.Task
 import intelmedia.ws.funnel.BucketName
+import journal.Logger
 
 object Sharding {
 
@@ -53,7 +54,12 @@ object Sharding {
    * how the new set should actually be distributed. main benifit here
    * is simply making the operations opaque (handling missing key cases)
    */
-  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution) = {
+  def distribution(s: Set[Target]
+    )(d: Distribution
+    )(implicit log: journal.Logger
+    ): (Seq[(Flask,Target)], Distribution) = {
+
+    log.debug(s"Attempting to distribute targets ${s.mkString(",")}")
     val work = calculate(s)(d)
 
     val dist = work.foldLeft(Distribution.empty){ (a,b) =>
@@ -70,24 +76,43 @@ object Sharding {
    * Compute the shard distribution for the given targets, update the in-memroy
    * state and actually call the flasks issuing the command to monitor said targets
    */
-  def distribute(s: Set[Target])(d: Ref[Distribution], i: Ref[InstanceM]): Task[Unit] = {
-    val (a,b) = distribution(s)(d.get)
+  def distribute(s: Set[Target])(d: Ref[Distribution], i: Ref[InstanceM])(implicit log: Logger): Task[Unit] = {
+    log.debug(s"supplied references: i=$i, d=$d")
 
-    val tasks = a.map { case (f,t) =>
-      val host = i.get.lookup(f).flatMap(_.host).getOrElse("localhost")
-      println(">>>>>>>>> " + host)
-      send(to = host, "testing")
+    val (a,b): (Seq[(Flask,Target)], Distribution) = distribution(s)(d.get)
+
+    log.debug(s"Sharding.distribute a=$a, b=$b")
+
+    val grouped: Map[Flask, Seq[Target]] = a.groupBy(_._1).mapValues(_.map(_._2))
+
+    log.debug(s"Sharding.distribute,grouped = $grouped")
+
+    val tasks = grouped.map { case (f,seq) =>
+      val location = i.get.lookup(f).map(_.location).getOrElse(Location.localhost)
+      log.debug(">>>>>>>>> " + seq)
+      send(to = location, seq)
     }
 
     for {
-      _ <- Task.gatherUnordered(tasks)
+      _ <- Task.gatherUnordered(tasks.toList)
       _ <- Task.now(d.update(_.union(b)))
     } yield ()
   }
 
-  private def send(to: Host, body: String): Task[String] = {
+  private def send(to: Location, targets: Seq[Target]): Task[String] = {
     import dispatch._, Defaults._
-    val svc = url(s"http://$to:5775/mirror") << body
+    import argonaut._, Argonaut._
+    import JSON.BucketsToJSON
+
+    val host: HostAndPort = to.dns.map(_ + ":" + to.port).get // "safe" because we know we're passing in the default localhost
+    val payload: Map[BucketName, List[SafeURL]] =
+      targets.groupBy(_.bucket).mapValues(_.map(_.url).toList)
+
+    println("==========================")
+    println(payload.toList.asJson.nospaces)
+    println("==========================")
+
+    val svc = url(s"http://$host/mirror") << payload.toList.asJson.nospaces
     fromScalaFuture(Http(svc OK as.String))
   }
 
@@ -95,15 +120,19 @@ object Sharding {
    * Given the new set of urls to monitor, compute how said urls
    * should be distributed over the known flask instances
    */
-  private[chemist] def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
+  private[chemist] def calculate(s: Set[Target])(d: Distribution)(implicit log: Logger): Seq[(Flask,Target)] = {
     val servers = flasks(d)
     val ss      = servers.size
     val input   = deduplicate(s)(d)
     val is      = input.size // caching operation as its O(n)
     val foo = if(is < ss) servers.take(is) else servers
 
-    if(ss == 0) Nil // needed for when there are no Flask's in-memory; causes SOE.
-    else {
+    log.debug(s"calculating the target distribution: servers=$servers, input=$input")
+
+    if(ss == 0){
+      log.warn("there are no flask servers currently registered to distribute work too.")
+      Nil // needed for when there are no Flask's in-memory; causes SOE.
+    } else {
       // interleave the input with the known flask servers ordered by the
       // flask that currently has the least amount of work assigned.
       Stream.continually(input).flatten.zip(

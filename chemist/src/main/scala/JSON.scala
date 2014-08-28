@@ -1,6 +1,6 @@
 package oncue.svc.funnel.chemist
 
-object Decoder {
+object JSON {
   import argonaut._, Argonaut._
   import javax.xml.bind.DatatypeConverter // hacky, but saves the extra dependencies
 
@@ -8,6 +8,31 @@ object Decoder {
     def asDate: java.util.Date =
       javax.xml.bind.DatatypeConverter.parseDateTime(in).getTime
   }
+
+  ////////////////////// flask messages //////////////////////
+
+  // import Sharding.Target
+
+  /**
+   *[
+   *  {
+   *    "bucket": "imqa-maestro-1-0-261-QmUo7Js",
+   *    "urls": [
+   *      "http://ec2-23-20-119-134.compute-1.amazonaws.com:5775/stream/sliding",
+   *      "http://ec2-23-20-119-134.compute-1.amazonaws.com:5775/stream/uptime",
+   *      "http://ec2-54-81-136-185.compute-1.amazonaws.com:5775/stream/sliding",
+   *      "http://ec2-54-81-136-185.compute-1.amazonaws.com:5775/stream/uptime"
+   *    ]
+   *  }
+   *]
+   */
+  implicit val BucketsToJSON: EncodeJson[(String, List[SafeURL])] =
+    EncodeJson((t: (String, List[SafeURL])) =>
+      ("bucket" := t._1) ->:
+      ("urls"   := t._2.map(_.underlying) ) ->: jEmptyObject
+    )
+
+  ////////////////////// lifecycle events //////////////////////
 
   implicit val JsonToAutoScalingEventKind: DecodeJson[AutoScalingEventKind] =
     DecodeJson(c => for {

@@ -5,10 +5,10 @@ package object chemist {
   import annotation.tailrec
   import scalaz.==>>
 
-  type InstanceID = String
-  type Host       = String
-  type Ref[A]     = AtomicReference[A]
-  type InstanceM  = InstanceID ==>> Instance
+  type InstanceID  = String
+  type HostAndPort = String
+  type Ref[A]      = AtomicReference[A]
+  type InstanceM   = InstanceID ==>> Instance
 
   implicit class Atomic[A](val atomic: AtomicReference[A]){
     @tailrec final def update(f: A => A): A = {

@@ -78,7 +78,7 @@ trait Server extends Interpreter[Server.ServerF] {
   import journal.Logger
   import Server._
 
-  val log = Logger("chemist")
+  implicit val log = Logger("chemist")
 
   /////// configuration resolution ////////
 

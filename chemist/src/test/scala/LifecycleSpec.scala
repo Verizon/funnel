@@ -6,7 +6,7 @@ import scalaz.stream.{Process,Sink}
 import scalaz.concurrent.Task
 import Sharding.{Distribution,Target}
 
-class LifecycleSpec extends FlatSpec with Matchers {
+class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {
   val sqs = new TestAmazonSQS
   val r1: Ref[Distribution] = new Ref(==>>())
   val k1 = "i-dd947af7"

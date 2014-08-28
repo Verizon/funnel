@@ -10,6 +10,9 @@ object Sandbox {
   def main(args: Array[String]): Unit = {
     import Sharding.{Distribution,Target}
 
+    implicit val log = journal.Logger("chemist")
+
+
     val K = sys.env("AWS_ACCESS_KEY")
     val S = sys.env("AWS_SECRET_KEY")
 

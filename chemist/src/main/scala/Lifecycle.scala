@@ -16,7 +16,7 @@ import oncue.svc.funnel.aws.{SQS,SNS}
  * algebra which is then acted upon. This is essentially interpreter pattern.
  */
 object Lifecycle {
-  import Decoder._
+  import JSON._
   import argonaut._, Argonaut._
 
   case class MessageParseException(override val getMessage: String) extends RuntimeException
@@ -42,7 +42,7 @@ object Lifecycle {
 
   //////////////////////////// I/O Actions ////////////////////////////
 
-  def toSink(ref: Ref[Sharding.Distribution]): Sink[Task, Action] = {
+  def toSink(ref: Ref[Sharding.Distribution])(implicit log: journal.Logger): Sink[Task, Action] = {
     Process.emit {
       case AddCapacity(id)  => Task.delay {
         ref.update(_.insert(id, Set.empty))
@@ -57,7 +57,7 @@ object Lifecycle {
     }
   }
 
-  def run(queueName: String, sqs: AmazonSQS, d: Ref[Sharding.Distribution]): Sink[Task, Action] = {
+  def run(queueName: String, sqs: AmazonSQS, d: Ref[Sharding.Distribution])(implicit log: journal.Logger): Sink[Task, Action] = {
     stream(queueName)(sqs).flatMap {
       case -\/(fail) => Process.halt
       case \/-(win)  => toSink(d)

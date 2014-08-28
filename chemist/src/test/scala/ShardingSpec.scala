@@ -5,7 +5,7 @@ import intelmedia.ws.funnel.Monitoring
 import intelmedia.ws.funnel.http.MonitoringServer
 import scalaz.==>>
 
-class ShardingSpec extends FlatSpec with Matchers {
+class ShardingSpec extends FlatSpec with Matchers with ChemistSpec  {
 
   import Sharding.{Distribution,Target}
 
