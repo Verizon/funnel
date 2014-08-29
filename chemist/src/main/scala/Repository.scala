@@ -68,11 +68,14 @@ class StatefulRepository(ec2: AmazonEC2) extends Repository {
   /**
    * when a new flask comes online, we want to add that flask to the in-memory
    */
-  def increaseCapacity(instanceId: InstanceID): Task[(Distribution,InstanceM)] =
+  def increaseCapacity(instanceId: InstanceID): Task[(Distribution,InstanceM)] = {
+    println(s"increaseCapacity instanceId=$instanceId")
     for {
       i <- Deployed.lookupOne(instanceId)(ec2)
+      // _  = println(s"increaseCapacity i=$i")
       a <- increaseCapacity(i)
     } yield a
+  }
 
   /**
    * when a new flask comes online, we want to add that flask to the in-memory.
@@ -89,6 +92,5 @@ class StatefulRepository(ec2: AmazonEC2) extends Repository {
     for {
       _ <- removeInstance(downed)
       d <- Task(D.update(_.delete(downed)))
-      // d <- Task(D.update(_ => revisedDistribution))
     } yield d
 }

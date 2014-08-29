@@ -5,14 +5,16 @@ import com.amazonaws.services.ec2.model.{Placement,Tag}
 
 object Fixtures {
 
-  private def inst(id: String): EC2Instance = new EC2Instance()
-    .withInstanceId(id)
+  def instance(id: String): EC2Instance =
+    (new EC2Instance).withInstanceId(id)
     .withPlacement(new Placement("us-east-1b"))
     .withPrivateDnsName("foo.internal")
     .withPublicDnsName("foo.ext.amazonaws.com")
     .withTags(Seq("baz" -> "v1","bar" -> "v2").map { case (k,v) => new Tag(k,v) }:_*)
 
-  val instances: Seq[EC2Instance] = inst("i-dx947af7") :: Nil
+  val instances: Seq[EC2Instance] =
+    instance("i-dx947af7") ::
+    instance("i-15807647") :: Nil
 
   val asgEventJson1 = """
     |{

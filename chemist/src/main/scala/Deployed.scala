@@ -22,18 +22,21 @@ object Deployed {
   def flasks(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
     instances(filter.flasks)(asg,ec2)
 
-  def lookupOne(id: InstanceID)(ec2: AmazonEC2): Task[Instance] =
+  def lookupOne(id: InstanceID)(ec2: AmazonEC2): Task[Instance] = {
     lookupMany(Seq(id))(ec2).flatMap {
-      _.headOption match {
+      _.filter(_.id == id).headOption match {
         case None => Task.fail(new Exception("No instance found with that key."))
         case Some(i) => Task.now(i)
       }
     }
+  }
 
   def lookupMany(ids: Seq[InstanceID])(ec2: AmazonEC2): Task[Seq[Instance]] =
     for {
       a <- EC2.reservations(ids)(ec2)
+      // _  = println(s"Deployed.lookupMany a=$a")
       b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
+      // _  = println(s"Deployed.lookupMany b=$b")
     } yield b
 
   private def instances(f: Instance => Boolean

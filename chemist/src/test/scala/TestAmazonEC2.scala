@@ -5,11 +5,11 @@ import com.amazonaws.services.ec2.model.DescribeInstancesResult
 import com.amazonaws.services.ec2.model.{Reservation,Instance => EC2Instance}
 
 object TestAmazonEC2 {
-  def apply(i: EC2Instance*): AmazonEC2 =
+  def apply(i: Seq[EC2Instance]): AmazonEC2 =
     new TestAmazonEC2 {
-      override def describeInstances(x$1: com.amazonaws.services.ec2.model.DescribeInstancesRequest): DescribeInstancesResult = {
+      override def describeInstances(arg: com.amazonaws.services.ec2.model.DescribeInstancesRequest): DescribeInstancesResult = {
         new DescribeInstancesResult().withReservations(
-          new Reservation().withInstances(i:_*))
+          i.map(in => new Reservation().withInstances(in)):_*)
       }
     }
 }

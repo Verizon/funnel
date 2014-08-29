@@ -50,8 +50,11 @@ object Lifecycle {
 
   def sink(r: Repository)(implicit log: Logger): Sink[Task,Action] =
     Process.emit {
-      case AddCapacity(id) =>
+      case AddCapacity(id) => {
+        println(s"adding capactiy $id")
         r.increaseCapacity(id).map(_ => ())
+      }
+
 
       case Redistribute(id) =>
         for {

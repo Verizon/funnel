@@ -8,15 +8,14 @@ import Sharding.{Distribution,Target}
 
 class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {
   val sqs = new TestAmazonSQS
-  val ec2 = TestAmazonEC2(Fixtures.instances:_*)
-
+  val ec2 = TestAmazonEC2(Fixtures.instances)
   val r = new StatefulRepository(ec2)
   val k1 = "i-dx947af7"
   val k2 = "i-15807647"
 
   private def effect(a: Action, s: Sink[Task, Action]): Unit = {
     val stream: Process[Task, Action] = Process.emit(a)
-    stream.to(s).runLast.run
+    stream.to(s).run.run
   }
 
   it should "Lifecycle.stream should process the ASG event JSON into the right algebra" in {
@@ -28,16 +27,14 @@ class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {
   ///// as we're testing effects in sinks, keep these in this order (urgh!) //////
 
   it should "1. Lifecycle.toSink should compute and update state given 'AddCapacity' command" in {
-    println {
-      effect(AddCapacity(k1), Lifecycle.sink(r))
-      r.assignedTargets(k1).run should equal (Set.empty[Target])
-    }
+    val s = Lifecycle.sink(r)
 
+    effect(AddCapacity(k1), s)
+    r.assignedTargets(k1).run should equal (Set.empty[Target])
 
-    // r1.get should equal ( ==>>(k1 -> Set.empty) )
-
-    // effect(AddCapacity(k2), Lifecycle.sink.noop)
-    // r1.get should equal ( ==>>(k1 -> Set.empty, k2 -> Set.empty) )
+    effect(AddCapacity(k2), s)
+    r.assignedTargets(k1).run should equal (Set.empty[Target])
+    r.assignedTargets(k2).run should equal (Set.empty[Target])
   }
 
   // it should "2. Lifecycle.toSink should compute and update state given 'Redistribute' command" in {
