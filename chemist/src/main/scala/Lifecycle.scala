@@ -43,28 +43,26 @@ object Lifecycle {
 
   //////////////////////////// I/O Actions ////////////////////////////
 
-  object sink {
-    def noop: Sink[Task,Action] =
-      Process.emit {
-        case _ => Task.now(())
-      }
+  def sink: Sink[Task,Action] =
+    Process.emit {
+      case _ => Task.now(())
+    }
 
-    def fromRepository(r: Repository)(implicit log: Logger): Sink[Task,Action] =
-      Process.emit {
-        case AddCapacity(id) =>
-          r.increaseCapacity(id).map(_ => ())
+  def sink(r: Repository)(implicit log: Logger): Sink[Task,Action] =
+    Process.emit {
+      case AddCapacity(id) =>
+        r.increaseCapacity(id).map(_ => ())
 
-        case Redistribute(id) =>
-          for {
-            targets <- r.assignedTargets(id)
-            _       <- r.decreaseCapacity(id)
-            _       <- Sharding.distribute(targets)(r)
-          } yield ()
+      case Redistribute(id) =>
+        for {
+          targets <- r.assignedTargets(id)
+          _       <- r.decreaseCapacity(id)
+          _       <- Sharding.distribute(targets)(r)
+        } yield ()
 
-        case NoOp =>
-          Task.now( () )
-      }
-  }
+      case NoOp =>
+        Task.now( () )
+    }
 
   def run(queueName: String, sqs: AmazonSQS, sink: Sink[Task, Action])(implicit log: Logger): Sink[Task, Action] = {
     stream(queueName)(sqs).flatMap {

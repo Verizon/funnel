@@ -7,6 +7,24 @@ import scalaz.concurrent.Task
 import scalaz.==>>
 
 object Sandbox {
+  def main(args: Array[String]): Unit = {
+    implicit val log = journal.Logger("chemist")
+
+    val K = sys.env("AWS_ACCESS_KEY")
+    val S = sys.env("AWS_SECRET_KEY")
+
+    val C = ASG.client(new BasicAWSCredentials(K, S))
+    val E = EC2.client(new BasicAWSCredentials(K, S))
+
+    val R = new StatefulRepository(E)
+
+    println {
+      R.increaseCapacity("i-xxx").run
+      // Deployed.lookupMany(List("doesntexist"))(E).run
+    }
+  }
+
+
   // def main(args: Array[String]): Unit = {
   //   import Sharding.{Distribution,Target}
 

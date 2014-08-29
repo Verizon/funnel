@@ -133,7 +133,7 @@ trait Server extends Interpreter[Server.ServerF] {
 
   /////// in-memory data storage ////////
 
-  val R = new ProductionRepository(ec2)
+  val R = new StatefulRepository(ec2)
 
   /////// interpreter implementation ////////
 

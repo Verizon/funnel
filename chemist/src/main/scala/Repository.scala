@@ -18,7 +18,7 @@ trait Repository {
   def assignedTargets(flask: InstanceID): Task[Set[Sharding.Target]]
   def increaseCapacity(instanceId: InstanceID): Task[(Distribution,InstanceM)]
   def increaseCapacity(instance: Instance): Task[(Distribution,InstanceM)]
-  def decreaseCapacity(instanceId: InstanceID): Task[(Distribution,InstanceM)]
+  def decreaseCapacity(downed: InstanceID): Task[Distribution]
 }
 
 import scalaz.==>>
@@ -26,7 +26,7 @@ import com.amazonaws.services.ec2.AmazonEC2
 
 case class MissingInstanceException(override val getMessage: String) extends RuntimeException(getMessage)
 
-class ProductionRepository(ec2: AmazonEC2){
+class StatefulRepository(ec2: AmazonEC2) extends Repository {
   /**
    * stores the mapping between flasks and their assigned workload
    */
