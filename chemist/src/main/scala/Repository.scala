@@ -21,6 +21,8 @@ trait Repository {
 import scalaz.==>>
 import com.amazonaws.services.ec2.AmazonEC2
 
+case class MissingInstanceException(override val getMessage: String) extends RuntimeException(getMessage)
+
 class ProductionRepository(ec2: AmazonEC2){
   /**
    * stores the mapping between flasks and their assigned workload
@@ -40,6 +42,12 @@ class ProductionRepository(ec2: AmazonEC2){
   def removeInstance(id: InstanceID): Task[InstanceM] =
     Task(I.update(_.delete(id)))
 
+  def instance(id: InstanceID): Task[Instance] =
+    I.get.lookup(id) match {
+      case None    => Task.fail(MissingInstanceException(s"No instance with the ID $id"))
+      case Some(i) => Task.now(i)
+    }
+
   /////////////// flask operations ///////////////
 
   def distribution: Task[Distribution] =
@@ -51,37 +59,28 @@ class ProductionRepository(ec2: AmazonEC2){
   def increaseCapacity(instanceId: InstanceID): Task[(Distribution,InstanceM)] =
     for {
       i <- Deployed.lookupOne(instanceId)(ec2)
-      a <- increaseCapacityWithInstance(i)
+      a <- increaseCapacity(i)
     } yield a
 
   /**
-   * when a new flask comes online, we want to add that flask to the in-memory
+   * when a new flask comes online, we want to add that flask to the in-memory.
+   * 1. Add a new instance key and set its workload to an empty set
+   * 2. Add that instance to the running set of all known machine instances
    */
-  def increaseCapacityWithInstance(instance: Instance): Task[(Distribution,InstanceM)] =
+  def increaseCapacity(instance: Instance): Task[(Distribution,InstanceM)] =
     for {
       a <- Task(D.update(_.insert(instance.id, Set.empty)))
       b <- addInstance(instance)
     } yield (a,b)
 
-  def decreaseCapacity(instanceId: InstanceID): Task[(Distribution,InstanceM)] = ???
+  def decreaseCapacity(instanceId: InstanceID): Task[Distribution] =
+    for {
+      _ <- removeInstance(instanceId)
+      targets = D.get.lookup(instanceId)
+      x <- Task.now(Sharding.distribution(targets)(D.get))
+    } yield x
 }
 
-// object State {
-
-//   def up(instance: Instance)(ri: Ref[InstanceM]): Task[InstanceM] =
-//     Task.now(ri.update(_.insert(instance.id, instance)))
-
-//   def down(id: InstanceID)(ri: Ref[InstanceM]): Task[InstanceM] =
-//     Task.now(ri.update(_.delete(id)))
-
-//   /**
-//    * when a new flask comes online, we want to add that flask to the in-memory
-//    */
-//   def increaseCapacity(instance: Instance)(rd: Ref[Distribution], ri: Ref[InstanceM]): Task[(Distribution,InstanceM)] =
-//     for {
-//       a <- Task(rd.update(_.insert(instance.id, Set.empty)))
-//       b <- up(instance)(ri)
-//     } yield (a,b)
 
 //   def decreaseCapacity(instance: Instance)(rd: Ref[Distribution], ri: Ref[InstanceM]): Task[(Distribution,InstanceM)] = {
 //     // def redistribute(id: String) = {
@@ -91,10 +90,3 @@ class ProductionRepository(ec2: AmazonEC2){
 //     //     Sharding.distribute(dd)
 //     //   }
 //     // }
-
-//     ???
-//   }
-
-
-
-// }
