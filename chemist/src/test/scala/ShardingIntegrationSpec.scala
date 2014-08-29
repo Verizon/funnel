@@ -74,7 +74,10 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
       intelmedia.ws.funnel.http.SSE.readEvents,
       "intspec")(println).runAsync(println)
 
-    Sharding.distribute(T1)(distribution, instances).run
+    sys.error("FIX ME")
+
+    // Sharding.distribute(
+    //     Sharding.distribution(T1)(distribution.get))(distribution,instances)
   }
 
 

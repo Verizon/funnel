@@ -73,13 +73,13 @@ object Sharding {
   }
 
   /**
-   * Compute the shard distribution for the given targets, update the in-memroy
-   * state and actually call the flasks issuing the command to monitor said targets
+   * update the in-memroy state and actually call the flasks issuing the
+   * command to monitor said targets to the flasks.
    */
-  def distribute(s: Set[Target])(d: Ref[Distribution], i: Ref[InstanceM])(implicit log: Logger): Task[Unit] = {
-    log.debug(s"supplied references: i=$i, d=$d")
+  def distribute(t: (Seq[(Flask,Target)], Distribution), d: Ref[Distribution], i: Ref[InstanceM])(implicit log: Logger): Task[Unit] = {
+    log.debug(s"supplied references: i=$i")
 
-    val (a,b): (Seq[(Flask,Target)], Distribution) = distribution(s)(d.get)
+    val (a,b): (Seq[(Flask,Target)], Distribution) = t
 
     log.debug(s"Sharding.distribute a=$a, b=$b")
 
@@ -89,7 +89,6 @@ object Sharding {
 
     val tasks = grouped.map { case (f,seq) =>
       val location = i.get.lookup(f).map(_.location).getOrElse(Location.localhost)
-      log.debug(">>>>>>>>> " + seq)
       send(to = location, seq)
     }
 
@@ -107,10 +106,6 @@ object Sharding {
     val host: HostAndPort = to.dns.map(_ + ":" + to.port).get // "safe" because we know we're passing in the default localhost
     val payload: Map[BucketName, List[SafeURL]] =
       targets.groupBy(_.bucket).mapValues(_.map(_.url).toList)
-
-    println("==========================")
-    println(payload.toList.asJson.nospaces)
-    println("==========================")
 
     val svc = url(s"http://$host/mirror") << payload.toList.asJson.nospaces
     fromScalaFuture(Http(svc OK as.String))

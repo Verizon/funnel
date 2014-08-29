@@ -42,25 +42,32 @@ object Lifecycle {
 
   //////////////////////////// I/O Actions ////////////////////////////
 
-  def toSink(ref: Ref[Sharding.Distribution])(implicit log: journal.Logger): Sink[Task, Action] = {
-    Process.emit {
-      case AddCapacity(id)  => Task.delay {
-        ref.update(_.insert(id, Set.empty))
+  object sink {
+    def noop: Sink[Task,Action] =
+      Process.emit {
+        case _ => Task.now(())
       }
-      case Redistribute(id) => Task.delay {
-        ref.get.lookup(id).foreach { set =>
-          val next = ref.update(_.delete(id))
-          ref.update(x => Sharding.distribution(set)(x)._2)
-        }
+
+    def fromRepository(r: Repository): Sink[Task,Action] =
+      Process.emit {
+        case AddCapacity(id)  =>
+          r.increaseCapacity(id).map(_ => ())
+
+        case Redistribute(id) =>
+          Task.delay(())
+
+        case NoOp             =>
+          Task.now( () )
       }
-      case NoOp             => Task.now( () )
-    }
   }
 
-  def run(queueName: String, sqs: AmazonSQS, d: Ref[Sharding.Distribution])(implicit log: journal.Logger): Sink[Task, Action] = {
+  def run(queueName: String, sqs: AmazonSQS, sink: Sink[Task, Action])(implicit log: journal.Logger): Sink[Task, Action] = {
     stream(queueName)(sqs).flatMap {
       case -\/(fail) => Process.halt
-      case \/-(win)  => toSink(d)
+      case \/-(win)  => sink
     }
   }
 }
+
+
+

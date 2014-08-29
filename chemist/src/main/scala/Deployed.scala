@@ -12,16 +12,6 @@ import oncue.svc.funnel.aws._
 
 // for what follows, im sorry!
 object Deployed {
-  // private val defaultResources = Set(
-  //   "stream/previous",
-  //   "stream/sliding",
-  //   "stream/uptime"
-  // )
-
-  // private def urlsForInstances(m: Map[String, Seq[Instance]], resources: Set[String]): Map[String,Seq[URL]] =
-  //   m.map {
-  //     case (k,v) => k -> v.flatMap(i => resources.flatMap(p => i.asURL(path = p).toList ))
-  //   }
 
   def list(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
     instances(g => true)(asg,ec2)
@@ -31,6 +21,20 @@ object Deployed {
 
   def flasks(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
     instances(filter.flasks)(asg,ec2)
+
+  def lookupOne(id: InstanceID)(ec2: AmazonEC2): Task[Instance] =
+    lookupMany(Seq(id))(ec2).flatMap {
+      _.headOption match {
+        case None => Task.fail(new Exception("No instance found with that key."))
+        case Some(i) => Task.now(i)
+      }
+    }
+
+  def lookupMany(ids: Seq[InstanceID])(ec2: AmazonEC2): Task[Seq[Instance]] =
+    for {
+      a <- EC2.reservations(ids)(ec2)
+      b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
+    } yield b
 
   private def instances(f: Instance => Boolean
     )(asg: AmazonAutoScaling, ec2: AmazonEC2
@@ -52,36 +56,26 @@ object Deployed {
   private def readAutoScallingGroups(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
     for {
       g <- ASG.list(asg)
-      x <- EC2.reservations(g.flatMap(_.instances.map(_.getInstanceId)))(ec2)
-    } yield {
-      val instances: Map[InstanceID, AWSInstance] =
-        x.flatMap(_.getInstances.asScala.toList)
-          .groupBy(_.getInstanceId).mapValues(_.head)
+      r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))(ec2)
+    } yield r
 
-      g.flatMap(extractInstance(_, instances))
-    }
+  private def fromAWSInstance(in: AWSInstance): Instance = {
+    val sgs: List[String] = in.getSecurityGroups.asScala.toList.map(_.getGroupName)
+    val extdns: Option[String] =
+      if(in.getPublicDnsName.nonEmpty) Option(in.getPublicDnsName) else None
+    val intdns = Option(in.getPrivateDnsName)
 
-  private def extractInstance(group: Group, instances: Map[InstanceID, AWSInstance]): Seq[Instance] =
-    group.instances.map { i =>
-      val found = instances.get(i.getInstanceId)
-      val sgs   = found.toList.flatMap(_.getSecurityGroups.asScala.toList).map(_.getGroupName)
-      // serioulsy hate APIs that return emtpy string as their result.
-      val extdns = found.flatMap(x =>
-        if(x.getPublicDnsName.nonEmpty) Option(x.getPublicDnsName)
-        else None)
-      val intdns = found.map(_.getPrivateDnsName)
-
-      Instance(
-        id = i.getInstanceId,
-        location = Location(
-          dns = extdns orElse intdns,
-          datacenter = i.getAvailabilityZone,
-          isPrivateNetwork = (extdns.isEmpty && intdns.nonEmpty)
-        ),
-        firewalls = sgs,
-        tags = group.tags
-      )
-    }
+    Instance(
+      id = in.getInstanceId,
+      location = Location(
+        dns = extdns orElse intdns,
+        datacenter = in.getPlacement.getAvailabilityZone,
+        isPrivateNetwork = (extdns.isEmpty && intdns.nonEmpty)
+      ),
+      firewalls = sgs,
+      tags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
+    )
+  }
 
   object filter {
     def funnels(i: Instance): Boolean =
@@ -93,9 +87,6 @@ object Deployed {
     def chemists(i: Instance): Boolean =
       i.application.map(_.name.startsWith("chemist")).getOrElse(false)
   }
-
-  // def periodic(delay: Duration)(asg: AmazonAutoScaling) =
-  //   Process.awakeEvery(delay).evalMap(_ => list(asg))
 
   import scala.io.Source
   import scalaz.\/

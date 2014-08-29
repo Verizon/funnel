@@ -133,25 +133,19 @@ trait Server extends Interpreter[Server.ServerF] {
 
   /////// in-memory data storage ////////
 
-  /**
-   * stores the mapping between flasks and their assigned workload
-   */
-  val D = new Ref[Distribution](Distribution.empty)
-
-  /**
-   * stores a key-value map of instance-id -> host
-   */
-  val I = new Ref[InstanceM](==>>())
+  val R = new ProductionRepository(ec2)
 
   /////// interpreter implementation ////////
 
   protected def op[A](r: ServerF[A]): Task[A] = r match {
     case Watch(targets, k) =>
-      for(_ <- Sharding.distribute(targets)(D, I)
-        ) yield k
+      Task.now(k)
+      // for(_ <- Sharding.distribute(
+      //   Sharding.distribution(targets)(D.get))(D,I)) yield k
 
     case Listen(k) =>
-      Lifecycle.run(queue, sqs, D).run.map(_ => k)
+      Task.now(k)
+      // Lifecycle.run(queue, sqs, D).run.map(_ => k)
   }
 
   protected def init(): Task[Unit] =
@@ -159,7 +153,8 @@ trait Server extends Interpreter[Server.ServerF] {
       // read the list of all deployed machines
       z <- Deployed.list(asg, ec2)
       // set the result to an in-memory list of "the world"
-      _  = I.update(_ => ==>>(z.map(i => i.id -> i):_*))
+      _  = z.foreach(R.addInstance)
+      // _  = I.update(_ => ==>>(z.map(i => i.id -> i):_*))
       // start to wire up the topics and subscriptions to queues
       a <- SNS.create(topic)(sns)
       _  = log.debug(s"created sns topic with arn = $a")

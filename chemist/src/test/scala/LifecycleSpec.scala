@@ -26,10 +26,10 @@ class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {
   ///// as we're testing effects in sinks, keep these in this order (urgh!) //////
 
   it should "1. Lifecycle.toSink should compute and update state given 'AddCapacity' command" in {
-    effect(AddCapacity(k1), Lifecycle.toSink(r1))
+    effect(AddCapacity(k1), Lifecycle.sink.noop)
     r1.get should equal ( ==>>(k1 -> Set.empty) )
 
-    effect(AddCapacity(k2), Lifecycle.toSink(r1))
+    effect(AddCapacity(k2), Lifecycle.sink.noop)
     r1.get should equal ( ==>>(k1 -> Set.empty, k2 -> Set.empty) )
   }
 
@@ -37,7 +37,7 @@ class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {
     val target = Target("foo", SafeURL("http://bar.internal"))
     r1.update(_.adjust(k1, _ ++ Set(target)))
 
-    effect(Redistribute(k1), Lifecycle.toSink(r1))
+    effect(Redistribute(k1), Lifecycle.sink.noop)
     r1.get should equal ( ==>>(k2 -> Set(target)) )
   }
 
