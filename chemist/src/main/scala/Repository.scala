@@ -9,10 +9,13 @@ trait Repository {
 
   def addInstance(instance: Instance): Task[InstanceM]
   def removeInstance(id: InstanceID): Task[InstanceM]
+  def instance(id: InstanceID): Task[Instance]
 
   /////////////// flask operations ///////////////
 
   def distribution: Task[Distribution]
+  def mergeDistribution(d: Distribution): Task[Distribution]
+  def assignedTargets(flask: InstanceID): Task[Set[Sharding.Target]]
   def increaseCapacity(instanceId: InstanceID): Task[(Distribution,InstanceM)]
   def increaseCapacity(instance: Instance): Task[(Distribution,InstanceM)]
   def decreaseCapacity(instanceId: InstanceID): Task[(Distribution,InstanceM)]
@@ -53,6 +56,15 @@ class ProductionRepository(ec2: AmazonEC2){
   def distribution: Task[Distribution] =
     Task.now(D.get)
 
+  def mergeDistribution(d: Distribution): Task[Distribution] =
+    Task(D.update(_.union(d)))
+
+  def assignedTargets(flask: InstanceID): Task[Set[Sharding.Target]] =
+    D.get.lookup(flask) match {
+      case None => Task.fail(MissingInstanceException(s"No flask with the ID $flask"))
+      case Some(t) => Task.now(t)
+    }
+
   /**
    * when a new flask comes online, we want to add that flask to the in-memory
    */
@@ -73,20 +85,10 @@ class ProductionRepository(ec2: AmazonEC2){
       b <- addInstance(instance)
     } yield (a,b)
 
-  def decreaseCapacity(instanceId: InstanceID): Task[Distribution] =
+  def decreaseCapacity(downed: InstanceID): Task[Distribution] =
     for {
-      _ <- removeInstance(instanceId)
-      targets = D.get.lookup(instanceId)
-      x <- Task.now(Sharding.distribution(targets)(D.get))
-    } yield x
+      _ <- removeInstance(downed)
+      d <- Task(D.update(_.delete(downed)))
+      // d <- Task(D.update(_ => revisedDistribution))
+    } yield d
 }
-
-
-//   def decreaseCapacity(instance: Instance)(rd: Ref[Distribution], ri: Ref[InstanceM]): Task[(Distribution,InstanceM)] = {
-//     // def redistribute(id: String) = {
-//     //     val next = ref.update(_.delete(id))
-//     //     val dd = Sharding.distribution(set)(ref.get) // this is kinda messy
-//     //     ref.update(x => dd._2)
-//     //     Sharding.distribute(dd)
-//     //   }
-//     // }

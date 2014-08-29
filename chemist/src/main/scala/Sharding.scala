@@ -72,6 +72,33 @@ object Sharding {
     (work, dist)
   }
 
+  def distribute(t: Set[Target])(r: Repository)(implicit log: Logger): Task[Unit] = {
+    log.debug(s"Sharding.distribute t=$t")
+
+    for {
+      x    <- r.distribution
+      (a,d) = distribution(t)(x)
+      // compute a new distribution given these new inputs
+      _     = log.debug(s"Sharding.distribute a=$a, d=$d")
+      // given we only want to issue commands to flasks once, lets bunch
+      // up those targets that have been assigned to the same flask so we
+      // can send them all over as a batch
+      grouped: Map[Flask, Seq[Target]] = a.groupBy(_._1).mapValues(_.map(_._2))
+      _ = log.debug(s"Sharding.distribute,grouped = $grouped")
+
+      tasks = grouped.map { case (f,seq) =>
+        for {
+          location <- r.instance(f).map(_.location)
+          _ <- send(to = location, seq)
+        } yield ()
+      }
+      // pre-emtivly update our new state as the sending will take longer
+      // than updating and we dont want the world to change under our feet
+      _ <- r.mergeDistribution(d)
+      _ <- Task.gatherUnordered(tasks.toList)
+    } yield ()
+  }
+
   /**
    * update the in-memroy state and actually call the flasks issuing the
    * command to monitor said targets to the flasks.
@@ -83,7 +110,8 @@ object Sharding {
 
     log.debug(s"Sharding.distribute a=$a, b=$b")
 
-    val grouped: Map[Flask, Seq[Target]] = a.groupBy(_._1).mapValues(_.map(_._2))
+    val grouped: Map[Flask, Seq[Target]] =
+      a.groupBy(_._1).mapValues(_.map(_._2))
 
     log.debug(s"Sharding.distribute,grouped = $grouped")
 

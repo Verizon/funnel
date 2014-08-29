@@ -26,7 +26,7 @@ import scalaz.{\/,\/-,-\/}
 
 case class Instance(
   id: String,
-  location: Location,
+  location: Location = Location.localhost,
   firewalls: Seq[String], // essentially security groups
   tags: Map[String,String] = Map.empty
 ){

@@ -18,6 +18,7 @@ import oncue.svc.funnel.aws.{SQS,SNS}
 object Lifecycle {
   import JSON._
   import argonaut._, Argonaut._
+  import journal.Logger
 
   case class MessageParseException(override val getMessage: String) extends RuntimeException
 
@@ -48,20 +49,24 @@ object Lifecycle {
         case _ => Task.now(())
       }
 
-    def fromRepository(r: Repository): Sink[Task,Action] =
+    def fromRepository(r: Repository)(implicit log: Logger): Sink[Task,Action] =
       Process.emit {
-        case AddCapacity(id)  =>
+        case AddCapacity(id) =>
           r.increaseCapacity(id).map(_ => ())
 
         case Redistribute(id) =>
-          Task.delay(())
+          for {
+            targets <- r.assignedTargets(id)
+            _       <- r.decreaseCapacity(id)
+            _       <- Sharding.distribute(targets)(r)
+          } yield ()
 
-        case NoOp             =>
+        case NoOp =>
           Task.now( () )
       }
   }
 
-  def run(queueName: String, sqs: AmazonSQS, sink: Sink[Task, Action])(implicit log: journal.Logger): Sink[Task, Action] = {
+  def run(queueName: String, sqs: AmazonSQS, sink: Sink[Task, Action])(implicit log: Logger): Sink[Task, Action] = {
     stream(queueName)(sqs).flatMap {
       case -\/(fail) => Process.halt
       case \/-(win)  => sink
