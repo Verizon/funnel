@@ -53,28 +53,39 @@ object Sharding {
    * provide the new distribution based on the result of calculating
    * how the new set should actually be distributed. main benifit here
    * is simply making the operations opaque (handling missing key cases)
+   *
+   * Returns values of this function represent two things:
+   * 1. `Seq[(Flask,Target)]` is a sequence of targets zipped with the flask it was assigned too.
+   * 2. `Distribution` is that same sequence folded into a `Distribution` instance which can
+   *     then be added to the existing state of the world.
    */
   def distribution(s: Set[Target]
     )(d: Distribution
     )(implicit log: journal.Logger
     ): (Seq[(Flask,Target)], Distribution) = {
+    // this check is needed as otherwise the fold gets stuck in a gnarly
+    // infinate loop, and this function never completes.
+    if(s.isEmpty) (Seq.empty,d)
+    else {
+      log.debug(s"Sharding.distribution: attempting to distribute targets '${s.mkString(",")}'")
+      val work = calculate(s)(d)
 
-    log.debug(s"Attempting to distribute targets ${s.mkString(",")}")
-    val work = calculate(s)(d)
+      log.debug(s"Sharding.distribution: work = $work")
 
-    val dist = work.foldLeft(Distribution.empty){ (a,b) =>
-      if(a.member(b._1))
-        a.adjust(b._1, _ + b._2)
-      else
-        a.insert(b._1, Set(b._2))
+      val dist = work.foldLeft(Distribution.empty){ (a,b) =>
+        a.alter(b._1, _ match {
+          case Some(s) => Option(s + b._2)
+          case None    => Option(Set(b._2))
+        })
+      }
+
+      log.debug(s"work = $work, dist = $dist")
+
+      (work, dist)
     }
-
-    (work, dist)
   }
 
-  def distribute(t: Set[Target])(r: Repository)(implicit log: Logger): Task[Unit] = {
-    log.debug(s"Sharding.distribute t=$t")
-
+  def locateAndAssignDistribution(t: Set[Target], r: Repository)(implicit log: Logger): Task[Map[Location, Seq[Target]]] = {
     for {
       x    <- r.distribution
       (a,d) = distribution(t)(x)
@@ -87,44 +98,45 @@ object Sharding {
       _ = log.debug(s"Sharding.distribute,grouped = $grouped")
 
       tasks = grouped.map { case (f,seq) =>
-        for {
-          location <- r.instance(f).map(_.location)
-          _ <- send(to = location, seq)
-        } yield ()
+        r.instance(f).map(_.location).map((_,seq))
       }
       // pre-emtivly update our new state as the sending will take longer
       // than updating and we dont want the world to change under our feet
       _ <- r.mergeDistribution(d)
-      _ <- Task.gatherUnordered(tasks.toList)
-    } yield ()
+      x <- Task.gatherUnordered(tasks.toList)
+    } yield x.toMap
   }
 
-  /**
-   * update the in-memroy state and actually call the flasks issuing the
-   * command to monitor said targets to the flasks.
-   */
-  def distribute(t: (Seq[(Flask,Target)], Distribution), d: Ref[Distribution], i: Ref[InstanceM])(implicit log: Logger): Task[Unit] = {
-    log.debug(s"supplied references: i=$i")
+  def distribute(locations: Map[Location, Seq[Target]])(implicit log: Logger): Task[List[String]] =
+    Task.gatherUnordered(locations.map { case (loc,targets) =>
+      send(loc,targets) }.toSeq)
 
-    val (a,b): (Seq[(Flask,Target)], Distribution) = t
+  // /**
+  //  * update the in-memroy state and actually call the flasks issuing the
+  //  * command to monitor said targets to the flasks.
+  //  */
+  // def distribute(t: (Seq[(Flask,Target)], Distribution), d: Ref[Distribution], i: Ref[InstanceM])(implicit log: Logger): Task[Unit] = {
+  //   log.debug(s"supplied references: i=$i")
 
-    log.debug(s"Sharding.distribute a=$a, b=$b")
+  //   val (a,b): (Seq[(Flask,Target)], Distribution) = t
 
-    val grouped: Map[Flask, Seq[Target]] =
-      a.groupBy(_._1).mapValues(_.map(_._2))
+  //   log.debug(s"Sharding.distribute a=$a, b=$b")
 
-    log.debug(s"Sharding.distribute,grouped = $grouped")
+  //   val grouped: Map[Flask, Seq[Target]] =
+  //     a.groupBy(_._1).mapValues(_.map(_._2))
 
-    val tasks = grouped.map { case (f,seq) =>
-      val location = i.get.lookup(f).map(_.location).getOrElse(Location.localhost)
-      send(to = location, seq)
-    }
+  //   log.debug(s"Sharding.distribute,grouped = $grouped")
 
-    for {
-      _ <- Task.gatherUnordered(tasks.toList)
-      _ <- Task.now(d.update(_.union(b)))
-    } yield ()
-  }
+  //   val tasks = grouped.map { case (f,seq) =>
+  //     val location = i.get.lookup(f).map(_.location).getOrElse(Location.localhost)
+  //     send(to = location, seq)
+  //   }
+
+  //   for {
+  //     _ <- Task.gatherUnordered(tasks.toList)
+  //     _ <- Task.now(d.update(_.union(b)))
+  //   } yield ()
+  // }
 
   private def send(to: Location, targets: Seq[Target]): Task[String] = {
     import dispatch._, Defaults._

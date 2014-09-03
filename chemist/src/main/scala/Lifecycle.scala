@@ -20,6 +20,8 @@ object Lifecycle {
   import argonaut._, Argonaut._
   import journal.Logger
 
+  private implicit val log = Logger[Lifecycle.type]
+
   case class MessageParseException(override val getMessage: String) extends RuntimeException
 
   def parseMessage(msg: Message): Throwable \/ AutoScalingEvent =
@@ -43,31 +45,35 @@ object Lifecycle {
 
   //////////////////////////// I/O Actions ////////////////////////////
 
-  def sink: Sink[Task,Action] =
-    Process.emit {
-      case _ => Task.now(())
-    }
-
-  def sink(r: Repository)(implicit log: Logger): Sink[Task,Action] =
-    Process.emit {
+  // kinda horrible, but works for now.
+  // seems like there should be a more pure solution to this
+  // that results in a less-janky coupling
+  def transform(a: Action, r: Repository): Task[Action] =
+    a match {
       case AddCapacity(id) => {
-        println(s"adding capactiy $id")
-        r.increaseCapacity(id).map(_ => ())
+        log.debug(s"Adding capactiy $id")
+        r.increaseCapacity(id).map(_ => NoOp)
       }
-
-
       case Redistribute(id) =>
         for {
-          targets <- r.assignedTargets(id)
-          _       <- r.decreaseCapacity(id)
-          _       <- Sharding.distribute(targets)(r)
-        } yield ()
+          t <- r.assignedTargets(id)
+          _  = log.debug(s"sink, targets= $t")
+          _ <- r.decreaseCapacity(id)
+          m <- Sharding.locateAndAssignDistribution(t,r)
+        } yield Redistributed(m)
 
-      case NoOp =>
-        Task.now( () )
+      case a => Task.now(NoOp)
     }
 
-  def run(queueName: String, sqs: AmazonSQS, sink: Sink[Task, Action])(implicit log: Logger): Sink[Task, Action] = {
+  def sink(r: Repository): Sink[Task,Action] =
+    Process.emit {
+      case Redistributed(seq) =>
+        Sharding.distribute(seq).map(_ => ())
+
+      case _ => Task.now( () )
+    }
+
+  def run(queueName: String, sqs: AmazonSQS, sink: Sink[Task, Action]): Sink[Task, Action] = {
     stream(queueName)(sqs).flatMap {
       case -\/(fail) => Process.halt
       case \/-(win)  => sink

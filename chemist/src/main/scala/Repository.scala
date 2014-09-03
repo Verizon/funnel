@@ -57,7 +57,7 @@ class StatefulRepository(ec2: AmazonEC2) extends Repository {
     Task.now(D.get)
 
   def mergeDistribution(d: Distribution): Task[Distribution] =
-    Task(D.update(_.union(d)))
+    Task(D.update(_.unionWith(d)(_ ++ _)))
 
   def assignedTargets(flask: InstanceID): Task[Set[Sharding.Target]] =
     D.get.lookup(flask) match {

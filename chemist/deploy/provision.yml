@@ -1,5 +1,5 @@
 ---
-- name: flask | create image
+- name: chemist | create image
   hosts: all
   gather_facts: false
   user: ec2-user

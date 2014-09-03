@@ -1,5 +1,5 @@
 ---
-- name: su3 | deploy cluster
+- name: flask | deploy cluster
   hosts: all
   connection: local
   gather_facts: false
