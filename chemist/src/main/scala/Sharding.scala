@@ -111,33 +111,6 @@ object Sharding {
     Task.gatherUnordered(locations.map { case (loc,targets) =>
       send(loc,targets) }.toSeq)
 
-  // /**
-  //  * update the in-memroy state and actually call the flasks issuing the
-  //  * command to monitor said targets to the flasks.
-  //  */
-  // def distribute(t: (Seq[(Flask,Target)], Distribution), d: Ref[Distribution], i: Ref[InstanceM])(implicit log: Logger): Task[Unit] = {
-  //   log.debug(s"supplied references: i=$i")
-
-  //   val (a,b): (Seq[(Flask,Target)], Distribution) = t
-
-  //   log.debug(s"Sharding.distribute a=$a, b=$b")
-
-  //   val grouped: Map[Flask, Seq[Target]] =
-  //     a.groupBy(_._1).mapValues(_.map(_._2))
-
-  //   log.debug(s"Sharding.distribute,grouped = $grouped")
-
-  //   val tasks = grouped.map { case (f,seq) =>
-  //     val location = i.get.lookup(f).map(_.location).getOrElse(Location.localhost)
-  //     send(to = location, seq)
-  //   }
-
-  //   for {
-  //     _ <- Task.gatherUnordered(tasks.toList)
-  //     _ <- Task.now(d.update(_.union(b)))
-  //   } yield ()
-  // }
-
   private def send(to: Location, targets: Seq[Target]): Task[String] = {
     import dispatch._, Defaults._
     import argonaut._, Argonaut._
