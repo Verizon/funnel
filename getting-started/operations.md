@@ -175,3 +175,24 @@ SIGAR gathers a large set of metrics for the local machine:
 
 The final component living under the *Funnel* umbrella is *Chemist*. Given that each and every *Flask* does not know about any of its peers - it only understands the work it has been assigned - there has to be a way to automatically identity and assign new work as machines in a operational region startup, fail and gracefully shutdown. This is especially true when a given *Flask* instance fails unexpectedly, as its work will need to be re-assigned to other available *Flask* instances so that operational visibility does not get compromised.
 
+For deployment to AWS, *Chemist* leverages the fact that auto-scalling groups can notify an SNS topic upon different lifecycle events happening which are associated to that group. For example, if a machine is terminated a notification is pushed to SNS detailing exactly what happened and to the specific instance(s). This is incredibly useful from a monitoring perspective, as it means that the *Chemist* lifecycle is the following:
+
+1. *Chemist* boots up and reads the list of machines from the AWS API and figures out which subset of all the given machines can be monitored. 
+1. Figure out of all of those machines, which look like *Flask* instances based upon the deployment metadata.
+1. Next, partition all non-flask instances to the discovered *Flask* instances that are running. 
+1. Consume an SQS queue that is in turn subscribed to the aforementioned SNS topic that ASGs push their lifecycle events too. In this way, *Chemist* always gets notified of new machines that come online within a given region. 
+
+Because of its managerial role within the system, Chemist has a rudimentary but useful API for conducting several management tasks. At the time of writing the following APIs were available:
+
+* `GET /shards`: display a list of all *Flask* shards and display the work that is current assigned to the given shard.
+
+* `GET `
+
+
+* `POST /mirror`: using the same bucketing format as *Flask* instance, manually add some machines to be monitored.
+
+
+
+
+
+
