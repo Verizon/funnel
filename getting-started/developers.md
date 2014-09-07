@@ -116,7 +116,7 @@ object metrics {
 The 1.0.x series of `funnel-core` has four supported metric types: `Counter`, `Timer`, `Gauge` and `TrafficLight`.
 
 
-##### Counters
+#### Counters
 
 These simply increment an integer value specified by a label that you supply. Typical examples are number of sales, number of children etc.
 
@@ -152,7 +152,7 @@ trait SomeFun {
 
 ````
 
-##### Timers
+#### Timers
 
 As the name suggests, **timers** are all about the amount of time take to perform a specific operation.
 
@@ -205,7 +205,7 @@ trait SomeFun {
 
 ````
 
-##### Gauges
+#### Gauges
 
 Gauges represent the current state of a value. The best way to visualise this is a checking the oil on a car; the dipstick is the gauge of how much oil the vehicle currently has, and this changes over time, moving both up and down, but it can only have a single value at any particular reading.
 
@@ -260,7 +260,7 @@ object metrics {
 ````
 
 
-##### Traffic Light
+#### Traffic Light
 
 As an extension to the concept of `Gauge`, there is also the notion of a "traffic light" which is essentially a gauge that can be in only one of three possible finite states:
 
@@ -324,7 +324,7 @@ object Main {
 
 With this in your application, and assuming you are developing locally, once running you will be able to access [http://127.0.0.1:5775/](http://127.0.0.1:5775/) in your local web browser, where the index page will give you a list of available resources and descriptions of their function:
 
-![image]({{ site.baseurl }}/img/control-panel.png)
+![image]({{ site.baseurl }}img/control-panel.png)
 
 
 

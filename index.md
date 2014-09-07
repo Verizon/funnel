@@ -27,7 +27,7 @@ This section outlines some of the specific design choices within *Funnel*, both 
 1. [Time Periods](#time-periods) - how funnel handles time and local periodic aggregation.
 1. [Units](#units) - overview of the types of units that funnel is aware of. 
 
-<a name="time-periods"></a>
+<a name="scalability"></a>
 
 ## Scalability 
 
