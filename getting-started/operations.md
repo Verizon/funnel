@@ -46,7 +46,14 @@ For more information about the accessible URLs on the control server, please see
 
 # Flask
 
-Flask is - perhaps confusingly - also a funnel, as it too is a service. However, its sole job is to mirror the service funnels by taking mirroring instructions. This is achieved with a simple HTTP `POST` to `http://<host>:<port>/mirror` on the flask host.
+Flask is - perhaps confusingly - also a funnel, as it too is a service. This section includes several sub-sections which are of interest:
+
+* [Configuraiton](#flask-configuration): details about configuring *Flask*.
+* [Error Reporting](#flask-error-reporting): how does *Flask* report on errors
+* [Stream Consumers](#flask-stream-consumers): how does *Flask* push data to 3rd party systems for visualisation and analysis.
+* [System Metrics](#flask-system-metrics): enabling / disabling *Flask*'s built-in *Funnel*.
+
+*Flask*'s sole job is to mirror the *Funnel* hosts by taking mirroring instructions. This is achieved with a simple HTTP `POST` to `http://<host>:<port>/mirror` on the *Flask* host.
 
 ````
 [
@@ -60,6 +67,8 @@ Flask is - perhaps confusingly - also a funnel, as it too is a service. However,
 ````
 
 This simple structure represents the "buckets" of nodes that one wishes to monitor. The expectation is that a given logical bucket (for example, accounts-2.1-us-east) there will be an associated set of nodes that are exposing metrics. This bucketing is entirely arbitrary, and you can construct whatever bucket/URL combinations you want, with the one restriction that a given stream can only be connected to a single bucket at any given time (on the basis that connecting over and over to the same machine is a needless drain on resources). However, it is fine to send the same URL multiple times. In the event that there is an existing connection to that node, the existing connection will be used instead of creating a new one (in other words, monitoring instructions are idempotent for bucket -> url combinations).
+
+<a name="flask-configuration"></a>
 
 ### Configuration
 
@@ -118,6 +127,24 @@ The SNS topic specified with the configuration parameter `flask.sns-error-topic`
 
 ### Stream Consumers
 
+*Flask* is designed to pull metrics from *Funnel* hosts and then emit those windows to a set of output locations. These output locations are for the most part arbitrary - all that's needed is to write a `Sink` that then serialises the stream from *Flask* to something that can be understood by the system you wish to send the datapoints too. 
+
+At the time of writing, there were two stream consumers implemented:
+
+#### Riemann
+
+Primarily for alerting. Events are batched up and sent to Riemann so that alerts can be configured (and saving the need for us to integrate with many 3rd party vendors). Please see the [Riemann documentation](http://riemann.io) for information on how to setup the alerting system.
+
+#### ElasticSearch
+
+Primarily for visualisation, this consumer takes each desecrate `previous` window and serialises it *per-funnel-host* and then sends those documents to Elastic Search in a bulk `PUT` operation. The format of the message looks like this:
+
+```
+ES JSON MESSAGE TO GO HERE
+```
+
+Using this document format enable Elastic Search to reason about both aggregate time queries, and top-n queries - the two primary use cases for monitoring visualisation.
+
 
 <a name="flask-system-metrics"></a>
 
@@ -146,6 +173,5 @@ SIGAR gathers a large set of metrics for the local machine:
 
 # Chemist
 
-Whatever normcore pour-over Portland, slow-carb paleo quinoa gentrify Helvetica small batch. Cosby sweater McSweeney's Echo Park fingerstache tofu. 90's scenester bespoke, farm-to-table you probably haven't heard of them forage 8-bit normcore Vice High Life quinoa kitsch freegan Tonx single-origin coffee. Readymade wayfarers beard pop-up Neutra banh mi ennui mlkshk. Pinterest fap hoodie seitan. Sartorial paleo kitsch dreamcatcher, food truck viral hella blog. Typewriter Tonx fashion axe biodiesel dreamcatcher.
-
+The final component living under the *Funnel* umbrella is *Chemist*. Given that each and every *Flask* does not know about any of its peers - it only understands the work it has been assigned - there has to be a way to automatically identity and assign new work as machines in a operational region startup, fail and gracefully shutdown. This is especially true when a given *Flask* instance fails unexpectedly, as its work will need to be re-assigned to other available *Flask* instances so that operational visibility does not get compromised.
 
