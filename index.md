@@ -31,7 +31,7 @@ This section outlines some of the specific design choices within *Funnel*, both 
 
 ## Scalability 
 
-Several design choices were made specifically with the ability to scale linearly in mind. Probably the most obvious is the pull-based model the system employs by default: by pulling metrics and conducting service-local aggregation of samples, the aggregating systems never see load-spikes that might cause cascading failure: they instead see a consistent load that only increases with the number of metric keys in total that *Flask* instance is being asked to monitor.
+Several design choices were made specifically with goal of giving *Funnel* the ability to scale linearly. Probably the most obvious is the pull-based model the system employs by default: by pulling metrics and conducting service-local aggregation of samples, the aggregating systems never see load-spikes that might cause cascading failure: they instead see a consistent load that only increases with the number of metric keys in total that *Flask* instance is being asked to monitor. Put another way: increases in local sampling on a given host adds overhead to that host, but it doesn't affect the wider system.
 
 The [operational instructions](getting-started/operations.html) contain some insight into how the system handles automatic load-sharding and rebalancing.
 
