@@ -1,9 +1,10 @@
 ---
 layout: default
-title:  "Quickstart - Engineering"
+title:  "Getting Started - Developers"
+section: "getting-started"
 ---
 
-# Quickstart: Engineering Team
+# Getting Started: Developers
 
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
@@ -184,7 +185,7 @@ trait SomeFun {
 
     // for timing strict values, just use the block syntax:
     GetUserList.time {
-    	// expensive operation goes here
+      // expensive operation goes here
     }
 
     // for timing async Future[A]
@@ -237,11 +238,11 @@ By default, the following types are supported as values for gauges:
 
 * `String`
 * Any `Numeric[A]` instance; the Scala std library supplies typeclasses for:
-	* `Int`
-	* `Double`
-	* `Float`
-	* `BigDecimal`
-	* `Long`
+  * `Int`
+  * `Double`
+  * `Float`
+  * `BigDecimal`
+  * `Long`
 
 In addition to simply recording the value of the gauge, there is a specialised gauge that can also track numerical statistics like `mean`, `variance` etc. To use it, just adjust your `metrics` declaration like so:
 
@@ -288,8 +289,8 @@ import metrics._
 trait SomeFun {
   def doGeoLocation = {
     // your logic for the function
-	  …
-	// if all went well, set the breaker accordingly
+    …
+  // if all went well, set the breaker accordingly
    GeoLocationCircuit.green
 
    /*

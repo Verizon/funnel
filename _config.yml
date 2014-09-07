@@ -1,4 +1,6 @@
-name: Your New Jekyll Site
+name: Funnel Documentation
 markdown: redcarpet
 pygments: true
-baseurl: "/pages/intelmedia/funnel"
+# baseurl: "/pages/intelmedia/funnel"
+# for local development, switch the above with the below
+baseurl: "/"

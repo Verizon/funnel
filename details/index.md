@@ -1,25 +1,30 @@
 ---
 layout: default
-title:  "Manual"
+title:  "Details"
+section: "details"
 ---
 
-# Manual
+# Detailed Information
 
-This document details the specifics of the *Funnel* monitoring system.
+As funnel is a fairly comprehensive system, but its user-level API is fairly constrained, this page adds some additional detail to both some of the internal workings and useful things to know as users.
 
-### Time Periods
+1. [Built-in Metrics](#builtin-metrics)
+1. [Control Server](#control-server)
 
-As with all monitoring systems, understanding the way time periods is handled is really important (where time period represents the time in which metrics are collected, and then reset). *Funnel* supports three different time period types, as illustrated by the diagram below.
+<a name="builtin-metrics"></a>
 
-![image]({{ site.baseurl }}/img/time-periods.jpg)
+# Built-in Metrics
 
-In this diagram, **T** represents time moving left to right. A, B and C respectively illustrate the boundaries of given time periods. The duration of the time period is very arbitrary, but the default setting is for 5 minute periods. In this frame:
+Using the default instruments, you'll notice that there are a raft of metrics that are being produced by default. These logically fall under two categories:
 
-* **N** - The "now" time period, representing the current set of metrics that are in flight, and explicitly does not represent a completed period. If 2.5 minutes have elapsed in the current 5 minute period, then **N** only illustrates the metrics collected in 2.5 minutes.
-* **P** - The "previous" time period, representing the last "full" window that has elapsed. This can be thought of as a stream that only updates its values once every period duration.
-* **S** - The "sliding" time period, representing the last period duration, irrespective of if that crossed period boundaries defined by N and P. This is a useful system to collect "what happened in the last 5 minutes"-style view.
+1. [JVM and Clock Metrics](#jvm-metrics) - list of the built-in JVM metrics
+1. [System Metrics](#system-metrics) - information about the built-in system metrics 
 
-### JVM and Clock Metrics
+The following subsections cover these in more detail.
+
+<a name="jvm-metrics"></a>
+
+## JVM and Clock Metrics
 
 The default set of instruments (`intelmedia.ws.funnel.instruments`) will automatically collect the following JVM statistics (where `:period` is one of either `now`, `sliding` or `previous`):
 
@@ -60,7 +65,9 @@ val I = new Instruments(2 minutes, Monitoring.default) with DefaultKeys {
 }
 ````
 
-### SIGAR metrics
+<a name="system-metrics"></a>
+
+## System metrics
 
 The default set of instruments (`intelmedia.ws.funnel.instruments`) will also automatically collect operating system statistics if the Hyperic SIGAR library is available on the `java.library.path` (by default on Linux systems this maps to the `LD_LIBRARY_PATH` environment variable).
 
@@ -76,29 +83,13 @@ SIGAR gathers a large set of metrics which will appear in Funnel under `:period/
 * `:period/system/load_average` - Load averages for 5, 10, and 15 minute intervals.
 * `system/uptime` - Amount of time the OS has been running.
 
-### Units
+<a name="control-server"></a>
 
-Any given metric has the notion of reporting the `Units` that the specific metric denotes. For example, simply seeing the value `18544` for, say, memory usage would not be specifically useful. Is it gigabytes, megabytes? If its the former, perhaps its running hot, if its the latter, there is plenty of headroom. In this frame, you can see how important it is to have an associated metric. At the time of writing the library supports the following `Units`:
-
-* `Count`
-* `Ratio`
-* `TrafficLight`
-* `Healthy`
-* `Load`
-* `Milliseconds`
-* `Seconds`
-* `Minutes`
-* `Hours`
-* `Megabytes`
-* `None`
-
-Generally speaking, this is not something that users ever specifically need to extend, but when using the `gauge` instrument the engineer will need to specify the units for that gauge. 
-
-### Monitoring Server
+# Control Server
 
 Funnel comes with a built in system for plug-able monitoring servers - that is, a way to expose the internal streams over some kind of wire protocol. At the time of writing, there was only a single `MonitoringServer` implementation that uses `HTTP` as its wire protocol and `JSON` over `SSE` as its serialisation strategy. This is entirely flexible, and if one wanted to implement a different `MonitoringServer` it would be entirely easy to do so externally by writing a `scalaz.stream.Process[Task, A]` consumer. 
 
-#### Bootup
+### Bootup
 
 The working expectation is that applications that expose metrics of their own (or indeed, consume metrics from others they wish to replicate) expose a monitoring server. This is done simply by calling `MonitoringServer.start`
 
@@ -117,7 +108,7 @@ object Main {
 
 Once the server is booted as a part of your application, you can visit the specified port on `localhost` and have access to a range of resources. 
 
-#### Resources
+### Resources
 
 * `/:period` - For example, `/now`, `/sliding` or `/previous`. Displays all of the metric keys that have values in that period. If there is nothing to display, the resulting JSON array will be empty. 
 
@@ -126,7 +117,7 @@ Once the server is booted as a part of your application, you can visit the speci
 * `/stream` - obtain a stream of everything that is happening in the system right now as a HTTP SSE stream.
 
 
-#### JSON
+### JSON
 
 ````
 {
@@ -146,9 +137,3 @@ Once the server is booted as a part of your application, you can visit the speci
   }
 }
 ````
-
-
-
-
-
-

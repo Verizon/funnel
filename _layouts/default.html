@@ -5,33 +5,57 @@
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
     <title>{{ page.title }}</title>
 
-    <link rel="stylesheet" href="{{ site.baseurl }}/css/styles.css">
-    <link rel="stylesheet" href="{{ site.baseurl }}/css/pygment_trac.css">
+    <link rel="stylesheet" href="{{ site.baseurl }}css/styles.css">
+    <link rel="stylesheet" href="{{ site.baseurl }}css/pygment_trac.css">
+    <link rel="stylesheet" href="{{ site.baseurl }}css/custom.css">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <!--[if lt IE 9]>
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
   </head>
   <body>
+    <a name="top"></a>
     <div class="wrapper">
       <header>
         <h1>Funnel</h1>
-        <p>Generic lightweight stream-based monitoring system for Scala.</p>
-        <p class="view"><a href="http://github-media.sc.intel.com/intelmedia/funnel">View the Project on GitHub Enterprise <small>intelmedia/monitoring</small></a></p>
+        <p>Last updated on <em>{{ site.time | date: '%B %d, %Y' }}</em></p>
+        <p class="view"><a href="https://github.svc.oncue.com/arch/documentation">View the source on Github<small>intelmedia/funnel</small></a></p>
         <hr />
 
-        {% for post in site.pages %}
-          <p><a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a></p>
-        {% endfor %}
+        <ol>
+          <!-- home -->
+          <li><a href="{{ site.baseurl }}">Home</a></li>
+          <li><a href="{{ site.baseurl }}#overview">Overview</a></li>
+          <!-- getting started -->
+          <li><a href="{{ site.baseurl }}getting-started">Getting Started</a></li>
+          {% if page.section == 'getting-started' %}
+            <li>
+              <ol>
+                <li><a href="{{ site.baseurl }}getting-started/developers.html">Developers</a></li>
+                <li><a href="{{ site.baseurl }}getting-started/operations.html">Operations</a></li>
+              </ol>
+            </li>
+          {% endif %}
+          <!-- details -->
+          <li><a href="{{ site.baseurl }}details">Detailed Information</a></li>
+          {% if page.section == 'details' %}
+            <li>
+              <ol>
+                <li><a href="{{ site.baseurl }}details/#top">Built-in Metrics</a></li>
+                <li><a href="{{ site.baseurl }}details/#control-server">Control Server</a></li>
+              </ol>
+            </li>
+          {% endif %}
+        </ol>
 
         <hr />
-        <!-- </ul> -->
+
       </header>
       <section>
         {{ content }}
       </section>
       <footer>
-        <p>This project is maintained by <a href="http://github-media.sc.intel.com/tmperret">Tim</a> and <a href="http://github-media.sc.intel.com/pchiusax">Paul</a></p>
+        <p>This project is maintained by <a href="http://github-media.sc.intel.com/arch">Arch Team</a></p>
         <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
       </footer>
     </div>

@@ -1,9 +1,10 @@
 ---
 layout: default
-title:  "Quickstart - Operations"
+title:  "Getting Started - Operations"
+section: "getting-started"
 ---
 
-# Quickstart: Operations Team
+# Getting Started: Operations
 
 Before reading this guide, ensure you have read the [primer document](riemann.html) that discusses the setup required for [Riemann](http://riemann.io/).
 
@@ -11,16 +12,16 @@ Assuming you have that done, and you're keen to get started, great!
 
 **NOTE: Media deployments are always done to Linux machines, and operational monitoring will only be supported on linux.**
 
-For operations staff, the funnel system has a binary called `utensil` that simply boots a local monitoring server and has the ability to funnel metrics into Riemann for operational consumption. 
+For operations staff, the funnel system has a binary called `utensil` that simply boots a local monitoring server and has the ability to funnel metrics into Riemann for operational consumption.
 
-### Manual Installation 
+### Manual Installation
 
-If you would like to simply download the binary and run it manually using your shell, TGZ and ZIP packages are available on the nexus. Download the [.zip](http://nexus.svc.oncue.com/nexus/content/repositories/releases/intelmedia/ws/funnel/oncue/) files and expand them into the directory of your choice. 
+If you would like to simply download the binary and run it manually using your shell, TGZ and ZIP packages are available on the nexus. Download the [.zip](http://nexus.svc.oncue.com/nexus/content/repositories/releases/intelmedia/ws/funnel/oncue/) files and expand them into the directory of your choice.
 
-On unix systems, make the `./bin/utensil` shell executable (`chmod 755 ./bin/utensil`) and then execute the same file. This will boot up a local funnel instance that is ready to receive monitoring instructions. 
+On unix systems, make the `./bin/utensil` shell executable (`chmod 755 ./bin/utensil`) and then execute the same file. This will boot up a local funnel instance that is ready to receive monitoring instructions.
 
 
-### System Package Installation 
+### System Package Installation
 
 ***CURRENTLY NOT AVAILABLE DUE TO A PROBLEM WITH OUR REPOSITORIES***
 
