@@ -6,55 +6,41 @@ section: "getting-started"
 
 # Getting Started: Operations
 
-Before reading this guide, ensure you have read the [primer document](riemann.html) that discusses the setup required for [Riemann](http://riemann.io/).
+The *Funnel* monitoring system is an umbrella for several components:
 
-Assuming you have that done, and you're keen to get started, great!
+* [Funnel](#funnel): runs on each and every service and provides an instrumentation API for engineers to publish metrics about their application.
 
-**NOTE: Media deployments are always done to Linux machines, and operational monitoring will only be supported on linux.**
+* [Flask](#flask): collects metrics coming out of funnels and stores them in local memory, partitioned by a given "bucket" (more on this later).
 
-For operations staff, the funnel system has a binary called `utensil` that simply boots a local monitoring server and has the ability to funnel metrics into Riemann for operational consumption.
+* [Chemist](#chemist): organising what funnels are pouring which metrics into which flasks. In essence this component is a job manager. Chemist can automatically detect failures in flasks and repartition the load amongst the remaining flasks in the operational cluster.
 
-### Manual Installation
+At a high-level, the system can be visualised like this:
 
-If you would like to simply download the binary and run it manually using your shell, TGZ and ZIP packages are available on the nexus. Download the [.zip](http://nexus.svc.oncue.com/nexus/content/repositories/releases/intelmedia/ws/funnel/oncue/) files and expand them into the directory of your choice.
+![image]({{ site.baseurl }}img/chemist-flask-funnel.png)
 
-On unix systems, make the `./bin/utensil` shell executable (`chmod 755 ./bin/utensil`) and then execute the same file. This will boot up a local funnel instance that is ready to receive monitoring instructions.
+Given the different functions of each component, this document now reviews them each in turn.
 
+<a name="funnel"></a>
 
-### System Package Installation
+# Funnel
 
-***CURRENTLY NOT AVAILABLE DUE TO A PROBLEM WITH OUR REPOSITORIES***
+From an operational perspective, the typical use case is not to talk directly to Funnel. Instead, the goal is to simply instruct flasks to monitor the correct URLs being published from the built-in control server.
 
-The binary has been made available with a super simple `yum` command:
+With that being said, its worth noting that each and every funnel server allow you to get an aggregate count of its metric keys, which can be operationally useful for debugging etc. This can be accessed by visiting `http://<location>:<port>/audit`. The response looks like:
 
-````
-sudo yum install funnel-utensil
-````
+```
+{
+	// add json response here
+}
+```
 
-As this is a totally internal system, this has not been published to a public yum repository, so if your box has never used the internal yum repo, then you'll need to add it to your system by adding the below to `/etc/yum.repos.d/IntelMedia.repo`:
+For more information about the accessible URLs on the control server, please see the [detailed information section]({{ site.baseurl }}details/#control-server).
 
-````
-[intel_media_yum]
-name=Intel Media YUM Group
-baseurl=http://USERNAME:PASSWORD@nexus-nexusloadbal-1cj6r4t1cb574-1345959472.us-east-1.elb.amazonaws.com/nexus/content/groups/intel_media_yum
-enabled=1
-protect=0
-gpgcheck=0
-metadata_expire=30s
-autorefresh=1
-type=rpm-md
+<a name="flask"></a>
 
-````
+# Flask
 
-With the binary installed, you can simply start the service using the regular `init.d` commands:
-
-````
-// TODO: Binary does not currently have init.d bash scripts and runs in the foreground. Swap this to use init.d
-````
-
-### Request metrics
-
-From an operational perspective the only thing that one should really care about is how to instruct the aggregating funnel utensil which nodes it should be monitoring. This is achieved with a simple HTTP `POST` to `http://<host>:<port>/mirror`
+Flask is - perhaps confusingly - also a funnel, as it too is a service. However, its sole job is to mirror the service funnels by taking mirroring instructions. This is achieved with a simple HTTP `POST` to `http://<host>:<port>/mirror` on the flask host.
 
 ````
 [
@@ -66,14 +52,15 @@ From an operational perspective the only thing that one should really care about
   }
 ]
 ````
-This simple structure represents the "buckets" of nodes that one wishes to monitor. The expectation is that a given logical bucket (for example, accounts-2.1-us-east) there will be an associated set of nodes that are exposing metrics. This bucketing is entirely arbitrary, and you can construct whatever bucket/URL combinations you want, with the one restriction that a given stream can only be connected to a single bucket at any given time (on the basis that connecting over and over to the same machine is a needless drain on resources). However, it is fine to send the same URL multiple times. In the event that there is an existing connection to that node, the existing connection will be used instead of creating a new one.
 
+This simple structure represents the "buckets" of nodes that one wishes to monitor. The expectation is that a given logical bucket (for example, accounts-2.1-us-east) there will be an associated set of nodes that are exposing metrics. This bucketing is entirely arbitrary, and you can construct whatever bucket/URL combinations you want, with the one restriction that a given stream can only be connected to a single bucket at any given time (on the basis that connecting over and over to the same machine is a needless drain on resources). However, it is fine to send the same URL multiple times. In the event that there is an existing connection to that node, the existing connection will be used instead of creating a new one (in other words, monitoring instructions are idempotent for bucket -> url combinations).
 
 ### Local system metrics
 
-Utensil will also collect operating system statistics for the local machine if these two conditions are true:
+As mentioned above, the *Flask* is also a service so it too can produce metrics and be monitored. To enable funnel on the Flask instance, two conditions need to be true:
 
-* The Hyperic SIGAR library is available on the `LD_LIBRARY_PATH`.
+* The Hyperic SIGAR library is available on the `LD_LIBRARY_PATH` (note this happens by default when the Flask instances are deployed using the bake pipeline).
+
 * The Utensil configuration file contains the `localHostMonitorFrequencySeconds` setting.
 
 If your machine is a recently baked instance, it should already contain Hyperic SIGAR on the `LD_LIBRARY_PATH`.Otherwise download the library here: [http://sourceforge.net/projects/sigar/files/](http://sourceforge.net/projects/sigar/files/).
@@ -89,4 +76,11 @@ SIGAR gathers a large set of metrics for the local machine:
 * Memory statistics.
 * Load averages for 5, 10, and 15 minute intervals.
 * Operating system uptime.
+
+<a name="chemist"></a>
+
+# Chemist
+
+Whatever normcore pour-over Portland, slow-carb paleo quinoa gentrify Helvetica small batch. Cosby sweater McSweeney's Echo Park fingerstache tofu. 90's scenester bespoke, farm-to-table you probably haven't heard of them forage 8-bit normcore Vice High Life quinoa kitsch freegan Tonx single-origin coffee. Readymade wayfarers beard pop-up Neutra banh mi ennui mlkshk. Pinterest fap hoodie seitan. Sartorial paleo kitsch dreamcatcher, food truck viral hella blog. Typewriter Tonx fashion axe biodiesel dreamcatcher.
+
 
