@@ -15,8 +15,8 @@ libraryDependencies += "intelmedia.ws.funnel" %% "http" % "x.y.z"
 
 Current transitive dependencies this will introduce on your classpath:
 
-- [Scalaz](https://github.com/scalaz/scalaz) 7.0.4
-- [Scalaz Stream](https://github.com/scalaz/scalaz-stream) 0.1
+- [Scalaz](https://github.com/scalaz/scalaz) 7.0.6
+- [Scalaz Stream](https://github.com/scalaz/scalaz-stream) 0.5
 - [Algebird Core](https://github.com/twitter/algebird) 0.3.0
 
 You will likely never touch these dependencies directly, but its important to be aware of them in case you decide yourself to use Scalaz (for example); if you have conflicting versions then you will see some very strange binary collisions at runtime.

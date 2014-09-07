@@ -186,9 +186,6 @@ Because of its managerial role within the system, Chemist has a rudimentary but 
 
 * `GET /shards`: display a list of all *Flask* shards and display the work that is current assigned to the given shard.
 
-* `GET `
-
-
 * `POST /mirror`: using the same bucketing format as *Flask* instance, manually add some machines to be monitored.
 
 
