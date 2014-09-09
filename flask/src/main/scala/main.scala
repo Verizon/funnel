@@ -62,9 +62,13 @@ object Main {
   }, identity _))
 
   def main(args: Array[String]): Unit = {
-    val config =
-      knobs.loadImmutable(List(Required(FileResource(new File("/usr/share/oncue/etc/flask.cfg"))))) or
-      knobs.loadImmutable(List(Required(ClassPathResource("oncue/flask.cfg"))))
+    // merge the file config with the aws config
+    val config: Task[Config] = for {
+      a <- knobs.loadImmutable(List(Required(
+        FileResource(new File("/usr/share/oncue/etc/flask.cfg")) or
+        ClassPathResource("oncue/flask.cfg"))))
+      b <- knobs.aws.config
+    } yield a ++ b
 
     val (options, cfg) = config.flatMap { cfg =>
       val port        = cfg.lookup[Int]("flask.network.port").getOrElse(5775)

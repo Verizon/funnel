@@ -1,0 +1,24 @@
+
+flask {
+  name = "flask"
+  sns-error-topic = "flask-notifications"
+
+  collect-local-metrics = true
+  local-metric-frequency = 30
+
+  network {
+    host = "localhost"
+    port = 5777
+  }
+
+  riemann {
+    host = "{{ application_environment }}-riemann.svc.oncue.com"
+    port = 5555
+    ttl-in-minutes = 2
+  }
+}
+
+aws {
+  access-key = "$(AWS_ACCESS_KEY)"
+  secret-key = "$(AWS_SECRET_KEY)"
+}

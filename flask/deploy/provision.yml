@@ -5,3 +5,10 @@
   user: ec2-user
   roles:
     - application
+  tasks:
+    - name: flask | override configuration file
+      sudo: yes
+      template: >
+        src=templates/flask.cfg.j2
+        dest=/usr/share/oncue/etc/flask.cfg
+        owner=root group=root mode=0644
