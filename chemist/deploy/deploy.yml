@@ -1,0 +1,11 @@
+---
+- name: chemist | deploy cluster
+  hosts: all
+  connection: local
+  gather_facts: false
+  roles:
+    - launcher:
+        amazon_instance_type: m3.medium
+        asg_min_size: "1"
+        asg_max_size: "1"
+        asg_desired:  "1"

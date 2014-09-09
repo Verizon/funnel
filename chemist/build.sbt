@@ -10,18 +10,22 @@ Bundle.settings
 
 Revolver.settings
 
-fork in (run in Test) := true
+ScalaTest.settings
+
+fork in test := true
 
 libraryDependencies ++= Seq(
-  "intelmedia.ws.common" %% "s3-appender"  % "6.0.2",
-  "com.amazonaws"         % "aws-java-sdk" % "1.7.9",
-  "oncue.svc.knobs"      %% "core"         % "0.1.+"
+  "intelmedia.ws.common"    %% "s3-appender"   % "6.0.2",
+  "com.amazonaws"            % "aws-java-sdk"  % "1.7.9",
+  "oncue.svc.knobs"         %% "core"          % "1.1.+",
+  "oncue.svc.journal"       %% "core"          % "1.0.+",
+  "net.databinder.dispatch" %% "dispatch-core" % "0.11.2"
 )
 
 name in Universal := "chemist"
 
-// mappings in Universal ++= Seq(
-//   file("utensil/etc/flask.cfg") -> "etc/flask.cfg"
-// )
+mainClass in Revolver.reStart := Some("oncue.svc.funnel.chemist.Sandbox")
 
-// mainClass in Revolver.reStart := Some("intelmedia.ws.funnel.flask.Main")
+scalacOptions := Compilation.flags.filterNot(_ == "-Xlint") ++ Seq(
+  "-language:postfixOps"
+)

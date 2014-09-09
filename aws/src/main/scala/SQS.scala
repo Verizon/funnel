@@ -1,11 +1,14 @@
 package oncue.svc.funnel.aws
 
-import com.amazonaws.services.sqs.AmazonSQSClient
+import com.amazonaws.services.sqs.{AmazonSQS,AmazonSQSClient}
 import com.amazonaws.services.sqs.model.{
   AddPermissionRequest,
   CreateQueueRequest,
   GetQueueAttributesRequest,
-  Message}
+  Message,
+  ReceiveMessageRequest,
+  DeleteMessageBatchRequestEntry,
+  DeleteMessageBatchResult}
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.auth.BasicAWSCredentials
@@ -43,7 +46,7 @@ object SQS {
     awsProxyPort: Option[Int] = None,
     awsProxyProtocol: Option[String] = None,
     region: Region = Region.getRegion(Regions.fromName("us-east-1"))
-  ): AmazonSQSClient = { //cfg.require[String]("aws.region"))
+  ): AmazonSQS = { //cfg.require[String]("aws.region"))
     val client = new AmazonSQSClient(
       credentials,
       proxy.configuration(awsProxyHost, awsProxyPort, awsProxyProtocol))
@@ -51,7 +54,7 @@ object SQS {
     client
   }
 
-  def arnForQueue(url: String)(client: AmazonSQSClient): Task[ARN] = {
+  def arnForQueue(url: String)(client: AmazonSQS): Task[ARN] = {
     Task {
       val attrs = client.getQueueAttributes(
         new GetQueueAttributesRequest(url, List("QueueArn").asJava)).getAttributes.asScala
@@ -63,7 +66,7 @@ object SQS {
   }
 
   // http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-long-polling.html
-  def create(queueName: String)(client: AmazonSQSClient): Task[ARN] = {
+  def create(queueName: String)(client: AmazonSQS): Task[ARN] = {
     val req = (new CreateQueueRequest(queueName)).withAttributes(
       Map("MaximumMessageSize"            -> "64000",
           "MessageRetentionPeriod"        -> "1800",
@@ -80,18 +83,47 @@ object SQS {
   import scalaz.stream.Process
 
   def subscribe(
-    queue: ARN,
-    wait: Duration = readInterval
-  )(client: AmazonSQSClient)(
+    url: String,
+    tick: Duration = readInterval,
+    visibilityTimeout: Duration = 20.seconds
+  )(client: AmazonSQS)(
     implicit pool: ExecutorService = Monitoring.defaultPool,
     schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool
-  ): Process[Task, Message] = {
-    Process.awakeEvery(wait)(Strategy.Executor(Monitoring.defaultPool), Monitoring.schedulingPool).evalMap { _ =>
+  ): Process[Task, List[Message]] = {
+    Process.awakeEvery(tick)(Strategy.Executor(Monitoring.defaultPool), Monitoring.schedulingPool).evalMap { _ =>
       Task {
-        val msgs: List[Message] = client.receiveMessage(queue).getMessages.asScala.toList
-        msgs.head
+        val req = (new ReceiveMessageRequest
+          ).withQueueUrl(url
+          ).withVisibilityTimeout(visibilityTimeout.toSeconds.toInt)
+
+        val msgs: List[Message] =
+          client.receiveMessage(req).getMessages.asScala.toList
+
+        // println("sqs messages recieved count: " + msgs.length)
+        // println("sqs messages: " + msgs)
+
+        msgs
       }(Monitoring.defaultPool)
     }
+  }
+
+  case class FailedDeletions(messageIds: List[String]) extends RuntimeException
+
+  def deleteMessages(queue: String, msgs: List[Message])(sqs: AmazonSQS): Process[Task, Unit] = {
+    val result: Task[Unit] = Task {
+      val req = msgs.map(m => new DeleteMessageBatchRequestEntry(m.getMessageId, m.getReceiptHandle))
+
+      if(msgs.nonEmpty){
+        val res = sqs.deleteMessageBatch(queue, req.asJava)
+        res.getFailed.asScala.toList match {
+          case Nil    => Task.now(())
+          case errors => Task.fail(FailedDeletions(errors.map(_.getId)))
+        }
+        ()
+      } else ()
+    }
+
+    Process.eval(result)
   }
 
 }

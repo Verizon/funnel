@@ -1,6 +1,6 @@
 package intelmedia.ws.funnel
 
-import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
+import java.util.concurrent.{ExecutorService, ScheduledExecutorService}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.Process

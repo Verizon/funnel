@@ -116,7 +116,8 @@ trait Monitoring {
   def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
     alive.continuous.zip(p).map(_._2)
 
-  private[funnel] def processMirroringEvents(
+  //private[funnel]
+  def processMirroringEvents(
     parse: DatapointParser,
     myName: String = "Funnel Mirror",
     nodeRetries: Names => Event = _ => defaultRetries
