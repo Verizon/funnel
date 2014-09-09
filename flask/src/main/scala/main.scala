@@ -133,13 +133,15 @@ trait CLI {
 
   def run(args: Array[String])(f: (Options, Config) => Unit): Unit = {
 
-    val config =
-      knobs.loadImmutable(List(Required(
-        FileResource(new File("/usr/share/oncue/etc/flask.cfg")) or
-        ClassPathResource("oncue/flask.cfg"))))
-
     import scalaz.syntax.applicative._
     import scalaz.std.option._
+
+    val config: Task[Config] = for {
+      a <- knobs.loadImmutable(List(Required(
+        FileResource(new File("/usr/share/oncue/etc/flask.cfg")) or
+        ClassPathResource("oncue/flask.cfg"))))
+      b <- knobs.aws.config
+    } yield a ++ b
 
     config.flatMap { cfg =>
       val port        = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
