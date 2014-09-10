@@ -5,11 +5,16 @@ import com.amazonaws.services.ec2.model.{Placement,Tag}
 
 object Fixtures {
 
-  def instance(id: String): EC2Instance =
+  def instance(
+    id: String,
+    datacenter: String = "us-east-1b",
+    privateDns: String = "foo.internal",
+    publicDns: String = "foo.ext.amazonaws.com"
+  ): EC2Instance =
     (new EC2Instance).withInstanceId(id)
-    .withPlacement(new Placement("us-east-1b"))
-    .withPrivateDnsName("foo.internal")
-    .withPublicDnsName("foo.ext.amazonaws.com")
+    .withPlacement(new Placement(datacenter))
+    .withPrivateDnsName(privateDns)
+    .withPublicDnsName(publicDns)
     .withTags(Seq("baz" -> "v1","bar" -> "v2").map { case (k,v) => new Tag(k,v) }:_*)
 
   val instances: Seq[EC2Instance] =

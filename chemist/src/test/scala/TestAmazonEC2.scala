@@ -5,6 +5,9 @@ import com.amazonaws.services.ec2.model.DescribeInstancesResult
 import com.amazonaws.services.ec2.model.{Reservation,Instance => EC2Instance}
 
 object TestAmazonEC2 {
+  def apply(i: EC2Instance): AmazonEC2 =
+    apply(Seq(i))
+
   def apply(i: Seq[EC2Instance]): AmazonEC2 =
     new TestAmazonEC2 {
       override def describeInstances(arg: com.amazonaws.services.ec2.model.DescribeInstancesRequest): DescribeInstancesResult = {
