@@ -111,14 +111,17 @@ object Sharding {
     Task.gatherUnordered(locations.map { case (loc,targets) =>
       send(loc,targets) }.toSeq)
 
-  private def send(to: Location, targets: Seq[Target]): Task[String] = {
+  private def send(to: Location, targets: Seq[Target])(implicit log: Logger): Task[String] = {
     import dispatch._, Defaults._
     import argonaut._, Argonaut._
     import JSON.BucketsToJSON
 
-    val host: HostAndPort = to.dns.map(_ + ":" + to.port).get // "safe" because we know we're passing in the default localhost
+    // FIXME: "safe" because we know we're passing in the default localhost
+    val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
     val payload: Map[BucketName, List[SafeURL]] =
       targets.groupBy(_.bucket).mapValues(_.map(_.url).toList)
+
+    log.debug(s"submitting to $host: $payload")
 
     val svc = url(s"http://$host/mirror") << payload.toList.asJson.nospaces
     fromScalaFuture(Http(svc OK as.String))

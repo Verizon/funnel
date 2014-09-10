@@ -16,12 +16,6 @@ object Deployed {
   def list(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
     instances(g => true)(asg,ec2)
 
-  def funnels(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
-    instances(filter.funnels)(asg,ec2)
-
-  def flasks(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
-    instances(filter.flasks)(asg,ec2)
-
   def lookupOne(id: InstanceID)(ec2: AmazonEC2): Task[Instance] = {
     lookupMany(Seq(id))(ec2).flatMap {
       _.filter(_.id == id).headOption match {

@@ -23,10 +23,10 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
   /////////////////// flasks ///////////////////
   lazy val F1 = Monitoring.instance
   lazy val I3 = new Instruments(W, F1)
-  val FS1 = MonitoringServer.start(F1, 9090)
+  val FS1 = MonitoringServer.start(F1, 5775)
 
-  val instances = new Ref[InstanceM](==>>())
-  val distribution = new Ref[Distribution](Distribution.empty)
+  val E = TestAmazonEC2(Fixtures.instance(id = "i-localhost9090", publicDns = "localhost"))
+  val R = new StatefulRepository(E)
 
   val T1 = Set(
     Target("test1",SafeURL("http://127.0.0.1:8080/stream/uptime")),
@@ -40,7 +40,7 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
     addInstruments(I1)
     addInstruments(I2)
     Thread.sleep(100)
-    addFlask("i-123", 9090)
+    addFlask("i-localhost9090")
     Thread.sleep(1000)
   }
 
@@ -52,16 +52,8 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
     dispatch.Http.shutdown()
   }
 
-  private def addFlask(fid: String, fport: Int): Unit = {
-    instances.update(_.insert(fid,
-      Instance(
-        id = fid,
-        location = Location.localhost.copy(port = fport),
-        firewalls = Seq.empty
-      )
-    ))
-    // typically happens with asg lifecycle, but simulating here
-    distribution.update(_.insert(fid, Set.empty))
+  private def addFlask(fid: String): Unit = {
+    R.increaseCapacity(fid).run
   }
 
   private def addInstruments(i: Instruments): Unit = {
@@ -74,10 +66,12 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
       intelmedia.ws.funnel.http.SSE.readEvents,
       "intspec")(println).runAsync(println)
 
-    sys.error("FIX ME")
+    val x = for {
+      a <- Sharding.locateAndAssignDistribution(T1,R)
+      b <- Sharding.distribute(a)
+    } yield b
 
-    // Sharding.distribute(
-    //     Sharding.distribution(T1)(distribution.get))(distribution,instances)
+    x.run
   }
 
 
