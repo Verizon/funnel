@@ -24,7 +24,9 @@ libraryDependencies ++= Seq(
 
 name in Universal := "chemist"
 
-mainClass in Revolver.reStart := Some("oncue.svc.funnel.chemist.Sandbox")
+mainClass in Compile := Some("oncue.svc.funnel.chemist.Main")
+
+mainClass in Revolver.reStart := Some("oncue.svc.funnel.chemist.Main")
 
 scalacOptions := Compilation.flags.filterNot(_ == "-Xlint") ++ Seq(
   "-language:postfixOps"
