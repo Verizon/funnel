@@ -56,6 +56,9 @@ object Server {
     }
   }
 
+  val serverPool: ExecutorService =
+    Executors.newFixedThreadPool(2, daemonThreads("chemist-server"))
+
   val defaultPool: ExecutorService =
     Executors.newFixedThreadPool(8, daemonThreads("chemist-thread"))
 
