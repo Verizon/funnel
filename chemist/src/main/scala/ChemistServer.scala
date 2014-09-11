@@ -35,7 +35,7 @@ class ChemistServer(port: Int){
     req.getResponseBody.write("Nothing to see here yet.".getBytes)
   }
 
-  protected def handleMirror(req: HttpExchange): Unit = {
+  protected def handleDistribute(req: HttpExchange): Unit = {
     req.sendResponseHeaders(200,0)
     req.getResponseBody.write("Nothing to see here yet.".getBytes)
   }
@@ -43,6 +43,9 @@ class ChemistServer(port: Int){
   protected def handleNotImplemented(req: HttpExchange): Unit = {
     req.sendResponseHeaders(501,0)
   }
+
+  protected def handleStatus(req: HttpExchange): Unit =
+    req.sendResponseHeaders(200,0)
 
   protected def handler = new HttpHandler {
     def handle(req: HttpExchange): Unit = try {
@@ -55,8 +58,9 @@ class ChemistServer(port: Int){
 
       path match {
         case Nil              => handleIndex(req)
+        case "status"  :: Nil => handleStatus(req)
         case "shards"  :: Nil => handleShards(req)
-        case "mirror"  :: Nil => handleMirror(req)
+        case "mirror"  :: Nil => handleDistribute(req)
         case _                => handleNotImplemented(req)
       }
     }
