@@ -25,4 +25,6 @@
 
 -J-XX:SurvivorRatio=2
 
+-J-XX:+UseG1GC
+
 -Dlogback.configurationFile=${{chdir}}/etc/logback.xml
