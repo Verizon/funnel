@@ -85,9 +85,11 @@ trait Server extends Interpreter[Server.ServerF] {
 
   /////// configuration resolution ////////
 
-  val cfg =
-    (knobs.loadImmutable(List(Required(FileResource(new File("/usr/share/oncue/etc/chemist.cfg"))))) or
-    knobs.loadImmutable(List(Required(ClassPathResource("oncue/chemist.cfg"))))).run
+  val cfg: Config = (for {
+    a <- knobs.loadImmutable(List(Required(FileResource(new File("/usr/share/oncue/etc/chemist.cfg"))))) or
+         knobs.loadImmutable(List(Required(ClassPathResource("oncue/chemist.cfg"))))
+    b <- knobs.aws.config
+  } yield a ++ b).run
 
   val topic = cfg.require[String]("chemist.sns-topic-name")
   val queue = cfg.require[String]("chemist.sqs-queue-name")

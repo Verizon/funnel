@@ -14,8 +14,8 @@
 # ${{daemon_user}}      daemon user
 # -------------------------------------------------
 
-# Setting -Xmx and -Xms in Megabyte. Destined for m3.large
--mem 7168
+# Setting -Xmx and -Xms in Megabyte for a m3.medium instance
+-mem 2816
 
 -J-server
 
