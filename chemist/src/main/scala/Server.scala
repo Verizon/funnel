@@ -15,11 +15,11 @@ object Server {
     def map[B](f: A => B): ServerF[B]
   }
 
-  case class Watch[A](urls: Set[Target], k: A) extends ServerF[A]{
-    def map[B](g: A => B): ServerF[B] = Watch(urls, g(k))
+  case class Distribute[A](urls: Set[Target], k: A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = Distribute(urls, g(k))
   }
-  case class Listen[A](k: A) extends ServerF[A]{
-    def map[B](g: A => B): ServerF[B] = Listen(g(k))
+  case class ShowDistribution[A](k: Map[InstanceID, Set[Target]] => A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = ShowDistribution(k andThen g)
   }
 
   ////////////// free monad plumbing //////////////
@@ -33,14 +33,17 @@ object Server {
 
   ////////////// public api / syntax ///////////////
 
-  def watch(urls: Set[Target]): Server[Unit] =
-    liftF(Watch(urls, ()))
+  def distribution: Server[Map[InstanceID, Map[String, Seq[SafeURL]]]] =
+    liftF(ShowDistribution(identity))
+
+  def distribute(urls: Set[Target]): Server[Unit] =
+    liftF(Distribute(urls, ()))
 
   // TODO: probally move this into the init of the interpreter
   // as starting to listen on the queue is an infinite Task that
   // will never "compelte"
-  def listen: Server[Unit] =
-    liftF(Listen( () ))
+  // def listen: Server[Unit] =
+  //   liftF(Listen( () ))
 
 
   ////////////// threading ///////////////
@@ -143,13 +146,17 @@ trait Server extends Interpreter[Server.ServerF] {
   /////// interpreter implementation ////////
 
   protected def op[A](r: ServerF[A]): Task[A] = r match {
-    case Watch(targets, k) =>
+
+    case ShowDistribution(k) =>
+      R.distribution.map(d => k(Sharding.snapshot(d)))
+
+    case Distribute(targets, k) =>
       Task.now(k)
+
       // for(_ <- Sharding.distribute(
       //   Sharding.distribution(targets)(D.get))(D,I)) yield k
 
-    case Listen(k) =>
-      Task.now(k)
+    // case Listen(k) =>
       // Lifecycle.run(queue, sqs, D).run.map(_ => k)
   }
 

@@ -7,14 +7,19 @@ import java.io.{BufferedWriter, IOException, OutputStream, OutputStreamWriter}
 import java.net.{InetSocketAddress, URL}
 import journal.Logger
 import intelmedia.ws.funnel.BuildInfo
+import scalaz.{\/,-\/,\/-,Free}
+import scalaz.concurrent.Task
 
 object ChemistServer {
   private val log = Logger[Server]
 }
 
-class ChemistServer(port: Int){
+class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
   import ChemistServer.log
+  import argonaut._
+  import Argonaut._
 
+  private val S = Server
   private val server = HttpServer.create(new InetSocketAddress(port), 0)
 
   def start(): Unit = {
@@ -25,14 +30,22 @@ class ChemistServer(port: Int){
 
   def stop(): Unit = server.stop(0)
 
+  private def run[A : CodecJson](exe: Free[Server.ServerF, A], req: HttpExchange): Unit =
+    I.run(exe).attemptRun match {
+      case \/-(a) => {
+        val out = a.asJson.nospaces // the `A` must be convertable to JSON
+        req.sendResponseHeaders(200, out.length)
+        req.getResponseBody.write(out.getBytes)
+      }
+      case -\/(e) => {
+        req.sendResponseHeaders(500, e.toString.length)
+        req.getResponseBody.write(e.toString.getBytes)
+      }
+    }
+
   protected def handleIndex(req: HttpExchange): Unit = {
     req.sendResponseHeaders(200, indexHTML.length)
     req.getResponseBody.write(indexHTML.getBytes)
-  }
-
-  protected def handleShards(req: HttpExchange): Unit = {
-    req.sendResponseHeaders(200,0)
-    req.getResponseBody.write("Nothing to see here yet.".getBytes)
   }
 
   protected def handleDistribute(req: HttpExchange): Unit = {
@@ -57,11 +70,11 @@ class ChemistServer(port: Int){
       log.debug(s"http request for $path")
 
       path match {
-        case Nil              => handleIndex(req)
-        case "status"  :: Nil => handleStatus(req)
-        case "shards"  :: Nil => handleShards(req)
-        case "mirror"  :: Nil => handleDistribute(req)
-        case _                => handleNotImplemented(req)
+        case Nil                    => handleIndex(req)
+        case "status"        :: Nil => handleStatus(req)
+        case "distribution"  :: Nil => run(S.distribution, req)
+        case "distribute"    :: Nil => handleDistribute(req)
+        case _                      => handleNotImplemented(req)
       }
     }
     catch {

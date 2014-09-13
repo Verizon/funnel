@@ -5,12 +5,13 @@ object Main {
     val I = Server0
     val S = Server
 
-    val exe = S.listen
+    // val exe = S.listen
 
     // block at the edge of the world
     // I.run(exe).run
 
-    new ChemistServer(9000).start()
+    new ChemistServer(Server0, 9000).start()
+
 
     // this should probally be called to release
     // the underlying resources.
