@@ -36,8 +36,10 @@ object Sharding {
    * dump out the current snapshot of how chemist believes work
    * has been assigned to flasks.
    */
-  def snapshot(d: Distribution): Map[Flask, Set[Target]] =
-    d.toList.toMap
+  def snapshot(d: Distribution): Map[Flask, Map[BucketName, List[SafeURL]]] =
+    d.toList.map { case (i,s) =>
+      i -> s.groupBy(_.bucket).mapValues(_.toList.map(_.url))
+    }.toMap
 
   /**
    * obtain the entire set of what chemist views as the

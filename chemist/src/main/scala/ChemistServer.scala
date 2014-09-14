@@ -16,8 +16,7 @@ object ChemistServer {
 
 class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
   import ChemistServer.log
-  import argonaut._
-  import Argonaut._
+  import argonaut._, Argonaut._, JSON._
 
   private val S = Server
   private val server = HttpServer.create(new InetSocketAddress(port), 0)
@@ -30,10 +29,13 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
 
   def stop(): Unit = server.stop(0)
 
-  private def run[A : CodecJson](exe: Free[Server.ServerF, A], req: HttpExchange): Unit =
+  private def run[A, B : EncodeJson](
+    exe: Free[Server.ServerF, A],
+    req: HttpExchange
+  )(f: A => B): Unit = {
     I.run(exe).attemptRun match {
       case \/-(a) => {
-        val out = a.asJson.nospaces // the `A` must be convertable to JSON
+        val out = f(a).asJson.nospaces // the `A` must be convertable to JSON
         req.sendResponseHeaders(200, out.length)
         req.getResponseBody.write(out.getBytes)
       }
@@ -42,6 +44,7 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
         req.getResponseBody.write(e.toString.getBytes)
       }
     }
+  }
 
   protected def handleIndex(req: HttpExchange): Unit = {
     req.sendResponseHeaders(200, indexHTML.length)
@@ -72,7 +75,7 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
       path match {
         case Nil                    => handleIndex(req)
         case "status"        :: Nil => handleStatus(req)
-        case "distribution"  :: Nil => run(S.distribution, req)
+        case "distribution"  :: Nil => run(S.distribution, req)(_.toList)
         case "distribute"    :: Nil => handleDistribute(req)
         case _                      => handleNotImplemented(req)
       }

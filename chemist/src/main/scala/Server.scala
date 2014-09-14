@@ -18,7 +18,7 @@ object Server {
   case class Distribute[A](urls: Set[Target], k: A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = Distribute(urls, g(k))
   }
-  case class ShowDistribution[A](k: Map[InstanceID, Set[Target]] => A) extends ServerF[A]{
+  case class ShowDistribution[A](k: Map[InstanceID, Map[String, List[SafeURL]]] => A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = ShowDistribution(k andThen g)
   }
 
@@ -33,7 +33,7 @@ object Server {
 
   ////////////// public api / syntax ///////////////
 
-  def distribution: Server[Map[InstanceID, Map[String, Seq[SafeURL]]]] =
+  def distribution: Server[Map[InstanceID, Map[String, List[SafeURL]]]] =
     liftF(ShowDistribution(identity))
 
   def distribute(urls: Set[Target]): Server[Unit] =

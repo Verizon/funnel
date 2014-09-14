@@ -11,7 +11,36 @@ object JSON {
 
   ////////////////////// chemist messages //////////////////////
 
-  // implicit val 
+  /**
+
+    Map[InstanceID, Map[String, Set[SafeURL]]]
+
+   */
+  implicit val ShardingSnapshotAsJson: EncodeJson[(InstanceID, Map[String, List[SafeURL]])] =
+    EncodeJson((m: (InstanceID, Map[String, List[SafeURL]])) =>
+      ("shard"   := m._1) ->:
+      ("targets" := m._2.toList) ->: jEmptyObject
+    )
+
+  /*
+  {
+    "shard": "instance-f1",
+    "targets": [
+      {
+        "bucket": "testing",
+        "urls": [
+          "http://...:5775/stream/sliding",
+          "http://...:5775/stream/sliding"
+        ]
+      }
+    ]
+  }
+  */
+  // implicit val FlaskTargetsAsJson: EncodeJson[(InstanceID, Set[Target])] =
+  //   EncodeJson((t: (InstanceID, Set[Target])) =>
+  //     ("shard"   := t._1) ->:
+  //     ("targets" := List.empty[String]) ->: jEmptyObject
+  //   )
 
   ////////////////////// flask messages //////////////////////
 
