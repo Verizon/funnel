@@ -2,8 +2,11 @@ package oncue.svc.funnel.chemist
 
 import scalaz.concurrent.Task
 import Sharding.Distribution
+import scalaz.==>>
 
 trait Repository {
+
+  type InstanceM   = InstanceID ==>> Instance
 
   /////////////// instance operations ///////////////
 
@@ -21,7 +24,6 @@ trait Repository {
   def decreaseCapacity(downed: InstanceID): Task[Distribution]
 }
 
-import scalaz.==>>
 import com.amazonaws.services.ec2.AmazonEC2
 
 case class MissingInstanceException(override val getMessage: String) extends RuntimeException(getMessage)

@@ -29,13 +29,13 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
 
   def stop(): Unit = server.stop(0)
 
-  private def run[A, B : EncodeJson](
+  private def run[A : EncodeJson](
     exe: Free[Server.ServerF, A],
     req: HttpExchange
-  )(f: A => B): Unit = {
+  ): Unit = {
     I.run(exe).attemptRun match {
       case \/-(a) => {
-        val out = f(a).asJson.nospaces // the `A` must be convertable to JSON
+        val out = a.asJson.nospaces // the `A` must be convertable to JSON
         req.sendResponseHeaders(200, out.length)
         req.getResponseBody.write(out.getBytes)
       }
@@ -74,8 +74,10 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
 
       path match {
         case Nil                    => handleIndex(req)
+        // GET
         case "status"        :: Nil => handleStatus(req)
-        case "distribution"  :: Nil => run(S.distribution, req)(_.toList)
+        case "distribution"  :: Nil => run(S.distribution.map(_.toList), req)
+        // POST
         case "distribute"    :: Nil => handleDistribute(req)
         case _                      => handleNotImplemented(req)
       }
@@ -97,88 +99,69 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
     |    <style type="text/css">
     |    /* Space out content a bit */
     |    body {
-    |      padding-top: 20px;
-    |      padding-bottom: 20px;
+    |    padding-top: 20px;
+    |    padding-bottom: 20px;
     |    }
     |
     |    /* Everything but the jumbotron gets side spacing for mobile first views */
     |    .header,
     |    .marketing,
     |    .footer {
-    |      padding-right: 15px;
-    |      padding-left: 15px;
+    |    padding-right: 15px;
+    |    padding-left: 15px;
     |    }
     |
     |    /* Custom page header */
     |    .header {
-    |      border-bottom: 1px solid #e5e5e5;
+    |    border-bottom: 1px solid #e5e5e5;
     |    }
     |    /* Make the masthead heading the same height as the navigation */
     |    .header h3 {
-    |      padding-bottom: 19px;
-    |      margin-top: 0;
-    |      margin-bottom: 0;
-    |      line-height: 40px;
+    |    padding-bottom: 19px;
+    |    margin-top: 0;
+    |    margin-bottom: 0;
+    |    line-height: 40px;
     |    }
     |
     |    /* Custom page footer */
     |    .footer {
-    |      padding-top: 19px;
-    |      color: #777;
-    |      border-top: 1px solid #e5e5e5;
+    |    padding-top: 19px;
+    |    color: #777;
+    |    border-top: 1px solid #e5e5e5;
     |    }
     |
     |    /* Customize container */
     |    @media (min-width: 768px) {
-    |      .container {
-    |        max-width: 730px;
-    |      }
+    |    .container {
+    |    max-width: 730px;
     |    }
-    |    .container-narrow > hr {
-    |      margin: 30px 0;
     |    }
-    |
-    |    /* Main marketing message and sign up button */
-    |    .jumbotron {
-    |      text-align: center;
-    |      border-bottom: 1px solid #e5e5e5;
-    |    }
-    |    .jumbotron .btn {
-    |      padding: 14px 24px;
-    |      font-size: 21px;
-    |    }
-    |
     |    /* Supporting marketing content */
     |    .marketing {
-    |      margin: 40px 0;
+    |    margin: 40px 0;
     |    }
     |    .marketing p + h4 {
-    |      margin-top: 28px;
+    |    margin-top: 28px;
     |    }
     |
     |    /* Responsive: Portrait tablets and up */
     |    @media screen and (min-width: 768px) {
-    |      /* Remove the padding we set earlier */
-    |      .header,
-    |      .marketing,
-    |      .footer {
-    |        padding-right: 0;
-    |        padding-left: 0;
-    |      }
-    |      /* Space out the masthead */
-    |      .header {
-    |        margin-bottom: 30px;
-    |      }
-    |      /* Remove the bottom border on the jumbotron for visual effect */
-    |      .jumbotron {
-    |        border-bottom: 0;
-    |      }
+    |    /* Remove the padding we set earlier */
+    |    .header,
+    |    .marketing,
+    |    .footer {
+    |    padding-right: 0;
+    |    padding-left: 0;
+    |    }
+    |    /* Space out the masthead */
+    |    .header {
+    |    margin-bottom: 30px;
+    |    }
     |    }
     |    </style>
     |  </head>
     |
     |  <body>
-    |
     |    <div class="container">
     |      <div class="header">
     |        <ul class="nav nav-pills pull-right">
@@ -189,22 +172,19 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
     |      </div>
     |
     |      <div class="row marketing">
-    |        <div class="col-lg-6">
-    |          <h4>Metric Resources</h4>
-    |          <p><a href="/keys">GET /keys</a>: Display the current snapshot of all keys registred with the monitoring instance.</p>
-    |          <p><a href="/keys/prefix">GET /keys/prefix</a>: Display the current snapshot of all keys prefixed by the word 'prefix'.</p>
     |
-    |          <h4>Window Resources</h4>
-    |          <p><a href="/now">GET /now</a>: Current values for all metrics prefixed by 'now'.</p>
-    |          <p><a href="/previous">GET /previous</a>: Current values for all metrics prefixed by 'previous'.</p>
-    |          <p><a href="/sliding">GET /sliding</a>: Current values for all metrics prefixed by 'sliding'.</p>
+    |        <div class="col-lg-6">
+    |          <h4>Distribution Resources</h4>
+    |          <p><a href="/distribution">GET /distribution</a>: Display the current distribution of shards and associated work.</p>
+    |          <p><a href="/distribute">POST /distribute</a>: Manually instruct a given set of inputs to be sharded over avalible Flask instances.</p>
     |        </div>
     |
     |        <div class="col-lg-6">
-    |          <h4>Operations Resources</h4>
-    |          <p><a href="/mirror">POST /now</a>: Dynamically mirror metrics from other funnel(s).</p>
-    |          <p><a href="/halt">POST /halt</a>: Stop mirroring metrics from the given funnel URLs).</p>
+    |          <h4>Shard Resources</h4>
+    |          <p><a href="/shards">GET /shards</a>: List all shards and known information about those hosts</p>
+    |          <p><a href="/shard/:shardid">GET /shard/:shard-id</a>: Displays all known information about a given shard.</p>
     |        </div>
+    |
     |      </div>
     |
     |      <div class="footer">
@@ -217,27 +197,4 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
   """.stripMargin
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

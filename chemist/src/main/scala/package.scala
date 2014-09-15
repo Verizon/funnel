@@ -8,7 +8,6 @@ package object chemist {
   type InstanceID  = String
   type HostAndPort = String
   type Ref[A]      = AtomicReference[A]
-  type InstanceM   = InstanceID ==>> Instance
 
   implicit class Atomic[A](val atomic: AtomicReference[A]){
     @tailrec final def update(f: A => A): A = {
