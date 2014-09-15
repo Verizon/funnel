@@ -166,7 +166,13 @@ trait Server extends Interpreter[Server.ServerF] {
       z <- Deployed.list(asg, ec2)
       // set the result to an in-memory list of "the world"
       _  = z.foreach(R.addInstance)
-      // _  = I.update(_ => ==>>(z.map(i => i.id -> i):_*))
+      // from the whole world, figure out which are flask instances
+      _ = Task.now {
+        z.foreach(println)
+        // println(">>>>>>> " + z.filter(Deployed.filter.flasks))
+      }
+      // ask those flasks for their current work and update the distribution accordingly
+      _ = Task.now(())
       // start to wire up the topics and subscriptions to queues
       a <- SNS.create(topic)(sns)
       _  = log.debug(s"created sns topic with arn = $a")
