@@ -2,7 +2,7 @@ package intelmedia.ws.funnel
 
 import java.net.{URL,URLEncoder}
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
+import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory, ConcurrentHashMap}
 import scala.concurrent.duration._
 import scala.language.higherKinds
 import scalaz.concurrent.{Actor,Strategy,Task}
@@ -110,13 +110,22 @@ trait Monitoring {
 
   private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue
 
-  private val urlSignals = new java.util.concurrent.ConcurrentHashMap[URL, Signal[Unit]]
+  private val urlSignals = new ConcurrentHashMap[URL, Signal[Unit]]
+
+  /**
+   * Fetch a list of all the URLs that are currently being mirrored.
+   * If nothing is currently being mirrored (as is the case for all funnels)
+   * then this method yields an empty `Set[URL]`.
+   */
+  def mirroringUrls: Set[URL] = {
+    import collection.JavaConverters._
+    urlSignals.keySet.asScala.toSet
+  }
 
   /** Terminate `p` when the given `Signal` terminates. */
   def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
     alive.continuous.zip(p).map(_._2)
 
-  //private[funnel]
   def processMirroringEvents(
     parse: DatapointParser,
     myName: String = "Funnel Mirror",

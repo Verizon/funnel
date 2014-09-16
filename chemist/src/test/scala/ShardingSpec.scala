@@ -39,7 +39,7 @@ class ShardingSpec extends FlatSpec with Matchers with ChemistSpec  {
   )
 
   it should "correctly sort the map and return the flasks in order of their set length" in {
-    Sharding.flasks(d1) should equal (Set("a", "c", "b", "d"))
+    Sharding.shards(d1) should equal (Set("a", "c", "b", "d"))
   }
 
   it should "snapshot the exsiting shard distribution" in {
