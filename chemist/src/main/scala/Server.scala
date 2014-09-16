@@ -18,8 +18,11 @@ object Server {
   case class Distribute[A](urls: Set[Target], k: A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = Distribute(urls, g(k))
   }
-  case class ShowDistribution[A](k: Map[InstanceID, Map[String, List[SafeURL]]] => A) extends ServerF[A]{
-    def map[B](g: A => B): ServerF[B] = ShowDistribution(k andThen g)
+  case class DescribeDistribution[A](k: Map[InstanceID, Map[String, List[SafeURL]]] => A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = DescribeDistribution(k andThen g)
+  }
+  case class DescribeShards[A](k: Seq[Instance] => A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = DescribeShards(k andThen g)
   }
 
   ////////////// free monad plumbing //////////////
@@ -34,10 +37,13 @@ object Server {
   ////////////// public api / syntax ///////////////
 
   def distribution: Server[Map[InstanceID, Map[String, List[SafeURL]]]] =
-    liftF(ShowDistribution(identity))
+    liftF(DescribeDistribution(identity))
 
   def distribute(urls: Set[Target]): Server[Unit] =
     liftF(Distribute(urls, ()))
+
+  def shards: Server[Seq[Instance]] =
+    liftF(DescribeShards(identity))
 
   // TODO: probally move this into the init of the interpreter
   // as starting to listen on the queue is an infinite Task that
@@ -147,14 +153,19 @@ trait Server extends Interpreter[Server.ServerF] {
 
   protected def op[A](r: ServerF[A]): Task[A] = r match {
 
-    case ShowDistribution(k) =>
+    case DescribeDistribution(k) =>
       R.distribution.map(d => k(Sharding.snapshot(d)))
 
     case Distribute(targets, k) =>
       Task.now(k)
 
-      // for(_ <- Sharding.distribute(
-      //   Sharding.distribution(targets)(D.get))(D,I)) yield k
+    case DescribeShards(k) =>
+      for {
+        a <- R.distribution.map(Sharding.shards)
+        b <- Task.gatherUnordered(a.map(R.instance).toSeq)
+      } yield k(b)
+
+    // Task.now(k(Nil))
 
     // case Listen(k) =>
       // Lifecycle.run(queue, sqs, D).run.map(_ => k)
@@ -165,21 +176,18 @@ trait Server extends Interpreter[Server.ServerF] {
       // read the list of all deployed machines
       z <- Deployed.list(asg, ec2)
       // set the result to an in-memory list of "the world"
-      _  = z.foreach(R.addInstance)
+      _ <- Task.gatherUnordered(z.map(R.addInstance))
       // from the whole world, figure out which are flask instances
-      _ = Task.now {
-        z.foreach(println)
-        // println(">>>>>>> " + z.filter(Deployed.filter.flasks))
-      }
+      _ <- Task.gatherUnordered(z.filter(Deployed.filter.flasks).map(R.increaseCapacity))
       // ask those flasks for their current work and update the distribution accordingly
-      _ = Task.now(())
+      _ <- Task.now(())
       // start to wire up the topics and subscriptions to queues
-      a <- SNS.create(topic)(sns)
-      _  = log.debug(s"created sns topic with arn = $a")
-      b <- SQS.create(queue)(sqs)
-      _  = log.debug(s"created sqs queue with arn = $a")
-      c <- SNS.subscribe(a, b)(sns)
-      _  = log.debug(s"subscribed sqs queue to the sns topic")
+      // a <- SNS.create(topic)(sns)
+      // _  = log.debug(s"created sns topic with arn = $a")
+      // b <- SQS.create(queue)(sqs)
+      // _  = log.debug(s"created sqs queue with arn = $a")
+      // c <- SNS.subscribe(a, b)(sns)
+      // _  = log.debug(s"subscribed sqs queue to the sns topic")
       // _ <- collateExistingWork
     } yield ()
 

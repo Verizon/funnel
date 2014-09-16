@@ -25,10 +25,13 @@ trait Repository {
 }
 
 import com.amazonaws.services.ec2.AmazonEC2
+import journal.Logger
 
 case class MissingInstanceException(override val getMessage: String) extends RuntimeException(getMessage)
 
 class StatefulRepository(ec2: AmazonEC2) extends Repository {
+  private lazy val log = Logger[StatefulRepository]
+
   /**
    * stores the mapping between flasks and their assigned workload
    */
@@ -87,7 +90,9 @@ class StatefulRepository(ec2: AmazonEC2) extends Repository {
   def increaseCapacity(instance: Instance): Task[(Distribution,InstanceM)] =
     for {
       a <- Task(D.update(_.insert(instance.id, Set.empty)))
+      _  = log.debug(s"increaseCapacity, updating the distribution for ${instance.id}")
       b <- addInstance(instance)
+      _  = log.debug(s"increaseCapacity, updated with ${instance.id}")
     } yield (a,b)
 
   def decreaseCapacity(downed: InstanceID): Task[Distribution] =
