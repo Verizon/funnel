@@ -51,10 +51,10 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
     req.getResponseBody.write(indexHTML.getBytes)
   }
 
-  protected def handleDistribute(req: HttpExchange): Unit = {
-    req.sendResponseHeaders(200,0)
-    req.getResponseBody.write("Nothing to see here yet.".getBytes)
-  }
+  // protected def handleDistribute(req: HttpExchange): Unit = {
+  //   req.sendResponseHeaders(200,0)
+  //   req.getResponseBody.write("Nothing to see here yet.".getBytes)
+  // }
 
   protected def handleNotImplemented(req: HttpExchange): Unit = {
     req.sendResponseHeaders(501,0)
@@ -75,11 +75,13 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
       path match {
         case Nil                    => handleIndex(req)
         // GET
-        case "status"        :: Nil => handleStatus(req)
-        case "distribution"  :: Nil => run(S.distribution.map(_.toList), req)
+        case "status"       :: Nil => handleStatus(req)
+        case "distribution" :: Nil => run(S.distribution.map(_.toList), req)
+        case "shards"       :: Nil => run(S.shards.map(_.toList), req)
+        case "shards" :: id :: Nil => run(S.shard(id), req)
         // POST
-        case "distribute"    :: Nil => handleDistribute(req)
-        case _                      => handleNotImplemented(req)
+        case "distribute"   :: Nil => handleNotImplemented(req)
+        case _                     => handleNotImplemented(req)
       }
     }
     catch {

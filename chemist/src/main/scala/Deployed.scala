@@ -10,12 +10,32 @@ import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
 import oncue.svc.funnel.aws._
 
-// for what follows, im sorry!
+/**
+ * This module contains functions for describing the deployed world as the caller
+ * sees it. Functions are provided to look up instance metadata for a single host,
+ * multiple hosts, or listing the entire known world.
+ *
+ * The assumptions that have been made about hosts are:
+ * 1. They are network accessible from the *Chemist* perspective
+ * 2. They are running a Funnel server on port 5775 - this is used to validate that
+ *    the instance is in fact a useful server for the sake of work sharding.
+ */
 object Deployed {
 
+  ///////////////////////////// public api /////////////////////////////
+
+  /**
+   * List all of the instances in the given AWS account that respond to a rudimentry
+   * verification that Funnel is running on port 5775 and is network accessible.
+   */
   def list(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
     instances(_ => true)(asg,ec2)
 
+
+  /**
+   * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
+   * of the useful AWS metadata encoded into an internal representation.
+   */
   def lookupOne(id: InstanceID)(ec2: AmazonEC2): Task[Instance] = {
     lookupMany(Seq(id))(ec2).flatMap {
       _.filter(_.id == id).headOption match {
@@ -25,6 +45,10 @@ object Deployed {
     }
   }
 
+  /**
+   * Lookup the `Instace` metadata for a set of `InstanceID`.
+   * @see oncue.svc.funnel.chemist.Deployed.lookupOne
+   */
   def lookupMany(ids: Seq[InstanceID])(ec2: AmazonEC2): Task[Seq[Instance]] =
     for {
       a <- EC2.reservations(ids)(ec2)
@@ -32,6 +56,22 @@ object Deployed {
       b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
       // _  = println(s"Deployed.lookupMany b=$b")
     } yield b
+
+  ///////////////////////////// filters /////////////////////////////
+
+  object filter {
+    def funnels(i: Instance): Boolean =
+      i.firewalls.exists(_.toLowerCase == "monitor-funnel")
+
+    def flasks(i: Instance): Boolean =
+      i.application.map(_.name.startsWith("flask")).getOrElse(false)
+
+    def chemists(i: Instance): Boolean =
+      i.application.map(_.name.startsWith("chemist")).getOrElse(false)
+  }
+
+
+  ///////////////////////////// internal api /////////////////////////////
 
   private def instances(f: Instance => Boolean
     )(asg: AmazonAutoScaling, ec2: AmazonEC2
@@ -72,17 +112,6 @@ object Deployed {
       firewalls = sgs,
       tags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
     )
-  }
-
-  object filter {
-    def funnels(i: Instance): Boolean =
-      i.firewalls.exists(_.toLowerCase == "monitor-funnel")
-
-    def flasks(i: Instance): Boolean =
-      i.application.map(_.name.startsWith("flask")).getOrElse(false)
-
-    def chemists(i: Instance): Boolean =
-      i.application.map(_.name.startsWith("chemist")).getOrElse(false)
   }
 
   import scala.io.Source

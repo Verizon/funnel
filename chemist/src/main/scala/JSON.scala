@@ -12,35 +12,45 @@ object JSON {
   ////////////////////// chemist messages //////////////////////
 
   /**
-
-    Map[InstanceID, Map[String, Set[SafeURL]]]
-
+   * {
+   *   "shard": "instance-f1",
+   *   "targets": [
+   *     {
+   *       "bucket": "testing",
+   *       "urls": [
+   *         "http://...:5775/stream/sliding",
+   *         "http://...:5775/stream/sliding"
+   *       ]
+   *     }
+   *   ]
+   * }
    */
-  implicit val ShardingSnapshotAsJson: EncodeJson[(InstanceID, Map[String, List[SafeURL]])] =
+  implicit val ShardingSnapshotToJson: EncodeJson[(InstanceID, Map[String, List[SafeURL]])] =
     EncodeJson((m: (InstanceID, Map[String, List[SafeURL]])) =>
       ("shard"   := m._1) ->:
       ("targets" := m._2.toList) ->: jEmptyObject
     )
 
-  /*
-  {
-    "shard": "instance-f1",
-    "targets": [
-      {
-        "bucket": "testing",
-        "urls": [
-          "http://...:5775/stream/sliding",
-          "http://...:5775/stream/sliding"
-        ]
-      }
-    ]
-  }
-  */
-  // implicit val FlaskTargetsAsJson: EncodeJson[(InstanceID, Set[Target])] =
-  //   EncodeJson((t: (InstanceID, Set[Target])) =>
-  //     ("shard"   := t._1) ->:
-  //     ("targets" := List.empty[String]) ->: jEmptyObject
-  //   )
+  /**
+   * {
+   *   "firewalls": [
+   *     "imdev-flask-1-7-118-pbXOvo-WebServiceSecurityGroup-11WVCT4E6GY52",
+   *     "monitor-funnel"
+   *   ],
+   *   "datacenter": "us-east-1a",
+   *   "host": "ec2-54-197-46-246.compute-1.amazonaws.com",
+   *   "id": "i-0c24ede2"
+   * }
+   */
+  implicit val InstanceToJson: EncodeJson[Instance] =
+    EncodeJson((i: Instance) =>
+      ("id"         := i.id) ->:
+      ("host"       := i.location.dns) ->:
+      ("version"    := i.application.map(_.version)) ->:
+      ("datacenter" := i.location.datacenter) ->:
+      ("firewalls"  := i.firewalls.toList) ->:
+      ("tags"       := i.tags) ->: jEmptyObject
+    )
 
   ////////////////////// flask messages //////////////////////
 

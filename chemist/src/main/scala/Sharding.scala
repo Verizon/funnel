@@ -20,7 +20,7 @@ object Sharding {
    * obtain a list of flasks ordered by flasks with the least
    * assigned work first.
    */
-  def flasks(d: Distribution): Set[Flask] =
+  def shards(d: Distribution): Set[Flask] =
     sorted(d).keySet
 
   /**
@@ -134,7 +134,7 @@ object Sharding {
    * should be distributed over the known flask instances
    */
   private[chemist] def calculate(s: Set[Target])(d: Distribution)(implicit log: Logger): Seq[(Flask,Target)] = {
-    val servers = flasks(d)
+    val servers = shards(d)
     val ss      = servers.size
     val input   = deduplicate(s)(d)
     val is      = input.size // caching operation as its O(n)

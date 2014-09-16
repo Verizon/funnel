@@ -23,7 +23,7 @@ object Sandbox {
       // Deployed.lookupMany(List("i-114deb3c","i-4df70d61"))(E).run
       val list = Deployed.list(C, E).run
 
-      s"==================== ${list.length}"
+      s"==================== ${list.filter(Deployed.filter.flasks)}"
     }
   }
 
