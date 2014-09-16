@@ -45,6 +45,9 @@ object Server {
   def shards: Server[Seq[Instance]] =
     liftF(DescribeShards(identity))
 
+  def shard(id: InstanceID): Server[Option[Instance]] =
+    liftF(DescribeShards(identity)).map(_.find(_.id.toLowerCase == id.trim.toLowerCase))
+
   ////////////// threading ///////////////
 
   import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}

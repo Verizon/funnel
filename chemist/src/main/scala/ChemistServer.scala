@@ -75,12 +75,13 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
       path match {
         case Nil                    => handleIndex(req)
         // GET
-        case "status"        :: Nil => handleStatus(req)
-        case "distribution"  :: Nil => run(S.distribution.map(_.toList), req)
-        case "shards"        :: Nil => run(S.shards.map(_.toList), req)
+        case "status"       :: Nil => handleStatus(req)
+        case "distribution" :: Nil => run(S.distribution.map(_.toList), req)
+        case "shards"       :: Nil => run(S.shards.map(_.toList), req)
+        case "shards" :: id :: Nil => run(S.shard(id), req)
         // POST
-        case "distribute"    :: Nil => handleDistribute(req)
-        case _                      => handleNotImplemented(req)
+        case "distribute"   :: Nil => handleDistribute(req)
+        case _                     => handleNotImplemented(req)
       }
     }
     catch {
