@@ -45,13 +45,6 @@ object Server {
   def shards: Server[Seq[Instance]] =
     liftF(DescribeShards(identity))
 
-  // TODO: probally move this into the init of the interpreter
-  // as starting to listen on the queue is an infinite Task that
-  // will never "compelte"
-  // def listen: Server[Unit] =
-  //   liftF(Listen( () ))
-
-
   ////////////// threading ///////////////
 
   import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
@@ -164,8 +157,6 @@ trait Server extends Interpreter[Server.ServerF] {
         a <- R.distribution.map(Sharding.shards)
         b <- Task.gatherUnordered(a.map(R.instance).toSeq)
       } yield k(b)
-
-    // Task.now(k(Nil))
 
     // case Listen(k) =>
       // Lifecycle.run(queue, sqs, D).run.map(_ => k)
