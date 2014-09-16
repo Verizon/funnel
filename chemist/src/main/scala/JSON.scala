@@ -46,8 +46,10 @@ object JSON {
     EncodeJson((i: Instance) =>
       ("id"         := i.id) ->:
       ("host"       := i.location.dns) ->:
+      ("version"    := i.application.map(_.version)) ->:
       ("datacenter" := i.location.datacenter) ->:
-      ("firewalls"  := i.firewalls.toList) ->: jEmptyObject
+      ("firewalls"  := i.firewalls.toList) ->:
+      ("tags"       := i.tags) ->: jEmptyObject
     )
 
   ////////////////////// flask messages //////////////////////
