@@ -78,7 +78,7 @@ import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.regions.{Regions,Region}
 import com.amazonaws.services.sns.AmazonSNSClient
 import com.amazonaws.services.sqs.AmazonSQSClient
-import oncue.svc.funnel.aws.{SQS,SNS,EC2,ASG}
+import oncue.svc.funnel.internals.{SQS,SNS,EC2,ASG}
 import java.util.concurrent.atomic.AtomicReference
 
 trait Server extends Interpreter[Server.ServerF] {

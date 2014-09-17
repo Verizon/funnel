@@ -6,7 +6,7 @@ import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorServic
 import scala.concurrent.duration._
 import scala.language.higherKinds
 import scalaz.concurrent.{Actor,Strategy,Task}
-import scalaz.Nondeterminism
+import scalaz.{Nondeterminism,==>>}
 import scalaz.stream._
 import scalaz.stream.merge._
 import scalaz.stream.async
@@ -111,6 +111,8 @@ trait Monitoring {
   private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue
 
   private val urlSignals = new ConcurrentHashMap[URL, Signal[Unit]]
+
+  private val bucketUrls = new AtomicReference[BucketName ==>> URL]
 
   /**
    * Fetch a list of all the URLs that are currently being mirrored.

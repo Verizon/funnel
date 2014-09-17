@@ -12,7 +12,7 @@ import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
 import com.amazonaws.services.sns.{AmazonSNSClient,AmazonSNS}
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.regions.{Region, Regions}
-import oncue.svc.funnel.aws.SNS
+import oncue.svc.funnel.internals.SNS
 import riemann.Riemann
 import http.{MonitoringServer,SSE}
 

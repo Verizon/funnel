@@ -1,4 +1,4 @@
-package oncue.svc.funnel.aws
+package oncue.svc.funnel.internals
 
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.auth.{AWSCredentials,BasicAWSCredentials}
