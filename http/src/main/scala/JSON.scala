@@ -39,7 +39,7 @@ object JSON {
   def encode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).nospaces
   def prettyEncode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).spaces2
 
-  implicit val BucketCodecJson: DecodeJson[Bucket] =
+  implicit val BucketCodecJson: CodecJson[Bucket] =
     casecodec2(Bucket.apply, Bucket.unapply)("bucket", "urls")
 
   implicit val DoubleEncodeJson =

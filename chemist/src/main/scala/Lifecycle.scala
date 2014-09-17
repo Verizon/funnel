@@ -5,7 +5,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.{Process,Sink}
 import com.amazonaws.services.sqs.model.Message
 import com.amazonaws.services.sqs.AmazonSQS
-import oncue.svc.funnel.internals.{SQS,SNS}
+import oncue.svc.funnel.aws.{SQS,SNS}
 
 /**
  * The purpose of this object is to manage all the "lifecycle" events

@@ -25,7 +25,7 @@ trait Repository {
 }
 
 import com.amazonaws.services.ec2.AmazonEC2
-import oncue.svc.funnel.internals._
+import intelmedia.ws.funnel.internals._
 import journal.Logger
 
 case class MissingInstanceException(override val getMessage: String) extends RuntimeException(getMessage)

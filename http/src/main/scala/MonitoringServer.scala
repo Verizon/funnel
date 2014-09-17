@@ -139,6 +139,13 @@ class MonitoringServer(M: Monitoring, port: Int) {
     }
   }
 
+  private def handleListMirroringURLs(M: Monitoring, req: HttpExchange): Unit = {
+    import JSON._; import argonaut._, Argonaut._;
+    flush(200, M.mirroringUrls.map { 
+      case (a,b) => Bucket(a,b) 
+    }.asJson.nospaces.getBytes, req)
+  }
+
   private def handleAudit(M: Monitoring, req: HttpExchange): Unit = {
     import JSON._; import argonaut._, Argonaut._;
 
@@ -151,11 +158,6 @@ class MonitoringServer(M: Monitoring, port: Int) {
       list => flush(200,
         list.map(t => Audit(t._1, t._2)).asJson.nospaces.getBytes, req)
     )
-  }
-
-  private def handleListMirroringURLs(M: Monitoring, req: HttpExchange): Unit = {
-    import JSON._; import argonaut._, Argonaut._;
-    flush(200, M.mirroringUrls.toList.map(_.toString).asJson.nospaces.getBytes, req)
   }
 
   private def post(req: HttpExchange)(f: String => Unit): Unit = {

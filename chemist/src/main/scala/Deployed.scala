@@ -8,7 +8,7 @@ import scalaz.stream.Process
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
-import oncue.svc.funnel.internals._
+import oncue.svc.funnel.aws._
 
 /**
  * This module contains functions for describing the deployed world as the caller

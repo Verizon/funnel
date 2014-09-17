@@ -1,6 +1,6 @@
 package oncue.svc.funnel.chemist
 
-import oncue.svc.funnel.internals._
+import oncue.svc.funnel.aws._
 import com.amazonaws.auth.{AWSCredentials,BasicAWSCredentials}
 import scala.collection.JavaConverters._
 import scalaz.concurrent.Task

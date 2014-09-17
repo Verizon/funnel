@@ -1,4 +1,4 @@
-package oncue.svc.funnel.internals
+package oncue.svc.funnel.aws
 
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
 import com.amazonaws.services.sns.{AmazonSNS,AmazonSNSClient}
