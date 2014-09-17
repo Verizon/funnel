@@ -139,6 +139,13 @@ class MonitoringServer(M: Monitoring, port: Int) {
     }
   }
 
+  private def handleListMirroringURLs(M: Monitoring, req: HttpExchange): Unit = {
+    import JSON._; import argonaut._, Argonaut._;
+    flush(200, M.mirroringUrls.map {
+      case (a,b) => Bucket(a,b)
+    }.asJson.nospaces.getBytes, req)
+  }
+
   private def handleAudit(M: Monitoring, req: HttpExchange): Unit = {
     import JSON._; import argonaut._, Argonaut._;
 
@@ -178,14 +185,15 @@ class MonitoringServer(M: Monitoring, port: Int) {
         case p   => p.split("/").toList.tail
       }
       path match {
-        case Nil                       => handleIndex(req)
-        case "audit"  :: Nil           => handleAudit(M, req)
-        case "halt"   :: Nil           => handleHaltMirroringURLs(M, req)
-        case "mirror" :: Nil           => handleAddMirroringURLs(M, req)
-        case "keys"   :: tl            => handleKeys(M, tl.mkString("/"), req)
-        case "stream" :: "keys" :: Nil => handleKeysStream(M, req)
-        case "stream" :: tl            => handleStream(M, tl.mkString("/"), req)
-        case now                       => handleNow(M, now.mkString("/"), req)
+        case Nil                          => handleIndex(req)
+        case "audit"  :: Nil              => handleAudit(M, req)
+        case "halt"   :: Nil              => handleHaltMirroringURLs(M, req)
+        case "mirror" :: Nil              => handleAddMirroringURLs(M, req)
+        case "mirror" :: "sources" :: Nil => handleListMirroringURLs(M, req)
+        case "keys"   :: tl               => handleKeys(M, tl.mkString("/"), req)
+        case "stream" :: "keys" :: Nil    => handleKeysStream(M, req)
+        case "stream" :: tl               => handleStream(M, tl.mkString("/"), req)
+        case now                          => handleNow(M, now.mkString("/"), req)
       }
     }
     catch {

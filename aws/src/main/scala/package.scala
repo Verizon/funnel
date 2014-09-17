@@ -1,5 +1,6 @@
 package oncue.svc.funnel
 package object aws {
+
   type ARN = String
 
   import com.amazonaws.services.sns.AmazonSNSClient
@@ -14,5 +15,4 @@ package object aws {
       x <- SNS.subscribe(t,q,"sqs")(sns)
     } yield x
   }
-
 }
