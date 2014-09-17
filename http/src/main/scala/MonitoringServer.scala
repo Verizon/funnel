@@ -141,8 +141,8 @@ class MonitoringServer(M: Monitoring, port: Int) {
 
   private def handleListMirroringURLs(M: Monitoring, req: HttpExchange): Unit = {
     import JSON._; import argonaut._, Argonaut._;
-    flush(200, M.mirroringUrls.map { 
-      case (a,b) => Bucket(a,b) 
+    flush(200, M.mirroringUrls.map {
+      case (a,b) => Bucket(a,b)
     }.asJson.nospaces.getBytes, req)
   }
 
