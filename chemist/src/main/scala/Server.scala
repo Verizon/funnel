@@ -172,17 +172,22 @@ trait Server extends Interpreter[Server.ServerF] {
       // set the result to an in-memory list of "the world"
       _ <- Task.gatherUnordered(z.map(R.addInstance))
       // from the whole world, figure out which are flask instances
-      _ <- Task.gatherUnordered(z.filter(Deployed.filter.flasks).map(R.increaseCapacity))
-      // ask those flasks for their current work and update the distribution accordingly
-      _ <- Task.now(())
+      f = z.filter(Deployed.filter.flasks)
+      // update the distribution with new capacity seeds
+      _ <- Task.gatherUnordered(f.map(R.increaseCapacity))
+      // ask those flasks for their current work and yield a `Distribution`
+      d <- Sharding.gatherAssignedTargets(f)
+      // update the distribution accordingly
+      _ <- R.mergeDistribution(d)
       // start to wire up the topics and subscriptions to queues
-      // a <- SNS.create(topic)(sns)
-      // _  = log.debug(s"created sns topic with arn = $a")
-      // b <- SQS.create(queue)(sqs)
-      // _  = log.debug(s"created sqs queue with arn = $a")
-      // c <- SNS.subscribe(a, b)(sns)
-      // _  = log.debug(s"subscribed sqs queue to the sns topic")
-      // _ <- collateExistingWork
+      a <- SNS.create(topic)(sns)
+      _  = log.debug(s"created sns topic with arn = $a")
+
+      b <- SQS.create(queue)(sqs)
+      _  = log.debug(s"created sqs queue with arn = $a")
+
+      c <- SNS.subscribe(a, b)(sns)
+      _  = log.debug(s"subscribed sqs queue to the sns topic")
     } yield ()
 
 }

@@ -63,8 +63,7 @@ object Sharding {
    */
   def distribution(s: Set[Target]
     )(d: Distribution
-    )(implicit log: journal.Logger
-    ): (Seq[(Flask,Target)], Distribution) = {
+    )(implicit log: journal.Logger): (Seq[(Flask,Target)], Distribution) = {
     // this check is needed as otherwise the fold gets stuck in a gnarly
     // infinate loop, and this function never completes.
     if(s.isEmpty) (Seq.empty,d)
@@ -85,48 +84,6 @@ object Sharding {
 
       (work, dist)
     }
-  }
-
-  def locateAndAssignDistribution(t: Set[Target], r: Repository)(implicit log: Logger): Task[Map[Location, Seq[Target]]] = {
-    for {
-      x    <- r.distribution
-      (a,d) = distribution(t)(x)
-      // compute a new distribution given these new inputs
-      _     = log.debug(s"Sharding.distribute a=$a, d=$d")
-      // given we only want to issue commands to flasks once, lets bunch
-      // up those targets that have been assigned to the same flask so we
-      // can send them all over as a batch
-      grouped: Map[Flask, Seq[Target]] = a.groupBy(_._1).mapValues(_.map(_._2))
-      _ = log.debug(s"Sharding.distribute,grouped = $grouped")
-
-      tasks = grouped.map { case (f,seq) =>
-        r.instance(f).map(_.location).map((_,seq))
-      }
-      // pre-emtivly update our new state as the sending will take longer
-      // than updating and we dont want the world to change under our feet
-      _ <- r.mergeDistribution(d)
-      x <- Task.gatherUnordered(tasks.toList)
-    } yield x.toMap
-  }
-
-  def distribute(locations: Map[Location, Seq[Target]])(implicit log: Logger): Task[List[String]] =
-    Task.gatherUnordered(locations.map { case (loc,targets) =>
-      send(loc,targets) }.toSeq)
-
-  private def send(to: Location, targets: Seq[Target])(implicit log: Logger): Task[String] = {
-    import dispatch._, Defaults._
-    import argonaut._, Argonaut._
-    import JSON.BucketsToJSON
-
-    // FIXME: "safe" because we know we're passing in the default localhost
-    val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
-    val payload: Map[BucketName, List[SafeURL]] =
-      targets.groupBy(_.bucket).mapValues(_.map(_.url).toList)
-
-    log.debug(s"submitting to $host: $payload")
-
-    val svc = url(s"http://$host/mirror") << payload.toList.asJson.nospaces
-    fromScalaFuture(Http(svc OK as.String))
   }
 
   /**
@@ -171,6 +128,84 @@ object Sharding {
     delta.foldLeft(Set.empty[Target]){ (a,b) =>
       a ++ next.filter(_.url == b)
     }
+  }
+
+  ///////////////////////// IO functions ///////////////////////////
+
+  /**
+   * The goal here is given the `Set[Target]` be able to compute how things
+   * should be sharded, update the state, and then yield the results such that
+   * its possible to test to the nearest edge of the world without actually
+   * doing the side effect and calling the shards to assign the work (which would
+   * of course result in `Task[Unit]` and be a nightmare to test)
+   */
+  def locateAndAssignDistribution(t: Set[Target], r: Repository)(implicit log: Logger): Task[Map[Location, Seq[Target]]] = {
+    for {
+      x    <- r.distribution
+      (a,d) = distribution(t)(x)
+      // compute a new distribution given these new inputs
+      _     = log.debug(s"Sharding.distribute a=$a, d=$d")
+      // given we only want to issue commands to flasks once, lets bunch
+      // up those targets that have been assigned to the same flask so we
+      // can send them all over as a batch
+      grouped: Map[Flask, Seq[Target]] = a.groupBy(_._1).mapValues(_.map(_._2))
+      _ = log.debug(s"Sharding.distribute,grouped = $grouped")
+
+      tasks = grouped.map { case (f,seq) =>
+        r.instance(f).map(_.location).map((_,seq))
+      }
+      // pre-emtivly update our new state as the sending will take longer
+      // than updating and we dont want the world to change under our feet
+      _ <- r.mergeDistribution(d)
+      x <- Task.gatherUnordered(tasks.toList)
+    } yield x.toMap
+  }
+
+  /**
+   * Given a computer set of locations -> targets, actually send them to the
+   * relevant shard node API.
+   */
+  def distribute(locations: Map[Location, Seq[Target]])(implicit log: Logger): Task[List[String]] =
+    Task.gatherUnordered(locations.map { case (loc,targets) =>
+      send(loc,targets) }.toSeq)
+
+  /**
+   * Given a collection of flask instances, find out what exactly they are already
+   * mirroring and absorb that into the view of the world.
+   *
+   * This function should only really be used startup of chemist.
+   */
+  def gatherAssignedTargets(instances: Seq[Instance]): Task[Distribution] =
+    for {
+      a <- Task.gatherUnordered(instances.map(
+            i => requestAssignedTargets(i.location).map(i.id -> _)))
+    } yield a.foldLeft(Distribution.empty){ (a,b) =>
+      a.alter(b._1, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
+    }
+
+  /**
+   * Call out to the specific location and grab the list of things the flask
+   * is already mirroring.
+   */
+  private def requestAssignedTargets(location: Location): Task[Set[Target]] = ???
+
+  /**
+   * Touch the network and do the I/O using Dispatch.
+   */
+  private def send(to: Location, targets: Seq[Target])(implicit log: Logger): Task[String] = {
+    import dispatch._, Defaults._
+    import argonaut._, Argonaut._
+    import JSON.BucketsToJSON
+
+    // FIXME: "safe" because we know we're passing in the default localhost
+    val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
+    val payload: Map[BucketName, List[SafeURL]] =
+      targets.groupBy(_.bucket).mapValues(_.map(_.url).toList)
+
+    log.debug(s"submitting to $host: $payload")
+
+    val svc = url(s"http://$host/mirror") << payload.toList.asJson.nospaces
+    fromScalaFuture(Http(svc OK as.String))
   }
 
 }
