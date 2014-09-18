@@ -202,7 +202,7 @@ object Sharding {
       Parse.decodeOption[List[Bucket]](c
         ).toList.flatMap(identity
         ).foldLeft(Set.empty[Target]){ (a,b) =>
-          b.urls.map(Target(b.label, _))
+          b.urls.map(s => Target(b.label, SafeURL(s))).toSet
         }
     }
   }
