@@ -178,7 +178,7 @@ object Sharding {
   def gatherAssignedTargets(instances: Seq[Instance]): Task[Distribution] =
     for {
       a <- Task.gatherUnordered(instances.map(
-            i => requestAssignedTargets(i.location).map(i.id -> _)))
+            i => requestAssignedTargets(i).map(i.id -> _)))
     } yield a.foldLeft(Distribution.empty){ (a,b) =>
       a.alter(b._1, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
     }
@@ -187,7 +187,17 @@ object Sharding {
    * Call out to the specific location and grab the list of things the flask
    * is already mirroring.
    */
-  private def requestAssignedTargets(location: Location): Task[Set[Target]] = ???
+  private def requestAssignedTargets(instance: Instance): Task[Set[Target]] = {
+    import argonaut._, Argonaut._, JSON._
+
+    for {
+      u <- instance.asURL.fold(Task.fail(_), Task.now(_))
+      // o <-
+    } yield {
+      // Parse.decodeOption[List[Target]](o)
+      Set.empty[Target]
+    }
+  }
 
   /**
    * Touch the network and do the I/O using Dispatch.
@@ -198,14 +208,16 @@ object Sharding {
     import JSON.BucketsToJSON
 
     // FIXME: "safe" because we know we're passing in the default localhost
-    val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
+    // val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
     val payload: Map[BucketName, List[SafeURL]] =
       targets.groupBy(_.bucket).mapValues(_.map(_.url).toList)
 
-    log.debug(s"submitting to $host: $payload")
-
-    val svc = url(s"http://$host/mirror") << payload.toList.asJson.nospaces
-    fromScalaFuture(Http(svc OK as.String))
+    for {
+      a <- to.asURL(path = "mirror").fold(Task.fail(_), Task.now(_))
+      b  = url(a.toString) << payload.toList.asJson.nospaces
+      _  = log.debug(s"submitting to $a: $payload")
+      c <- fromScalaFuture(Http(b OK as.String))
+    } yield c
   }
 
 }

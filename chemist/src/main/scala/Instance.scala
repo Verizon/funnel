@@ -1,12 +1,21 @@
 package oncue.svc.funnel.chemist
 
+import java.net.URL
+import scalaz.{\/,\/-,-\/}
+
 case class Location(
   dns: Option[String],
   ip: String = "", // currently not needed so skipping for speed
   port: Int = 5775,
   datacenter: String,
   isPrivateNetwork: Boolean = false
-)
+){
+  def asURL(port: Int = port, path: String = ""): Throwable \/ URL =
+    dns match {
+      case Some(h) if h.nonEmpty => \/-(new URL(s"http://$h:$port/$path"))
+      case _ => -\/(new RuntimeException(s"No hostname is specified for the specified location."))
+    }
+}
 object Location {
   def localhost: Location =
     Location(
@@ -21,9 +30,6 @@ case class Application(
   version: String
 )
 
-import java.net.URL
-import scalaz.{\/,\/-,-\/}
-
 case class Instance(
   id: String,
   location: Location = Location.localhost,
@@ -36,15 +42,5 @@ case class Instance(
       b <- tags.get("revision")
     } yield Application(a,b)
 
-  // def hostAndPort: Option[HostAndPort] =
-  //   location.dns.map(_ + ":" + location.port)
-
-  def asURL: Throwable \/ URL = asURL()
-
-  def asURL(port: Int = location.port, path: String = ""): Throwable \/ URL =
-    location.dns match {
-      case Some(h) if h.nonEmpty => \/-(new URL(s"http://$h:$port/$path"))
-      case _ => -\/(new RuntimeException(s"No hostname is specified for $id"))
-    }
-
+  def asURL: Throwable \/ URL = location.asURL()
 }
