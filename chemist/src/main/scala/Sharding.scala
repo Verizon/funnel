@@ -175,27 +175,35 @@ object Sharding {
    *
    * This function should only really be used startup of chemist.
    */
-  def gatherAssignedTargets(instances: Seq[Instance]): Task[Distribution] =
+  def gatherAssignedTargets(instances: Seq[Instance])(implicit log: Logger): Task[Distribution] =
     for {
       a <- Task.gatherUnordered(instances.map(
-            i => requestAssignedTargets(i).map(i.id -> _)))
+            i => requestAssignedTargets(i.location).map(i.id -> _)))
     } yield a.foldLeft(Distribution.empty){ (a,b) =>
       a.alter(b._1, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
     }
+
+  import intelmedia.ws.funnel.http.{Bucket,JSON => HJSON}
 
   /**
    * Call out to the specific location and grab the list of things the flask
    * is already mirroring.
    */
-  private def requestAssignedTargets(instance: Instance): Task[Set[Target]] = {
-    import argonaut._, Argonaut._, JSON._
+  private def requestAssignedTargets(location: Location)(implicit log: Logger): Task[Set[Target]] = {
+    import argonaut._, Argonaut._, JSON._, HJSON._
+    import dispatch._, Defaults._
 
     for {
-      u <- instance.asURL.fold(Task.fail(_), Task.now(_))
-      // o <-
+      a <- location.asURL(path = "mirror/sources").fold(Task.fail(_), Task.now(_))
+      b  = url(a.toString)
+      _  = log.debug(s"requesting assigned targets from $a")
+      c <- fromScalaFuture(Http(b OK as.String))
     } yield {
-      // Parse.decodeOption[List[Target]](o)
-      Set.empty[Target]
+      Parse.decodeOption[List[Bucket]](c
+        ).toList.flatMap(identity
+        ).foldLeft(Set.empty[Target]){ (a,b) =>
+          b.urls.map(Target(b.label, _))
+        }
     }
   }
 
