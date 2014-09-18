@@ -16,6 +16,8 @@ object Sharding {
 
   case class Target(bucket: BucketName, url: SafeURL)
 
+  private lazy val log = Logger[Sharding.type]
+
   /**
    * obtain a list of flasks ordered by flasks with the least
    * assigned work first.
@@ -61,9 +63,7 @@ object Sharding {
    * 2. `Distribution` is that same sequence folded into a `Distribution` instance which can
    *     then be added to the existing state of the world.
    */
-  def distribution(s: Set[Target]
-    )(d: Distribution
-    )(implicit log: journal.Logger): (Seq[(Flask,Target)], Distribution) = {
+  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution) = {
     // this check is needed as otherwise the fold gets stuck in a gnarly
     // infinate loop, and this function never completes.
     if(s.isEmpty) (Seq.empty,d)
@@ -90,7 +90,7 @@ object Sharding {
    * Given the new set of urls to monitor, compute how said urls
    * should be distributed over the known flask instances
    */
-  private[chemist] def calculate(s: Set[Target])(d: Distribution)(implicit log: Logger): Seq[(Flask,Target)] = {
+  private[chemist] def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
     val servers = shards(d)
     val ss      = servers.size
     val input   = deduplicate(s)(d)
@@ -139,7 +139,7 @@ object Sharding {
    * doing the side effect and calling the shards to assign the work (which would
    * of course result in `Task[Unit]` and be a nightmare to test)
    */
-  def locateAndAssignDistribution(t: Set[Target], r: Repository)(implicit log: Logger): Task[Map[Location, Seq[Target]]] = {
+  def locateAndAssignDistribution(t: Set[Target], r: Repository): Task[Map[Location, Seq[Target]]] = {
     for {
       x    <- r.distribution
       (a,d) = distribution(t)(x)
@@ -165,7 +165,7 @@ object Sharding {
    * Given a computer set of locations -> targets, actually send them to the
    * relevant shard node API.
    */
-  def distribute(locations: Map[Location, Seq[Target]])(implicit log: Logger): Task[List[String]] =
+  def distribute(locations: Map[Location, Seq[Target]]): Task[List[String]] =
     Task.gatherUnordered(locations.map { case (loc,targets) =>
       send(loc,targets) }.toSeq)
 
@@ -175,7 +175,7 @@ object Sharding {
    *
    * This function should only really be used startup of chemist.
    */
-  def gatherAssignedTargets(instances: Seq[Instance])(implicit log: Logger): Task[Distribution] =
+  def gatherAssignedTargets(instances: Seq[Instance]): Task[Distribution] =
     for {
       a <- Task.gatherUnordered(instances.map(
             i => requestAssignedTargets(i.location).map(i.id -> _)))
@@ -189,14 +189,17 @@ object Sharding {
    * Call out to the specific location and grab the list of things the flask
    * is already mirroring.
    */
-  private def requestAssignedTargets(location: Location)(implicit log: Logger): Task[Set[Target]] = {
+  private def requestAssignedTargets(location: Location): Task[Set[Target]] = {
     import argonaut._, Argonaut._, JSON._, HJSON._
     import dispatch._, Defaults._
 
     for {
       a <- location.asURL(path = "mirror/sources").fold(Task.fail(_), Task.now(_))
+      _  = log.debug(s"attempting to fetch sources from $a")
+
       b  = url(a.toString)
       _  = log.debug(s"requesting assigned targets from $a")
+
       c <- fromScalaFuture(Http(b OK as.String))
     } yield {
       Parse.decodeOption[List[Bucket]](c
@@ -210,7 +213,7 @@ object Sharding {
   /**
    * Touch the network and do the I/O using Dispatch.
    */
-  private def send(to: Location, targets: Seq[Target])(implicit log: Logger): Task[String] = {
+  private def send(to: Location, targets: Seq[Target]): Task[String] = {
     import dispatch._, Defaults._
     import argonaut._, Argonaut._
     import JSON.BucketsToJSON
