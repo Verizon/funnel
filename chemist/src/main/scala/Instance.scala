@@ -3,6 +3,27 @@ package oncue.svc.funnel.chemist
 import java.net.URL
 import scalaz.{\/,\/-,-\/}
 
+case class Instance(
+  id: String,
+  location: Location = Location.localhost,
+  firewalls: Seq[String], // essentially security groups
+  tags: Map[String,String] = Map.empty
+){
+  private def fromAppNameAndRevision: Option[Application] =
+    for {
+      a <- tags.get("AppName")
+      b <- tags.get("revision")
+    } yield Application(a,b)
+
+  private def fromLegacyStackName: Option[Application] =
+    tags.get("aws:cloudformation:stack-name").map(Application(_, "unknown"))
+
+  def application: Option[Application] =
+    fromAppNameAndRevision orElse fromLegacyStackName
+
+  def asURL: Throwable \/ URL = location.asURL()
+}
+
 case class Location(
   dns: Option[String],
   ip: String = "", // currently not needed so skipping for speed
@@ -28,19 +49,7 @@ object Location {
 case class Application(
   name: String,
   version: String
-)
-
-case class Instance(
-  id: String,
-  location: Location = Location.localhost,
-  firewalls: Seq[String], // essentially security groups
-  tags: Map[String,String] = Map.empty
 ){
-  def application: Option[Application] =
-    for {
-      a <- tags.get("AppName")
-      b <- tags.get("revision")
-    } yield Application(a,b)
-
-  def asURL: Throwable \/ URL = location.asURL()
+  override def toString: String = s"$name-v$version"
 }
+

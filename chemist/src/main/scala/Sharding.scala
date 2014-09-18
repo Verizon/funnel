@@ -15,6 +15,16 @@ object Sharding {
   }
 
   case class Target(bucket: BucketName, url: SafeURL)
+  object Target {
+    val defaultResources = Seq("stream/previous")
+
+    def fromInstance(resources: Seq[String] = defaultResources)(i: Instance): Set[Target] =
+      (for {
+        a <- i.application
+        b <- i.asURL.toOption
+      } yield resources.map(r => Target(a.toString, SafeURL(b+r))).toSet
+      ).getOrElse(Set.empty[Target])
+  }
 
   private lazy val log = Logger[Sharding.type]
 
@@ -141,9 +151,10 @@ object Sharding {
    */
   def locateAndAssignDistribution(t: Set[Target], r: Repository): Task[Map[Location, Seq[Target]]] = {
     for {
+      // read the current distribution from the repository
       x    <- r.distribution
-      (a,d) = distribution(t)(x)
       // compute a new distribution given these new inputs
+      (a,d) = distribution(t)(x)
       _     = log.debug(s"Sharding.distribute a=$a, d=$d")
       // given we only want to issue commands to flasks once, lets bunch
       // up those targets that have been assigned to the same flask so we
