@@ -130,7 +130,7 @@ object Main {
 
     import elastic._
 
-    Elastic.publish(M, "").run
+    Elastic.publish(M, "http://10.0.1.11:9200/funnel/fun", "localhost").run
 
     options.riemann.foreach { riemann =>
       val R = RiemannClient.tcp(riemann.host, riemann.port)

@@ -67,17 +67,29 @@ object Elastic {
         ("host" := name.getOrElse(flaskName)) ->:
         m.toList.foldLeft(jEmptyObject) {
           case (o, (path, dp)) =>
-            o deepmerge path.foldRight((dp.asJson -| "value").get)((a, b) => (a := b) ->: jEmptyObject)
+            o deepmerge path.foldRight((dp.asJson -| "value").get)((a, b) =>
+              (a := b) ->: jEmptyObject)
         }
       })
     }.repeat
 
   import Events._
   import scala.concurrent.duration._
+  import dispatch._, Defaults._
+  import scalaz.\/
+  import concurrent.{Future,ExecutionContext}
 
-  def publish(M: Monitoring, esURL: String,
-    retries: Event = Events.every(1 minutes))(
+  implicit def fromScalaFuture[A](a: Future[A])(implicit e: ExecutionContext): Task[A] =
+    Task async { k =>
+      a.onComplete {
+        t => k(\/.fromTryCatch(t.get)) }}
+
+  def publish(M: Monitoring, esURL: String, flaskName: String)(
     implicit log: String => Unit): Task[Unit] =
-      (Monitoring.subscribe(M)(_ => true) |> elasticGroup).evalMap(m => Task(println(m))).run
-
+      (Monitoring.subscribe(M)(_.name.startsWith("previous")) |>
+        elasticGroup |> elasticUngroup(flaskName)).evalMap { json =>
+          val req = url(esURL).setContentType("application/json", "UTF-8") << json.nospaces
+          fromScalaFuture(Http(req OK as.String)).attempt.map(
+            _.fold(e => log("error in:\n" + json.nospaces), _ => ()))
+        }.run
 }
