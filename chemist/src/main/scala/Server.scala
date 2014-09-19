@@ -86,7 +86,7 @@ trait Server extends Interpreter[Server.ServerF] {
   import journal.Logger
   import Server._
 
-  implicit val log = Logger("chemist")
+  implicit lazy val log = Logger[Server.type]
 
   /////// configuration resolution ////////
 
@@ -165,25 +165,56 @@ trait Server extends Interpreter[Server.ServerF] {
       // Lifecycle.run(queue, sqs, D).run.map(_ => k)
   }
 
-  protected def init(): Task[Unit] =
+  protected def init(): Task[Unit] = {
+    log.debug("attempting to read the world of deployed instances")
     for {
       // read the list of all deployed machines
-      z <- Deployed.list(asg, ec2)
+      l <- Deployed.list(asg, ec2)
+      // filter out all the instances that are in private networks
+      // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
+      z  = l.filterNot(_.location.isPrivateNetwork)
+      _  = log.debug(s"located ${z.length} instances that appear to be monitorable")
+
+      // convert the instance list into reachable targets
+      t  = z.flatMap(Target.fromInstance(cfg.require[List[String]]("chemist.resources-to-monitor"))).toSet
+      _  = log.debug(s"targets are: $t")
+
       // set the result to an in-memory list of "the world"
       _ <- Task.gatherUnordered(z.map(R.addInstance))
+      _  = log.debug("added instances to the repository")
+
       // from the whole world, figure out which are flask instances
-      _ <- Task.gatherUnordered(z.filter(Deployed.filter.flasks).map(R.increaseCapacity))
-      // ask those flasks for their current work and update the distribution accordingly
-      _ <- Task.now(())
+      f  = z.filter(Deployed.filter.flasks)
+      _  = log.debug(s"found ${f.length} flasks in the running instance list")
+
+      // update the distribution with new capacity seeds
+      _ <- Task.gatherUnordered(f.map(R.increaseCapacity))
+      _  = log.debug("increased the known monitoring capactiy based on discovered flasks")
+
+      // ask those flasks for their current work and yield a `Distribution`
+      d <- Sharding.gatherAssignedTargets(f)
+      _  = log.debug("read the existing state of assigned work from the remote instances")
+
+      // update the distribution accordingly
+      _ <- R.mergeDistribution(d)
+      _  = log.debug("merged the currently assigned work into the current distribution")
+
+      _ <- for {
+        h <- Sharding.locateAndAssignDistribution(t,R)
+        g <- Sharding.distribute(h)
+      } yield ()
+
       // start to wire up the topics and subscriptions to queues
-      // a <- SNS.create(topic)(sns)
-      // _  = log.debug(s"created sns topic with arn = $a")
-      // b <- SQS.create(queue)(sqs)
-      // _  = log.debug(s"created sqs queue with arn = $a")
-      // c <- SNS.subscribe(a, b)(sns)
-      // _  = log.debug(s"subscribed sqs queue to the sns topic")
-      // _ <- collateExistingWork
+      a <- SNS.create(topic)(sns)
+      _  = log.debug(s"created sns topic with arn = $a")
+
+      b <- SQS.create(queue)(sqs)
+      _  = log.debug(s"created sqs queue with arn = $a")
+
+      c <- SNS.subscribe(a, b)(sns)
+      _  = log.debug(s"subscribed sqs queue to the sns topic")
     } yield ()
+  }
 
 }
 
