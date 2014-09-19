@@ -424,8 +424,10 @@ object Monitoring {
 
   val default: Monitoring = instance(defaultPool, printLog)
 
+  private lazy val log = journal.Logger[Monitoring.type]
+
   private lazy val printLog: String => Unit = { s =>
-    println(s)
+    log.debug(s)
   }
 
   def instance(implicit ES: ExecutorService = defaultPool,

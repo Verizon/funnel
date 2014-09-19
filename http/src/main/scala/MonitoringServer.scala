@@ -179,7 +179,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
 
   protected def handleMetrics(M: Monitoring) = new HttpHandler {
     def handle(req: HttpExchange): Unit = try {
-      M.log("path: " + req.getRequestURI.getPath)
+      M.log("requested path: " + req.getRequestURI.getPath)
       val path = req.getRequestURI.getPath match {
         case "/" => Nil
         case p   => p.split("/").toList.tail

@@ -78,7 +78,6 @@ class StatefulRepository(ec2: AmazonEC2) extends Repository {
     log.debug(s"increaseCapacity instanceId=$instanceId")
     for {
       i <- Deployed.lookupOne(instanceId)(ec2)
-      // _  = println(s"increaseCapacity i=$i")
       a <- increaseCapacity(i)
     } yield a
   }
