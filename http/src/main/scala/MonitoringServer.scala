@@ -298,15 +298,10 @@ class MonitoringServer(M: Monitoring, port: Int) {
     |    <div class="container">
     |      <div class="header">
     |        <ul class="nav nav-pills pull-right">
-    |          <li><a href="http://github-media.sc.intel.com/pages/intelmedia/funnel/">About</a></li>
+    |          <li><a href="https://github.svc.oncue.com/pages/intelmedia/funnel/">About</a></li>
     |          <li><a href="mailto:timothy.m.perrett@oncue.com">Contact</a></li>
     |        </ul>
     |        <h3 class="text-muted">Funnel Control Panel</h3>
-    |      </div>
-    |
-    |      <div class="jumbotron">
-    |        <p class="lead">Once this system is deployed, visulize the instrumented cluster data in real-time dashboards which you can save to your github account. Simply click the button below to get started.</p>
-    |        <p><a class="btn btn-lg btn-primary" href="http://github-media.sc.intel.com/login/oauth/authorize?client_id=8af95c578127c236c370&amp;scope=gist" role="button">Login with Github</a></p>
     |      </div>
     |
     |      <div class="row marketing">
@@ -324,7 +319,9 @@ class MonitoringServer(M: Monitoring, port: Int) {
     |        <div class="col-lg-6">
     |          <h4>Operations Resources</h4>
     |          <p><a href="/mirror">POST /now</a>: Dynamically mirror metrics from other funnel(s).</p>
-    |          <p><a href="/halt">POST /halt</a>: Stop mirroring metrics from the given funnel URLs).</p>
+    |          <p><a href="/halt">POST /halt</a>: Stop mirroring metrics from the given funnel URLs.</p>
+    |          <p><a href="/audit">GET /audit</a>: Display an aggregated view of all keys in this server broken down by previx.</p>
+    |          <p><a href="/mirror/sources">GET /mirror/sources</a>: If mirroring from other nodes, display the sources of those keys.</p>
     |        </div>
     |      </div>
     |
