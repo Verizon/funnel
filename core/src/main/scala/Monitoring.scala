@@ -113,7 +113,7 @@ trait Monitoring {
 
   private val urlSignals = new ConcurrentHashMap[URL, Signal[Unit]]
 
-  private val bucketUrls = new Ref[BucketName ==>> List[URL]](==>>())
+  private val bucketUrls = new Ref[BucketName ==>> Set[URL]](==>>())
 
   /**
    * Fetch a list of all the URLs that are currently being mirrored.
@@ -122,7 +122,7 @@ trait Monitoring {
    */
   def mirroringUrls: List[(BucketName, List[String])] = {
     bucketUrls.get.toList.map { case (k,s) =>
-      k -> s.map(_.toString)
+      k -> s.toList.map(_.toString)
     }
   }
 
@@ -136,28 +136,29 @@ trait Monitoring {
     nodeRetries: Names => Event = _ => defaultRetries
   )(implicit log: String => Unit): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
-    val alive = signal[Unit](S)
-    val active = signal[Set[URL]](S)
-    def modifyActive(f: Set[URL] => Set[URL]): Task[Unit] =
-      active.compareAndSet(a => Some(f(a.getOrElse(Set())))).map(_ => ())
+    val alive     = signal[Unit](S)
+    val active    = signal[Set[URL]](S)
+
+    /**
+     * Update the running state of the world by updating the URLs we know about
+     * to mirror, and the bucket -> url mapping.
+     */
+    def modifyActive(b: BucketName, f: Set[URL] => Set[URL]): Task[Unit] =
+      for {
+        _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set()))) )
+        _ <- Task( bucketUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty))))) )
+      } yield ()
+
     for {
       _ <- active.set(Set.empty)
       _ <- alive.set(())
       _ <- mirroringCommands.evalMap {
-        case Mirror(url,group) => Task.delay {
+        case Mirror(url,bucket) => Task.delay {
           val S = Strategy.Executor(Monitoring.serverPool)
           val hook = signal[Unit](S)
           hook.set(()).runAsync(_ => ())
 
           urlSignals.put(url, hook)
-          // jesus christ this is ugly.
-          // TODO: refactor this from such a filthy hack.
-          bucketUrls.update { x =>
-            x.alter(group, _ match {
-              case Some(seq) => Some(seq :+ url)
-              case None      => Some(List.empty)
-            })
-          }
 
           // adding the `localName` onto the string here so that later in the
           // process its possible to find the key we're specifically looking for
@@ -166,14 +167,14 @@ trait Monitoring {
 
           val received: Process[Task,Unit] = link(hook) {
             attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
-              url, m => s"$group/$m:::$localName")
+              url, m => s"$bucket/$m:::$localName")
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
             if (urls.contains(url)) Process.halt // skip it, alread running
-            else Process.eval_(modifyActive(_ + url)) ++ // add to active at start
+            else Process.eval_(modifyActive(bucket, _ + url)) ++ // add to active at start
               // and remove it when done
-              received.onComplete(Process.eval_(modifyActive(_ - url)))
+              received.onComplete(Process.eval_(modifyActive(bucket, _ - url)))
           }
 
           Task.fork(receivedIdempotent.run).runAsync(_.fold(
