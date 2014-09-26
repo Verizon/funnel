@@ -5,8 +5,6 @@ import scalaz.stream._
 
 /* Elastic Event format:
 {
-  "@timestamp": "2014-08-20T21:50:51.292Z",
-  "cluster": "improd-instanceeval-2-0-269-JJcxfuI",
   "host": "foo1.com",
   "http": {
     "get": {
@@ -28,12 +26,20 @@ import scalaz.stream._
 object Elastic {
   type Name = String
   type Path = List[String]
+
+  /** Data points grouped by mirror URL and key */
   type ESGroup[A] = Map[Option[Name], Map[Path, Datapoint[A]]]
 
   import Process._
   import scalaz.concurrent.Task
   import scalaz.Tree
 
+  /**
+   * Groups data points by key and mirror URL.
+   * Emits when it receives a key/mirror where the key is already in the group for the mirror.
+   * That is, emits as few times as possible without duplicates
+   * and without dropping any data.
+   */
   def elasticGroup[A]: Process1[Datapoint[A], ESGroup[A]] = {
     def go(m: ESGroup[A]):
     Process1[Datapoint[A], ESGroup[A]] =
@@ -61,6 +67,11 @@ object Elastic {
   import Argonaut._
   import http.JSON._
 
+  /**
+   * Emits one JSON document per mirror URL.
+   * Once grouped by `elasticGroup`, this process emits one document per URL
+   * with all the key/value pairs that were seen for that mirror in the group.
+   */
   def elasticUngroup[A](flaskName: String): Process1[ESGroup[A], Json] =
     await1[ESGroup[A]].flatMap { g =>
       emitAll(g.toSeq.map { case (name, m) =>
@@ -84,6 +95,9 @@ object Elastic {
       a.onComplete {
         t => k(\/.fromTryCatch(t.get)) }}
 
+  /**
+   * Publishes to an ElasticSearch URL at `esURL`.
+   */
   def publish(M: Monitoring, esURL: String, flaskName: String)(
     implicit log: String => Unit): Task[Unit] =
       (Monitoring.subscribe(M)(_.name.startsWith("previous")) |>
