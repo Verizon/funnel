@@ -31,7 +31,7 @@ object Main {
   case class HostPort(host: String, port: Int)
 
   case class Options(
-    elastic: Option[HostPort] = None,
+    elastic: Option[String] = None,
     riemann: Option[HostPort] = None,
     riemannTTL: Duration = 5 minutes,
     funnelPort: Int = 5775,
@@ -76,14 +76,12 @@ object Main {
     val (options, cfg) = config.flatMap { cfg =>
       val port        = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
       val name        = cfg.lookup[String]("flask.name").getOrElse("flask")
-      val elasticHost = cfg.lookup[String]("flask.elastic-search.host")
-      val elasticPort = cfg.lookup[Int]("flask.elastic-search.port")
+      val elasticUrl  = cfg.lookup[String]("flask.elastic-search.url")
       val riemannHost = cfg.lookup[String]("flask.riemann.host")
       val riemannPort = cfg.lookup[Int]("flask.riemann.port")
       val ttl         = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").getOrElse(5).minutes
       val riemann     = (riemannHost |@| riemannPort)(HostPort)
-      val elastic     = (elasticHost |@| elasticPort)(HostPort)
-      Task((Options(elastic, riemann, ttl, port), cfg))
+      Task((Options(elasticUrl, riemann, ttl, port), cfg))
     }.run
 
     val logger = LoggerFactory.getLogger("flask")
@@ -130,7 +128,9 @@ object Main {
 
     import elastic._
 
-    Elastic.publish(M, "http://10.0.1.11:9200/funnel/fun", "localhost").run
+    options.elastic.foreach { elastic =>
+      Elastic.publish(M, elastic, flaskName)
+    }
 
     options.riemann.foreach { riemann =>
       val R = RiemannClient.tcp(riemann.host, riemann.port)
