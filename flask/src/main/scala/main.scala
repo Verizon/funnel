@@ -7,6 +7,8 @@ import com.aphyr.riemann.client.RiemannClient
 import scala.concurrent.duration._
 import scalaz.concurrent.{Task,Strategy,Actor}
 import scalaz.stream.Process
+import scalaz.std.option._
+import scalaz.syntax.applicative._
 import knobs.{Config, Required, ClassPathResource, FileResource}
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
 import com.amazonaws.services.sns.{AmazonSNSClient,AmazonSNS}
@@ -26,10 +28,11 @@ object Main {
   import Events.Event
   import scalaz.\/._
 
-  case class RiemannHostPort(host: String, port: Int)
+  case class HostPort(host: String, port: Int)
 
   case class Options(
-    riemann: Option[RiemannHostPort] = None,
+    elastic: Option[String] = None,
+    riemann: Option[HostPort] = None,
     riemannTTL: Duration = 5 minutes,
     funnelPort: Int = 5775,
     transport: DatapointParser = SSE.readEvents _
@@ -45,7 +48,7 @@ object Main {
     Process.eval(SNS.publish(cfg.require[String]("flask.sns-error-topic"), msg)(sns))
   }
 
-  private def riemannErrorAndQuit(rm: RiemannHostPort, f: () => Unit): Unit = {
+  private def riemannErrorAndQuit(rm: HostPort, f: () => Unit): Unit = {
     val msg = s"# Riemann is not running at the specified location (${rm.host}:${rm.port}) #"
     val padding = (for(_ <- 1 to msg.length) yield "#").mkString
     Console.err.println(padding)
@@ -73,11 +76,12 @@ object Main {
     val (options, cfg) = config.flatMap { cfg =>
       val port        = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
       val name        = cfg.lookup[String]("flask.name").getOrElse("flask")
-      val riemannHost = cfg.lookup[String]("flask.riemann.host").getOrElse("localhost")
-      val riemannPort = cfg.lookup[Int]("flask.riemann.port").getOrElse(5555)
+      val elasticUrl  = cfg.lookup[String]("flask.elastic-search.url")
+      val riemannHost = cfg.lookup[String]("flask.riemann.host")
+      val riemannPort = cfg.lookup[Int]("flask.riemann.port")
       val ttl         = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").getOrElse(5).minutes
-      val riemann     = Option(RiemannHostPort(riemannHost,riemannPort))
-      Task((Options(riemann, ttl, port), cfg))
+      val riemann     = (riemannHost |@| riemannPort)(HostPort)
+      Task((Options(elasticUrl, riemann, ttl, port), cfg))
     }.run
 
     val logger = LoggerFactory.getLogger("flask")
@@ -121,6 +125,12 @@ object Main {
     val flaskName = cfg.lookup[String]("flask.name").getOrElse(localhost)
 
     runAsync(M.processMirroringEvents(SSE.readEvents, flaskName, retries))
+
+    import elastic._
+
+    options.elastic.foreach { elastic =>
+      Elastic.publish(M, elastic, flaskName)
+    }
 
     options.riemann.foreach { riemann =>
       val R = RiemannClient.tcp(riemann.host, riemann.port)
