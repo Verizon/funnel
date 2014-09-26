@@ -25,6 +25,7 @@ trait Repository {
 }
 
 import com.amazonaws.services.ec2.AmazonEC2
+import intelmedia.ws.funnel.internals._
 import journal.Logger
 
 case class MissingInstanceException(override val getMessage: String) extends RuntimeException(getMessage)
@@ -74,10 +75,9 @@ class StatefulRepository(ec2: AmazonEC2) extends Repository {
    * when a new flask comes online, we want to add that flask to the in-memory
    */
   def increaseCapacity(instanceId: InstanceID): Task[(Distribution,InstanceM)] = {
-    println(s"increaseCapacity instanceId=$instanceId")
+    log.debug(s"increaseCapacity instanceId=$instanceId")
     for {
       i <- Deployed.lookupOne(instanceId)(ec2)
-      // _  = println(s"increaseCapacity i=$i")
       a <- increaseCapacity(i)
     } yield a
   }

@@ -2,11 +2,11 @@ package intelmedia.ws.funnel
 
 import java.net.{URL,URLEncoder}
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
+import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory, ConcurrentHashMap}
 import scala.concurrent.duration._
 import scala.language.higherKinds
 import scalaz.concurrent.{Actor,Strategy,Task}
-import scalaz.Nondeterminism
+import scalaz.{Nondeterminism,==>>}
 import scalaz.stream._
 import scalaz.stream.merge._
 import scalaz.stream.async
@@ -17,6 +17,7 @@ import scalaz.{\/, ~>, Monad}
 import Events.Event
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.signal
+import internals._
 
 /**
  * A hub for publishing and subscribing to streams
@@ -110,28 +111,49 @@ trait Monitoring {
 
   private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue
 
-  private val urlSignals = new java.util.concurrent.ConcurrentHashMap[URL, Signal[Unit]]
+  private val urlSignals = new ConcurrentHashMap[URL, Signal[Unit]]
+
+  private val bucketUrls = new Ref[BucketName ==>> Set[URL]](==>>())
+
+  /**
+   * Fetch a list of all the URLs that are currently being mirrored.
+   * If nothing is currently being mirrored (as is the case for all funnels)
+   * then this method yields an empty `Set[URL]`.
+   */
+  def mirroringUrls: List[(BucketName, List[String])] = {
+    bucketUrls.get.toList.map { case (k,s) =>
+      k -> s.toList.map(_.toString)
+    }
+  }
 
   /** Terminate `p` when the given `Signal` terminates. */
   def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
     alive.continuous.zip(p).map(_._2)
 
-  //private[funnel]
   def processMirroringEvents(
     parse: DatapointParser,
     myName: String = "Funnel Mirror",
     nodeRetries: Names => Event = _ => defaultRetries
   )(implicit log: String => Unit): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
-    val alive = signal[Unit](S)
-    val active = signal[Set[URL]](S)
-    def modifyActive(f: Set[URL] => Set[URL]): Task[Unit] =
-      active.compareAndSet(a => Some(f(a.getOrElse(Set())))).map(_ => ())
+    val alive     = signal[Unit](S)
+    val active    = signal[Set[URL]](S)
+
+    /**
+     * Update the running state of the world by updating the URLs we know about
+     * to mirror, and the bucket -> url mapping.
+     */
+    def modifyActive(b: BucketName, f: Set[URL] => Set[URL]): Task[Unit] =
+      for {
+        _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set()))) )
+        _ <- Task( bucketUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty))))) )
+      } yield ()
+
     for {
       _ <- active.set(Set.empty)
       _ <- alive.set(())
       _ <- mirroringCommands.evalMap {
-        case Mirror(url,group) => Task.delay {
+        case Mirror(url,bucket) => Task.delay {
           val S = Strategy.Executor(Monitoring.serverPool)
           val hook = signal[Unit](S)
           hook.set(()).runAsync(_ => ())
@@ -145,14 +167,14 @@ trait Monitoring {
 
           val received: Process[Task,Unit] = link(hook) {
             attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
-              url, m => s"$group/$m:::$localName")
+              url, m => s"$bucket/$m:::$localName")
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
             if (urls.contains(url)) Process.halt // skip it, alread running
-            else Process.eval_(modifyActive(_ + url)) ++ // add to active at start
+            else Process.eval_(modifyActive(bucket, _ + url)) ++ // add to active at start
               // and remove it when done
-              received.onComplete(Process.eval_(modifyActive(_ - url)))
+              received.onComplete(Process.eval_(modifyActive(bucket, _ - url)))
           }
 
           Task.fork(receivedIdempotent.run).runAsync(_.fold(
@@ -403,8 +425,10 @@ object Monitoring {
 
   val default: Monitoring = instance(defaultPool, printLog)
 
+  private lazy val log = journal.Logger[Monitoring.type]
+
   private lazy val printLog: String => Unit = { s =>
-    println(s)
+    log.debug(s)
   }
 
   def instance(implicit ES: ExecutorService = defaultPool,
