@@ -130,7 +130,7 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
     val currEstab = num("curr_estab", "Number of open sockets")
     val passiveOpens = num("passive_opens", "Number of open server connections")
     val activeOpens = num("active_opens", "Number of open client connections")
-    val attemptFails = num("attempt_fails", "Number of client connection failures")
+    val attemptFails = num("attempt_fails", "Number of failed client connections")
   }
 
   def instrument(
