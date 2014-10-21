@@ -20,3 +20,4 @@ bin
 .lib
 *.swp
 sbt
+*~

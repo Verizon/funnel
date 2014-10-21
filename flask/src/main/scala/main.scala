@@ -129,7 +129,7 @@ object Main {
     import elastic._
 
     options.elastic.foreach { elastic =>
-      Elastic.publish(M, elastic, flaskName)
+      runAsync(Elastic.publish(M, elastic, flaskName))
     }
 
     options.riemann.foreach { riemann =>
