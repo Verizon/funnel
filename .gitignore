@@ -21,3 +21,4 @@ bin
 *.swp
 sbt
 *~
+tags
