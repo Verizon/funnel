@@ -22,9 +22,11 @@ object ElasticTest extends Properties("elastic") {
     d <- Gen.posNum[Double]
   } yield Datapoint(k, d)
 
+  import Elastic._
+
   // At least one group per key/host pair. I.e. no data is lost.
   property("elasticGroupTop") = Prop.forAll(Gen.listOf(datapoint)) { dps =>
-    val gs = Elastic.elasticGroup(dps ++ dps)
+    val gs = elasticGroup(dps ++ dps)
     val sz = gs.map(_.mapValues(_.size).values.sum).sum
     sz >= dps.size
   }
@@ -32,6 +34,12 @@ object ElasticTest extends Properties("elastic") {
   // Emits as few times as possible
   property("elasticGroupBottom") = Prop.forAll(Gen.listOf(datapoint)) { dps =>
     val noDups = dps.groupBy(_.key).mapValues(_.head).values
-    Elastic.elasticGroup(noDups ++ noDups).size == 1 || dps.size == 0
+    elasticGroup(noDups ++ noDups).size == 1 || dps.size == 0
+  }
+
+  property("elasticUngroup") = Prop.forAll(Gen.listOf(datapoint)) { dps =>
+    val gs = elasticGroup(dps ++ dps)
+    val ug = elasticUngroup("flask")(gs)
+    gs.map(_.size).sum == ug.size
   }
 }
