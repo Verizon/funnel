@@ -105,9 +105,7 @@ object Elastic {
     implicit log: String => Unit): Task[Unit] =
       (Monitoring.subscribe(M)(x => !x.name.startsWith("now") && !x.name.startsWith("sliding")) |>
         elasticGroup |> elasticUngroup(flaskName)).evalMap { json =>
-          val req =
-            url(esURL).setContentType("application/json", "UTF-8") <<
-              json.nospaces
+          val req = url(esURL).setContentType("application/json", "UTF-8") << json.nospaces
           fromScalaFuture(Http(req OK as.String)).attempt.map(
             _.fold(e => log("error in:\n" + json.nospaces), _ => ()))
         }.run
