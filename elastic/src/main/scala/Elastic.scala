@@ -100,7 +100,7 @@ object Elastic {
    */
   def publish(M: Monitoring, esURL: String, flaskName: String)(
     implicit log: String => Unit): Task[Unit] =
-      (Monitoring.subscribe(M)(_.name.startsWith("previous")) |>
+      (Monitoring.subscribe(M)(x => !x.name.startsWith("now") && !x.name.startsWith("sliding")) |>
         elasticGroup |> elasticUngroup(flaskName)).evalMap { json =>
           val req = url(esURL).setContentType("application/json", "UTF-8") << json.nospaces
           fromScalaFuture(Http(req OK as.String)).attempt.map(
