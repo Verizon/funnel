@@ -66,6 +66,8 @@ object Elastic {
   import argonaut._
   import Argonaut._
   import http.JSON._
+  import java.util.Date
+  import java.text.SimpleDateFormat
 
   /**
    * Emits one JSON document per mirror URL.
@@ -76,6 +78,7 @@ object Elastic {
     await1[ESGroup[A]].flatMap { g =>
       emitAll(g.toSeq.map { case (name, m) =>
         ("host" := name.getOrElse(flaskName)) ->:
+        ("_timestamp" := new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
         m.toList.foldLeft(jEmptyObject) {
           case (o, (path, dp)) =>
             o deepmerge path.foldRight((dp.asJson -| "value").get)((a, b) =>
