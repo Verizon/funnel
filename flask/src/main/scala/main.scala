@@ -17,6 +17,7 @@ import com.amazonaws.regions.{Region, Regions}
 import oncue.svc.funnel.aws.SNS
 import riemann.Riemann
 import http.{MonitoringServer,SSE}
+import elastic._
 
 /**
   * How to use: Modify oncue/flask.cfg on the classpath
@@ -31,7 +32,7 @@ object Main {
   case class HostPort(host: String, port: Int)
 
   case class Options(
-    elastic: Option[String] = None,
+    elastic: Option[ElasticCfg] = None,
     riemann: Option[HostPort] = None,
     riemannTTL: Duration = 5 minutes,
     funnelPort: Int = 5775,
@@ -76,12 +77,15 @@ object Main {
     val (options, cfg) = config.flatMap { cfg =>
       val port        = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
       val name        = cfg.lookup[String]("flask.name").getOrElse("flask")
-      val elasticUrl  = cfg.lookup[String]("flask.elastic-search.url")
+      val elasticURL  = cfg.lookup[String]("flask.elastic-search.url")
+      val elasticIx   = cfg.lookup[String]("flask.elastic-search.index-name")
+      val elasticTy   = cfg.lookup[String]("flask.elastic-search.type-name")
       val riemannHost = cfg.lookup[String]("flask.riemann.host")
       val riemannPort = cfg.lookup[Int]("flask.riemann.port")
       val ttl         = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").getOrElse(5).minutes
       val riemann     = (riemannHost |@| riemannPort)(HostPort)
-      Task((Options(elasticUrl, riemann, ttl, port), cfg))
+      val elastic     = (elasticURL |@| elasticIx |@| elasticTy)(ElasticCfg)
+      Task((Options(elastic, riemann, ttl, port), cfg))
     }.run
 
     val logger = LoggerFactory.getLogger("flask")
@@ -125,8 +129,6 @@ object Main {
     val flaskName = cfg.lookup[String]("flask.name").getOrElse(localhost)
 
     runAsync(M.processMirroringEvents(SSE.readEvents, flaskName, retries))
-
-    import elastic._
 
     options.elastic.foreach { elastic =>
       runAsync(Elastic.publish(M, elastic, flaskName))

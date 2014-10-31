@@ -27,6 +27,8 @@ import scalaz.stream._
 }
 */
 
+case class ElasticCfg(url: String, indexName: String, typeName: String)
+
 object Elastic {
   type Name = String
   type Path = List[String]
@@ -89,8 +91,9 @@ object Elastic {
             val obj = if (p == "previous")
               jEmptyObject else
               ("cluster" := p.asJson) ->: jEmptyObject
+            val ps = if (p == "previous") path else path.tail
             obj deepmerge
-              (o deepmerge path.foldRight((dp.asJson -| "value").get)((a, b) =>
+              (o deepmerge ps.foldRight((dp.asJson -| "value").get)((a, b) =>
                 (a := b) ->: jEmptyObject))
         }
       })
@@ -110,11 +113,13 @@ object Elastic {
   /**
    * Publishes to an ElasticSearch URL at `esURL`.
    */
-  def publish(M: Monitoring, esURL: String, flaskName: String)(
+  def publish(M: Monitoring, es: ElasticCfg, flaskName: String)(
     implicit log: String => Unit): Task[Unit] =
       (Monitoring.subscribe(M)(x => !x.name.startsWith("now/") && !x.name.startsWith("sliding/")) |>
         elasticGroup |> elasticUngroup(flaskName)).evalMap { json =>
-          val req = url(esURL).setContentType("application/json", "UTF-8") << json.nospaces
+          val date = new SimpleDateFormat("yyyy.MM.dd").format(new Date)
+          val req = url(s"${es.url}/${es.indexName}_${date}/${es.typeName}").
+            setContentType("application/json", "UTF-8") << json.nospaces
           fromScalaFuture(Http(req OK as.String)).attempt.map(
             _.fold(e => log("error in:\n" + json.nospaces), _ => ()))
         }.run
