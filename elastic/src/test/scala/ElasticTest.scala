@@ -37,9 +37,9 @@ object ElasticTest extends Properties("elastic") {
     elasticGroup(noDups ++ noDups).size == 1 || dps.size == 0
   }
 
-  property("elasticUngroup") = Prop.forAll(Gen.listOf(datapoint)) { dps =>
-    val gs = elasticGroup(dps ++ dps)
-    val ug = elasticUngroup("flask")(gs)
-    gs.map(_.size).sum == ug.size
-  }
+  //property("elasticUngroup") = Prop.forAll(Gen.listOf(datapoint)) { dps =>
+  //  val gs = elasticGroup(dps ++ dps)
+  //  val ug = elasticUngroup("flask")(gs)
+  //  gs.map(_.size).sum == ug.size
+  //}
 }
