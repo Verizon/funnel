@@ -80,11 +80,13 @@ object Main {
       val elasticURL  = cfg.lookup[String]("flask.elastic-search.url")
       val elasticIx   = cfg.lookup[String]("flask.elastic-search.index-name")
       val elasticTy   = cfg.lookup[String]("flask.elastic-search.type-name")
+      val elasticDf   = cfg.lookup[String]("flask.elastic-search.partition-date-format").
+        getOrElse("yyyy.MM.dd")
       val riemannHost = cfg.lookup[String]("flask.riemann.host")
       val riemannPort = cfg.lookup[Int]("flask.riemann.port")
       val ttl         = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").getOrElse(5).minutes
       val riemann     = (riemannHost |@| riemannPort)(HostPort)
-      val elastic     = (elasticURL |@| elasticIx |@| elasticTy)(ElasticCfg)
+      val elastic     = (elasticURL |@| elasticIx |@| elasticTy)(ElasticCfg(_, _, _, elasticDf))
       Task((Options(elastic, riemann, ttl, port), cfg))
     }.run
 

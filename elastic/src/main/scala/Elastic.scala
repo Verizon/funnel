@@ -27,7 +27,7 @@ import scalaz.stream._
 }
 */
 
-case class ElasticCfg(url: String, indexName: String, typeName: String)
+case class ElasticCfg(url: String, indexName: String, typeName: String, dateFormat: String)
 
 object Elastic {
   type Name = String
@@ -117,7 +117,7 @@ object Elastic {
     implicit log: String => Unit): Task[Unit] =
       (Monitoring.subscribe(M)(x => !x.name.startsWith("now/") && !x.name.startsWith("sliding/")) |>
         elasticGroup |> elasticUngroup(flaskName)).evalMap { json =>
-          val date = new SimpleDateFormat("yyyy.MM.dd").format(new Date)
+          val date = new SimpleDateFormat(es.dateFormat).format(new Date)
           val req = url(s"${es.url}/${es.indexName}_${date}/${es.typeName}").
             setContentType("application/json", "UTF-8") << json.nospaces
           fromScalaFuture(Http(req OK as.String)).attempt.map(
