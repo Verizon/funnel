@@ -118,7 +118,7 @@ object Elastic {
       (Monitoring.subscribe(M)(x => !x.name.startsWith("now/") && !x.name.startsWith("sliding/")) |>
         elasticGroup |> elasticUngroup(flaskName)).evalMap { json =>
           val date = new SimpleDateFormat(es.dateFormat).format(new Date)
-          val req = url(s"${es.url}/${es.indexName}_${date}/${es.typeName}").
+          val req = url(s"${es.url}/${es.indexName}-${date}/${es.typeName}").
             setContentType("application/json", "UTF-8") << json.nospaces
           fromScalaFuture(Http(req OK as.String)).attempt.map(
             _.fold(e => log("error in:\n" + json.nospaces), _ => ()))
