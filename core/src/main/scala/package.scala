@@ -2,7 +2,7 @@ package intelmedia.ws.funnel {
 
   import scala.concurrent.duration._
 
-  package object instruments extends Instruments(1 minute, Monitoring.default) with DefaultKeys {
+  package object instruments extends Instruments(1 minute) with DefaultKeys {
     implicit val log: String => Unit = s => Monitoring.default.log(s)
 
     Clocks.instrument(this)
