@@ -14,9 +14,7 @@ import scalaz.stream.Process
  * may update multiple metrics, see `counter`, `gauge` and
  * `timer` methods for more information.
  */
-class Instruments(window: Duration,
-                  monitoring: Monitoring = Monitoring.default,
-                  bufferTime: Duration = 200 milliseconds) {
+class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default) {
 
   private def nowL(s: String) = if (s == "") s else s"$s (now)"
   private def previousL(s: String) = if (s == "") s else s"$s ($window ago)"
@@ -49,7 +47,7 @@ class Instruments(window: Duration,
 
       incrementBy(0)
     }
-    c.buffer(bufferTime) // only publish updates this often
+    c.buffer(50 milliseconds) // only publish updates this often
   }
 
   // todo: histogramgauge, histogramCount, histogramTimer
@@ -119,7 +117,7 @@ class Instruments(window: Duration,
 
       set(init)
     }
-    g.buffer(bufferTime)
+    g.buffer(50 milliseconds)
   }
 
   def trafficLight(label: String, description: String = ""): TrafficLight =
@@ -150,7 +148,7 @@ class Instruments(window: Duration,
       }
       set(init)
     }
-    g.buffer(bufferTime)
+    g.buffer(50 milliseconds)
   }
 
   /**
@@ -177,7 +175,7 @@ class Instruments(window: Duration,
         nowSnk(millis); prevSnk(millis); slidingSnk(millis)
       }
     }
-    t.buffer(bufferTime)
+    t.buffer(50 milliseconds)
   }
 
 }
