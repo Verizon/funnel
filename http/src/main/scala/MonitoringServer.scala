@@ -182,11 +182,15 @@ class MonitoringServer(M: Monitoring, port: Int) {
     req.getResponseBody.write(body)
   }
 
+  import scalaz.syntax.traverse._, scalaz.std.list._, scalaz.std.option._
+
   def getQuery(uri: URI): Map[String, String] =
-    Option(uri.getQuery).map(_.split("&").map { x =>
-      val Array(k, v) = x.split("=")
-      (k, v)
-    }.toMap).getOrElse(Map())
+    Option(uri.getQuery).flatMap(_.split("&").toList.traverse { x =>
+      x.split("=") match {
+        case Array(k, v) => Some((k, v))
+        case _ => None
+      }
+    }).map(_.toMap).getOrElse(Map())
 
   def keyQuery(uri: URI): Key[Any] => Boolean = k => {
     import JSON._; import argonaut._, Argonaut._
