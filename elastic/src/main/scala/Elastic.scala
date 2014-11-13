@@ -87,11 +87,12 @@ object Elastic {
         ("@timestamp" :=
           new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
         m.toList.foldLeft(jEmptyObject) {
-          case (o, (p::path, dp)) =>
-            val obj = if (p == "previous")
-              jEmptyObject else
-              ("cluster" := p.asJson) ->: jEmptyObject
-            val ps = if (p == "previous") path else path.tail
+          case (o, (path, dp)) =>
+            val (ps, obj) = path match {
+              case ("previous"|"now"|"sliding") :: _ => (path, jEmptyObject)
+              case p::ps => (ps, ("cluster" := p.asJson) ->: jEmptyObject)
+              case _ => (path, jEmptyObject)
+            }
             obj deepmerge
               (o deepmerge ps.foldRight((dp.asJson -| "value").get)((a, b) =>
                 (a := b) ->: jEmptyObject))
@@ -115,7 +116,7 @@ object Elastic {
    */
   def publish(M: Monitoring, es: ElasticCfg, flaskName: String)(
     implicit log: String => Unit): Task[Unit] =
-      (Monitoring.subscribe(M)(x => !x.name.startsWith("now/") && !x.name.startsWith("sliding/")) |>
+      (Monitoring.subscribe(M)(_ => true) |>
         elasticGroup |> elasticUngroup(flaskName)).evalMap { json =>
           val date = new SimpleDateFormat(es.dateFormat).format(new Date)
           val req = url(s"${es.url}/${es.indexName}-${date}/${es.typeName}").
