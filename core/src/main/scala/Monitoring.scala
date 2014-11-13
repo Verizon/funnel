@@ -160,14 +160,13 @@ trait Monitoring {
 
           urlSignals.put(url, hook)
 
-          // adding the `localName` onto the string here so that later in the
+          // adding the `localName` onto the key here so that later in the
           // process its possible to find the key we're specifically looking for
-          // and trim off the `localName`
           val localName = prettyURL(url)
 
           val received: Process[Task,Unit] = link(hook) {
             attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
-              url, m => s"$bucket/$m:::$localName")
+              url, Map("bucket" -> bucket, "url" -> localName))
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
@@ -193,11 +192,11 @@ trait Monitoring {
    * all loaded keys. `url` is assumed to be a stream of datapoints in SSE format.
    */
   def mirrorAll(parse: DatapointParser)(
-                url: URL, localName: String => String = identity)(
+                url: URL, attrs: Map[String,String] = Map())(
                 implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
     parse(url).evalMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
-      val k = pt.key.modifyName(localName)
+      val k = pt.key.withAttributes(attrs)
       for {
         b <- exists(k)
         _ <- if (b) {
@@ -219,16 +218,14 @@ trait Monitoring {
    * 5 attempts before raising the most recent exception.
    */
   def attemptMirrorAll(
-      parse: DatapointParser)(
-      breaker: Event)(
-      url: URL, localName: String => String = identity)(
+      parse: DatapointParser)(breaker: Event)(url: URL, attrs: Map[String, String] = Map())(
         implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
     val report = (e: Throwable) => {
       log(s"attemptMirrorAll.ERROR: url: $url, error: $e")
       ()
     }
     Monitoring.attemptRepeatedly(report)(
-      mirrorAll(parse)(url, localName))(breaker(this))
+      mirrorAll(parse)(url, attrs))(breaker(this))
   }
 
   /**
@@ -279,11 +276,11 @@ trait Monitoring {
         } else Task(()) }.join
         localName = prettyURL(url)
         _ <- Task.delay { if (!seenURLs.contains(url -> group)) {
-            decay(Key.EndsWith(localName))(decayFrequency).flatMap { _ =>
+            decay(_.has("url", localName))(decayFrequency).flatMap { _ =>
               Task.delay { seenURLs = seenURLs + (url -> group) }
             }
           } else Task(()) }.join
-        _ <- Task.fork(attemptMirrorAll(parse)(reconnectFrequency)(url, m => s"$group/$m/$localName").run)
+        _ <- Task.fork(attemptMirrorAll(parse)(reconnectFrequency)(url, Map("bucket" -> group, "url" -> localName)).run)
       } yield ()
       }.run }
 

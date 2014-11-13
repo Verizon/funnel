@@ -3,11 +3,19 @@ package intelmedia.ws.funnel
 case class Key[+A] private[funnel](name: String,
                                    typeOf: Reportable[A],
                                    units: Units[A],
-                                   description: String) {
+                                   description: String,
+                                   attributes: Map[String, String]) {
   def endsWith(suffix: String): Boolean = name.endsWith(suffix)
   def startsWith(prefix: String): Boolean = name.startsWith(prefix)
+  def has(attribute: String, value: String): Boolean =
+    attributeMatch(attribute, _ == value)
+  def attributeMatch(attribute: String, p: String => Boolean): Boolean =
+    attributes.get(attribute).map(p).getOrElse(false)
   def rename(s: String) = copy(name = s)
   def withDescription(s: String) = copy(description = s)
+  def withAttributes(m: Map[String, String]) = copy(attributes = m)
+  def setAttribute(name: String, value: String) =
+    copy(attributes = attributes + (name -> value))
   def modifyName(f: String => String): Key[A] = rename(f(name))
   def cast[B](R: Reportable[B], U: Units[B]): Option[Key[B]] =
     if (R == typeOf && units == U) Some(this.asInstanceOf[Key[B]])
@@ -26,8 +34,8 @@ object Key {
     override def toString = "Key.EndsWith("+suffix+")"
   }
 
-  def apply[A](name: String, units: Units[A], desc: String = "")(
-    implicit R: Reportable[A]): Key[A] = Key(name, R, units, desc)
+  def apply[A](name: String, units: Units[A], desc: String = "", attribs: Map[String, String] = Map())(
+    implicit R: Reportable[A]): Key[A] = Key(name, R, units, desc, attribs)
 
   implicit def keyToMetric[A](k: Key[A]): Metric[A] = Metric.key(k)
 }
