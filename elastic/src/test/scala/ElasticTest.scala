@@ -6,19 +6,17 @@ import scalaz._
 import Scalaz._
 
 object ElasticTest extends Properties("elastic") {
-  val genK = Gen.oneOf("k1", "k2")
+  val genName = Gen.oneOf("k1", "k2")
 
   val genHost = Gen.oneOf("h1", "h2")
 
-  val genName = for {
-    k <- genK
-    h <- genHost
-  } yield s"$k:::$h"
-
-  val key = genName map { k => Key(k, Units.Count: Units[Stats], "description") }
+  val genKey = for {
+   n <- genName
+   h <- genHost
+  } yield Key(k, Units.Count: Units[Stats], "description", Map("url" -> h))
 
   val datapoint = for {
-    k <- key
+    k <- genKey
     d <- Gen.posNum[Double]
   } yield Datapoint(k, d)
 

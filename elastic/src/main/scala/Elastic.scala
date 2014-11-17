@@ -50,10 +50,8 @@ object Elastic {
     def go(m: ESGroup[A]):
     Process1[Datapoint[A], ESGroup[A]] =
       await1[Datapoint[A]].flatMap { pt =>
-        val (name, host) = pt.key.name.split(":::") match {
-          case Array(n, h) => (n, Some(h))
-          case _ => (pt.key.name, None)
-        }
+        val name = pt.key.name
+        val host = pt.key.attributes.get("url")
         val t = name.split("/").toList
         m.get(host) match {
           case Some(g) => g.get(t) match {
@@ -87,14 +85,11 @@ object Elastic {
         ("@timestamp" :=
           new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
         m.toList.foldLeft(jEmptyObject) {
-          case (o, (p::path, dp)) =>
-            val obj = if (p == "previous")
-              jEmptyObject else
-              ("cluster" := p.asJson) ->: jEmptyObject
-            val ps = if (p == "previous") path else path.tail
-            obj deepmerge
-              (o deepmerge ps.foldRight((dp.asJson -| "value").get)((a, b) =>
-                (a := b) ->: jEmptyObject))
+          case (o, (ps, dp)) =>
+            dp.key.attributes.get("bucket").map(x => ("cluster" := x) ->: jEmptyObject).
+              getOrElse(jEmptyObject) deepmerge
+                (o deepmerge ps.foldRight((dp.asJson -| "value").get)((a, b) =>
+                  (a := b) ->: jEmptyObject))
         }
       })
     }.repeat
@@ -115,7 +110,7 @@ object Elastic {
    */
   def publish(M: Monitoring, es: ElasticCfg, flaskName: String)(
     implicit log: String => Unit): Task[Unit] =
-      (Monitoring.subscribe(M)(x => !x.name.startsWith("now/") && !x.name.startsWith("sliding/")) |>
+      (Monitoring.subscribe(M)(k => k.attributes.contains("host") || k.name.matches("previous/.*")) |>
         elasticGroup |> elasticUngroup(flaskName)).evalMap { json =>
           val date = new SimpleDateFormat(es.dateFormat).format(new Date)
           val req = url(s"${es.url}/${es.indexName}-${date}/${es.typeName}").

@@ -44,17 +44,12 @@ object Riemann {
   }
 
   private def splitStats(key: Key[Any], s: Stats): List[Datapoint[Any]] = {
-    val (k, tl) = key.name.split(":::") match {
-      case Array(hd,tl) => (key.rename(hd), tl)
-      case _ => (key,"")
-    }
-    val tl2 = if (tl.isEmpty) "" else ":::"+tl
     List(
-      Datapoint(k.modifyName(_ + "/count" + tl2), s.count.toDouble),
-      Datapoint(k.modifyName(_ + "/variance" + tl2), s.variance),
-      Datapoint(k.modifyName(_ + "/mean" + tl2), s.mean),
-      Datapoint(k.modifyName(_ + "/last" + tl2), s.last.getOrElse(Double.NaN)),
-      Datapoint(k.modifyName(_ + "/standardDeviation" + tl2), s.standardDeviation)
+      Datapoint(key.modifyName(_ + "/count"), s.count.toDouble),
+      Datapoint(key.modifyName(_ + "/variance"), s.variance),
+      Datapoint(key.modifyName(_ + "/mean"), s.mean),
+      Datapoint(key.modifyName(_ + "/last"), s.last.getOrElse(Double.NaN)),
+      Datapoint(key.modifyName(_ + "/standardDeviation"), s.standardDeviation)
     )
   }
 
@@ -82,11 +77,8 @@ object Riemann {
     */
   private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any]
     )(implicit log: String => Unit): REvent = {
-
-    val (name, host) = pt.key.name.split(":::") match {
-      case Array(n, h) => (n, Some(h))
-      case _ => (pt.key.name, None)
-    }
+    val name = pt.key.name
+    val host = pt.key.attributes.get("url")
 
     val t = tags(name)
 

@@ -57,14 +57,5 @@ object MirroringExample {
     val M = Monitoring.instance
     MonitoringServer.start(M, 8000)
 
-    M.mirrorAndAggregate(SSE.readEvents)(
-      Events.takeEvery(1.minutes, 5),
-      Events.every(15.seconds),
-      Events.every(5.seconds))(urls, health) {
-        case "accounts" => TrafficLight.quorum(2)
-        case "decoding" => TrafficLight.majority
-        case _          => sys.error("unknown group type")
-      }.run
-
   }
 }
