@@ -5,7 +5,7 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
 import java.io.{BufferedWriter, IOException, OutputStream, OutputStreamWriter}
-import java.net.{InetSocketAddress, URL}
+import java.net.{InetSocketAddress, URL, URI}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
@@ -70,14 +70,17 @@ class MonitoringServer(M: Monitoring, port: Int) {
     req.getResponseHeaders.set("Content-Type", "text/event-stream")
     req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
     req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
-    val events = Monitoring.subscribe(M)(Key.StartsWith(prefix))
+    val events = Monitoring.subscribe(M)(k =>
+      Key.StartsWith(prefix)(k) && keyQuery(req.getRequestURI)(k))
     val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
     SSE.writeEvents(events, sink)
   }
 
   protected def handleKeys(M: Monitoring, prefix: String, req: HttpExchange): Unit = {
     import JSON._; import argonaut.EncodeJson._
-    val ks = M.keys.continuous.once.runLastOr(List()).run.filter(_.startsWith(prefix))
+    val query = keyQuery(req.getRequestURI)
+    val ks = M.keys.continuous.once.runLastOr(List()).run.filter(x =>
+      x.startsWith(prefix) && query(x))
     val respBytes = JSON.prettyEncode(ks).getBytes
     req.getResponseHeaders.set("Content-Type", "application/json")
     req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
@@ -90,14 +93,16 @@ class MonitoringServer(M: Monitoring, port: Int) {
     req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
     req.sendResponseHeaders(200, 0L) // 0 as length means we're producing a stream
     val sink = new BufferedWriter(new OutputStreamWriter(req.getResponseBody))
-    SSE.writeKeys(M.distinctKeys, sink)
+    SSE.writeKeys(M.distinctKeys.filter(keyQuery(req.getRequestURI)), sink)
   }
 
   protected def handleNow(M: Monitoring, label: String, req: HttpExchange): Unit = {
     import JSON._; import argonaut.EncodeJson._
     val m = Monitoring.snapshot(M).run
     val respBytes =
-      JSON.prettyEncode(m.filterKeys(_.startsWith(label)).values.toList).getBytes
+      JSON.prettyEncode(m.filterKeys(k =>
+        k.startsWith(label) &&
+        keyQuery(req.getRequestURI)(k)).values.toList).getBytes
     req.getResponseHeaders.set("Content-Type", "application/json")
     req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
     req.sendResponseHeaders(200, respBytes.length)
@@ -175,6 +180,27 @@ class MonitoringServer(M: Monitoring, port: Int) {
   private def flush(status: Int, body: Array[Byte], req: HttpExchange): Unit = {
     req.sendResponseHeaders(status,body.length)
     req.getResponseBody.write(body)
+  }
+
+  import scalaz.syntax.traverse._, scalaz.std.list._, scalaz.std.option._
+
+  def getQuery(uri: URI): Map[String, String] =
+    Option(uri.getQuery).flatMap(_.split("&").toList.traverse { x =>
+      x.split("=") match {
+        case Array(k, v) => Some((k, v))
+        case _ => None
+      }
+    }).map(_.toMap).getOrElse(Map())
+
+  def keyQuery(uri: URI): Key[Any] => Boolean = k => {
+    import JSON._; import argonaut._, Argonaut._
+    val q = getQuery(uri)
+    def attr[T:DecodeJson](a: String, v: T) =
+      q.get(a).flatMap(Parse.decodeOption[T]).map(_ == v).getOrElse(true)
+    val p = attr("units", k.units) && attr("type", k.typeOf)
+    (q - "units" - "type").foldLeft(p) {
+      case (p, (a, v)) => p && (k.attributes.get(a) == Some(v))
+    }
   }
 
   protected def handleMetrics(M: Monitoring) = new HttpHandler {
