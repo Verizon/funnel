@@ -228,62 +228,6 @@ trait Monitoring {
       mirrorAll(parse)(url, attrs))(breaker(this))
   }
 
-  /**
-   * Given a stream of URLs with associated group names, mirror all
-   * metrics from these URLs, and aggregate the `health` key for
-   * clusters of nodes with the same name. `reconnectFrequency` controls reconnect
-   * attempts. Example:
-   *
-   * {{{
-   * val parser: DatapointParser = url => ....
-   *
-   * // when there's a failure connecting to a node, define the reconnect frequency
-   * val reconnect   = Events.every(2 minutes)
-   *
-   * // if the url has not produced any updates in this duration/event cycle,
-   * // reset the values to their defaults after this bound
-   * val decay       = Event.every(15 seconds)
-   *
-   * // how frequently to produce the "aggregate" health `key` for each group of urls
-   * val aggregating = Event.every(5 seconds)
-   *
-   * mirrorAndAggregate(parser)(reconnect,decay,aggregating)(urls)(
-   *   Key[Boolean]("health", Units.Healthy)) {
-   *     case "accounts" => Policies.quorum(2) _
-   *     case "decoding" => Policies.majority _
-   *     case "blah"     => Policies.all _
-   *   }
-   * }}}
-   */
-  def mirrorAndAggregate[A](
-      parse: DatapointParser)(
-      reconnectFrequency: Event,
-      decayFrequency: Event,
-      aggregateFrequency: Event)(
-      groupedUrls: Process[Task, (URL,String)],
-      health: Key[A])(f: String => Seq[A] => A): Task[Unit] =
-    Task.fork {
-      // use urls as the local names for keys
-      var seen = Set[String]()
-      var seenURLs = Set[(URL,String)]()
-      groupedUrls.evalMap { case (url,group) => for {
-        _ <- Task.delay { if (!seen.contains(group)) {
-          val aggregateKey = health.modifyName(group + "/" + _)
-          val keyFamily = health.modifyName(x => s"$group/$x/")
-          aggregate(keyFamily, aggregateKey)(aggregateFrequency)(f(group)).flatMap {_ =>
-            Task.delay { seen = seen + group }
-          }
-        } else Task(()) }.join
-        localName = prettyURL(url)
-        _ <- Task.delay { if (!seenURLs.contains(url -> group)) {
-            decay(_.has("url", localName))(decayFrequency).flatMap { _ =>
-              Task.delay { seenURLs = seenURLs + (url -> group) }
-            }
-          } else Task(()) }.join
-        _ <- Task.fork(attemptMirrorAll(parse)(reconnectFrequency)(url, Map("bucket" -> group, "url" -> localName)).run)
-      } yield ()
-      }.run }
-
   private def initialize[O](key: Key[O]): Task[Unit] = for {
     e <- exists(key)
     _ <- if (e) Task.delay {
