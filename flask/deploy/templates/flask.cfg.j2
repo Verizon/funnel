@@ -7,14 +7,8 @@ flask {
   local-metric-frequency = 30
 
   network {
-    host = "localhost"
+    host = "127.0.0.1"
     port = 5775
-  }
-
-  riemann {
-    host = "{{ application_environment }}-riemann.svc.oncue.com"
-    port = 5555
-    ttl-in-minutes = 2
   }
 }
 
