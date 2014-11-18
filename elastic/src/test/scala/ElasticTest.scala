@@ -13,7 +13,7 @@ object ElasticTest extends Properties("elastic") {
   val genKey = for {
    n <- genName
    h <- genHost
-  } yield Key(k, Units.Count: Units[Stats], "description", Map("url" -> h))
+  } yield Key(n, Units.Count: Units[Stats], "description", Map("url" -> h))
 
   val datapoint = for {
     k <- genKey
