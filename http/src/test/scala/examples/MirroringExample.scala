@@ -55,7 +55,7 @@ object MirroringExample {
       }
 
     val M = Monitoring.instance
-    MonitoringServer.start(M, 8000)
-
+    val _ = MonitoringServer.start(M, 8000)
+    ()
   }
 }
