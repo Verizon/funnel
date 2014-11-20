@@ -51,6 +51,8 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
     req.getResponseBody.write(indexHTML.getBytes)
   }
 
+  // Tim: this shouldnt be implemented, right? allocations of work to shards
+  // should happen automatically. Unless we want some override / manual input?
   // protected def handleDistribute(req: HttpExchange): Unit = {
   //   req.sendResponseHeaders(200,0)
   //   req.getResponseBody.write("Nothing to see here yet.".getBytes)
