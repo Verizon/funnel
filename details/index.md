@@ -137,3 +137,16 @@ Once the server is booted as a part of your application, you can visit the speci
   }
 }
 ````
+
+### Queries
+
+For any given resource that serves metrics or metric keys, you can restrict the keys that are returned by specifying them in the query parameters of the URL. For example, to request only keys from the `/stream/now` resource whose type is `String` use a URL like the following:
+
+```
+http://localhost:5777/stream/now?type="String"
+```
+
+The quotes around `"String"` are important since the query value must actually be valid JSON. You can also specify a value for `units` if you want, for example, all the keys whose values are measured in megabytes.
+
+When querying a Flask instance, some keys will be associated with buckets and urls ([see the Flask documentation]({{ site.baseurl }}getting-started/#flask)). You can request keys from a specific bucket or URL by specifying `bucket="myBucket"` or `url="myURL"`, as desired.
+
