@@ -213,6 +213,8 @@ trait Server extends Interpreter[Server.ServerF] {
 
       c <- SNS.subscribe(a, b)(sns)
       _  = log.debug(s"subscribed sqs queue to the sns topic")
+
+      _ <- Task(log.info(">>>>>>>>>>>> bootup complete <<<<<<<<<<<<"))
     } yield ()
   }
 

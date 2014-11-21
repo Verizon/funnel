@@ -16,6 +16,10 @@ case class Group(
   instances: Seq[ASGInstance] = Nil,
   tags: Map[String,String] = Map.empty)
 
+case class ASGNotFoundException(asgName: String) extends RuntimeException {
+  override def getMessage: String = s"Unable to find the specified ASG in AWS: '$asgName'"
+}
+
 object ASG {
 
   def client(
@@ -53,6 +57,18 @@ object ASG {
         instances = g.getInstances.asScala.toSeq,
         tags      = tags(g))
       ))
+  }
+
+  def lookupOne(name: String)(asg: AmazonAutoScaling): Task[AutoScalingGroup] = {
+    val req = (new DescribeAutoScalingGroupsRequest
+      ).withMaxRecords(1
+      ).withAutoScalingGroupNames(name)
+
+    Task(asg.describeAutoScalingGroups(req)).flatMap { r =>
+      val opt: Option[AutoScalingGroup] = r.getAutoScalingGroups.asScala.toList.headOption
+      val fail: Task[AutoScalingGroup] = Task.fail(ASGNotFoundException(name))
+      opt.fold(fail)(Task.now(_))
+    }
   }
 
   private def tags(g: AutoScalingGroup): Map[String,String] =

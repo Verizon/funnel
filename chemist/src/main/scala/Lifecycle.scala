@@ -1,6 +1,7 @@
 package oncue.svc.funnel.chemist
 
 import scalaz.{\/,-\/,\/-}
+import scalaz.syntax.traverse._
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Sink}
 import com.amazonaws.services.sqs.model.Message
@@ -27,18 +28,19 @@ object Lifecycle {
   def parseMessage(msg: Message): Throwable \/ AutoScalingEvent =
     Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException(_))
 
-  def eventToAction(event: AutoScalingEvent): Action = event.kind match {
-    case Launch                       => AddCapacity(event.instanceId)
-    case Terminate                    => Redistribute(event.instanceId)
-    case LaunchError | TerminateError => NoOp
-    case TestNotification | Unknown   => NoOp
+  def eventToAction(event: AutoScalingEvent): Task[Action] = event.kind match {
+    case Launch                       => Task.now(AddCapacity(event.instanceId))
+    case Terminate                    => Task.now(Redistribute(event.instanceId))
+    case LaunchError | TerminateError => Task.now(NoOp)
+    case TestNotification | Unknown   => Task.now(NoOp)
   }
 
   def stream(queueName: String)(sqs: AmazonSQS): Process[Task, Throwable \/ Action] = {
     for {
       a <- SQS.subscribe(queueName)(sqs)
       b <- Process.emitAll(a)
-      c <- Process.emit(parseMessage(b).map(eventToAction))
+      c <- Process.eval(parseMessage(b).traverseU(eventToAction))
+      _ <- Process.eval(Task(println("=========================================== sdfsdfsdfs")))
       _ <- SQS.deleteMessages(queueName, a)(sqs)
     } yield c
   }
