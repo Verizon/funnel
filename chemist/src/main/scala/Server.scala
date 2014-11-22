@@ -160,9 +160,6 @@ trait Server extends Interpreter[Server.ServerF] {
         a <- R.distribution.map(Sharding.shards)
         b <- Task.gatherUnordered(a.map(R.instance).toSeq)
       } yield k(b)
-
-    // case Listen(k) =>
-      // Lifecycle.run(queue, sqs, D).run.map(_ => k)
   }
 
   protected def init(): Task[Unit] = {
@@ -213,6 +210,11 @@ trait Server extends Interpreter[Server.ServerF] {
 
       c <- SNS.subscribe(a, b)(sns)
       _  = log.debug(s"subscribed sqs queue to the sns topic")
+
+      // now the queues are setup with the right permissions,
+      // start the lifecycle listener
+      _ <- Lifecycle.run(queue, Lifecycle.sink)(R, sqs, asg)
+      _  = log.debug("lifecycle process started")
 
       _ <- Task(log.info(">>>>>>>>>>>> bootup complete <<<<<<<<<<<<"))
     } yield ()

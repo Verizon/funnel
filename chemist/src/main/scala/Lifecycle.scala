@@ -104,17 +104,17 @@ object Lifecycle {
   //     case a => Task.now(NoOp)
   //   }
 
-  def sink(r: Repository): Sink[Task,Action] =
+  def sink: Sink[Task,Action] =
     Process.emit {
       case Redistributed(seq) => Sharding.distribute(seq).map(_ => ())
       case _ => Task.now( () )
     }
 
-  def run(queueName: String, sink: Sink[Task, Action])(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling): Sink[Task, Action] = {
+  def run(queueName: String, s: Sink[Task, Action])(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling): Task[Unit] = {
     stream(queueName)(r,sqs,asg).flatMap {
       case -\/(fail) => Process.halt
-      case \/-(win)  => sink
-    }
+      case \/-(win)  => s
+    }.run
   }
 }
 
