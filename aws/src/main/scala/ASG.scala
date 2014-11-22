@@ -59,7 +59,7 @@ object ASG {
       ))
   }
 
-  def lookupOne(name: String)(asg: AmazonAutoScaling): Task[AutoScalingGroup] = {
+  def lookupByName(name: String)(asg: AmazonAutoScaling): Task[AutoScalingGroup] = {
     val req = (new DescribeAutoScalingGroupsRequest
       ).withMaxRecords(1
       ).withAutoScalingGroupNames(name)
