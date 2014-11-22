@@ -36,8 +36,14 @@ object Lifecycle {
   def stream(queueName: String)(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling): Process[Task, Throwable \/ Action] = {
     for {
       a <- SQS.subscribe(queueName)(sqs)
+      _ <- Process.eval(Task(println(s">> a = $a")))
+
       b <- Process.emitAll(a)
+      _ <- Process.eval(Task(println(s">> b = $b")))
+
       c <- Process.eval(parseMessage(b).traverseU(interpreter(_)(r, asg)))
+      _ <- Process.eval(Task(println(s">> c = $c")))
+
       _ <- SQS.deleteMessages(queueName, a)(sqs)
     } yield c
   }
