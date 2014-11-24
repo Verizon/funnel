@@ -36,13 +36,13 @@ object Lifecycle {
   def stream(queueName: String)(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling): Process[Task, Throwable \/ Action] = {
     for {
       a <- SQS.subscribe(queueName)(sqs)
-      _ <- Process.eval(Task(println(s">> a = $a")))
+      _ <- Process.eval(Task(log.debug(s">> a = $a")))
 
       b <- Process.emitAll(a)
-      _ <- Process.eval(Task(println(s">> b = $b")))
+      _ <- Process.eval(Task(log.debug(s">> b = $b")))
 
       c <- Process.eval(parseMessage(b).traverseU(interpreter(_)(r, asg)))
-      _ <- Process.eval(Task(println(s">> c = $c")))
+      _ <- Process.eval(Task(log.debug(s">> c = $c")))
 
       _ <- SQS.deleteMessages(queueName, a)(sqs)
     } yield c
@@ -65,7 +65,7 @@ object Lifecycle {
     def flask: PartialFunction[AutoScalingEvent, Task[Action]] = {
       case AutoScalingEvent(_,Launch,_,_,_,_,_,_,_,_,_,_,id) =>
         log.debug(s"Adding capactiy $id")
-        r.increaseCapacity(e.instanceId).map(_ => NoOp)
+        r.increaseCapacity(id).map(_ => NoOp)
 
       case AutoScalingEvent(_,Terminate,_,_,_,_,_,_,_,_,_,_,id) =>
         for {
@@ -87,28 +87,6 @@ object Lifecycle {
 
     isFlask.flatMap(_ => flask(e)) or other(e) or noop(e)
   }
-
-
-  // def eventToAction(event: AutoScalingEvent): Task[Action] = event.kind match {
-  //   case Launch                       => Task.now(AddCapacity(event.instanceId))
-  //   case Terminate                    => Task.now(Redistribute(event.instanceId))
-  //   case LaunchError | TerminateError => Task.now(NoOp)
-  //   case TestNotification | Unknown   => Task.now(NoOp)
-  // }
-
-  // kinda horrible, but works for now.
-  // seems like there should be a more pure solution to this
-  // that results in a less-janky coupling
-  // def transform(a: Action, r: Repository): Task[Action] =
-  //   a match {
-  //     case AddCapacity(id) => {
-
-  //     }
-  //     case Redistribute(id) =>
-
-
-  //     case a => Task.now(NoOp)
-  //   }
 
   def sink: Sink[Task,Action] =
     Process.emit {
