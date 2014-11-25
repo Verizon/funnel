@@ -95,6 +95,7 @@ object Lifecycle {
     }
   }
 
+  // not sure if this is really needed
   def sink: Sink[Task,Action] =
     Process.emit {
       case Redistributed(seq) => Sharding.distribute(seq).map(_ => ())

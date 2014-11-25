@@ -9,17 +9,19 @@ object Fixtures {
     id: String,
     datacenter: String = "us-east-1b",
     privateDns: String = "foo.internal",
-    publicDns: String = "foo.ext.amazonaws.com"
+    publicDns: String = "foo.ext.amazonaws.com",
+    tags: Seq[(String,String)] = Seq("baz" -> "v1","bar" -> "v2")
   ): EC2Instance =
     (new EC2Instance).withInstanceId(id)
     .withPlacement(new Placement(datacenter))
     .withPrivateDnsName(privateDns)
     .withPublicDnsName(publicDns)
-    .withTags(Seq("baz" -> "v1","bar" -> "v2").map { case (k,v) => new Tag(k,v) }:_*)
+    .withTags(tags.map { case (k,v) => new Tag(k,v) }:_*)
 
   val instances: Seq[EC2Instance] =
     instance("i-dx947af7") ::
-    instance("i-15807647") :: Nil
+    instance("i-15807647") ::
+    instance("i-flaskAAA", tags = Seq("type" -> "flask")) :: Nil
 
   def asgEvent(
     kind: AutoScalingEventKind,
