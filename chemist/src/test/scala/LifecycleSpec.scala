@@ -1,31 +1,37 @@
 package oncue.svc.funnel.chemist
 
 import org.scalatest.{FlatSpec,Matchers}
+import com.amazonaws.services.sqs.AmazonSQS
+import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import scalaz.{\/,\/-,-\/,==>>}
 import scalaz.stream.{Process,Sink}
 import scalaz.concurrent.Task
 import Sharding.{Distribution,Target}
 
 class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {
-  val sqs = new TestAmazonSQS
   val ec2 = TestAmazonEC2(Fixtures.instances)
-  val asg1 = TestAmazonASG.single(_ => "test-group")
-  // val asg2 = TestAmazonASG.multiple
+  val uuid = java.util.UUID.randomUUID.toString
+  val sqs1 = TestAmazonSQS(Fixtures.asgEvent(Launch, name = uuid))
+  val sqs2 = TestAmazonSQS(Fixtures.asgEvent(Terminate, name = uuid))
+
+  val asg1 = TestAmazonASG.single(_ => uuid)
+  // val asg1 = TestAmazonASG.single(_ => "test-group")
+
   val r = new StatefulRepository(ec2)
 
   val k1 = "i-dx947af7"
   val k2 = "i-15807647"
 
-  it should "Lifecycle.stream should process the ASG event JSON into the right algebra" in {
+  private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): Throwable \/ Action =
+    Lifecycle.stream("name-of-queue")(r, sqs, asg
+      ).until(Process.emit(false)).runLast.run.get // never do this anywhere but tests
 
+  it should "side-effect and update the repository when a new flask is launched" in {
+    fromStream(sqs1, asg1) should equal ( \/-(NoOp) )
+  }
 
-    println {
-      Lifecycle.stream("queue-doesnt-exist")(r, sqs, asg1
-        ).until(Process.emit(false)).runLast.run
-    }
-
-      // should equal (
-      //   Some(\/-(Redistribute("i-dd947af7"))))
+  it should "side-effect and update the repository when a flask is terminated" in {
+    fromStream(sqs2, asg1) should equal ( \/-(NoOp) )
   }
 
 }

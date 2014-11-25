@@ -4,17 +4,24 @@ import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model._
 import scala.collection.JavaConversions._
 
-class TestAmazonSQS extends AmazonSQS {
+object TestAmazonSQS {
+  def apply(event: String): AmazonSQS = new TestAmazonSQS {
+    def receiveMessage(x$1: com.amazonaws.services.sqs.model.ReceiveMessageRequest): com.amazonaws.services.sqs.model.ReceiveMessageResult = {
+      new ReceiveMessageResult().withMessages(
+        new Message()
+          .withMessageId("foo")
+          .withBody(event))
+    }
+  }
+}
+
+trait TestAmazonSQS extends AmazonSQS {
   // methods we use
   def deleteMessageBatch(x$1: String,x$2: java.util.List[com.amazonaws.services.sqs.model.DeleteMessageBatchRequestEntry]): com.amazonaws.services.sqs.model.DeleteMessageBatchResult = {
     new DeleteMessageBatchResult().withSuccessful(new DeleteMessageBatchResultEntry().withId("foo"))
   }
-  def receiveMessage(x$1: com.amazonaws.services.sqs.model.ReceiveMessageRequest): com.amazonaws.services.sqs.model.ReceiveMessageResult = {
-    new ReceiveMessageResult().withMessages(new Message().withMessageId("foo").withBody(Fixtures.asgEvent(Launch)))
-  }
 
   // erroneous methods
-
   def addPermission(x$1: String,x$2: String,x$3: java.util.List[String],x$4: java.util.List[String]): Unit = ???
   def addPermission(x$1: com.amazonaws.services.sqs.model.AddPermissionRequest): Unit = ???
   def changeMessageVisibility(x$1: String,x$2: String,x$3: Integer): Unit = ???

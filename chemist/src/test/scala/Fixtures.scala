@@ -21,11 +21,15 @@ object Fixtures {
     instance("i-dx947af7") ::
     instance("i-15807647") :: Nil
 
-  def asgEvent(kind: AutoScalingEventKind): String = s"""
+  def asgEvent(
+    kind: AutoScalingEventKind,
+    name: String = "test-group",
+    instanceId: String = "instance-id-goes-here"
+  ): String = s"""
     |{
     |  "StatusCode": "InProgress",
     |  "Service": "AWS Auto Scaling",
-    |  "AutoScalingGroupName": "test-group",
+    |  "AutoScalingGroupName": "${name}",
     |  "Description": "test",
     |  "ActivityId": "926c4ae3-8181-4668-bcd1-6febc7668d18",
     |  "Event": "${kind.notification}",
@@ -39,7 +43,7 @@ object Fixtures {
     |  "RequestId": "926c4ae3-8181-4668-bcd1-6febc7668d18",
     |  "StatusMessage": "",
     |  "EndTime": "2014-07-31T18:30:41.244Z",
-    |  "EC2InstanceId": "i-dd947af7",
+    |  "EC2InstanceId": "${instanceId}",
     |  "StartTime": "2014-07-31T18:30:35.406Z",
     |  "Cause": "At 2014-07-31T18:30:35Z ..."
     |}

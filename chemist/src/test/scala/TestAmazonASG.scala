@@ -26,7 +26,7 @@ object TestAmazonASG {
       .withMaxSize(1)
       .withMinSize(1)
       .withInstances()
-      .withLaunchConfigurationName("lc-$uuid")
+      .withLaunchConfigurationName(s"lc-$uuid")
       .withTags(tags("type" -> "flask"))
   }
 

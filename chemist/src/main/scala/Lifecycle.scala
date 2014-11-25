@@ -53,41 +53,46 @@ object Lifecycle {
   // im really not sure what to say about this monster...
   // sorry reader.
   def interpreter(e: AutoScalingEvent)(r: Repository, asg: AmazonAutoScaling): Task[Action] = {
-    log.info(s"event: $e")
+    log.debug(s"event: $e")
 
-    def fail[A]: Task[A] = Task.fail(LowPriorityScalingException)
+    def isFlask: Task[Boolean] =
+      ASG.lookupByName(e.asgName)(asg).flatMap { a =>
+        log.debug(s"Found ASG from the EC2 lookup: $a")
 
-    def isFlask: Task[Unit] =
-      ASG.lookupByName(e.asgName)(asg).flatMap(
-        _.getTags.asScala.map(t => t.getKey -> t.getValue).toMap.find { case (k,v) =>
+        a.getTags.asScala.map(t => t.getKey -> t.getValue).toMap.find { case (k,v) =>
           k.trim == "type" && v.startsWith("flask")
-        }.map(_ => Task.delay(()) ).getOrElse(fail)
-      )
+        }.fold(Task.now(false))(_ => Task.now(true))
+      }
 
-    def flask: Task[Action] = e match {
+    e match {
       case AutoScalingEvent(_,Launch,_,_,_,_,_,_,_,_,_,_,id) =>
-        log.debug(s"Adding capactiy $id")
-        r.increaseCapacity(id).map(_ => NoOp)
+        isFlask.flatMap(bool =>
+          if(bool){
+            log.debug(s"Adding capactiy $id")
+            r.increaseCapacity(id).map(_ => NoOp)
+          } else
+            Task.now(NoOp) // do something more meaningful here to start monitoring remotes
+        )
 
-      case AutoScalingEvent(_,Terminate,_,_,_,_,_,_,_,_,_,_,id) =>
-        for {
-          t <- r.assignedTargets(id)
-          _  = log.debug(s"sink, targets= $t")
-          _ <- r.decreaseCapacity(id)
-          m <- Sharding.locateAndAssignDistribution(t,r)
-        } yield Redistributed(m)
-
-      case _ => fail[Action]
-    }
-
-    def other: Task[Action] = e match {
-      case AutoScalingEvent(_,Launch,_,_,_,_,_,_,_,_,_,_,id) =>
-        Task.now(NoOp) // need to do something meaningful here
+      case AutoScalingEvent(_,Terminate,_,_,_,_,_,_,_,_,_,_,id) => {
+        r.isFlask(id).flatMap(bool =>
+          if(bool){
+            log.info(s"Terminating and rebalancing the flask cluster. Downing $id")
+            for {
+              t <- r.assignedTargets(id)
+              _  = log.debug(s"sink, targets= $t")
+              _ <- r.decreaseCapacity(id)
+              m <- Sharding.locateAndAssignDistribution(t,r)
+            } yield Redistributed(m)
+          } else {
+            log.info(s"Terminating the monitoring of a non-flask service instance with id = $id")
+            Task.now(NoOp)
+          }
+        )
+      }
 
       case _ => Task.now(NoOp)
     }
-
-    isFlask.flatMap(_ => flask) or other
   }
 
   def sink: Sink[Task,Action] =
