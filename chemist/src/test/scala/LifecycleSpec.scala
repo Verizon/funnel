@@ -6,13 +6,32 @@ import scalaz.stream.{Process,Sink}
 import scalaz.concurrent.Task
 import Sharding.{Distribution,Target}
 
-// class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {
-//   val sqs = new TestAmazonSQS
-//   val ec2 = TestAmazonEC2(Fixtures.instances)
-//   val r = new StatefulRepository(ec2)
+class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {
+  val sqs = new TestAmazonSQS
+  val ec2 = TestAmazonEC2(Fixtures.instances)
+  val asg1 = TestAmazonASG.single(_ => "test-group")
+  // val asg2 = TestAmazonASG.multiple
+  val r = new StatefulRepository(ec2)
+
+  val k1 = "i-dx947af7"
+  val k2 = "i-15807647"
+
+  it should "Lifecycle.stream should process the ASG event JSON into the right algebra" in {
+
+
+    println {
+      Lifecycle.stream("queue-doesnt-exist")(r, sqs, asg1
+        ).until(Process.emit(false)).runLast.run
+    }
+
+      // should equal (
+      //   Some(\/-(Redistribute("i-dd947af7"))))
+  }
+
+}
+
 //   val s: Sink[Task,Action] = Lifecycle.sink(r) //Process.emit { case x => Task.now( println(x) ) }
-//   val k1 = "i-dx947af7"
-//   val k2 = "i-15807647"
+
 //   val f: (Set[Target], Repository) => Task[Unit] = (s,_) => Task.now(s.foreach(x => "  + $x"))
 
 
@@ -21,11 +40,7 @@ import Sharding.{Distribution,Target}
 //     stream.evalMap(Lifecycle.transform(_,r)).to(s).run.run
 //   }
 
-//   it should "Lifecycle.stream should process the ASG event JSON into the right algebra" in {
-//     Lifecycle.stream("doesntexist")(sqs)
-//       .until(Process.emit(false)).runLast.run should equal (
-//         Some(\/-(Redistribute("i-dd947af7"))))
-//   }
+
 
 //   ///// as we're testing effects in sinks, keep these in this order (urgh!) //////
 

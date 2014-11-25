@@ -53,16 +53,18 @@ object Lifecycle {
   // im really not sure what to say about this monster...
   // sorry reader.
   def interpreter(e: AutoScalingEvent)(r: Repository, asg: AmazonAutoScaling): Task[Action] = {
-    def fail: Task[Unit] = Task.fail(LowPriorityScalingException)
+    log.info(s"event: $e")
+
+    def fail[A]: Task[A] = Task.fail(LowPriorityScalingException)
 
     def isFlask: Task[Unit] =
       ASG.lookupByName(e.asgName)(asg).flatMap(
         _.getTags.asScala.map(t => t.getKey -> t.getValue).toMap.find { case (k,v) =>
           k.trim == "type" && v.startsWith("flask")
-        }.map(_ => Task.delay(())).getOrElse(fail)
+        }.map(_ => Task.delay(()) ).getOrElse(fail)
       )
 
-    def flask: PartialFunction[AutoScalingEvent, Task[Action]] = {
+    def flask: Task[Action] = e match {
       case AutoScalingEvent(_,Launch,_,_,_,_,_,_,_,_,_,_,id) =>
         log.debug(s"Adding capactiy $id")
         r.increaseCapacity(id).map(_ => NoOp)
@@ -74,18 +76,18 @@ object Lifecycle {
           _ <- r.decreaseCapacity(id)
           m <- Sharding.locateAndAssignDistribution(t,r)
         } yield Redistributed(m)
+
+      case _ => fail[Action]
     }
 
-    def other: PartialFunction[AutoScalingEvent, Task[Action]] = {
+    def other: Task[Action] = e match {
       case AutoScalingEvent(_,Launch,_,_,_,_,_,_,_,_,_,_,id) =>
         Task.now(NoOp) // need to do something meaningful here
-    }
 
-    def noop: PartialFunction[AutoScalingEvent, Task[Action]] = {
       case _ => Task.now(NoOp)
     }
 
-    isFlask.flatMap(_ => flask(e)) or other(e) or noop(e)
+    isFlask.flatMap(_ => flask) or other
   }
 
   def sink: Sink[Task,Action] =

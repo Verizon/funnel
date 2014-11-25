@@ -9,6 +9,7 @@ import com.amazonaws.services.autoscaling.model.{
   Instance => ASGInstance}
 import collection.JavaConverters._
 
+// I really hate this shit, but its nessicary to run a fat integration test.
 object TestAmazonASG {
   private def tags(t: (String,String)*): java.util.List[TagDescription] =
     t.toSeq.map { case (k,v) =>
@@ -26,25 +27,29 @@ object TestAmazonASG {
       .withMinSize(1)
       .withInstances()
       .withLaunchConfigurationName("lc-$uuid")
-      .withTags(tags("foo" -> "bar"))
+      .withTags(tags("type" -> "flask"))
   }
 
-  def multiple: DescribeAutoScalingGroupsResult = {
-    (new DescribeAutoScalingGroupsResult)
-      .withAutoScalingGroups(Seq(randomasg, randomasg).asJava)
-  }
+  def multiple: TestAmazonASG =
+    new TestAmazonASG {
+      def describeAutoScalingGroups(x$1: DescribeAutoScalingGroupsRequest): DescribeAutoScalingGroupsResult =
+        (new DescribeAutoScalingGroupsResult)
+          .withAutoScalingGroups(Seq(randomasg, randomasg).asJava)
+    }
 
-  def single: DescribeAutoScalingGroupsResult = {
-    (new DescribeAutoScalingGroupsResult)
-      .withAutoScalingGroups(Seq(randomasg, randomasg).asJava)
-  }
+  def single(f: String => String): TestAmazonASG =
+    new TestAmazonASG {
+      def describeAutoScalingGroups(x$1: DescribeAutoScalingGroupsRequest): DescribeAutoScalingGroupsResult = {
+        val a = randomasg
+        val n = a.getAutoScalingGroupName
+        (new DescribeAutoScalingGroupsResult)
+          .withAutoScalingGroups(a.withAutoScalingGroupName(f(n)))
+      }
+    }
+
+  def single: TestAmazonASG = single(identity)
 
   // def failure:
-}
-
-class TestAmazonASGMulti extends TestAmazonASG {
-  def describeAutoScalingGroups(x$1: DescribeAutoScalingGroupsRequest): DescribeAutoScalingGroupsResult =
-    TestAmazonASG.multiple
 }
 
 trait TestAmazonASG extends AmazonAutoScaling {

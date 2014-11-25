@@ -10,7 +10,7 @@ class TestAmazonSQS extends AmazonSQS {
     new DeleteMessageBatchResult().withSuccessful(new DeleteMessageBatchResultEntry().withId("foo"))
   }
   def receiveMessage(x$1: com.amazonaws.services.sqs.model.ReceiveMessageRequest): com.amazonaws.services.sqs.model.ReceiveMessageResult = {
-    new ReceiveMessageResult().withMessages(new Message().withMessageId("foo").withBody(Fixtures.asgEventJson1))
+    new ReceiveMessageResult().withMessages(new Message().withMessageId("foo").withBody(Fixtures.asgEvent(Launch)))
   }
 
   // erroneous methods

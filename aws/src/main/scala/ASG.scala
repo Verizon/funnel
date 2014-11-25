@@ -67,7 +67,7 @@ object ASG {
     Task(asg.describeAutoScalingGroups(req)).flatMap { r =>
       val opt: Option[AutoScalingGroup] = r.getAutoScalingGroups.asScala.toList.headOption
       val fail: Task[AutoScalingGroup] = Task.fail(ASGNotFoundException(name))
-      opt.fold(fail)(Task.now(_))
+      opt.fold(fail)(Task.delay(_))
     }
   }
 

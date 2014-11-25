@@ -17,7 +17,7 @@ class JSONSpec extends FlatSpec with Matchers {
   }
 
   it should "correctly parse the incoming JSON from AWS ASG notifications" in {
-    Parse.decodeOption[AutoScalingEvent](Fixtures.asgEventJson1
+    Parse.decodeOption[AutoScalingEvent](Fixtures.asgEvent(Terminate)
       ).get should equal (
         AutoScalingEvent(
           activityId      = "926c4ae3-8181-4668-bcd1-6febc7668d18",
