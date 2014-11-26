@@ -96,8 +96,9 @@ trait Server extends Interpreter[Server.ServerF] {
     b <- knobs.aws.config
   } yield a ++ b).run
 
-  val topic = cfg.require[String]("chemist.sns-topic-name")
-  val queue = cfg.require[String]("chemist.sqs-queue-name")
+  val topic     = cfg.require[String]("chemist.sns-topic-name")
+  val queue     = cfg.require[String]("chemist.sqs-queue-name")
+  val resources = cfg.require[List[String]]("chemist.resources-to-monitor")
 
   /////// queues and event streaming ////////
 
@@ -141,6 +142,7 @@ trait Server extends Interpreter[Server.ServerF] {
     Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
   )
 
+
   /////// in-memory data storage ////////
 
   val R = new StatefulRepository(ec2)
@@ -160,9 +162,6 @@ trait Server extends Interpreter[Server.ServerF] {
         a <- R.distribution.map(Sharding.shards)
         b <- Task.gatherUnordered(a.map(R.instance).toSeq)
       } yield k(b)
-
-    // case Listen(k) =>
-      // Lifecycle.run(queue, sqs, D).run.map(_ => k)
   }
 
   protected def init(): Task[Unit] = {
@@ -176,7 +175,7 @@ trait Server extends Interpreter[Server.ServerF] {
       _  = log.debug(s"located ${z.length} instances that appear to be monitorable")
 
       // convert the instance list into reachable targets
-      t  = z.flatMap(Target.fromInstance(cfg.require[List[String]]("chemist.resources-to-monitor"))).toSet
+      t  = z.flatMap(Target.fromInstance(resources)).toSet
       _  = log.debug(s"targets are: $t")
 
       // set the result to an in-memory list of "the world"
@@ -213,6 +212,13 @@ trait Server extends Interpreter[Server.ServerF] {
 
       c <- SNS.subscribe(a, b)(sns)
       _  = log.debug(s"subscribed sqs queue to the sns topic")
+
+      // now the queues are setup with the right permissions,
+      // start the lifecycle listener
+      _ <- Lifecycle.run(queue, resources, Lifecycle.sink)(R, sqs, asg, ec2)
+      _  = log.debug("lifecycle process started")
+
+      _ <- Task(log.info(">>>>>>>>>>>> bootup complete <<<<<<<<<<<<"))
     } yield ()
   }
 
