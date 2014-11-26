@@ -23,7 +23,7 @@ class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {
   val k2 = "i-15807647"
 
   private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): Throwable \/ Action =
-    Lifecycle.stream("name-of-queue")(r, sqs, asg
+    Lifecycle.stream("name-of-queue", "stream/previous" :: Nil)(r, sqs, asg, ec2
       ).until(Process.emit(false)).runLast.run.get // never do this anywhere but tests
 
   // val s: Sink[Task,Action] = Lifecycle.sink(r) //Process.emit { case x => Task.now( println(x) ) }

@@ -6,6 +6,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.{Process,Sink}
 import com.amazonaws.services.sqs.model.Message
 import com.amazonaws.services.sqs.AmazonSQS
+import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import oncue.svc.funnel.aws.{SQS,SNS,ASG}
 
@@ -33,7 +34,7 @@ object Lifecycle {
   def parseMessage(msg: Message): Throwable \/ AutoScalingEvent =
     Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException(_))
 
-  def stream(queueName: String)(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling): Process[Task, Throwable \/ Action] = {
+  def stream(queueName: String, resources: Seq[String])(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2): Process[Task, Throwable \/ Action] = {
     for {
       a <- SQS.subscribe(queueName)(sqs)
       _ <- Process.eval(Task(log.debug(s">> a = $a")))
@@ -41,7 +42,7 @@ object Lifecycle {
       b <- Process.emitAll(a)
       _ <- Process.eval(Task(log.debug(s">> b = $b")))
 
-      c <- Process.eval(parseMessage(b).traverseU(interpreter(_)(r, asg)))
+      c <- Process.eval(parseMessage(b).traverseU(interpreter(_, resources)(r, asg, ec2)))
       _ <- Process.eval(Task(log.debug(s">> c = $c")))
 
       _ <- SQS.deleteMessages(queueName, a)(sqs)
@@ -52,16 +53,17 @@ object Lifecycle {
 
   // im really not sure what to say about this monster...
   // sorry reader.
-  def interpreter(e: AutoScalingEvent)(r: Repository, asg: AmazonAutoScaling): Task[Action] = {
+  def interpreter(e: AutoScalingEvent, resources: Seq[String])(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Action] = {
     log.debug(s"event: $e")
 
     def isFlask: Task[Boolean] =
       ASG.lookupByName(e.asgName)(asg).flatMap { a =>
         log.debug(s"Found ASG from the EC2 lookup: $a")
 
-        a.getTags.asScala.map(t => t.getKey -> t.getValue).toMap.find { case (k,v) =>
-          k.trim == "type" && v.startsWith("flask")
-        }.fold(Task.now(false))(_ => Task.now(true))
+        a.getTags.asScala.find(t =>
+          t.getKey.trim == "type" &&
+          t.getValue.trim.startsWith("flask")
+        ).fold(Task.now(false))(_ => Task.now(true))
       }
 
     e match {
@@ -71,7 +73,17 @@ object Lifecycle {
             log.debug(s"Adding capactiy $id")
             r.increaseCapacity(id).map(_ => NoOp)
           } else
-            Task.now(NoOp) // do something more meaningful here to start monitoring remotes
+            for {
+              i <- Deployed.lookupOne(id)(ec2)
+              _  = log.debug(s"Found instance metadata from remote: $i")
+
+              _ <- r.addInstance(i)
+              _  = log.debug(s"Adding service instance '$id' to known entries")
+
+              t  = Sharding.Target.fromInstance(resources)(i)
+              m <- Sharding.locateAndAssignDistribution(t, r)
+              _  = log.debug("Computed and set a new distribution for the addition of host...")
+            } yield Redistributed(m)
         )
 
       case AutoScalingEvent(_,Terminate,_,_,_,_,_,_,_,_,_,_,id) => {
@@ -95,15 +107,18 @@ object Lifecycle {
     }
   }
 
-  // not sure if this is really needed
+  // not sure if this is really needed but
+  // looks like i can use this in a more generic way
+  // to send previously unknown targets to flasks
   def sink: Sink[Task,Action] =
     Process.emit {
-      case Redistributed(seq) => Sharding.distribute(seq).map(_ => ())
+      case Redistributed(seq) =>
+        Sharding.distribute(seq).map(_ => ())
       case _ => Task.now( () )
     }
 
-  def run(queueName: String, s: Sink[Task, Action])(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling): Task[Unit] = {
-    stream(queueName)(r,sqs,asg).flatMap {
+  def run(queueName: String, resources: Seq[String], s: Sink[Task, Action])(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Unit] = {
+    stream(queueName, resources)(r,sqs,asg,ec2).flatMap {
       case -\/(fail) => Process.halt
       case \/-(win)  => s
     }.run
