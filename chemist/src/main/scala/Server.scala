@@ -169,10 +169,11 @@ trait Server extends Interpreter[Server.ServerF] {
     for {
       // read the list of all deployed machines
       l <- Deployed.list(asg, ec2)
+      _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
       // filter out all the instances that are in private networks
       // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
-      z  = l.filterNot(_.location.isPrivateNetwork)
-      _  = log.debug(s"located ${z.length} instances that appear to be monitorable")
+      z  = l.filterNot(x => x.location.isPrivateNetwork && Deployed.filter.flasks(x))
+      _  = log.info(s"located ${z.length} instances that appear to be monitorable")
 
       // convert the instance list into reachable targets
       t  = z.flatMap(Target.fromInstance(resources)).toSet
@@ -180,11 +181,11 @@ trait Server extends Interpreter[Server.ServerF] {
 
       // set the result to an in-memory list of "the world"
       _ <- Task.gatherUnordered(z.map(R.addInstance))
-      _  = log.debug("added instances to the repository")
+      _  = log.info("added instances to the repository...")
 
       // from the whole world, figure out which are flask instances
-      f  = z.filter(Deployed.filter.flasks)
-      _  = log.debug(s"found ${f.length} flasks in the running instance list")
+      f  = l.filter(Deployed.filter.flasks)
+      _  = log.info(s"found ${f.length} flasks in the running instance list...")
 
       // update the distribution with new capacity seeds
       _ <- Task.gatherUnordered(f.map(R.increaseCapacity))
