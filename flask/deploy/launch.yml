@@ -5,5 +5,5 @@
   gather_facts: false
   roles:
     - { role: launcher,
-        amazon_instance_type: c3.xlarge
+        amazon_instance_type: m3.xlarge
       }
