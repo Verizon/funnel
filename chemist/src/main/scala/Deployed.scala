@@ -9,6 +9,7 @@ import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
 import oncue.svc.funnel.aws._
+import journal.Logger
 
 /**
  * This module contains functions for describing the deployed world as the caller
@@ -23,6 +24,8 @@ import oncue.svc.funnel.aws._
 object Deployed {
 
   ///////////////////////////// public api /////////////////////////////
+
+  private val log = Logger[Deployed.type]
 
   /**
    * List all of the instances in the given AWS account that respond to a rudimentry
@@ -52,9 +55,10 @@ object Deployed {
   def lookupMany(ids: Seq[InstanceID])(ec2: AmazonEC2): Task[Seq[Instance]] =
     for {
       a <- EC2.reservations(ids)(ec2)
-      // _  = println(s"Deployed.lookupMany a=$a")
+      _  = log.debug(s"Deployed.lookupMany, a = ${a.length}")
       b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
-      // _  = println(s"Deployed.lookupMany b=$b")
+      _  = log.debug(s"Deployed.lookupMany b = ${b.length}")
+      _  = log.debug(b.map(_.id).mkString(", "))
     } yield b
 
   ///////////////////////////// filters /////////////////////////////
@@ -70,7 +74,6 @@ object Deployed {
       i.application.map(_.name.startsWith("chemist")).getOrElse(false)
   }
 
-
   ///////////////////////////// internal api /////////////////////////////
 
   private def instances(f: Instance => Boolean
@@ -84,7 +87,9 @@ object Deployed {
       y  = x.map(g => validate(g).attempt)
       // run the tasks on the specified thread pool (Server.defaultPool)
       b <- Task.gatherUnordered(y)
-    } yield b.flatMap(_.toList)
+      r  = b.flatMap(_.toList)
+      _  = log.debug(s"validated instance list: ${r.map(_.id).mkString(", ")}")
+    } yield r
 
   /**
    * This is kind of horrible, but it is what it is. The AWS api's really do not help here at all.
@@ -93,6 +98,7 @@ object Deployed {
   private def readAutoScallingGroups(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
     for {
       g <- ASG.list(asg)
+      _  = log.debug(s"Found ${g.length} auto-scalling groups with ${g.map(_.instances.length).reduceLeft(_ + _)} instances...")
       r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))(ec2)
     } yield r
 

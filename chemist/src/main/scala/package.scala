@@ -8,6 +8,12 @@ package object chemist {
   import scalaz.concurrent.Task
   import concurrent.{Future,ExecutionContext}
 
+  def printD[A](in: => A): Unit = {
+    println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    println(in)
+    println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+  }
+
   implicit def fromScalaFuture[A](a: Future[A])(implicit e: ExecutionContext): Task[A] =
     Task async { k =>
       a.onComplete {
