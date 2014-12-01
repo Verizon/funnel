@@ -33,7 +33,7 @@ object EC2 {
   import annotation.tailrec
 
   def reservations(ids: Seq[String])(ec2: AmazonEC2): Task[Seq[Reservation]] = {
-    @tailrec def fetch(result: => Seq[Reservation], token: Option[String] = None): Seq[Reservation] = {
+    @tailrec def fetch(result: Seq[Reservation], token: Option[String] = None): Seq[Reservation] = {
       val req = new DescribeInstancesRequest().withInstanceIds(ids:_*)
       val r = token.map(t => ec2.describeInstances(req.withNextToken(t))
           ).getOrElse(ec2.describeInstances(req))
