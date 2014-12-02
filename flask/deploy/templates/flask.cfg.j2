@@ -17,13 +17,13 @@ flask {
   }
 
   elastic-search {
-  {% if application_environment == 'improd' %}
+{% if application_environment == 'improd' %}
     url = "http://improd-ops-es.svc.oncue.com:9200"
-  {% elif application_environment == 'imqa' %}
+{% elif application_environment == 'imqa' %}
     url = "http://imqa-ops-es.svc.oncue.com:9200"
-  {% else application_environment == 'imdev' %}
+{% else %}
     url = "http://imdev-ops-es.svc.oncue.com:9200"
-  {% endif %}
+{% endif %}
     index-name = "funnel"
     type-name = "metric"
     partition-date-format = "yyyy.MM.dd"
