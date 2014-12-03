@@ -77,6 +77,12 @@ object Server {
   def exclude(shard: InstanceID): Server[Unit] =
     liftF(AlterShard(shard.toLowerCase, Terminate, ()))
 
+  /**
+   * Instruct flask to specifcally "launch" a given shard and
+   * start sending new load to the "new" shard.
+   *
+   * NOTE: Assumes all added instances here are free of work already.
+   */
   def include(shard: InstanceID): Server[Unit] =
     liftF(AlterShard(shard.toLowerCase, Launch, ()))
 
