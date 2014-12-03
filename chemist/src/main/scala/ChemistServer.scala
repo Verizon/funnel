@@ -194,6 +194,7 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
     |          <h4>Distribution Resources</h4>
     |          <p><a href="/distribution">GET /distribution</a>: Display the current distribution of shards and associated work.</p>
     |          <p><a href="/distribute">POST /distribute</a>: Manually instruct a given set of inputs to be sharded over avalible Flask instances.</p>
+    |          <p><a href="/bootstrap">POST /bootstrap</a>: Manually force Chemist to re-read its state of the world from AWS.</p>
     |        </div>
     |
     |        <div class="col-lg-6">
