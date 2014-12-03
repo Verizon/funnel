@@ -35,15 +35,21 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
   ): Unit = {
     I.run(exe).attemptRun match {
       case \/-(a) => {
-        val out = a.asJson.nospaces // the `A` must be convertable to JSON
-        req.sendResponseHeaders(200, out.length)
-        req.getResponseBody.write(out.getBytes)
+        // the `A` must be convertable to JSON
+        flush(200, a.asJson.nospaces, req)
       }
       case -\/(e) => {
-        req.sendResponseHeaders(500, e.toString.length)
-        req.getResponseBody.write(e.toString.getBytes)
+        flush(500, e.toString, req)
+        // req.sendResponseHeaders(500, e.toString.length)
+        // req.getResponseBody.write(e.toString.getBytes)
       }
     }
+  }
+
+  private def flush(status: Int, body: String, req: HttpExchange): Unit = {
+    val bytes = body.getBytes
+    req.sendResponseHeaders(status,bytes.length)
+    req.getResponseBody.write(bytes)
   }
 
   protected def handleIndex(req: HttpExchange): Unit = {
@@ -57,6 +63,12 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
   //   req.sendResponseHeaders(200,0)
   //   req.getResponseBody.write("Nothing to see here yet.".getBytes)
   // }
+
+  protected def handleBootstrap(req: HttpExchange): Unit = {
+    if(req.getRequestMethod.toLowerCase == "post"){
+      flush(201, "", req)
+    } else flush(400, "Method not allowed. Use POST.",req)
+  }
 
   protected def handleNotImplemented(req: HttpExchange): Unit = {
     req.sendResponseHeaders(501,0)
@@ -83,6 +95,7 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
         case "shards" :: id :: Nil => run(S.shard(id), req)
         // POST
         case "distribute"   :: Nil => handleNotImplemented(req)
+        case "bootstrap"    :: Nil => run(S.bootstrap, req)
         case _                     => handleNotImplemented(req)
       }
     }

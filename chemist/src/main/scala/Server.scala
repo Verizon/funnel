@@ -24,6 +24,9 @@ object Server {
   case class DescribeShards[A](k: Seq[Instance] => A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = DescribeShards(k andThen g)
   }
+  case class Bootstrap[A](k: A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = Bootstrap(g(k))
+  }
 
   ////////////// free monad plumbing //////////////
 
@@ -47,6 +50,13 @@ object Server {
 
   def shard(id: InstanceID): Server[Option[Instance]] =
     liftF(DescribeShards(identity)).map(_.find(_.id.toLowerCase == id.trim.toLowerCase))
+
+  /**
+   * Force chemist to re-read the world from AWS. Useful if for some reason
+   * Chemist gets into a weird state at runtime.
+   */
+  def bootstrap: Server[Unit] =
+    liftF(Bootstrap(()))
 
   ////////////// threading ///////////////
 
@@ -162,10 +172,12 @@ trait Server extends Interpreter[Server.ServerF] {
         a <- R.distribution.map(Sharding.shards)
         b <- Task.gatherUnordered(a.map(R.instance).toSeq)
       } yield k(b)
+
+    case Bootstrap(k) =>
+      Task.fork(bootstrap()).map(_ => k)
   }
 
-  protected def init(): Task[Unit] = {
-    log.debug("attempting to read the world of deployed instances")
+  protected def bootstrap(): Task[Unit] =
     for {
       // read the list of all deployed machines
       l <- Deployed.list(asg, ec2)
@@ -203,6 +215,14 @@ trait Server extends Interpreter[Server.ServerF] {
         h <- Sharding.locateAndAssignDistribution(t,R)
         g <- Sharding.distribute(h)
       } yield ()
+
+      _ <- Task(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<"))
+    } yield ()
+
+  protected def init(): Task[Unit] = {
+    log.debug("attempting to read the world of deployed instances")
+    for {
+      _ <- bootstrap
 
       // start to wire up the topics and subscriptions to queues
       a <- SNS.create(topic)(sns)
