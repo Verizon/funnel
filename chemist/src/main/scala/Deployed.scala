@@ -118,7 +118,7 @@ object Deployed {
   import scalaz.\/
 
   private def fetch(url: URL): Throwable \/ Unit =
-    \/.fromTryCatch {
+    \/.fromTryCatchThrowable[Unit, Exception] {
       val c = url.openConnection
       c.setConnectTimeout(300) // timeout in 300ms to keep the overhead reasonable
       c.setReadTimeout(300)

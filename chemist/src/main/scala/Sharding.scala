@@ -1,6 +1,7 @@
 package oncue.svc.funnel.chemist
 
 import scalaz.==>>
+import scalaz.std.string._
 import scalaz.concurrent.Task
 import intelmedia.ws.funnel.BucketName
 import journal.Logger

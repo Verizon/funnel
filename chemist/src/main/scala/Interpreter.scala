@@ -1,13 +1,13 @@
 package oncue.svc.funnel.chemist
 
-import scalaz.{Free,~>}
+import scalaz.{Free,Functor,~>}
 import scalaz.concurrent.Task
 
 /**
  * Generic abstraction over natural transformations for free servers in
  * the catagory of Task[A]
  */
-trait Interpreter[M[+_]] {
+abstract class Interpreter[M[+_]: Functor] {
   type F[A] = Free[M, A]
 
   protected def op[A](r: M[A]): Task[A]

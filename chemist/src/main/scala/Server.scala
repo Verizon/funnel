@@ -4,7 +4,7 @@ import java.net.URL
 import com.amazonaws.services.sqs.model.Message
 import scalaz.stream.{Process,Sink}
 import scalaz.concurrent.Task
-import scalaz.{~>,Free,Functor,\/,-\/,\/-}, Free.Return, Free.Suspend
+import scalaz.{~>,Free,Functor,\/,-\/,\/-}, Free.liftF
 import Sharding.{Target,Distribution}
 
 object Server {
@@ -24,13 +24,9 @@ object Server {
   case class DescribeShards[A](k: Seq[Instance] => A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = DescribeShards(k andThen g)
   }
-
   ////////////// free monad plumbing //////////////
 
-  private def liftF[A](srv: ServerF[A]): Free[ServerF,A] =
-    Suspend[ServerF, A](Functor[ServerF].map(srv)(a => Return[ServerF, A](a)))
-
-  private implicit def serverFFunctor[B]: Functor[ServerF] = new Functor[ServerF]{
+  implicit def serverFFunctor[B]: Functor[ServerF] = new Functor[ServerF]{
     def map[A,B](fa: ServerF[A])(f: A => B): ServerF[B] = fa.map(f)
   }
 
@@ -45,8 +41,10 @@ object Server {
   def shards: Server[Seq[Instance]] =
     liftF(DescribeShards(identity))
 
-  def shard(id: InstanceID): Server[Option[Instance]] =
-    liftF(DescribeShards(identity)).map(_.find(_.id.toLowerCase == id.trim.toLowerCase))
+  def shard(id: InstanceID): Server[Option[Instance]] = {
+    val ds: ServerF[Seq[Instance]] = DescribeShards(identity)
+    liftF(ds).map(_.find(_.id.toLowerCase == id.trim.toLowerCase))
+  }
 
   ////////////// threading ///////////////
 

@@ -3,6 +3,7 @@ package oncue.svc.funnel.chemist
 import scalaz.concurrent.Task
 import Sharding.Distribution
 import scalaz.==>>
+import scalaz.std.string._
 
 trait Repository {
 
