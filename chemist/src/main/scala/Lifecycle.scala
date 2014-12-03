@@ -117,6 +117,15 @@ object Lifecycle {
       case _ => Task.now( () )
     }
 
+  def event(e: AutoScalingEvent, resources: Seq[String])(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Unit] = {
+    interpreter(e, resources)(r, asg, ec2).map {
+      case Redistributed(seq) =>
+        Sharding.distribute(seq).map(_ => ())
+      case _ =>
+        Task.now( () )
+    }
+  }
+
   def run(queueName: String, resources: Seq[String], s: Sink[Task, Action])(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Unit] = {
     stream(queueName, resources)(r,sqs,asg,ec2).flatMap {
       case -\/(fail) => Process.halt

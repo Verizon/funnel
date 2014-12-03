@@ -34,16 +34,15 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
     req: HttpExchange
   ): Unit = {
     I.run(exe).attemptRun match {
-      case \/-(a) => {
-        val out = a.asJson.nospaces // the `A` must be convertable to JSON
-        req.sendResponseHeaders(200, out.length)
-        req.getResponseBody.write(out.getBytes)
-      }
-      case -\/(e) => {
-        req.sendResponseHeaders(500, e.toString.length)
-        req.getResponseBody.write(e.toString.getBytes)
-      }
+      case \/-(a) => flush(200, a.asJson.nospaces, req)
+      case -\/(e) => flush(500, e.toString, req)
     }
+  }
+
+  private def flush(status: Int, body: String, req: HttpExchange): Unit = {
+    val bytes = body.getBytes
+    req.sendResponseHeaders(status,bytes.length)
+    req.getResponseBody.write(bytes)
   }
 
   protected def handleIndex(req: HttpExchange): Unit = {
@@ -57,6 +56,20 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
   //   req.sendResponseHeaders(200,0)
   //   req.getResponseBody.write("Nothing to see here yet.".getBytes)
   // }
+
+  protected def handleBootstrap(req: HttpExchange): Unit = {
+    if(req.getRequestMethod.toLowerCase == "post"){
+      run(S.bootstrap, req)
+      flush(200, "", req)
+    } else flush(400, "Method not allowed. Use POST.",req)
+  }
+
+  protected def handleAlterShardState[A : EncodeJson](f: Free[Server.ServerF, A])(req: HttpExchange): Unit = {
+    if(req.getRequestMethod.toLowerCase == "post"){
+      run(f, req)
+      flush(201, "", req)
+    } else flush(400, "Method not allowed. Use POST.",req)
+  }
 
   protected def handleNotImplemented(req: HttpExchange): Unit = {
     req.sendResponseHeaders(501,0)
@@ -82,7 +95,10 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
         case "shards"       :: Nil => run(S.shards.map(_.toList), req)
         case "shards" :: id :: Nil => run(S.shard(id), req)
         // POST
+        case "shards" :: id :: "exclude" :: Nil => handleAlterShardState(S.exclude(id))(req)
+        case "shards" :: id :: "include" :: Nil => handleAlterShardState(S.include(id))(req)
         case "distribute"   :: Nil => handleNotImplemented(req)
+        case "bootstrap"    :: Nil => handleBootstrap(req)
         case _                     => handleNotImplemented(req)
       }
     }
@@ -181,12 +197,15 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
     |          <h4>Distribution Resources</h4>
     |          <p><a href="/distribution">GET /distribution</a>: Display the current distribution of shards and associated work.</p>
     |          <p><a href="/distribute">POST /distribute</a>: Manually instruct a given set of inputs to be sharded over avalible Flask instances.</p>
+    |          <p><a href="/bootstrap">POST /bootstrap</a>: Manually force Chemist to re-read its state of the world from AWS.</p>
     |        </div>
     |
     |        <div class="col-lg-6">
     |          <h4>Shard Resources</h4>
     |          <p><a href="/shards">GET /shards</a>: List all shards and known information about those hosts</p>
     |          <p><a href="/shard/:shardid">GET /shard/:shard-id</a>: Displays all known information about a given shard.</p>
+    |          <p><a href="/shard/:shardid/include">POST /shard/:shard-id/include</a>: Manually specify a machine to use as a load-bearing shard.</p>
+    |          <p><a href="/shard/:shardid/exclude">POST /shard/:shard-id/exclude</a>: Manually remove a shard from rotation and reshard its work.</p>
     |        </div>
     |
     |      </div>

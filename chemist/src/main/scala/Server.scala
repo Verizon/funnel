@@ -10,7 +10,8 @@ import Sharding.{Target,Distribution}
 object Server {
   type Server[A] = Free[ServerF, A]
 
-  // ServerF algebra
+  ////////////// ServerF algebra //////////////
+
   sealed trait ServerF[+A]{
     def map[B](f: A => B): ServerF[B]
   }
@@ -24,6 +25,12 @@ object Server {
   case class DescribeShards[A](k: Seq[Instance] => A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = DescribeShards(k andThen g)
   }
+  case class Bootstrap[A](k: A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = Bootstrap(g(k))
+  }
+  case class AlterShard[A](id: InstanceID, state: AutoScalingEventKind, k: A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = AlterShard(id, state, g(k))
+  }
 
   ////////////// free monad plumbing //////////////
 
@@ -36,17 +43,55 @@ object Server {
 
   ////////////// public api / syntax ///////////////
 
+  /**
+   * Of all known monitorable services, dispaly the current work assignments
+   * of funnel -> flask.
+   */
   def distribution: Server[Map[InstanceID, Map[String, List[SafeURL]]]] =
     liftF(DescribeDistribution(identity))
 
+  /**
+   * manually ask chemist to assign the given urls to a flask in order
+   * to be monitored. This is not recomended as a daily-use function; chemist
+   * should be smart enough to figure out when things go on/offline automatically.
+   */
   def distribute(urls: Set[Target]): Server[Unit] =
     liftF(Distribute(urls, ()))
 
+  /**
+   * list all the shards currently known by chemist.
+   */
   def shards: Server[Seq[Instance]] =
     liftF(DescribeShards(identity))
 
+  /**
+   * display all known node information about a specific shard
+   */
   def shard(id: InstanceID): Server[Option[Instance]] =
     liftF(DescribeShards(identity)).map(_.find(_.id.toLowerCase == id.trim.toLowerCase))
+
+  /**
+   * Instruct flask to specifcally take a given shard out of service and
+   * repartiion its given load to the rest of the system.
+   */
+  def exclude(shard: InstanceID): Server[Unit] =
+    liftF(AlterShard(shard.toLowerCase, Terminate, ()))
+
+  /**
+   * Instruct flask to specifcally "launch" a given shard and
+   * start sending new load to the "new" shard.
+   *
+   * NOTE: Assumes all added instances here are free of work already.
+   */
+  def include(shard: InstanceID): Server[Unit] =
+    liftF(AlterShard(shard.toLowerCase, Launch, ()))
+
+  /**
+   * Force chemist to re-read the world from AWS. Useful if for some reason
+   * Chemist gets into a weird state at runtime.
+   */
+  def bootstrap: Server[Unit] =
+    liftF(Bootstrap(()))
 
   ////////////// threading ///////////////
 
@@ -162,10 +207,17 @@ trait Server extends Interpreter[Server.ServerF] {
         a <- R.distribution.map(Sharding.shards)
         b <- Task.gatherUnordered(a.map(R.instance).toSeq)
       } yield k(b)
+
+    case AlterShard(id, s, k) =>
+      for {
+        _ <- Lifecycle.event(AutoScalingEvent(id, s), resources)(R, asg, ec2)
+      } yield k
+
+    case Bootstrap(k) =>
+      Task.fork(bootstrap()).map(_ => k)
   }
 
-  protected def init(): Task[Unit] = {
-    log.debug("attempting to read the world of deployed instances")
+  protected def bootstrap(): Task[Unit] =
     for {
       // read the list of all deployed machines
       l <- Deployed.list(asg, ec2)
@@ -203,6 +255,14 @@ trait Server extends Interpreter[Server.ServerF] {
         h <- Sharding.locateAndAssignDistribution(t,R)
         g <- Sharding.distribute(h)
       } yield ()
+
+      _ <- Task(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<"))
+    } yield ()
+
+  protected def init(): Task[Unit] = {
+    log.debug("attempting to read the world of deployed instances")
+    for {
+      _ <- bootstrap
 
       // start to wire up the topics and subscriptions to queues
       a <- SNS.create(topic)(sns)
