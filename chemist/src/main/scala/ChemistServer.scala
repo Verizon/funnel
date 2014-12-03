@@ -34,15 +34,8 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
     req: HttpExchange
   ): Unit = {
     I.run(exe).attemptRun match {
-      case \/-(a) => {
-        // the `A` must be convertable to JSON
-        flush(200, a.asJson.nospaces, req)
-      }
-      case -\/(e) => {
-        flush(500, e.toString, req)
-        // req.sendResponseHeaders(500, e.toString.length)
-        // req.getResponseBody.write(e.toString.getBytes)
-      }
+      case \/-(a) => flush(200, a.asJson.nospaces, req)
+      case -\/(e) => flush(500, e.toString, req)
     }
   }
 
