@@ -116,7 +116,7 @@ object Elastic {
           val req = url(s"${es.url}/${es.indexName}-${date}/${es.typeName}").
             setContentType("application/json", "UTF-8") << json.nospaces
           fromScalaFuture(Http(req OK as.String)).attempt.map(
-            _.fold(e => log("error in:\n" + json.nospaces), _ => ()))
+            _.fold(e => log(s"Unable to send document to elastic search.\nConfiguration was $es. Document was: \n ${json.nospaces}"), _ => ()))
         }.run
 }
 
