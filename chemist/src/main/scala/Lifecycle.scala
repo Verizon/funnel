@@ -56,6 +56,10 @@ object Lifecycle {
   def interpreter(e: AutoScalingEvent, resources: Seq[String])(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Action] = {
     log.debug(s"event: $e")
 
+    // terrible side-effect but we want to track the events
+    // that chemist actually sees
+    r.addEvent(e)
+
     def isFlask: Task[Boolean] =
       ASG.lookupByName(e.asgName)(asg).flatMap { a =>
         log.debug(s"Found ASG from the EC2 lookup: $a")

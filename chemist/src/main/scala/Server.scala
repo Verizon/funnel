@@ -31,6 +31,9 @@ object Server {
   case class AlterShard[A](id: InstanceID, state: AutoScalingEventKind, k: A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = AlterShard(id, state, g(k))
   }
+  case class DescribeLifecyeHistory[A](k: Seq[AutoScalingEvent] => A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = DescribeLifecyeHistory(k andThen g)
+  }
 
   ////////////// free monad plumbing //////////////
 
@@ -85,6 +88,12 @@ object Server {
    */
   def include(shard: InstanceID): Server[Unit] =
     liftF(AlterShard(shard.toLowerCase, Launch, ()))
+
+  /**
+   * List out the last 100 lifecycle events that this chemist has seen.
+   */
+  def history: Server[Seq[AutoScalingEvent]] =
+    liftF(DescribeLifecyeHistory(identity))
 
   /**
    * Force chemist to re-read the world from AWS. Useful if for some reason
@@ -213,6 +222,9 @@ trait Server extends Interpreter[Server.ServerF] {
         _ <- Lifecycle.event(AutoScalingEvent(id, s), resources)(R, asg, ec2)
       } yield k
 
+    case DescribeLifecyeHistory(k) =>
+      R.historicalEvents.map(k)
+
     case Bootstrap(k) =>
       Task.fork(bootstrap()).map(_ => k)
   }
@@ -224,7 +236,7 @@ trait Server extends Interpreter[Server.ServerF] {
       _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
       // filter out all the instances that are in private networks
       // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
-      z  = l.filterNot(x => x.location.isPrivateNetwork && Deployed.filter.flasks(x))
+      z  = l.filterNot(x => x.location.isPrivateNetwork) // && Deployed.filter.flasks(x)
       _  = log.info(s"located ${z.length} instances that appear to be monitorable")
 
       // convert the instance list into reachable targets
@@ -262,13 +274,13 @@ trait Server extends Interpreter[Server.ServerF] {
   protected def init(): Task[Unit] = {
     log.debug("attempting to read the world of deployed instances")
     for {
-      _ <- bootstrap
+      // _ <- bootstrap
 
       // start to wire up the topics and subscriptions to queues
       a <- SNS.create(topic)(sns)
       _  = log.debug(s"created sns topic with arn = $a")
 
-      b <- SQS.create(queue)(sqs)
+      b <- SQS.create(queue, a)(sqs)
       _  = log.debug(s"created sqs queue with arn = $a")
 
       c <- SNS.subscribe(a, b)(sns)
@@ -279,12 +291,13 @@ trait Server extends Interpreter[Server.ServerF] {
       _ <- Lifecycle.run(queue, resources, Lifecycle.sink)(R, sqs, asg, ec2)
       _  = log.debug("lifecycle process started")
 
-      _ <- Task(log.info(">>>>>>>>>>>> bootup complete <<<<<<<<<<<<"))
+      _ <- Task.delay(log.info(">>>>>>>>>>>> initilization complete <<<<<<<<<<<<"))
     } yield ()
   }
 
 }
 
 object Server0 extends Server {
-  init().runAsync(x => ())
+  init().runAsync(e =>
+    log.error(s"Problem occoured during server initilization: $e"))
 }

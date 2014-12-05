@@ -137,4 +137,30 @@ object JSON {
       instanceId      = m
     ))
 
+  /**
+   * {
+   *   "activity-id": "foo",
+   *   "instance-id": "i-353534",
+   *   "datetime": "2014....",
+   *   "kind": "launch",
+   *   "datacenter": "us-east-1a",
+   *   "description": "sdfsdfdssdfs",
+   *   "cause": "s sdf sdf sdfsd fsd",
+   *   "asg-name": "sodfso sdfs",
+   *   "asg-arn": "sdf sdfs "
+   * }
+   */
+  implicit val AutoScalingEventToJson: EncodeJson[AutoScalingEvent] =
+    EncodeJson((e: AutoScalingEvent) =>
+      ("activity-id" := e.activityId) ->:
+      ("instance-id" := e.instanceId) ->:
+      ("date-time"   := e.time.toString) ->:
+      ("kind"        := e.kind.notification) ->:
+      ("datacenter"  := e.avalibilityZone) ->:
+      ("description" := e.description) ->:
+      ("cause"       := e.cause) ->:
+      ("asg-name"    := e.asgName) ->:
+      ("asg-arn"     := e.asgARN) ->: jEmptyObject
+    )
+
 }

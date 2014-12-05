@@ -58,7 +58,6 @@ object Deployed {
       _  = log.debug(s"Deployed.lookupMany, a = ${a.length}")
       b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
       _  = log.debug(s"Deployed.lookupMany b = ${b.length}")
-      _  = log.debug(b.map(_.id).mkString(", "))
     } yield b
 
   ///////////////////////////// filters /////////////////////////////
