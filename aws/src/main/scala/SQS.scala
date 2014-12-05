@@ -72,6 +72,7 @@ object SQS {
   import com.amazonaws.auth.policy.{Principal,Policy,Statement}, Statement.Effect
   import com.amazonaws.auth.policy.conditions.ConditionFactory
   import com.amazonaws.auth.policy.actions.SQSActions
+  import com.amazonaws.auth.policy.Resource
 
   /**
    * This is kind of tricky. Basically we want the queue to be "public" for sending,
@@ -80,37 +81,50 @@ object SQS {
    * case for ASG event notifications, we also add all our known account IDs for
    * general administration purposes (chemist itself needs to hide messages etc).
    */
-  private def policy(snsArn: ARN): Policy =
+  private def policy(snsArn: ARN, sqsArn: ARN): Policy =
     new Policy().withStatements(
       new Statement(Effect.Allow)
         .withPrincipals(Principal.AllUsers)
         .withActions(SQSActions.SendMessage)
-        .withConditions(ConditionFactory.newSourceArnCondition(snsArn)),
-      new Statement(Effect.Allow)
-        .withPrincipals(accounts.map(new Principal(_)):_*)
-        .withActions(
-          SQSActions.SendMessage,
-          SQSActions.ReceiveMessage,
-          SQSActions.DeleteMessage,
-          SQSActions.ChangeMessageVisibility,
-          SQSActions.GetQueueAttributes,
-          SQSActions.GetQueueUrl))
+        .withResources(new Resource(sqsArn))
+        .withConditions(ConditionFactory.newSourceArnCondition(snsArn))//,
+      // new Statement(Effect.Allow)
+      //   .withPrincipals(accounts.sorted.map(new Principal(_)):_*)
+      //   .withActions(
+      //     SQSActions.SendMessage,
+      //     SQSActions.ReceiveMessage,
+      //     SQSActions.DeleteMessage,
+      //     SQSActions.ChangeMessageVisibility,
+      //     SQSActions.GetQueueAttributes,
+      //     SQSActions.GetQueueUrl)
+    )
 
   // http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-long-polling.html
   def create(queueName: String, snsArn: ARN)(client: AmazonSQS): Task[ARN] = {
-    val req = new CreateQueueRequest(queueName).withAttributes(
-      Map(
+    // val req = new CreateQueueRequest(queueName).withAttributes(
+    //   Map(
+    //     // "DelaySeconds"                  -> "120", // wait two minutes before making this message visibile to consumers so service has time to boot
+    //     "MaximumMessageSize"            -> "64000",
+    //     "MessageRetentionPeriod"        -> "1800",
+    //     "ReceiveMessageWaitTimeSeconds" -> (readInterval.toSeconds - 2).toString,
+    //     "Policy"                        -> policy(snsArn).toJson
+    //   ).asJava
+    // )
+
+    for {
+      u <- Task(client.createQueue(queueName).getQueueUrl)
+      a <- arnForQueue(u)(client)
+
+      attrs = Map(
         // "DelaySeconds"                  -> "120", // wait two minutes before making this message visibile to consumers so service has time to boot
         "MaximumMessageSize"            -> "64000",
         "MessageRetentionPeriod"        -> "1800",
         "ReceiveMessageWaitTimeSeconds" -> (readInterval.toSeconds - 2).toString,
-        "Policy"                        -> policy(snsArn).toJson
-      ).asJava
-    )
+        "Policy"                        -> policy(snsArn, a).toJson
+      )
 
-    for {
-      u <- Task(client.createQueue(req).getQueueUrl)
-      a <- arnForQueue(u)(client)
+      _ <- Task(client.setQueueAttributes(u, attrs.asJava))
+
     } yield a
   }
 
@@ -133,8 +147,8 @@ object SQS {
         val msgs: List[Message] =
           client.receiveMessage(req).getMessages.asScala.toList
 
-        // println("sqs messages recieved count: " + msgs.length)
-        // println("sqs messages: " + msgs)
+        println("sqs messages recieved count: " + msgs.length)
+        println("sqs messages: " + msgs)
 
         msgs
       }(Monitoring.defaultPool)

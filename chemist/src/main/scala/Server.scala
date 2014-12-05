@@ -281,7 +281,7 @@ trait Server extends Interpreter[Server.ServerF] {
       _  = log.debug(s"created sns topic with arn = $a")
 
       b <- SQS.create(queue, a)(sqs)
-      _  = log.debug(s"created sqs queue with arn = $a")
+      _  = log.debug(s"created sqs queue with arn = $b")
 
       c <- SNS.subscribe(a, b)(sns)
       _  = log.debug(s"subscribed sqs queue to the sns topic")
