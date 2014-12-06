@@ -101,28 +101,20 @@ object SQS {
 
   // http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-long-polling.html
   def create(queueName: String, snsArn: ARN)(client: AmazonSQS): Task[ARN] = {
-    // val req = new CreateQueueRequest(queueName).withAttributes(
-    //   Map(
-    //     // "DelaySeconds"                  -> "120", // wait two minutes before making this message visibile to consumers so service has time to boot
-    //     "MaximumMessageSize"            -> "64000",
-    //     "MessageRetentionPeriod"        -> "1800",
-    //     "ReceiveMessageWaitTimeSeconds" -> (readInterval.toSeconds - 2).toString,
-    //     "Policy"                        -> policy(snsArn).toJson
-    //   ).asJava
-    // )
-
     for {
       u <- Task(client.createQueue(queueName).getQueueUrl)
       a <- arnForQueue(u)(client)
 
       attrs = Map(
-        // "DelaySeconds"                  -> "120", // wait two minutes before making this message visibile to consumers so service has time to boot
+        "DelaySeconds"                  -> "120", // wait two minutes before making this message visibile to consumers so service has time to boot
         "MaximumMessageSize"            -> "64000",
         "MessageRetentionPeriod"        -> "1800",
         "ReceiveMessageWaitTimeSeconds" -> (readInterval.toSeconds - 2).toString,
         "Policy"                        -> policy(snsArn, a).toJson
       )
 
+      // doing this independantly from the create queue request because we need a very
+      // specific set of AWS policies to make the system work as needed.
       _ <- Task(client.setQueueAttributes(u, attrs.asJava))
 
     } yield a
@@ -147,8 +139,8 @@ object SQS {
         val msgs: List[Message] =
           client.receiveMessage(req).getMessages.asScala.toList
 
-        println("sqs messages recieved count: " + msgs.length)
-        println("sqs messages: " + msgs)
+        // println("sqs messages recieved count: " + msgs.length)
+        // println("sqs messages: " + msgs)
 
         msgs
       }(Monitoring.defaultPool)

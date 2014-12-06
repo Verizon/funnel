@@ -11,6 +11,10 @@ case class BoundedStack[A](maximumEntries: Int){
   private val lock = new ReentrantLock
 
   def push(item: A): Unit = {
+    println("===========================")
+    println(item)
+    println("===========================")
+
     def add: Unit = {
       list.push(item)
       if (list.size > maximumEntries) list.removeLast()

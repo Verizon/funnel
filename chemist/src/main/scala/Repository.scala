@@ -60,8 +60,10 @@ class StatefulRepository(ec2: AmazonEC2) extends Repository {
 
   /////////////// audit operations //////////////////
 
-  def addEvent(e: AutoScalingEvent): Task[Unit] =
+  def addEvent(e: AutoScalingEvent): Task[Unit] = {
+    log.info(s"Adding auto-scalling event to the historical events: $e")
     Task(Q.push(e))
+  }
 
   def historicalEvents: Task[Seq[AutoScalingEvent]] =
     Task(Q.toSeq)
