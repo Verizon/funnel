@@ -1,8 +1,8 @@
 package oncue.svc.funnel.chemist
 
 import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterAll}
-import intelmedia.ws.funnel.Monitoring
-import intelmedia.ws.funnel.http.MonitoringServer
+import oncue.svc.funnel.Monitoring
+import oncue.svc.funnel.http.MonitoringServer
 
 class DeployedSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 

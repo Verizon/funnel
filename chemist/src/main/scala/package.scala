@@ -11,6 +11,6 @@ package object chemist {
   implicit def fromScalaFuture[A](a: Future[A])(implicit e: ExecutionContext): Task[A] =
     Task async { k =>
       a.onComplete {
-        t => k(\/.fromTryCatch(t.get)) }}
+        t => k(\/.fromTryCatchThrowable[A,Exception](t.get)) }}
 }
 

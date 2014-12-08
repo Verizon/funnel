@@ -1,9 +1,9 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 package riemann
 
 import com.aphyr.riemann.client.RiemannClient
 import com.aphyr.riemann.Proto.{Event => REvent}
-import intelmedia.ws.funnel.Events.Event
+import oncue.svc.funnel.Events.Event
 import java.net.URL
 import scala.concurrent.duration._
 import scalaz.\/

@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 package riemann
 
 import scalaz.stream.Process

@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 case class Datapoint[A](key: Key[A], value: A) {
 

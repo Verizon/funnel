@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 /**
  * A `Key` represents a variable from Funnel that changes over time.

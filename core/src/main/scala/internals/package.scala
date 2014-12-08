@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 package object internals {
   import java.util.concurrent.atomic.AtomicReference

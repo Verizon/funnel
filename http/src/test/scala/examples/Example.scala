@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 package examples
 
 import org.scalacheck._
@@ -10,7 +10,7 @@ object Example {
   def main(args: Array[String]): Unit = {
 
     object metrics {
-      import intelmedia.ws.funnel.instruments._
+      import oncue.svc.funnel.instruments._
       val reqs = counter("requests#")
       val dbOk = gauge("db-up?", true)
       val query = timer("query-speed")

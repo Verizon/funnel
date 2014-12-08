@@ -1,7 +1,7 @@
 
 import oncue.build._
 
-organization in Global  := "intelmedia.ws.funnel"
+organization in Global  := "oncue.svc.funnel"
 
 scalaVersion in Global  := "2.10.4"
 

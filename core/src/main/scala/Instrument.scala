@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 trait Instrument[K] {
   def keys: K
