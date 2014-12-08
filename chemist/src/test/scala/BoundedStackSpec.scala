@@ -1,10 +1,8 @@
 package oncue.svc.funnel.chemist
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import org.scalatest.prop.Checkers
+import org.scalatest.{FlatSpec,Matchers}
 
-class BoundedStackSpec extends FlatSpec with Checkers with Matchers {
+class BoundedStackSpec extends FlatSpec with Matchers {
   val alpha = ('A' to 'Z').toList
 
   it should "pop values in order they were pushed" in {
