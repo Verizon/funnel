@@ -14,7 +14,7 @@ fork in test := true
 
 libraryDependencies ++= Seq(
   "intelmedia.ws.common" %% "s3-appender"  % "6.0.2",
-  "oncue.svc.knobs"      %% "core"         % "2.0-SNAPSHOT"
+  "oncue.svc.knobs"      %% "core"         % "2.0.+"
 )
 
 name in Universal := "flask"
