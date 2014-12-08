@@ -32,3 +32,21 @@ case class AutoScalingEvent(
   endTime: Date,
   instanceId: String
 )
+object AutoScalingEvent {
+  def apply(i: String, k: AutoScalingEventKind): AutoScalingEvent =
+    AutoScalingEvent(
+      activityId = "manual",
+      kind = k,
+      asgName = "unknown",
+      asgARN = "unknown",
+      avalibilityZone = "unknown",
+      description = "unknown",
+      cause = "operator manually triggered lifecycle operation",
+      progress = 50,
+      accountId = "unknown",
+      time = new java.util.Date,
+      startTime = new java.util.Date,
+      endTime = new java.util.Date,
+      instanceId = i
+    )
+}

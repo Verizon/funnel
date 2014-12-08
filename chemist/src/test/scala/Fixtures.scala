@@ -9,39 +9,45 @@ object Fixtures {
     id: String,
     datacenter: String = "us-east-1b",
     privateDns: String = "foo.internal",
-    publicDns: String = "foo.ext.amazonaws.com"
+    publicDns: String = "foo.ext.amazonaws.com",
+    tags: Seq[(String,String)] = Seq("baz" -> "v1","bar" -> "v2")
   ): EC2Instance =
     (new EC2Instance).withInstanceId(id)
     .withPlacement(new Placement(datacenter))
     .withPrivateDnsName(privateDns)
     .withPublicDnsName(publicDns)
-    .withTags(Seq("baz" -> "v1","bar" -> "v2").map { case (k,v) => new Tag(k,v) }:_*)
+    .withTags(tags.map { case (k,v) => new Tag(k,v) }:_*)
 
   val instances: Seq[EC2Instance] =
     instance("i-dx947af7") ::
-    instance("i-15807647") :: Nil
+    instance("i-15807647") ::
+    instance("i-flaskAAA", tags = Seq("type" -> "flask")) :: Nil
 
-  val asgEventJson1 = """
+  def asgEvent(
+    kind: AutoScalingEventKind,
+    name: String = "test-group",
+    instanceId: String = "instance-id-goes-here"
+  ): String = s"""
     |{
     |  "StatusCode": "InProgress",
     |  "Service": "AWS Auto Scaling",
-    |  "AutoScalingGroupName": "imdev-su-4-1-264-cSRykpc-WebServiceAutoscalingGroup-1X7QT7QEZKKC7",
-    |  "Description": "Terminating EC2 instance: i-dd947af7",
+    |  "AutoScalingGroupName": "${name}",
+    |  "Description": "test",
     |  "ActivityId": "926c4ae3-8181-4668-bcd1-6febc7668d18",
-    |  "Event": "autoscaling:EC2_INSTANCE_TERMINATE",
+    |  "Event": "${kind.notification}",
     |  "Details": {
     |    "Availability Zone": "us-east-1b"
     |  },
-    |  "AutoScalingGroupARN": "arn:aws:autoscaling:us-east-1:465404450664:autoScalingGroup:cf59efeb-6e6e-40c3-90a8-804662f400c7:autoScalingGroupName/imdev-su-4-1-264-cSRykpc-WebServiceAutoscalingGroup-1X7QT7QEZKKC7",
+    |  "AutoScalingGroupARN": "...",
     |  "Progress": 50,
     |  "Time": "2014-07-31T18:30:41.244Z",
     |  "AccountId": "465404450664",
     |  "RequestId": "926c4ae3-8181-4668-bcd1-6febc7668d18",
     |  "StatusMessage": "",
     |  "EndTime": "2014-07-31T18:30:41.244Z",
-    |  "EC2InstanceId": "i-dd947af7",
+    |  "EC2InstanceId": "${instanceId}",
     |  "StartTime": "2014-07-31T18:30:35.406Z",
-    |  "Cause": "At 2014-07-31T18:30:35Z an instance was taken out of service in response to a EC2 health check indicating it has been terminated or stopped."
+    |  "Cause": "At 2014-07-31T18:30:35Z ..."
     |}
     """.stripMargin
 }

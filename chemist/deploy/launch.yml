@@ -4,4 +4,9 @@
   connection: local
   gather_facts: false
   roles:
-    - { role: launcher, amazon_instance_type: m3.medium, asg_min_size: "1", asg_max_size: "1", asg_desired:  "1" }
+    - { role: launcher,
+        amazon_instance_type: m3.medium,
+        asg_min_size: "1",
+        asg_max_size: "1",
+        asg_desired:  "1"
+      }

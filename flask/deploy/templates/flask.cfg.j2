@@ -1,20 +1,32 @@
 
 flask {
-  name = "flask"
+  # dont set this for automted deployment as it will then be used
+  # for the 'cluster' of the local flask collecting metrics about itself.
+  # by not specifiying this, the process reads the network address and
+  # uses that instead.
+  # name = "flask"
+
   sns-error-topic = "flask-notifications"
 
   collect-local-metrics = true
   local-metric-frequency = 30
 
   network {
-    host = "localhost"
+    host = "127.0.0.1"
     port = 5775
   }
 
-  riemann {
-    host = "{{ application_environment }}-riemann.svc.oncue.com"
-    port = 5555
-    ttl-in-minutes = 2
+  elastic-search {
+{% if application_environment == 'improd' %}
+    url = "http://improd-ops-es.svc.oncue.com:9200"
+{% elif application_environment == 'imqa' %}
+    url = "http://imqa-ops-es.svc.oncue.com:9200"
+{% else %}
+    url = "http://imdev-ops-es.svc.oncue.com:9200"
+{% endif %}
+    index-name = "funnel"
+    type-name = "metric"
+    partition-date-format = "yyyy.MM.dd"
   }
 }
 

@@ -68,7 +68,8 @@ object SQS {
   // http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-long-polling.html
   def create(queueName: String)(client: AmazonSQS): Task[ARN] = {
     val req = (new CreateQueueRequest(queueName)).withAttributes(
-      Map("MaximumMessageSize"            -> "64000",
+      Map("DelaySeconds"                  -> "120", // wait two minutes before making this message visibile to consumers
+          "MaximumMessageSize"            -> "64000",
           "MessageRetentionPeriod"        -> "1800",
           "ReceiveMessageWaitTimeSeconds" -> (readInterval.toSeconds - 2).toString).asJava)
 

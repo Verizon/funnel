@@ -101,16 +101,19 @@ object JSON {
     }
   }
 
-  implicit def EncodeKey[A]: EncodeJson[Key[A]] =
-    jencode4L((k: Key[A]) => (k.name, k.typeOf, k.units, k.description))(
+  implicit def EncodeKey[A]: EncodeJson[Key[A]] = new EncodeJson[Key[A]] {
+    val e = jencode4L((k: Key[A]) => (k.name, k.typeOf, k.units, k.description))(
       "name", "type", "units", "description")
+    def encode(k: Key[A]) = e.encode(k).deepmerge(k.attributes.asJson)
+  }
 
   implicit def DecodeKey: DecodeJson[Key[Any]] = DecodeJson { c => for {
     name   <- (c --\ "name").as[String]
     typeOf <- (c --\ "type").as[Reportable[Any]]
     u      <- (c --\ "units").as[Units[Any]]
     desc   <- (c --\ "description").as[String].option
-  } yield Key(name, typeOf, u, desc getOrElse "") }
+    attrs  <- c.as[Map[String, String]].map(_ - "name" - "type" - "units" - "description")
+  } yield Key(name, typeOf, u, desc getOrElse "", attrs) }
 
   implicit def EncodeStats: EncodeJson[funnel.Stats] =
     jencode7L((s: funnel.Stats) =>

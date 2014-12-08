@@ -23,6 +23,10 @@ trait Repository {
   def increaseCapacity(instanceId: InstanceID): Task[(Distribution,InstanceM)]
   def increaseCapacity(instance: Instance): Task[(Distribution,InstanceM)]
   def decreaseCapacity(downed: InstanceID): Task[Distribution]
+  def isFlask(id: InstanceID): Task[Boolean] =
+    instance(id).map(_.tags.get("type"
+      ).map(_.startsWith("flask")
+      ).getOrElse(false))
 }
 
 import com.amazonaws.services.ec2.AmazonEC2

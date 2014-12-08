@@ -16,6 +16,7 @@ object Sharding {
   }
 
   case class Target(bucket: BucketName, url: SafeURL)
+
   object Target {
     val defaultResources = Seq("stream/previous")
 

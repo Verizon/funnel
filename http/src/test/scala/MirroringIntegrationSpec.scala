@@ -16,7 +16,7 @@ class MirroringIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfte
   private def mirrorFrom(port: Int): Unit =
     MI.mirrorAll(SSE.readEvents)(
       new URL(s"http://localhost:$port/stream/previous"),
-      s"node-$port/" + _
+      Map("port" -> port.toString)
     ).run.runAsync(_ => ())
 
   implicit val log = (s: String) => { println(s) }

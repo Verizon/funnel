@@ -10,7 +10,8 @@ import Sharding.{Target,Distribution}
 object Server {
   type Server[A] = Free[ServerF, A]
 
-  // ServerF algebra
+  ////////////// ServerF algebra //////////////
+
   sealed trait ServerF[+A]{
     def map[B](f: A => B): ServerF[B]
   }
@@ -24,6 +25,13 @@ object Server {
   case class DescribeShards[A](k: Seq[Instance] => A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = DescribeShards(k andThen g)
   }
+  case class Bootstrap[A](k: A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = Bootstrap(g(k))
+  }
+  case class AlterShard[A](id: InstanceID, state: AutoScalingEventKind, k: A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = AlterShard(id, state, g(k))
+  }
+
   ////////////// free monad plumbing //////////////
 
   implicit def serverFFunctor[B]: Functor[ServerF] = new Functor[ServerF]{
@@ -32,19 +40,57 @@ object Server {
 
   ////////////// public api / syntax ///////////////
 
+  /**
+   * Of all known monitorable services, dispaly the current work assignments
+   * of funnel -> flask.
+   */
   def distribution: Server[Map[InstanceID, Map[String, List[SafeURL]]]] =
     liftF(DescribeDistribution(identity))
 
+  /**
+   * manually ask chemist to assign the given urls to a flask in order
+   * to be monitored. This is not recomended as a daily-use function; chemist
+   * should be smart enough to figure out when things go on/offline automatically.
+   */
   def distribute(urls: Set[Target]): Server[Unit] =
     liftF(Distribute(urls, ()))
 
+  /**
+   * list all the shards currently known by chemist.
+   */
   def shards: Server[Seq[Instance]] =
     liftF(DescribeShards(identity))
 
+  /**
+   * display all known node information about a specific shard
+   */
   def shard(id: InstanceID): Server[Option[Instance]] = {
     val ds: ServerF[Seq[Instance]] = DescribeShards(identity)
     liftF(ds).map(_.find(_.id.toLowerCase == id.trim.toLowerCase))
   }
+
+  /**
+   * Instruct flask to specifcally take a given shard out of service and
+   * repartiion its given load to the rest of the system.
+   */
+  def exclude(shard: InstanceID): Server[Unit] =
+    liftF(AlterShard(shard.toLowerCase, Terminate, ()))
+
+  /**
+   * Instruct flask to specifcally "launch" a given shard and
+   * start sending new load to the "new" shard.
+   *
+   * NOTE: Assumes all added instances here are free of work already.
+   */
+  def include(shard: InstanceID): Server[Unit] =
+    liftF(AlterShard(shard.toLowerCase, Launch, ()))
+
+  /**
+   * Force chemist to re-read the world from AWS. Useful if for some reason
+   * Chemist gets into a weird state at runtime.
+   */
+  def bootstrap: Server[Unit] =
+    liftF(Bootstrap(()))
 
   ////////////// threading ///////////////
 
@@ -94,8 +140,9 @@ trait Server extends Interpreter[Server.ServerF] {
     b <- knobs.aws.config
   } yield a ++ b).run
 
-  val topic = cfg.require[String]("chemist.sns-topic-name")
-  val queue = cfg.require[String]("chemist.sqs-queue-name")
+  val topic     = cfg.require[String]("chemist.sns-topic-name")
+  val queue     = cfg.require[String]("chemist.sqs-queue-name")
+  val resources = cfg.require[List[String]]("chemist.resources-to-monitor")
 
   /////// queues and event streaming ////////
 
@@ -139,6 +186,7 @@ trait Server extends Interpreter[Server.ServerF] {
     Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
   )
 
+
   /////// in-memory data storage ////////
 
   val R = new StatefulRepository(ec2)
@@ -159,31 +207,36 @@ trait Server extends Interpreter[Server.ServerF] {
         b <- Task.gatherUnordered(a.map(R.instance).toSeq)
       } yield k(b)
 
-    // case Listen(k) =>
-      // Lifecycle.run(queue, sqs, D).run.map(_ => k)
+    case AlterShard(id, s, k) =>
+      for {
+        _ <- Lifecycle.event(AutoScalingEvent(id, s), resources)(R, asg, ec2)
+      } yield k
+
+    case Bootstrap(k) =>
+      Task.fork(bootstrap()).map(_ => k)
   }
 
-  protected def init(): Task[Unit] = {
-    log.debug("attempting to read the world of deployed instances")
+  protected def bootstrap(): Task[Unit] =
     for {
       // read the list of all deployed machines
       l <- Deployed.list(asg, ec2)
+      _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
       // filter out all the instances that are in private networks
       // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
-      z  = l.filterNot(_.location.isPrivateNetwork)
-      _  = log.debug(s"located ${z.length} instances that appear to be monitorable")
+      z  = l.filterNot(x => x.location.isPrivateNetwork && Deployed.filter.flasks(x))
+      _  = log.info(s"located ${z.length} instances that appear to be monitorable")
 
       // convert the instance list into reachable targets
-      t  = z.flatMap(Target.fromInstance(cfg.require[List[String]]("chemist.resources-to-monitor"))).toSet
+      t  = z.flatMap(Target.fromInstance(resources)).toSet
       _  = log.debug(s"targets are: $t")
 
       // set the result to an in-memory list of "the world"
       _ <- Task.gatherUnordered(z.map(R.addInstance))
-      _  = log.debug("added instances to the repository")
+      _  = log.info("added instances to the repository...")
 
       // from the whole world, figure out which are flask instances
-      f  = z.filter(Deployed.filter.flasks)
-      _  = log.debug(s"found ${f.length} flasks in the running instance list")
+      f  = l.filter(Deployed.filter.flasks)
+      _  = log.info(s"found ${f.length} flasks in the running instance list...")
 
       // update the distribution with new capacity seeds
       _ <- Task.gatherUnordered(f.map(R.increaseCapacity))
@@ -202,6 +255,14 @@ trait Server extends Interpreter[Server.ServerF] {
         g <- Sharding.distribute(h)
       } yield ()
 
+      _ <- Task(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<"))
+    } yield ()
+
+  protected def init(): Task[Unit] = {
+    log.debug("attempting to read the world of deployed instances")
+    for {
+      _ <- bootstrap
+
       // start to wire up the topics and subscriptions to queues
       a <- SNS.create(topic)(sns)
       _  = log.debug(s"created sns topic with arn = $a")
@@ -211,6 +272,13 @@ trait Server extends Interpreter[Server.ServerF] {
 
       c <- SNS.subscribe(a, b)(sns)
       _  = log.debug(s"subscribed sqs queue to the sns topic")
+
+      // now the queues are setup with the right permissions,
+      // start the lifecycle listener
+      _ <- Lifecycle.run(queue, resources, Lifecycle.sink)(R, sqs, asg, ec2)
+      _  = log.debug("lifecycle process started")
+
+      _ <- Task(log.info(">>>>>>>>>>>> bootup complete <<<<<<<<<<<<"))
     } yield ()
   }
 
