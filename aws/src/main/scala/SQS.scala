@@ -20,23 +20,27 @@ import java.util.concurrent.{ExecutorService,ScheduledExecutorService}
 
 object SQS {
   // hard-coded for now as these are so slow moving.
-  private val accounts = List(
-    "447570741169",
-    "460423777025",
-    "465404450664",
-    "573879536903",
-    "596986430194",
-    "653211152919",
-    "807520270390",
-    "825665186404",
-    "907213898261",
-    "987980579136")
+  private val accounts =
+    List(
+      "447570741169",
+      "460423777025",
+      "465404450664",
+      "573879536903",
+      "596986430194",
+      "653211152919",
+      "807520270390",
+      "825665186404",
+      "907213898261",
+      "987980579136"
+    )
 
   private val permissions = List(
     "SendMessage",
     "ReceiveMessage",
     "DeleteMessage",
-    "ChangeMessageVisibility")
+    "ChangeMessageVisibility",
+    "GetQueueAttributes",
+    "GetQueueUrl")
 
   private val readInterval = 12.seconds
 
@@ -65,19 +69,54 @@ object SQS {
     }
   }
 
-  // http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-long-polling.html
-  def create(queueName: String)(client: AmazonSQS): Task[ARN] = {
-    val req = (new CreateQueueRequest(queueName)).withAttributes(
-      Map("DelaySeconds"                  -> "120", // wait two minutes before making this message visibile to consumers
-          "MaximumMessageSize"            -> "64000",
-          "MessageRetentionPeriod"        -> "1800",
-          "ReceiveMessageWaitTimeSeconds" -> (readInterval.toSeconds - 2).toString).asJava)
+  import com.amazonaws.auth.policy.{Principal,Policy,Statement}, Statement.Effect
+  import com.amazonaws.auth.policy.conditions.ConditionFactory
+  import com.amazonaws.auth.policy.actions.SQSActions
+  import com.amazonaws.auth.policy.Resource
 
+  /**
+   * This is kind of tricky. Basically we want the queue to be "public" for sending,
+   * but only allow public senders that have an origin of a specific ARN. As usual,
+   * this is ass-about-face AWS API terminology. In addition to adding this special
+   * case for ASG event notifications, we also add all our known account IDs for
+   * general administration purposes (chemist itself needs to hide messages etc).
+   */
+  private def policy(snsArn: ARN, sqsArn: ARN): Policy =
+    new Policy().withStatements(
+      new Statement(Effect.Allow)
+        .withPrincipals(Principal.AllUsers)
+        .withActions(SQSActions.SendMessage)
+        .withResources(new Resource(sqsArn))
+        .withConditions(ConditionFactory.newSourceArnCondition(snsArn))//,
+      // new Statement(Effect.Allow)
+      //   .withPrincipals(accounts.sorted.map(new Principal(_)):_*)
+      //   .withActions(
+      //     SQSActions.SendMessage,
+      //     SQSActions.ReceiveMessage,
+      //     SQSActions.DeleteMessage,
+      //     SQSActions.ChangeMessageVisibility,
+      //     SQSActions.GetQueueAttributes,
+      //     SQSActions.GetQueueUrl)
+    )
+
+  // http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-long-polling.html
+  def create(queueName: String, snsArn: ARN)(client: AmazonSQS): Task[ARN] = {
     for {
-      u <- Task(client.createQueue(req).getQueueUrl)
+      u <- Task(client.createQueue(queueName).getQueueUrl)
       a <- arnForQueue(u)(client)
-      p  = new AddPermissionRequest(u, queueName, accounts.asJava, permissions.asJava)
-      _ <- Task(client.addPermission(p))
+
+      attrs = Map(
+        "DelaySeconds"                  -> "120", // wait two minutes before making this message visibile to consumers so service has time to boot
+        "MaximumMessageSize"            -> "64000",
+        "MessageRetentionPeriod"        -> "1800",
+        "ReceiveMessageWaitTimeSeconds" -> (readInterval.toSeconds - 2).toString,
+        "Policy"                        -> policy(snsArn, a).toJson
+      )
+
+      // doing this independantly from the create queue request because we need a very
+      // specific set of AWS policies to make the system work as needed.
+      _ <- Task(client.setQueueAttributes(u, attrs.asJava))
+
     } yield a
   }
 

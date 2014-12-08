@@ -208,8 +208,6 @@ object Sharding {
 
     for {
       a <- location.asURL(path = "mirror/sources").fold(Task.fail(_), Task.now(_))
-      _  = log.debug(s"attempting to fetch sources from $a")
-
       b  = url(a.toString)
       _  = log.debug(s"requesting assigned targets from $a")
 

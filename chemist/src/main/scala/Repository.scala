@@ -9,6 +9,11 @@ trait Repository {
 
   type InstanceM   = InstanceID ==>> Instance
 
+  /////////////// audit operations //////////////////
+
+  def addEvent(e: AutoScalingEvent): Task[Unit]
+  def historicalEvents: Task[Seq[AutoScalingEvent]]
+
   /////////////// instance operations ///////////////
 
   def addInstance(instance: Instance): Task[InstanceM]
@@ -36,7 +41,7 @@ import journal.Logger
 case class MissingInstanceException(override val getMessage: String) extends RuntimeException(getMessage)
 
 class StatefulRepository(ec2: AmazonEC2) extends Repository {
-  private lazy val log = Logger[StatefulRepository]
+  private val log = Logger[StatefulRepository]
 
   /**
    * stores the mapping between flasks and their assigned workload
@@ -47,6 +52,22 @@ class StatefulRepository(ec2: AmazonEC2) extends Repository {
    * stores a key-value map of instance-id -> host
    */
   private val I = new Ref[InstanceM](==>>())
+
+  /**
+   * stores lifecycle events to serve as an audit log that
+   * retains the last 100 scalling events
+   */
+  private val Q = new BoundedStack[AutoScalingEvent](100)
+
+  /////////////// audit operations //////////////////
+
+  def addEvent(e: AutoScalingEvent): Task[Unit] = {
+    log.info(s"Adding auto-scalling event to the historical events: $e")
+    Task(Q.push(e))
+  }
+
+  def historicalEvents: Task[Seq[AutoScalingEvent]] =
+    Task(Q.toSeq)
 
   /////////////// instance operations ///////////////
 

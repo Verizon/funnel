@@ -31,6 +31,9 @@ object Server {
   case class AlterShard[A](id: InstanceID, state: AutoScalingEventKind, k: A) extends ServerF[A]{
     def map[B](g: A => B): ServerF[B] = AlterShard(id, state, g(k))
   }
+  case class DescribeLifecyeHistory[A](k: Seq[AutoScalingEvent] => A) extends ServerF[A]{
+    def map[B](g: A => B): ServerF[B] = DescribeLifecyeHistory(k andThen g)
+  }
 
   ////////////// free monad plumbing //////////////
 
@@ -84,6 +87,12 @@ object Server {
    */
   def include(shard: InstanceID): Server[Unit] =
     liftF(AlterShard(shard.toLowerCase, Launch, ()))
+
+  /**
+   * List out the last 100 lifecycle events that this chemist has seen.
+   */
+  def history: Server[Seq[AutoScalingEvent]] =
+    liftF(DescribeLifecyeHistory(identity))
 
   /**
    * Force chemist to re-read the world from AWS. Useful if for some reason
@@ -212,6 +221,9 @@ trait Server extends Interpreter[Server.ServerF] {
         _ <- Lifecycle.event(AutoScalingEvent(id, s), resources)(R, asg, ec2)
       } yield k
 
+    case DescribeLifecyeHistory(k) =>
+      R.historicalEvents.map(k)
+
     case Bootstrap(k) =>
       Task.fork(bootstrap()).map(_ => k)
   }
@@ -257,7 +269,6 @@ trait Server extends Interpreter[Server.ServerF] {
 
       _ <- Task(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<"))
     } yield ()
-
   protected def init(): Task[Unit] = {
     log.debug("attempting to read the world of deployed instances")
     for {
@@ -267,8 +278,8 @@ trait Server extends Interpreter[Server.ServerF] {
       a <- SNS.create(topic)(sns)
       _  = log.debug(s"created sns topic with arn = $a")
 
-      b <- SQS.create(queue)(sqs)
-      _  = log.debug(s"created sqs queue with arn = $a")
+      b <- SQS.create(queue, a)(sqs)
+      _  = log.debug(s"created sqs queue with arn = $b")
 
       c <- SNS.subscribe(a, b)(sns)
       _  = log.debug(s"subscribed sqs queue to the sns topic")
@@ -278,12 +289,15 @@ trait Server extends Interpreter[Server.ServerF] {
       _ <- Lifecycle.run(queue, resources, Lifecycle.sink)(R, sqs, asg, ec2)
       _  = log.debug("lifecycle process started")
 
-      _ <- Task(log.info(">>>>>>>>>>>> bootup complete <<<<<<<<<<<<"))
+      _ <- Task.delay(log.info(">>>>>>>>>>>> initilization complete <<<<<<<<<<<<"))
     } yield ()
   }
 
 }
 
 object Server0 extends Server {
-  init().runAsync(x => ())
+  init().runAsync(_.fold(
+    e => log.error(s"Problem occoured during server initilization: $e"),
+    s => log.warn("Background process completed sucsessfully. This may have happened in error, as typically the process matches the lifecycle of the server.")
+  ))
 }

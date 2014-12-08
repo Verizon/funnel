@@ -54,7 +54,11 @@ object Lifecycle {
   // im really not sure what to say about this monster...
   // sorry reader.
   def interpreter(e: AutoScalingEvent, resources: Seq[String])(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Action] = {
-    log.debug(s"event: $e")
+    log.debug(s"interpreting event: $e")
+
+    // terrible side-effect but we want to track the events
+    // that chemist actually sees
+    r.addEvent(e).run // YIKES!
 
     def isFlask: Task[Boolean] =
       ASG.lookupByName(e.asgName)(asg).flatMap { a =>
@@ -70,9 +74,11 @@ object Lifecycle {
       case AutoScalingEvent(_,Launch,_,_,_,_,_,_,_,_,_,_,id) =>
         isFlask.flatMap(bool =>
           if(bool){
+            // if its a flask, update our internal list of avalible shards
             log.debug(s"Adding capactiy $id")
             r.increaseCapacity(id).map(_ => NoOp)
-          } else
+          } else {
+            // in any other case, its something new to monitor
             for {
               i <- Deployed.lookupOne(id)(ec2)
               _  = log.debug(s"Found instance metadata from remote: $i")
@@ -84,18 +90,19 @@ object Lifecycle {
               m <- Sharding.locateAndAssignDistribution(t, r)
               _  = log.debug("Computed and set a new distribution for the addition of host...")
             } yield Redistributed(m)
+          }
         )
 
       case AutoScalingEvent(_,Terminate,_,_,_,_,_,_,_,_,_,_,id) => {
         r.isFlask(id).flatMap(bool =>
           if(bool){
             log.info(s"Terminating and rebalancing the flask cluster. Downing $id")
-            for {
+            (for {
               t <- r.assignedTargets(id)
               _  = log.debug(s"sink, targets= $t")
               _ <- r.decreaseCapacity(id)
               m <- Sharding.locateAndAssignDistribution(t,r)
-            } yield Redistributed(m)
+            } yield Redistributed(m)) or Task.now(NoOp)
           } else {
             log.info(s"Terminating the monitoring of a non-flask service instance with id = $id")
             Task.now(NoOp)
