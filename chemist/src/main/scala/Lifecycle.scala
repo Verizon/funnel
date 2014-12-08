@@ -58,7 +58,7 @@ object Lifecycle {
 
     // terrible side-effect but we want to track the events
     // that chemist actually sees
-    r.addEvent(e)
+    r.addEvent(e).run // YIKES!
 
     def isFlask: Task[Boolean] =
       ASG.lookupByName(e.asgName)(asg).flatMap { a =>

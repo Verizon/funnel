@@ -40,7 +40,7 @@ import journal.Logger
 case class MissingInstanceException(override val getMessage: String) extends RuntimeException(getMessage)
 
 class StatefulRepository(ec2: AmazonEC2) extends Repository {
-  private lazy val log = Logger[StatefulRepository]
+  private val log = Logger[StatefulRepository]
 
   /**
    * stores the mapping between flasks and their assigned workload
