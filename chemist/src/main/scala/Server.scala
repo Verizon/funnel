@@ -269,7 +269,6 @@ trait Server extends Interpreter[Server.ServerF] {
 
       _ <- Task(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<"))
     } yield ()
-
   protected def init(): Task[Unit] = {
     log.debug("attempting to read the world of deployed instances")
     for {
@@ -297,6 +296,8 @@ trait Server extends Interpreter[Server.ServerF] {
 }
 
 object Server0 extends Server {
-  init().runAsync(e =>
-    log.error(s"Problem occoured during server initilization: $e"))
+  init().runAsync(_.fold(
+    e => log.error(s"Problem occoured during server initilization: $e"),
+    s => log.warn("Background process completed sucsessfully. This may have happened in error, as typically the process matches the lifecycle of the server.")
+  ))
 }
