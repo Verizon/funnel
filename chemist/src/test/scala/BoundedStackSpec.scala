@@ -3,8 +3,6 @@ package oncue.svc.funnel.chemist
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import org.scalatest.prop.Checkers
-import org.scalacheck.Arbitrary._
-import org.scalacheck._, Prop._
 
 class BoundedStackSpec extends FlatSpec with Checkers with Matchers {
   val alpha = ('A' to 'Z').toList
