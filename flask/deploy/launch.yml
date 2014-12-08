@@ -6,7 +6,7 @@
   roles:
     - { role: launcher,
         amazon_instance_type: m3.xlarge,
-        asg_min_size: "1",
-        asg_max_size: "10",
-        asg_desired:  "6"
+        asg_desired:  "4",
+        asg_min_size: "4",
+        asg_max_size: "10"
       }
