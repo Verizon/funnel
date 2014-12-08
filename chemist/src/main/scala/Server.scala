@@ -235,7 +235,7 @@ trait Server extends Interpreter[Server.ServerF] {
       _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
       // filter out all the instances that are in private networks
       // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
-      z  = l.filterNot(x => x.location.isPrivateNetwork) // && Deployed.filter.flasks(x)
+      z  = l.filterNot(x => x.location.isPrivateNetwork && Deployed.filter.flasks(x))
       _  = log.info(s"located ${z.length} instances that appear to be monitorable")
 
       // convert the instance list into reachable targets
