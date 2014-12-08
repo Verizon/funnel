@@ -3,6 +3,7 @@ package oncue.svc.funnel.chemist
 import scalaz.concurrent.Task
 import Sharding.Distribution
 import scalaz.==>>
+import scalaz.std.string._
 
 trait Repository {
 
@@ -29,7 +30,7 @@ trait Repository {
 }
 
 import com.amazonaws.services.ec2.AmazonEC2
-import intelmedia.ws.funnel.internals._
+import oncue.svc.funnel.internals._
 import journal.Logger
 
 case class MissingInstanceException(override val getMessage: String) extends RuntimeException(getMessage)

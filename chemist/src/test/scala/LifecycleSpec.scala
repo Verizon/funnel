@@ -6,6 +6,7 @@ import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import scalaz.{\/,\/-,-\/,==>>}
 import scalaz.stream.{Process,Sink}
 import scalaz.concurrent.Task
+import scalaz.std.string._
 import Sharding.{Distribution,Target}
 
 class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {

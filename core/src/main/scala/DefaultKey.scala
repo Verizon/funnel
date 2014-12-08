@@ -1,10 +1,10 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 
 /**
  * This type is just used for syntax, to pick out a default `Key`
  * from a `Historical`, `Continuous`, or `Periodic`.
- * See the instances in [[intelmedia.ws.funnel.DefaultKeys]].
+ * See the instances in [[oncue.svc.funnel.DefaultKeys]].
  * For example, given: {{{
  *   val healthy: Metric[Boolean] = for {
  *     n <- reqs.key

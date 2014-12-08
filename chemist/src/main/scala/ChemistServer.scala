@@ -6,7 +6,7 @@ import com.sun.net.httpserver.HttpServer
 import java.io.{BufferedWriter, IOException, OutputStream, OutputStreamWriter}
 import java.net.{InetSocketAddress, URL}
 import journal.Logger
-import intelmedia.ws.funnel.BuildInfo
+import oncue.svc.funnel.BuildInfo
 import scalaz.{\/,-\/,\/-,Free}
 import scalaz.concurrent.Task
 

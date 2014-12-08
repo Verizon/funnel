@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 import java.util.concurrent.atomic._
 import java.util.concurrent.TimeUnit

@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 package elastic
 
 import scalaz.stream._
@@ -103,7 +103,7 @@ object Elastic {
   implicit def fromScalaFuture[A](a: Future[A])(implicit e: ExecutionContext): Task[A] =
     Task async { k =>
       a.onComplete {
-        t => k(\/.fromTryCatch(t.get)) }}
+        t => k(\/.fromTryCatchThrowable[A,Throwable](t.get)) }}
 
   /**
    * Publishes to an ElasticSearch URL at `esURL`.
