@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 package http
 
 import com.sun.net.httpserver.HttpExchange
@@ -11,7 +11,7 @@ import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.signal
-import intelmedia.ws.funnel.Events.Event
+import oncue.svc.funnel.Events.Event
 import Monitoring.prettyURL
 
 object MonitoringServer {

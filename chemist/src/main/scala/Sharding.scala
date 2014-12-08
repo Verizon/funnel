@@ -3,7 +3,7 @@ package oncue.svc.funnel.chemist
 import scalaz.==>>
 import scalaz.std.string._
 import scalaz.concurrent.Task
-import intelmedia.ws.funnel.BucketName
+import oncue.svc.funnel.BucketName
 import journal.Logger
 
 object Sharding {
@@ -195,7 +195,7 @@ object Sharding {
       a.alter(b._1, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
     }
 
-  import intelmedia.ws.funnel.http.{Bucket,JSON => HJSON}
+  import oncue.svc.funnel.http.{Bucket,JSON => HJSON}
 
   /**
    * Call out to the specific location and grab the list of things the flask

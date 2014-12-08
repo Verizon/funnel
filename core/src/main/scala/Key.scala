@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 case class Key[+A] private[funnel](name: String,
                                    typeOf: Reportable[A],

@@ -1,8 +1,8 @@
 package oncue.svc.funnel.chemist
 
 import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterAll}
-import intelmedia.ws.funnel.{Monitoring,Instruments,Clocks,JVM}
-import intelmedia.ws.funnel.http.MonitoringServer
+import oncue.svc.funnel.{Monitoring,Instruments,Clocks,JVM}
+import oncue.svc.funnel.http.MonitoringServer
 import scalaz.==>>
 import concurrent.duration._
 
@@ -63,7 +63,7 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
 
   it should "sucsessfully be able to stream events from two local monitoring instances to a local flask" in {
     F1.processMirroringEvents(
-      intelmedia.ws.funnel.http.SSE.readEvents,
+      oncue.svc.funnel.http.SSE.readEvents,
       "intspec")(println).runAsync(println)
 
     val x = for {

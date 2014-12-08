@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 import java.util.concurrent.{ExecutorService, ScheduledExecutorService}
 import scala.concurrent.duration._

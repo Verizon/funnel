@@ -1,7 +1,7 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 import com.twitter.algebird.Group
-import intelmedia.ws.funnel.{Buffers => B}
+import oncue.svc.funnel.{Buffers => B}
 import java.net.URL
 import java.util.concurrent.{ExecutorService,TimeUnit}
 import scala.concurrent.duration._
@@ -24,7 +24,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * Return a `Counter` with the given starting count.
    * Keys updated by this `Counter` are `now/label`,
    * `previous/label` and `sliding/label`.
-   * See [[intelmedia.ws.funnel.Periodic]].
+   * See [[oncue.svc.funnel.Periodic]].
    */
   def counter(label: String,
               init: Int = 0,
@@ -127,7 +127,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
    * Return a `Gauge` with the given starting value.
    * Unlike `gauge`, keys updated by this `Counter` are
    * `now/label`, `previous/label` and `sliding/label`.
-   * See [[intelmedia.ws.funnel.Periodic]].
+   * See [[oncue.svc.funnel.Periodic]].
    */
   def numericGauge(label: String, init: Double,
                    units: Units[Stats] = Units.None,
@@ -154,7 +154,7 @@ class Instruments(window: Duration, monitoring: Monitoring = Monitoring.default)
   /**
    * Return a `Timer` which updates the following keys:
    * `now/label`, `previous/label`, and `sliding/label`.
-   * See [[intelmedia.ws.funnel.Periodic]].
+   * See [[oncue.svc.funnel.Periodic]].
    */
   def timer(label: String, description: String = ""): Timer[Periodic[Stats]] = {
     val t = new Timer[Periodic[Stats]] {

@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 /**
  * A key set for a periodic metric. Periodic metrics

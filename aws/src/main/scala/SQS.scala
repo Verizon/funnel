@@ -15,7 +15,7 @@ import com.amazonaws.auth.BasicAWSCredentials
 import scalaz.concurrent.{Strategy,Task}
 import scala.collection.JavaConverters._
 import concurrent.duration._
-import intelmedia.ws.funnel.Monitoring
+import oncue.svc.funnel.Monitoring
 import java.util.concurrent.{ExecutorService,ScheduledExecutorService}
 
 object SQS {

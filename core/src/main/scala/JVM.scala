@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 import java.lang.management.GarbageCollectorMXBean
 import java.lang.management.ManagementFactory

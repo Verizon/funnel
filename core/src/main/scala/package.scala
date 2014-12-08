@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel {
+package oncue.svc.funnel {
 
   import scala.concurrent.duration._
 
@@ -12,7 +12,7 @@ package intelmedia.ws.funnel {
 
 }
 
-package intelmedia.ws {
+package oncue.svc {
 
   import scalaz.concurrent.Task
   import scalaz.stream.Process

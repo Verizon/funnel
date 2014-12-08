@@ -1,4 +1,4 @@
-package intelmedia.ws.funnel
+package oncue.svc.funnel
 
 import java.net.{URL,URLEncoder}
 import java.util.concurrent.atomic.AtomicReference
@@ -13,6 +13,7 @@ import scalaz.stream.async
 import scalaz.syntax.traverse._
 import scalaz.syntax.monad._
 import scalaz.std.option._
+import scalaz.std.string._
 import scalaz.{\/, ~>, Monad}
 import Events.Event
 import scalaz.stream.async.mutable.Signal
