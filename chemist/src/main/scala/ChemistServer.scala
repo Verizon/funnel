@@ -85,8 +85,6 @@ class ChemistServer(I: Interpreter[Server.ServerF], port: Int){
         case p   => p.split("/").toList.tail
       }
 
-      log.debug(s"http request for ${path.mkString(",")}")
-
       path match {
         // GET
         case Nil                            => handleIndex(req)
