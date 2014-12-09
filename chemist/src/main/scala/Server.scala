@@ -269,6 +269,7 @@ trait Server extends Interpreter[Server.ServerF] {
 
       _ <- Task(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<"))
     } yield ()
+
   protected def init(): Task[Unit] = {
     log.debug("attempting to read the world of deployed instances")
     for {
