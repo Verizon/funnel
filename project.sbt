@@ -22,6 +22,8 @@ lazy val chemist = project.dependsOn(http, aws)
 
 lazy val aws = project.dependsOn(core)
 
+lazy val zeromq = project.dependsOn(core)
+
 OnCue.baseSettings
 
 Publishing.ignore
