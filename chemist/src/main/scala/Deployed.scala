@@ -62,16 +62,8 @@ object Deployed {
 
   ///////////////////////////// filters /////////////////////////////
 
-  object filter {
-    def funnels(i: Instance): Boolean =
-      i.firewalls.exists(_.toLowerCase == "monitor-funnel")
-
-    def flasks(i: Instance): Boolean =
-      i.application.map(_.name.startsWith("flask")).getOrElse(false)
-
-    def chemists(i: Instance): Boolean =
-      i.application.map(_.name.startsWith("chemist")).getOrElse(false)
-  }
+  def isFlask(i: Instance): Boolean =
+    i.application.map(_.name.startsWith("flask")).getOrElse(false)
 
   ///////////////////////////// internal api /////////////////////////////
 
