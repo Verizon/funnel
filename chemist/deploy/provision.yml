@@ -1,7 +1,0 @@
----
-- name: chemist | create image
-  hosts: all
-  gather_facts: false
-  user: ec2-user
-  roles:
-    - application
