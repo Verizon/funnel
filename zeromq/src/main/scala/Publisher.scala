@@ -3,6 +3,7 @@ package zeromq
 
 import org.zeromq.ZMQ, ZMQ.Context, ZMQ.Socket
 import scalaz.concurrent.Task
+import scalaz.stream.Process
 
 /**
  * Take all of the events happening on the monitoring stream, serialise them to binary
@@ -14,26 +15,22 @@ case class Publisher(
   port: Int = 7931
 ){
 
-  private val context: Context = ZMQ.context(1)
-  private val socket: Socket = context.socket(ZMQ.PUB)
-
-  def setup(): Unit = {
-    try {
-      socket.bind(s"$protocol://$host:$port")
-      ()
-    } catch {
-      case e: Throwable => println(s"ERRRROOOOORRRRR - $e")
-    }
+  def setup(threadCount: Int = 1): Task[(Socket,Context)] = Task.delay {
+    val context: Context = ZMQ.context(threadCount)
+    val socket: Socket = context.socket(ZMQ.PUB)
+    socket.bind(s"$protocol://$host:$port")
+    (socket,context)
   }
 
-  def destroy(): Unit = {
-    try {
-      socket.close()
-      context.close()
-    } catch {
-      case e: java.nio.channels.ClosedChannelException => ()
+  def destroy(s: Socket, c: Context): Task[Unit] =
+    Task.delay {
+      try {
+        s.close()
+        c.close()
+      } catch {
+        case e: java.nio.channels.ClosedChannelException => ()
+      }
     }
-  }
 
   import http.{SSE,JSON}, JSON._
 
@@ -41,14 +38,8 @@ case class Publisher(
   private def datapointToWireFormat(d: Datapoint[Any]):  Array[Byte] =
     s"${SSE.dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes("UTF-8")
 
-  def publish(M: Monitoring)(implicit log: String => Unit): Task[Unit] = {
+  def publish(M: Monitoring, S: Socket)(implicit log: String => Unit): Process[Task,Boolean] =
     Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat).evalMap { pt =>
-      println(pt)
-      Task(socket.send(pt))(Monitoring.defaultPool)
-    }.run
-  }
-
-  setup()
+      Task(S.send(pt))(Monitoring.defaultPool)
+    }
 }
-
-

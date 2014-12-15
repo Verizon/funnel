@@ -4,6 +4,7 @@ package zeromq
 import org.zeromq.ZMQ, ZMQ.Context, ZMQ.Socket
 import scalaz.concurrent.Task
 import java.util.concurrent.atomic.AtomicBoolean
+import scalaz.stream.Process
 
 object pub {
 
@@ -16,7 +17,17 @@ object pub {
     val T = counter("testing/foo")
     val close = new AtomicBoolean(false)
 
-    P.publish(M)(s => println(s)).runAsyncInterruptibly(_ => (), close)
+    val task: Task[Unit] = for {
+      x    <- P.setup(threadCount = 1)
+      (a,b) = x
+      _    <- P.publish(M,a)(d => println(d)).flatMap { b =>
+                if(close.get) Process.halt
+                else Process.emit(b)
+              }.run
+      _    <- P.destroy(a,b)
+    } yield ()
+
+    task.runAsyncInterruptibly(_ => (), close)
 
     println("Press [Enter] to stop the task")
 
@@ -26,7 +37,7 @@ object pub {
 
     close.set(true) // stops the task.
 
-    P.destroy()
+    // P.destroy()
   }
 }
 
