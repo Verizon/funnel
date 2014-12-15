@@ -40,6 +40,6 @@ case class Publisher(
 
   def publish(M: Monitoring, S: Socket)(implicit log: String => Unit): Process[Task,Boolean] =
     Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat).evalMap { pt =>
-      Task(S.send(pt))(Monitoring.defaultPool)
+      Task.delay(S.send(pt))
     }
 }

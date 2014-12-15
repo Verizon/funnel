@@ -4,7 +4,7 @@ package zeromq
 import org.zeromq.ZMQ, ZMQ.Context, ZMQ.Socket
 import scalaz.concurrent.Task
 import java.util.concurrent.atomic.AtomicBoolean
-import scalaz.stream.Process
+import scalaz.stream.{Process,Cause}
 
 object pub {
 
@@ -17,25 +17,29 @@ object pub {
     val T = counter("testing/foo")
     val close = new AtomicBoolean(false)
 
+    implicit class HaltWhenSyntax[O](p: Process[Task, O]){
+      def haltWhen(bool: AtomicBoolean): Process[Task, O] =
+        Process.repeatEval(Task.delay(bool.get)).zip(p).takeWhile(x => !x._1).map(_._2)
+    }
+
     val task: Task[Unit] = for {
       x    <- P.setup(threadCount = 1)
       (a,b) = x
-      _    <- P.publish(M,a)(d => println(d)).flatMap { b =>
-                if(close.get) Process.halt
-                else Process.emit(b)
-              }.run
+      _    <- P.publish(M,a)(d => println(d)).haltWhen(close).run
       _    <- P.destroy(a,b)
     } yield ()
 
-    task.runAsyncInterruptibly(_ => (), close)
-
     println("Press [Enter] to stop the task")
+
+    task.runAsync(_ => ())
 
     Console.readLine()
 
     println("Stopping the task...")
 
     close.set(true) // stops the task.
+
+    println(s"Stopped (${close.get})")
 
     // P.destroy()
   }
