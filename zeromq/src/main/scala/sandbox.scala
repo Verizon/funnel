@@ -33,76 +33,79 @@ import scalaz.stream.{Process,Cause}
 // }
 
 
-// object pub {
+object pub {
 
-//   def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
 
-//     import instruments._
+    import instruments._
 
-//     implicit val log: String => Unit = println _
+    implicit val log: String => Unit = println _
 
-//     val E = Endpoint(mode = Publish, port = 7931)
-//     val M = Monitoring.default
-//     val T = counter("testing/foo")
-//     val close = new AtomicBoolean(false)
-//     val K = Process.repeatEval(Task.delay(close.get))
+    val E = Endpoint(Publish, Address(TCP, port = 7931))
 
-//     // implicit class HaltWhenSyntax[O](p: Process[Task, O]){
-//     //   def haltWhen(bool: AtomicBoolean): Process[Task, O] =
-//     //     Process.repeatEval(Task.delay(bool.get)).zip(p).takeWhile(x => !x._1).map(_._2)
-//     // }
+    val M = Monitoring.default
+    val T = counter("testing/foo")
+    val close = new AtomicBoolean(false)
+    val K = Process.repeatEval(Task.delay(close.get))
 
-//     val task = ZeroMQ.outbound(TCP,E)(stream.from(M),K,ZeroMQ.channel) //ZeroMQ.run(TCP,E)(M,K)
+    // implicit class HaltWhenSyntax[O](p: Process[Task, O]){
+    //   def haltWhen(bool: AtomicBoolean): Process[Task, O] =
+    //     Process.repeatEval(Task.delay(bool.get)).zip(p).takeWhile(x => !x._1).map(_._2)
+    // }
 
-//     println("Press [Enter] to stop the task")
+    val proc: Process[Task, Boolean] = ZeroMQ.fooo(E)(K)(
+      s => stream.from(M).through(ZeroMQ.channel(s)))
 
-//     task.runAsync(_ => ())
+    // val task = ZeroMQ.outbound(E)(stream.from(M),K,ZeroMQ.channel) //ZeroMQ.run(TCP,E)(M,K)
 
-//     Console.readLine()
+    println("Press [Enter] to stop the task")
 
-//     println("Stopping the task...")
+    proc.run.runAsync(_ => ())
 
-//     close.set(true) // stops the task.
+    Console.readLine()
 
-//     println(s"Stopped (${close.get})")
-//   }
-// }
+    println("Stopping the task...")
 
-// object sub {
+    close.set(true) // stops the task.
 
-//   import scalaz.stream.async.boundedQueue
-//   import scalaz.stream.async.mutable.Queue
-//   import scalaz.stream.io
+    println(s"Stopped (${close.get})")
+  }
+}
 
-//   def main(args: Array[String]): Unit = {
-//     val context: Context = ZMQ.context(1)
-//     val socket: Socket = context.socket(ZMQ.SUB)
-//     val queue: Queue[String] = boundedQueue(100)
-//     val E = Endpoint(mode = Subscribe, port = 7931)
-//     val close = new AtomicBoolean(false)
-//     val K = Process.repeatEval(Task.delay(close.get))
+object sub {
 
+  import scalaz.stream.async.boundedQueue
+  import scalaz.stream.async.mutable.Queue
+  import scalaz.stream.io
 
+  def main(args: Array[String]): Unit = {
+    // val context: Context = ZMQ.context(1)
+    // val socket: Socket = context.socket(ZMQ.SUB)
+    val E = Endpoint(mode = SubscribeAll, Address(TCP, port =7931))
+    val close = new AtomicBoolean(false)
+    val K = Process.repeatEval(Task.delay(close.get))
 
-//     socket.connect("tcp://localhost:7931")
-//     socket.subscribe(Array.empty[Byte]) // providing an empty array means "all messages"
+    // socket.connect("tcp://localhost:7931")
+    // socket.subscribe(Array.empty[Byte]) // providing an empty array means "all messages"
 
-//     qqqq(socket).to(io.stdOut).run.runAsyncInterruptibly(_ => (), close)
+    // qqqq(socket).to(io.stdOut).run.runAsyncInterruptibly(_ => (), close)
 
-//     println("Press [Enter] to stop the task")
+    println("Press [Enter] to stop the task")
 
-//     Console.readLine() // block
+    ZeroMQ.fooo(E)(K)(ZeroMQ.consume).run.runAsyncInterruptibly(_ => (), close)
 
-//     println("Stopping the task...")
+    Console.readLine() // block
 
-//     close.set(true) // stops the task.
+    println("Stopping the task...")
 
-//     try {
-//       socket.close()
-//       context.close()
-//     } catch {
-//       case e: java.nio.channels.ClosedChannelException => ()
-//     }
+    close.set(true) // stops the task.
 
-//   }
-// }
+    // try {
+    //   socket.close()
+    //   context.close()
+    // } catch {
+    //   case e: java.nio.channels.ClosedChannelException => ()
+    // }
+
+  }
+}

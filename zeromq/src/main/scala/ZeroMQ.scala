@@ -2,30 +2,53 @@ package oncue.svc.funnel
 package zeromq
 
 import org.zeromq.ZMQ, ZMQ.Context, ZMQ.Socket
+import scalaz.concurrent.Task
+import scalaz.stream.{Process,Channel,io}
 
-abstract class Protocol(val asString: String)
+abstract class Protocol(override val toString: String)
 case object TCP extends Protocol("tcp")
 case object IPC extends Protocol("icp")
 case object UDP extends Protocol("udp")
 case object InProc extends Protocol("proc")
 case object Pair extends Protocol("pair")
 
-abstract class Mode(val asInt: Int)
-case object Publish extends Mode(ZMQ.PUB)
-case object Subscribe extends Mode(ZMQ.SUB)
-case object Dealer extends Mode(ZMQ.DEALER)
-case object Router extends Mode(ZMQ.ROUTER)
-case object Push extends Mode(ZMQ.PUSH)
-case object Pull extends Mode(ZMQ.PULL)
+abstract class Mode(val asInt: Int){
+  def configure(a: Address, s: Socket): Task[Unit]
+}
+case object Publish extends Mode(ZMQ.PUB){
+  def configure(a: Address, s: Socket): Task[Unit] =
+    Task.delay {
+      println("Configuring Publish...")
+      s.bind(a.toString)
+      ()
+    }
+}
+case object SubscribeAll extends Mode(ZMQ.SUB){
+  def configure(a: Address, s: Socket): Task[Unit] =
+    Task.delay {
+      println("Configuring SubscribeAll...")
+      s.connect(a.toString)
+      s.subscribe(Array.empty[Byte])
+    }
+}
+// case object Push extends Mode(ZMQ.PUSH)
+// case object Pull extends Mode(ZMQ.PULL)
+
+case class Address(
+  protocol: Protocol,
+  host: String = "*",
+  port: Int
+){
+  override def toString: String = s"$protocol://$host:$port"
+}
 
 case class Endpoint(
   mode: Mode,
-  host: String = "*",
-  port: Int
-)
-
-import scalaz.concurrent.Task
-import scalaz.stream.{Process,Channel,io}
+  address: Address
+){
+  def configure(s: Socket): Task[Unit] =
+    mode.configure(address, s)
+}
 
 case class Connection(
   socket: Socket,
@@ -41,9 +64,9 @@ object ZeroMQ {
   def haltWhen[O](kill: Process[Task,Boolean])(input: Process[Task,O]): Process[Task,O] =
     kill.zip(input).takeWhile(x => !x._1).map(_._2)
 
-  def outbound[O,O2](p: Protocol, e: Endpoint)(i: Process[Task,O], k: Process[Task,Boolean], c: Socket => Channel[Task,O,O2]): Task[Unit] =
+  def outbound[O,O2](e: Endpoint)(i: Process[Task,O], k: Process[Task,Boolean], c: Socket => Channel[Task,O,O2]): Task[Unit] =
     for {
-      a <- setup(p, e, threadCount = 1)
+      a <- setup(e, threadCount = 1)
       _ <- haltWhen(k)(i).through(c(a.socket)).run
       _ <- destroy(a)
     } yield ()
@@ -57,26 +80,33 @@ object ZeroMQ {
       proc(r).onComplete(Process.eval_(release(r)))
     }
 
-  def foooo(p: Protocol, e: Endpoint)(k: Process[Task,Boolean]): Process[Task, String] =
-    resource(setup(p,e))(r => destroy(r)){ connection =>
+  // def qux[O](p: Protocol, e: Endpoint)(i: Process[Task,O])
+
+  def fooo[O](e: Endpoint
+    )(k: Process[Task,Boolean]
+    )(f: Socket => Process[Task,O]
+  ): Process[Task, O] =
+    resource(setup(e))(r => destroy(r)){ connection =>
       haltWhen(k){
-        consume(connection.socket)
+        Process.eval(e.configure(connection.socket)
+          ).flatMap(_ => f(connection.socket))
       }
     }
 
   // def inbound(e: Endpoint, p: Protocol)(f: Socket => Task[Socket])
 
   def consume(socket: Socket): Process[Task, String] =
-    Process.eval(Task.delay(socket.recvStr)) ++ consume(socket)
+    Process.eval(Task {
+      println(">>>>> ")
+      socket.recvStr
+    }) ++ consume(socket)
 
   def setup(
-    protocol: Protocol,
     endpoint: Endpoint,
     threadCount: Int = 1
   ): Task[Connection] = Task.delay {
     val context: Context = ZMQ.context(threadCount)
     val socket: Socket = context.socket(endpoint.mode.asInt)
-    // socket.bind(s"${protocol.asString}://${endpoint.host}:${endpoint.port}")
     Connection(socket,context)
   }
 
