@@ -9,15 +9,15 @@ section: "getting-started"
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
 ````
-libraryDependencies += "intelmedia.ws.funnel" %% "http" % "x.y.z"
+libraryDependencies += "oncue.svc.funnel" %% "http" % "x.y.z"
 ````
-(check for the latest release by [looking on the nexus](http://nexus.svc.oncue.com/nexus/content/repositories/releases/intelmedia/ws/funnel/http_2.10/))
+(check for the latest release by [looking on the nexus](http://nexus.svc.oncue.com/nexus/content/repositories/releases/oncue/svc/funnel/http_2.10/))
 
 Current transitive dependencies this will introduce on your classpath:
 
-- [Scalaz](https://github.com/scalaz/scalaz) 7.0.6
-- [Scalaz Stream](https://github.com/scalaz/scalaz-stream) 0.5
-- [Algebird Core](https://github.com/twitter/algebird) 0.3.0
+- [Scalaz](https://github.com/scalaz/scalaz) 7.1.0
+- [Scalaz Stream](https://github.com/scalaz/scalaz-stream) 0.6a
+- [Algebird Core](https://github.com/twitter/algebird) 0.8.0
 
 You will likely never touch these dependencies directly, but its important to be aware of them in case you decide yourself to use Scalaz (for example); if you have conflicting versions then you will see some very strange binary collisions at runtime.
 
@@ -54,7 +54,7 @@ At first blush, clearly having a single namespace for the entire world of applic
 ````
 package oncue.svc.su
 
-import intelmedia.ws.funnel.instruments._
+import oncue.svc.funnel.instruments._
 
 object metrics {
 
@@ -121,7 +121,7 @@ The 1.0.x series of `funnel-core` has four supported metric types: `Counter`, `T
 These simply increment an integer value specified by a label that you supply. Typical examples are number of sales, number of children etc.
 
 ````
-package intelmedia.ws
+package oncue.svc
 package yourproject
 
 import funnel.instruments._
@@ -158,7 +158,7 @@ As the name suggests, **timers** are all about the amount of time take to perfor
 
 
 ````
-package intelmedia.ws
+package oncue.svc
 package yourproject
 
 import funnel.instruments._
@@ -210,7 +210,7 @@ trait SomeFun {
 Gauges represent the current state of a value. The best way to visualise this is a checking the oil on a car; the dipstick is the gauge of how much oil the vehicle currently has, and this changes over time, moving both up and down, but it can only have a single value at any particular reading.
 
 ````
-package intelmedia.ws
+package oncue.svc
 package yourproject
 
 import funnel.instruments._
@@ -247,7 +247,7 @@ By default, the following types are supported as values for gauges:
 In addition to simply recording the value of the gauge, there is a specialised gauge that can also track numerical statistics like `mean`, `variance` etc. To use it, just adjust your `metrics` declaration like so:
 
 ````
-package intelmedia.ws
+package oncue.svc
 package yourproject
 
 import funnel.instruments._
@@ -271,7 +271,7 @@ As an extension to the concept of `Gauge`, there is also the notion of a "traffi
 Traffic light metrics are used to derive actionable signals for operations (they can derive whatever they like too), but for example, one might put a traffic light metric on database access, or the status of a circuit breaker used to invoke a 3rd party system. Using traffic lights is super simple:
 
 ````
-package intelmedia.ws
+package oncue.svc
 package yourproject
 
 import funnel.instruments._
