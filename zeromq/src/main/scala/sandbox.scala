@@ -25,13 +25,6 @@ object pub {
 
     val task = ZeroMQ.run(TCP,E)(M,K)
 
-    // val task: Task[Unit] = for {
-    //   x    <- P.setup(threadCount = 1)
-    //   (a,b) = x
-    //   _    <- P.publish(M,a)(d => println(d)).haltWhen(close).run
-    //   _    <- P.destroy(a,b)
-    // } yield ()
-
     println("Press [Enter] to stop the task")
 
     task.runAsync(_ => ())
@@ -43,8 +36,6 @@ object pub {
     close.set(true) // stops the task.
 
     println(s"Stopped (${close.get})")
-
-    // P.destroy()
   }
 }
 

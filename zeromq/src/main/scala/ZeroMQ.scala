@@ -2,8 +2,6 @@ package oncue.svc.funnel
 package zeromq
 
 import org.zeromq.ZMQ, ZMQ.Context, ZMQ.Socket
-import scalaz.concurrent.Task
-import scalaz.stream.Process
 
 abstract class Protocol(val asString: String)
 case object TCP extends Protocol("tcp")
@@ -18,19 +16,14 @@ case object Subscribe extends Mode(ZMQ.SUB)
 case object Dealer extends Mode(ZMQ.DEALER)
 case object Router extends Mode(ZMQ.ROUTER)
 
-/*
-(
-  protocol: String = "tcp",
-  host: String = "*",
-  port: Int = 7931
-)
-*/
-
 case class Endpoint(
   mode: Mode,
   host: String = "*",
   port: Int
 )
+
+import scalaz.concurrent.Task
+import scalaz.stream.{Process,Sink}
 
 /**
  * Take all of the events happening on the monitoring stream, serialise them to binary
@@ -38,16 +31,14 @@ case class Endpoint(
  */
 object ZeroMQ {
 
-  // def publish(protocol: Protocol, host: String, port: Int){}
-
   def run(p: Protocol, e: Endpoint
     )(m: Monitoring, kill: Process[Task,Boolean]
     )(implicit log: String => Unit): Task[Unit] = {
     for {
-      x        <- setup(p,e,threadCount = 1)
-      (soc,ctx) = x
-      _        <- kill.zip(connect(m,soc)).takeWhile(x => !x._1).map(_._2).run
-      _        <- destroy(soc,ctx)
+      o <- setup(p,e,threadCount = 1)
+      (socket,context) = o
+      _ <- kill.zip(connect(m,socket)).takeWhile(x => !x._1).map(_._2).to(sink(socket)).run
+      _ <- destroy(socket,context)
     } yield ()
   }
 
@@ -72,14 +63,15 @@ object ZeroMQ {
       }
     }
 
+  def sink(s: Socket): Sink[Task, Array[Byte]] =
+    Process.emit(bytes => Task.delay { s.send(bytes); () })
+
   import http.{SSE,JSON}, JSON._
 
   // TODO: implement real serialisation here rather than using the JSON from `http` module
   private def datapointToWireFormat(d: Datapoint[Any]):  Array[Byte] =
     s"${SSE.dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes("UTF-8")
 
-  def connect(M: Monitoring, S: Socket)(implicit log: String => Unit): Process[Task,Boolean] =
-    Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat).evalMap { pt =>
-      Task.delay(S.send(pt))
-    }
+  def connect(M: Monitoring, S: Socket)(implicit log: String => Unit): Process[Task,Array[Byte]] =
+    Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat)
 }
