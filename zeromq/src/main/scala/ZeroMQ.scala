@@ -15,6 +15,8 @@ case object Publish extends Mode(ZMQ.PUB)
 case object Subscribe extends Mode(ZMQ.SUB)
 case object Dealer extends Mode(ZMQ.DEALER)
 case object Router extends Mode(ZMQ.ROUTER)
+case object Push extends Mode(ZMQ.PUSH)
+case object Pull extends Mode(ZMQ.PULL)
 
 case class Endpoint(
   mode: Mode,
@@ -23,7 +25,12 @@ case class Endpoint(
 )
 
 import scalaz.concurrent.Task
-import scalaz.stream.{Process,Sink}
+import scalaz.stream.{Process,Channel,io}
+
+case class Connection(
+  socket: Socket,
+  ctx: Context
+)
 
 /**
  * Take all of the events happening on the monitoring stream, serialise them to binary
@@ -31,26 +38,25 @@ import scalaz.stream.{Process,Sink}
  */
 object ZeroMQ {
 
-  def run(p: Protocol, e: Endpoint
-    )(m: Monitoring, kill: Process[Task,Boolean]
-    )(implicit log: String => Unit): Task[Unit] = {
+  def haltWhen[O,O2](input: Process[Task,O], kill: Process[Task,Boolean], output: Channel[Task,O,O2]): Process[Task,O2] =
+    kill.zip(input).takeWhile(x => !x._1).map(_._2).through(output)
+
+  def run[O,O2](p: Protocol, e: Endpoint)(i: Process[Task,O], k: Process[Task,Boolean], c: Socket => Channel[Task,O,O2]): Task[Unit] =
     for {
-      o <- setup(p,e,threadCount = 1)
-      (socket,context) = o
-      _ <- kill.zip(connect(m,socket)).takeWhile(x => !x._1).map(_._2).to(sink(socket)).run
-      _ <- destroy(socket,context)
+      a <- setup(p, e, threadCount = 1)
+      _ <- haltWhen(i, k, c(a.socket)).run
+      _ <- destroy(a.socket, a.ctx)
     } yield ()
-  }
 
   def setup(
     protocol: Protocol,
     endpoint: Endpoint,
     threadCount: Int = 1
-  ): Task[(Socket,Context)] = Task.delay {
+  ): Task[Connection] = Task.delay {
     val context: Context = ZMQ.context(threadCount)
     val socket: Socket = context.socket(endpoint.mode.asInt)
     socket.bind(s"${protocol.asString}://${endpoint.host}:${endpoint.port}")
-    (socket,context)
+    Connection(socket,context)
   }
 
   def destroy(s: Socket, c: Context): Task[Unit] =
@@ -63,15 +69,20 @@ object ZeroMQ {
       }
     }
 
-  def sink(s: Socket): Sink[Task, Array[Byte]] =
-    Process.emit(bytes => Task.delay { s.send(bytes); () })
+  def channel: Socket => Channel[Task, Array[Byte], Boolean] =
+    socket => io.channel(bytes => Task.delay(socket.send(bytes)))
 
+}
+
+object stream {
   import http.{SSE,JSON}, JSON._
 
   // TODO: implement real serialisation here rather than using the JSON from `http` module
   private def datapointToWireFormat(d: Datapoint[Any]):  Array[Byte] =
     s"${SSE.dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes("UTF-8")
 
-  def connect(M: Monitoring, S: Socket)(implicit log: String => Unit): Process[Task,Array[Byte]] =
+  def from(M: Monitoring)(implicit log: String => Unit): Process[Task,Array[Byte]] =
     Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat)
 }
+
+
