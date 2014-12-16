@@ -75,7 +75,7 @@ A URL can be any Funnel URL that serves a stream of metrics. It's a good idea to
 
 ### Configuration
 
-Flask takes all of its configuration information via [Knobs](https://github.svc.oncue.com/pages/intelmedia/knobs); primarily by file. The default configuration file looks like this:
+Flask takes all of its configuration information via [Knobs](https://github.oncue.verizon.net/pages/intelmedia/knobs); primarily by file. The default configuration file looks like this:
 
 ```
 flask {
