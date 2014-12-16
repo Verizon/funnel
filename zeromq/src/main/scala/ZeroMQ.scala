@@ -29,7 +29,7 @@ import scalaz.stream.{Process,Channel,io}
 
 case class Connection(
   socket: Socket,
-  ctx: Context
+  context: Context
 )
 
 /**
@@ -38,15 +38,36 @@ case class Connection(
  */
 object ZeroMQ {
 
-  def haltWhen[O,O2](input: Process[Task,O], kill: Process[Task,Boolean], output: Channel[Task,O,O2]): Process[Task,O2] =
-    kill.zip(input).takeWhile(x => !x._1).map(_._2).through(output)
+  def haltWhen[O](kill: Process[Task,Boolean])(input: Process[Task,O]): Process[Task,O] =
+    kill.zip(input).takeWhile(x => !x._1).map(_._2)
 
-  def run[O,O2](p: Protocol, e: Endpoint)(i: Process[Task,O], k: Process[Task,Boolean], c: Socket => Channel[Task,O,O2]): Task[Unit] =
+  def outbound[O,O2](p: Protocol, e: Endpoint)(i: Process[Task,O], k: Process[Task,Boolean], c: Socket => Channel[Task,O,O2]): Task[Unit] =
     for {
       a <- setup(p, e, threadCount = 1)
-      _ <- haltWhen(i, k, c(a.socket)).run
-      _ <- destroy(a.socket, a.ctx)
+      _ <- haltWhen(k)(i).through(c(a.socket)).run
+      _ <- destroy(a)
     } yield ()
+
+  private def resource[F[_],R,O](
+    acquire: F[R])(
+    release: R => F[Unit])(
+    proc: R => Process[F,O]
+  ): Process[F,O] =
+    Process.eval(acquire).flatMap { r =>
+      proc(r).onComplete(Process.eval_(release(r)))
+    }
+
+  def foooo(p: Protocol, e: Endpoint)(k: Process[Task,Boolean]): Process[Task, String] =
+    resource(setup(p,e))(r => destroy(r)){ connection =>
+      haltWhen(k){
+        consume(connection.socket)
+      }
+    }
+
+  // def inbound(e: Endpoint, p: Protocol)(f: Socket => Task[Socket])
+
+  def consume(socket: Socket): Process[Task, String] =
+    Process.eval(Task.delay(socket.recvStr)) ++ consume(socket)
 
   def setup(
     protocol: Protocol,
@@ -55,15 +76,15 @@ object ZeroMQ {
   ): Task[Connection] = Task.delay {
     val context: Context = ZMQ.context(threadCount)
     val socket: Socket = context.socket(endpoint.mode.asInt)
-    socket.bind(s"${protocol.asString}://${endpoint.host}:${endpoint.port}")
+    // socket.bind(s"${protocol.asString}://${endpoint.host}:${endpoint.port}")
     Connection(socket,context)
   }
 
-  def destroy(s: Socket, c: Context): Task[Unit] =
+  def destroy(c: Connection): Task[Unit] =
     Task.delay {
       try {
-        s.close()
-        c.close()
+        c.socket.close()
+        c.context.close()
       } catch {
         case e: java.nio.channels.ClosedChannelException => ()
       }
