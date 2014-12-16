@@ -9,4 +9,4 @@ ScalaTest.settings
 
 fork in (run in Test) := true
 
-libraryDependencies += "io.argonaut" %% "argonaut" % "6.1-M4"
+libraryDependencies += "oncue.argonaut" %% "argonaut" % "6.0.+"
