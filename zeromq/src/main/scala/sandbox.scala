@@ -12,22 +12,25 @@ object pub {
 
     import instruments._
 
-    val P = Publisher(port = 7931)
+    val E = Endpoint(mode = Publish, port = 7931)
     val M = Monitoring.default
     val T = counter("testing/foo")
     val close = new AtomicBoolean(false)
+    val K = Process.repeatEval(Task.delay(close.get))
 
-    implicit class HaltWhenSyntax[O](p: Process[Task, O]){
-      def haltWhen(bool: AtomicBoolean): Process[Task, O] =
-        Process.repeatEval(Task.delay(bool.get)).zip(p).takeWhile(x => !x._1).map(_._2)
-    }
+    // implicit class HaltWhenSyntax[O](p: Process[Task, O]){
+    //   def haltWhen(bool: AtomicBoolean): Process[Task, O] =
+    //     Process.repeatEval(Task.delay(bool.get)).zip(p).takeWhile(x => !x._1).map(_._2)
+    // }
 
-    val task: Task[Unit] = for {
-      x    <- P.setup(threadCount = 1)
-      (a,b) = x
-      _    <- P.publish(M,a)(d => println(d)).haltWhen(close).run
-      _    <- P.destroy(a,b)
-    } yield ()
+    val task = ZeroMQ.run(TCP,E)(M,K)
+
+    // val task: Task[Unit] = for {
+    //   x    <- P.setup(threadCount = 1)
+    //   (a,b) = x
+    //   _    <- P.publish(M,a)(d => println(d)).haltWhen(close).run
+    //   _    <- P.destroy(a,b)
+    // } yield ()
 
     println("Press [Enter] to stop the task")
 
