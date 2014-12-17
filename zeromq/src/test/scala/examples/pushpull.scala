@@ -6,15 +6,13 @@ import scalaz.concurrent.Task
 import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process
 
-object pub {
-
+object push {
   def main(args: Array[String]): Unit = {
-
     import instruments._
 
     implicit val log: String => Unit = println _
 
-    val E = Endpoint(Publish, Address(TCP, port = 7931))
+    val E = Endpoint(Push, Address(TCP, port = 7932))
 
     val M = Monitoring.default
     val T = counter("testing/foo")
@@ -38,14 +36,11 @@ object pub {
   }
 }
 
-object sub {
-
-  import scalaz.stream.async.boundedQueue
-  import scalaz.stream.async.mutable.Queue
+object pull {
   import scalaz.stream.io
 
   def main(args: Array[String]): Unit = {
-    val E = Endpoint(mode = SubscribeAll, Address(TCP, port =7931))
+    val E = Endpoint(mode = SubscribeAll, Address(TCP, port =7932))
     val close = new AtomicBoolean(false)
     val K = Process.repeatEval(Task.delay(close.get))
 

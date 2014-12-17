@@ -26,3 +26,23 @@ case object SubscribeAll extends Mode(ZMQ.SUB){
       s.subscribe(Array.empty[Byte])
     }
 }
+
+case object Push extends Mode(ZMQ.PUSH) {
+  def configure(a: Address, s: Socket): Task[Unit] =
+    Task.delay {
+      println("Configuring Push... " + a.toString)
+      s.bind(a.toString)
+      ()
+    }
+}
+
+case object Pull extends Mode(ZMQ.PULL) {
+  def configure(a: Address, s: Socket): Task[Unit] =
+    Task.delay {
+      println("Configuring Pull... " + a.toString)
+      s.connect(a.toString)
+    }
+}
+
+
+
