@@ -5,47 +5,16 @@ import org.zeromq.ZMQ, ZMQ.Context, ZMQ.Socket
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Channel,io}
 
-abstract class Protocol(override val toString: String)
-case object TCP extends Protocol("tcp")
-case object IPC extends Protocol("icp")
-case object UDP extends Protocol("udp")
-case object InProc extends Protocol("proc")
-case object Pair extends Protocol("pair")
-
-abstract class Mode(val asInt: Int){
-  def configure(a: Address, s: Socket): Task[Unit]
-}
-case object Publish extends Mode(ZMQ.PUB){
-  def configure(a: Address, s: Socket): Task[Unit] =
-    Task.delay {
-      println("Configuring Publish... " + a.toString)
-      s.bind(a.toString)
-      ()
-    }
-}
-case object SubscribeAll extends Mode(ZMQ.SUB){
-  def configure(a: Address, s: Socket): Task[Unit] =
-    Task.delay {
-      println("Configuring SubscribeAll... " + a.toString)
-      s.connect(a.toString)
-      s.subscribe(Array.empty[Byte])
-    }
-}
-// case object Push extends Mode(ZMQ.PUSH)
-// case object Pull extends Mode(ZMQ.PULL)
-
 case class Address(
   protocol: Protocol,
   host: String = "*",
-  port: Int
-){
+  port: Int){
   override def toString: String = s"$protocol://$host:$port"
 }
 
 case class Endpoint(
   mode: Mode,
-  address: Address
-){
+  address: Address){
   def configure(s: Socket): Task[Unit] =
     mode.configure(address, s)
 }
@@ -61,19 +30,7 @@ case class Connection(
  */
 object ZeroMQ {
 
-  def haltWhen[O](kill: Process[Task,Boolean])(input: Process[Task,O]): Process[Task,O] =
-    kill.zip(input).takeWhile(x => !x._1).map(_._2)
-
-  private def resource[F[_],R,O](
-    acquire: F[R])(
-    release: R => F[Unit])(
-    proc: R => Process[F,O]
-  ): Process[F,O] =
-    Process.eval(acquire).flatMap { r =>
-      proc(r).onComplete(Process.eval_(release(r)))
-    }
-
-  def fooo[O](e: Endpoint
+  def link[O](e: Endpoint
     )(k: Process[Task,Boolean]
     )(f: Socket => Process[Task,O]
   ): Process[Task, O] =
@@ -85,15 +42,33 @@ object ZeroMQ {
     }
 
   def consume(socket: Socket): Process[Task, String] = {
-    println(">>>>> consume")
-
-    Process.eval(Task {
-      socket.recvStr
-    }) ++ consume(socket)
+    Process.eval(Task(socket.recvStr)) ++ consume(socket)
   }
 
+  def channel(socket: Socket): Channel[Task, Array[Byte], Boolean] =
+    io.channel(bytes => {
+      println(s"Sending ${bytes.length}")
+      Task.delay(socket.send(bytes))
+    })
 
-  def setup(
+  /////////////////////////////// INTERNALS ///////////////////////////////////
+
+  private[zeromq] def haltWhen[O](
+    kill: Process[Task,Boolean])(
+    input: Process[Task,O]
+  ): Process[Task,O] =
+    kill.zip(input).takeWhile(x => !x._1).map(_._2)
+
+  private[zeromq] def resource[F[_],R,O](
+    acquire: F[R])(
+    release: R => F[Unit])(
+    proc: R => Process[F,O]
+  ): Process[F,O] =
+    Process.eval(acquire).flatMap { r =>
+      proc(r).onComplete(Process.eval_(release(r)))
+    }
+
+  private[zeromq] def setup(
     endpoint: Endpoint,
     threadCount: Int = 1
   ): Task[Connection] = Task.delay {
@@ -103,7 +78,7 @@ object ZeroMQ {
     Connection(socket,context)
   }
 
-  def destroy(c: Connection): Task[Unit] =
+  private[zeromq] def destroy(c: Connection): Task[Unit] =
     Task.delay {
       println("Destroying connection...")
       try {
@@ -113,13 +88,6 @@ object ZeroMQ {
         case e: java.nio.channels.ClosedChannelException => ()
       }
     }
-
-  def channel: Socket => Channel[Task, Array[Byte], Boolean] =
-    socket => io.channel(bytes => {
-      println(s"Sending ${bytes.length}")
-      Task.delay(socket.send(bytes))
-    })
-
 }
 
 object stream {
