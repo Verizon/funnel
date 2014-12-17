@@ -18,7 +18,7 @@ abstract class Mode(val asInt: Int){
 case object Publish extends Mode(ZMQ.PUB){
   def configure(a: Address, s: Socket): Task[Unit] =
     Task.delay {
-      println("Configuring Publish...")
+      println("Configuring Publish... " + a.toString)
       s.bind(a.toString)
       ()
     }
@@ -26,7 +26,7 @@ case object Publish extends Mode(ZMQ.PUB){
 case object SubscribeAll extends Mode(ZMQ.SUB){
   def configure(a: Address, s: Socket): Task[Unit] =
     Task.delay {
-      println("Configuring SubscribeAll...")
+      println("Configuring SubscribeAll... " + a.toString)
       s.connect(a.toString)
       s.subscribe(Array.empty[Byte])
     }
@@ -64,13 +64,6 @@ object ZeroMQ {
   def haltWhen[O](kill: Process[Task,Boolean])(input: Process[Task,O]): Process[Task,O] =
     kill.zip(input).takeWhile(x => !x._1).map(_._2)
 
-  def outbound[O,O2](e: Endpoint)(i: Process[Task,O], k: Process[Task,Boolean], c: Socket => Channel[Task,O,O2]): Task[Unit] =
-    for {
-      a <- setup(e, threadCount = 1)
-      _ <- haltWhen(k)(i).through(c(a.socket)).run
-      _ <- destroy(a)
-    } yield ()
-
   private def resource[F[_],R,O](
     acquire: F[R])(
     release: R => F[Unit])(
@@ -79,8 +72,6 @@ object ZeroMQ {
     Process.eval(acquire).flatMap { r =>
       proc(r).onComplete(Process.eval_(release(r)))
     }
-
-  // def qux[O](p: Protocol, e: Endpoint)(i: Process[Task,O])
 
   def fooo[O](e: Endpoint
     )(k: Process[Task,Boolean]
@@ -92,8 +83,6 @@ object ZeroMQ {
           ).flatMap(_ => f(connection.socket))
       }
     }
-
-  // def inbound(e: Endpoint, p: Protocol)(f: Socket => Task[Socket])
 
   def consume(socket: Socket): Process[Task, String] =
     Process.eval(Task {
@@ -121,7 +110,10 @@ object ZeroMQ {
     }
 
   def channel: Socket => Channel[Task, Array[Byte], Boolean] =
-    socket => io.channel(bytes => Task.delay(socket.send(bytes)))
+    socket => io.channel(bytes => {
+      println(s"Sending ${bytes.length}")
+      Task.delay(socket.send(bytes))
+    })
 
 }
 

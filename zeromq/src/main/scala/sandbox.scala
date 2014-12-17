@@ -79,20 +79,13 @@ object sub {
   import scalaz.stream.io
 
   def main(args: Array[String]): Unit = {
-    // val context: Context = ZMQ.context(1)
-    // val socket: Socket = context.socket(ZMQ.SUB)
     val E = Endpoint(mode = SubscribeAll, Address(TCP, port =7931))
     val close = new AtomicBoolean(false)
     val K = Process.repeatEval(Task.delay(close.get))
 
-    // socket.connect("tcp://localhost:7931")
-    // socket.subscribe(Array.empty[Byte]) // providing an empty array means "all messages"
-
-    // qqqq(socket).to(io.stdOut).run.runAsyncInterruptibly(_ => (), close)
-
     println("Press [Enter] to stop the task")
 
-    ZeroMQ.fooo(E)(K)(ZeroMQ.consume).run.runAsyncInterruptibly(_ => (), close)
+    ZeroMQ.fooo(E)(K)(ZeroMQ.consume).to(io.stdOut).run.runAsync(_ => ())
 
     Console.readLine() // block
 
@@ -100,12 +93,6 @@ object sub {
 
     close.set(true) // stops the task.
 
-    // try {
-    //   socket.close()
-    //   context.close()
-    // } catch {
-    //   case e: java.nio.channels.ClosedChannelException => ()
-    // }
-
+    println(s"Stopped (${close.get})")
   }
 }
