@@ -84,16 +84,20 @@ object ZeroMQ {
       }
     }
 
-  def consume(socket: Socket): Process[Task, String] =
+  def consume(socket: Socket): Process[Task, String] = {
+    println(">>>>> consume")
+
     Process.eval(Task {
-      println(">>>>> ")
       socket.recvStr
     }) ++ consume(socket)
+  }
+
 
   def setup(
     endpoint: Endpoint,
     threadCount: Int = 1
   ): Task[Connection] = Task.delay {
+    println("Setting up endpoint = " + endpoint)
     val context: Context = ZMQ.context(threadCount)
     val socket: Socket = context.socket(endpoint.mode.asInt)
     Connection(socket,context)
@@ -101,6 +105,7 @@ object ZeroMQ {
 
   def destroy(c: Connection): Task[Unit] =
     Task.delay {
+      println("Destroying connection...")
       try {
         c.socket.close()
         c.context.close()
