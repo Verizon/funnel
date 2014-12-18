@@ -91,11 +91,15 @@ object ZeroMQ {
 }
 
 object stream {
-  import http.{SSE,JSON}, JSON._
+  import http.JSON._
+  import argonaut.EncodeJson
 
-  // TODO: implement real serialisation here rather than using the JSON from `http` module
+  // TODO: implement binary serialisation here rather than using the JSON from `http` module
+  private def dataEncode[A](a: A)(implicit A: EncodeJson[A]): String =
+    A(a).nospaces
+
   private def datapointToWireFormat(d: Datapoint[Any]):  Array[Byte] =
-    s"${SSE.dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes("UTF-8")
+    s"${dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes("UTF-8")
 
   def from(M: Monitoring)(implicit log: String => Unit): Process[Task,Array[Byte]] =
     Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat)
