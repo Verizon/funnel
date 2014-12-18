@@ -14,7 +14,8 @@ object pub {
 
     implicit val log: String => Unit = println _
 
-    val E = Endpoint(Publish, Address(TCP, port = 7931))
+    // val E = Endpoint(Publish, Address(TCP, port = 7931))
+    val E = Endpoint(Publish, Address(IPC, host = "/tmp/feeds/0", port = 7931))
 
     val M = Monitoring.default
     val T = counter("testing/foo")
@@ -42,7 +43,9 @@ object sub {
   import scalaz.stream.io
 
   def main(args: Array[String]): Unit = {
-    val E = Endpoint(mode = SubscribeAll, Address(TCP, port =7931))
+    // val E = Endpoint(mode = SubscribeAll, Address(TCP, port =7931))
+    val E = Endpoint(SubscribeAll, Address(IPC, host = "/tmp/feeds/0", port = 7931))
+
     val close = new AtomicBoolean(false)
     val K = Process.repeatEval(Task.delay(close.get))
 
