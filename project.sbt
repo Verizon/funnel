@@ -17,6 +17,8 @@ lazy val elastic = project.dependsOn(core, http)
 
 lazy val zeromq = project.dependsOn(http)
 
+lazy val agent = project.dependsOn(zeromq)
+
 OnCue.baseSettings
 
 Publishing.ignore
