@@ -8,7 +8,7 @@ package object msgpack {
 
   import codecs.MessagePackCodec
 
-  private def gen[A](s: Serialize[A]): Codec[A] = new Codec[A] {
+  def gen[A](s: Serialize[A]): Codec[A] = new Codec[A] {
     def encode(a: A): Err \/ BitVector = MessagePackCodec.encode(s.pack(a))
     def decode(buffer: BitVector): Err \/ (BitVector, A) =
       MessagePackCodec.decode(buffer).flatMap { case (rest, a) => s.unpack(a).map((rest, _)).toRightDisjunction(Err("fail to unpack")) }

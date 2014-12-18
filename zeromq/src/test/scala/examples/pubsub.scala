@@ -39,9 +39,6 @@ object pub {
 }
 
 object sub {
-
-  import scalaz.stream.async.boundedQueue
-  import scalaz.stream.async.mutable.Queue
   import scalaz.stream.io
 
   def main(args: Array[String]): Unit = {
