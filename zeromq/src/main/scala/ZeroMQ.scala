@@ -8,8 +8,15 @@ import scalaz.stream.{Process,Channel,io}
 case class Address(
   protocol: Protocol,
   host: String = "*",
-  port: Int){
-  override def toString: String = s"$protocol://$host:$port"
+  port: Option[Int] = None){
+  override def toString: String =
+    port.map(p => s"$protocol://$host:$p"
+      ).getOrElse(s"$protocol://$host")
+}
+
+object Address {
+  def apply(protocol: Protocol, host: String, port: Int): Address =
+    Address(protocol, host, Option(port))
 }
 
 case class Endpoint(
@@ -25,8 +32,12 @@ case class Connection(
 )
 
 /**
- * Take all of the events happening on the monitoring stream, serialise them to binary
- * and then flush them out down the "PUB" 0mq socket.
+ * Model 0mq as a set of streams. Primary API should be the `link` function.
+ * Example usage:
+ *
+ * ```
+ * Ø.link(E)(K)(Ø.consume).to(io.stdOut)
+ * ```
  */
 object ZeroMQ {
 
