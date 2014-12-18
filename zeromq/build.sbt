@@ -7,6 +7,4 @@ ScalaCheck.settings
 
 ScalaTest.settings
 
-libraryDependencies ++= Seq(
-  "org.zeromq" % "jeromq" % "0.3.4"
-)
+libraryDependencies += "org.zeromq" % "jeromq" % "0.3.4"
