@@ -66,17 +66,17 @@ object JSON {
   implicit def EncodeUnits[A]: EncodeJson[Units[A]] = {
     import Units._; import Units.Base._
     jencode1[Units[A], String] {
-      case Bytes(Zero) => "Bytes"
-      case Bytes(Kilo) => "Kilobytes"
-      case Bytes(Mega) => "Megabytes"
-      case Bytes(Giga) => "Gigabytes"
-      case Duration(g) => unCapsLock(g.toString)
-      case Count => "Count"
-      case Ratio => "Ratio"
+      case Bytes(Zero)  => "Bytes"
+      case Bytes(Kilo)  => "Kilobytes"
+      case Bytes(Mega)  => "Megabytes"
+      case Bytes(Giga)  => "Gigabytes"
+      case Duration(g)  => unCapsLock(g.toString)
+      case Count        => "Count"
+      case Ratio        => "Ratio"
       case TrafficLight => "TrafficLight"
-      case Healthy => "Healthy"
-      case Load => "Load"
-      case None => "None"
+      case Healthy      => "Healthy"
+      case Load         => "Load"
+      case None         => "None"
     }
   }
 

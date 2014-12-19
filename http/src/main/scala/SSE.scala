@@ -14,7 +14,7 @@ object SSE {
   import JSON._
 
   def dataEncode[A](a: A)(implicit A: EncodeJson[A]): String =
-    "data: " + A(a).spaces2.replace("\n", "\ndata: ")
+    "data: " + A(a).nospaces.replace("\n", "\ndata: ")
 
   /**
    * Write a server-side event stream (http://www.w3.org/TR/eventsource/)
