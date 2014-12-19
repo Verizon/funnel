@@ -55,11 +55,11 @@ object ZeroMQ {
       }
     }
 
-  def consume(socket: Socket): Process[Task, String] = {
-    Process.eval(Task(socket.recvStr)) ++ consume(socket)
+  def receive(socket: Socket): Process[Task, Array[Byte]] = {
+    Process.eval(Task(socket.recv)) ++ receive(socket)
   }
 
-  def channel(socket: Socket): Channel[Task, Array[Byte], Boolean] =
+  def write(socket: Socket): Channel[Task, Array[Byte], Boolean] =
     io.channel(bytes =>
       Task.delay {
         log.debug(s"Sending ${bytes.length}")

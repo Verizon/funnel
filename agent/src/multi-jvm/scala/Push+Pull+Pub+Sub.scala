@@ -1,7 +1,6 @@
-package oncue.svc.funnel
-package zeromq
-package examples
+package oncue.svc.funnel.agent
 
+import oncue.svc.funnel._, zeromq._
 import scalaz.concurrent.Task
 import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process
@@ -13,7 +12,6 @@ abstract class Pusher(name: String, alive: Duration = 12.seconds) {
 
     implicit val log: String => Unit = println _
 
-    // val E = Endpoint(Publish, Address(TCP, port = 7931))
     val E = Endpoint(`Push+Connect`, Address(IPC, host = "/tmp/feeds/0"))
 
     val M = Monitoring.default
@@ -36,22 +34,28 @@ abstract class Pusher(name: String, alive: Duration = 12.seconds) {
   }
 }
 
-object SampleMultiJvmPusher1 extends Pusher("pub1")
+object SampleMultiJvmPusher1 extends Pusher("push-1")
 
-object SampleMultiJvmPusher2 extends Pusher("pub2")
+object SampleMultiJvmPusher2 extends Pusher("push-2")
 
-object SampleMultiJvmPuller {
+object SampleMultiJvmPublisher {
+  def main(args: Array[String]): Unit = {
+    val I = Endpoint(`Pull+Bind`, Address(IPC, host = "/tmp/feeds/0"))
+    val O = Endpoint(Publish, Address(TCP, port = Option(7390)))
+    new Agent(I,O).task.run
+  }
+}
+
+object SampleMultiJvmSubscriber {
   import scalaz.stream.io
 
   def main(args: Array[String]): Unit = {
-    val E = Endpoint(`Pull+Bind`, Address(IPC, host = "/tmp/feeds/0"))
+    val E = Endpoint(SubscribeAll, Address(TCP, port = Option(7390)))
 
     val close = new AtomicBoolean(false)
     val K = Process.repeatEval(Task.delay(close.get))
 
-    println("Press [Enter] to stop the task")
-
-    Ø.link(E)(K)(Ø.consume).to(io.stdOut).run.runAsync(_ => ())
+    Ø.link(E)(K)(Ø.receive).map(new String(_)).to(io.stdOut).run.runAsync(_ => ())
 
     Thread.sleep(10.seconds.toMillis) // block to keep the test JVM running
 
@@ -62,3 +66,5 @@ object SampleMultiJvmPuller {
     println(s"Puller - Stopped (${close.get})")
   }
 }
+
+

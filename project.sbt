@@ -19,7 +19,7 @@ lazy val elastic = project.dependsOn(core, http)
 
 lazy val zeromq = project.dependsOn(http).configs(MultiJvm)
 
-lazy val agent = project.dependsOn(zeromq)
+lazy val agent = project.dependsOn(zeromq, http).configs(MultiJvm)
 
 OnCue.baseSettings
 
