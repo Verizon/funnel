@@ -4,6 +4,7 @@ package zeromq
 import org.zeromq.ZMQ, ZMQ.Context, ZMQ.Socket
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Channel,io}
+import journal.Logger
 
 case class Address(
   protocol: Protocol,
@@ -41,6 +42,8 @@ case class Connection(
  */
 object ZeroMQ {
 
+  private[zeromq] val log = Logger[ZeroMQ.type]
+
   def link[O](e: Endpoint
     )(k: Process[Task,Boolean]
     )(f: Socket => Process[Task,O]
@@ -57,10 +60,12 @@ object ZeroMQ {
   }
 
   def channel(socket: Socket): Channel[Task, Array[Byte], Boolean] =
-    io.channel(bytes => {
-      println(s"Sending ${bytes.length}")
-      Task.delay(socket.send(bytes))
-    })
+    io.channel(bytes =>
+      Task.delay {
+        log.debug(s"Sending ${bytes.length}")
+        socket.send(bytes)
+      }
+    )
 
   /////////////////////////////// INTERNALS ///////////////////////////////////
 
@@ -83,7 +88,7 @@ object ZeroMQ {
     endpoint: Endpoint,
     threadCount: Int = 1
   ): Task[Connection] = Task.delay {
-    println("Setting up endpoint = " + endpoint)
+    log.info("Setting up endpoint = " + endpoint)
     val context: Context = ZMQ.context(threadCount)
     val socket: Socket = context.socket(endpoint.mode.asInt)
     Connection(socket,context)
@@ -91,7 +96,7 @@ object ZeroMQ {
 
   private[zeromq] def destroy(c: Connection): Task[Unit] =
     Task.delay {
-      println("Destroying connection...")
+      log.info("Destroying connection...")
       try {
         c.socket.close()
         c.context.close()
