@@ -34,11 +34,11 @@ abstract class Pusher(name: String, alive: Duration = 12.seconds) {
   }
 }
 
-object SampleMultiJvmPusher1 extends Pusher("push-1")
+object TestingMultiJvmPusher1 extends Pusher("push-1")
 
-object SampleMultiJvmPusher2 extends Pusher("push-2")
+object TestingMultiJvmPusher2 extends Pusher("push-2")
 
-object SampleMultiJvmPublisher {
+object TestingMultiJvmPublisher {
   def main(args: Array[String]): Unit = {
     val I = Endpoint(`Pull+Bind`, Address(IPC, host = "/tmp/feeds/0"))
     val O = Endpoint(Publish, Address(TCP, port = Option(7390)))
@@ -46,7 +46,7 @@ object SampleMultiJvmPublisher {
   }
 }
 
-object SampleMultiJvmSubscriber {
+object TestingMultiJvmSubscriber {
   import scalaz.stream.io
 
   def main(args: Array[String]): Unit = {
