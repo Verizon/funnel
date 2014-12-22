@@ -6,8 +6,9 @@ import scalaz.stream.async.signal
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.Process
 import scalaz.concurrent.Task
+import journal.Logger
 
-class Agent(I: Endpoint, O: Endpoint){
+class Proxy(I: Endpoint, O: Endpoint){
   private val alive: Signal[Boolean] = signal[Boolean]
   private val stream: Process[Task,Boolean] =
     Ø.link(O)(alive.continuous)(s =>
@@ -22,10 +23,15 @@ class Agent(I: Endpoint, O: Endpoint){
 }
 
 object Main {
+  private val log = Logger[Main.type]
+
   def main(args: Array[String]): Unit = {
     val I = Endpoint(`Pull+Bind`, Address(IPC, host = "/tmp/feeds/0"))
     val O = Endpoint(Publish, Address(TCP, port = Option(7390)))
 
-    new Agent(I,O).task.run
+    new Proxy(I,O).task.runAsync(_.fold(
+      e => log.error(s"0mq proxy resulted in failure: $e"),
+      _ => ()
+    ))
   }
 }
