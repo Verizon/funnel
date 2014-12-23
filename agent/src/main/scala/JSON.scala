@@ -54,6 +54,7 @@ object JSON {
   import InstrumentKinds._, InstrumentBuilder._
   import concurrent.duration._
 
+  // TIM: this really should not be here. Move elsewhere; pass as an argument
   val I = new Instruments(1.minute)
 
   // {
@@ -67,7 +68,7 @@ object JSON {
   //   ]
   // }
 
-  def toTypedInstrument[A : InstrumentBuilder](a: List[ArbitraryMetric])(I: Instruments): List[A] = {
+  private def toTypedInstrument[A : InstrumentBuilder](a: List[ArbitraryMetric])(I: Instruments): List[A] = {
     val B = implicitly[InstrumentBuilder[A]]
     a.filter(m => B.filter(m.kind)).flatMap(B.apply)
   }

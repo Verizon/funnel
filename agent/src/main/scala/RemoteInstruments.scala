@@ -1,6 +1,6 @@
 package oncue.svc.funnel.agent
 
-import oncue.svc.funnel.{Units,Instrument,Instruments,Reportable}
+import oncue.svc.funnel.{Units,Instrument,Instruments,Reportable,Counter,Timer,Periodic,Stats}
 import scalaz.concurrent.Task
 
 import unfiltered.request._
@@ -9,12 +9,23 @@ import unfiltered.netty._
 import unfiltered.directives._, Directives._
 import java.util.concurrent.ConcurrentHashMap
 
+trait RemoteInstruments {
+  import collection.JavaConverters._
+
+  val H: Map[String, Instrument[_]] = Map.empty
+
+  def fooooo = H.get("metric-name") match {
+    case Counter(Periodic(n,s,p)) => null
+  }
+
+  // val timers   = new ConcurrentHashMap[String, Timer[Periodic[Stats]]]
+  // def keys: Set[String] =
+  //   counters.keySet.asScala.toSet ++
+  //   timers.keySet.asScala.toSet
+}
+
 @io.netty.channel.ChannelHandler.Sharable
 object RemoteInstruments extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
-
-  private val H = new ConcurrentHashMap[String, Instrument[_]]
-
-  import QParams._
 
   def intent = Directive.Intent.Path {
     case Seg("metrics" :: Nil) =>
