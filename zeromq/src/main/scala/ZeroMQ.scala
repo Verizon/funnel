@@ -62,7 +62,7 @@ object ZeroMQ {
   def write(socket: Socket): Channel[Task, Array[Byte], Boolean] =
     io.channel(bytes =>
       Task.delay {
-        log.debug(s"Sending ${bytes.length}")
+        // log.debug(s"Sending ${bytes.length}")
         socket.send(bytes)
       }
     )
