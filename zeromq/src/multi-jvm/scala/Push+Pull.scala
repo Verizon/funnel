@@ -7,6 +7,19 @@ import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process
 import scala.concurrent.duration._
 
+object Fixtures {
+  def data = large
+
+  def makeBytes(max: Int): Array[Byte] =
+    (0 to max).toSeq.map(_.toByte).toArray
+
+  val tiny: Array[Byte] = makeBytes(2)
+  val small: Array[Byte] = makeBytes(15)
+  val medium: Array[Byte] = makeBytes(150)
+  val large: Array[Byte] = makeBytes(1500)
+  val megabitInBytes = 125000D
+}
+
 abstract class Pusher(name: String) {
   def main(args: Array[String]): Unit = {
     val E = Endpoint(`Push+Connect`, Address(IPC, host = "/tmp/feeds/0"))
@@ -15,7 +28,7 @@ abstract class Pusher(name: String) {
 
     println(s"$name - Press [Enter] to stop the task")
 
-    val seq: Seq[Array[Byte]] = for(i <- 0 to 1000000) yield Array[Byte](1,2,3)
+    val seq: Seq[Array[Byte]] = for(i <- 0 to 1000000) yield Fixtures.data
     // stupid scalac cant handle this done in-line.
     val proc: Process[Task, Array[Byte]] = Process.emitAll(seq)
 
@@ -77,11 +90,14 @@ object PerfMultiJvmPuller {
     println(s"Puller - Stopped (${close.get})")
 
     val seconds = concurrent.duration.FiniteDuration(finish - start, "milliseconds").toSeconds
+    val bytes = Fixtures.data.length * received.get
+    val megabits = bytes.toDouble / Fixtures.megabitInBytes
 
     println("=================================================")
-    println(s"duration = $seconds seconds")
-    println(s"msg/sec  = ${received.get.toDouble / seconds}")
-    println(s"")
+    println(s"duration  = $seconds seconds")
+    println(s"msg/sec   = ${received.get.toDouble / seconds}")
+    println(s"megabits  = $megabits")
+    println(s"data mb/s = ${megabits.toDouble / seconds}")
     println("=================================================")
 
 
