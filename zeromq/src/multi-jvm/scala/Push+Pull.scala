@@ -51,7 +51,7 @@ object SampleMultiJvmPuller {
 
     println("Press [Enter] to stop the task")
 
-    Ø.link(E)(K)(Ø.consume).to(io.stdOut).run.runAsync(_ => ())
+    Ø.link(E)(K)(Ø.consume).map(_.toString).to(io.stdOut).run.runAsync(_ => ())
 
     Thread.sleep(10.seconds.toMillis) // block to keep the test JVM running
 
