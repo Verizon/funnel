@@ -12,16 +12,20 @@ import java.util.concurrent.ConcurrentHashMap
 trait RemoteInstruments {
   import collection.JavaConverters._
 
-  val H: Map[String, Instrument[_]] = Map.empty
+  type MetricName = String
 
-  def fooooo = H.get("metric-name") match {
-    case Counter(Periodic(n,s,p)) => null
-  }
+  val counters = new ConcurrentHashMap[MetricName, Counter[Periodic[Double]]]
+
+  // def fooooo = ()
+
+  // H.get("metric-name") match {
+  //   case Counter(Periodic(n,s,p)) => null
+  // }
 
   // val timers   = new ConcurrentHashMap[String, Timer[Periodic[Stats]]]
-  // def keys: Set[String] =
-  //   counters.keySet.asScala.toSet ++
-  //   timers.keySet.asScala.toSet
+
+  def keys: Set[String] =
+    counters.keySet.asScala.toSet //++
 }
 
 @io.netty.channel.ChannelHandler.Sharable
