@@ -7,7 +7,7 @@ object Server {
     val stop = MonitoringServer.start(Monitoring.default, 5775)
 
     unfiltered.netty.Server.http(8080)
-      .handler(RemoteInstruments)
+      .handler(HttpInstruments)
       .run
   }
 }

@@ -1,43 +1,50 @@
-package oncue.svc.funnel
-package agent
+package oncue.svc.funnel.agent
 
-import unfiltered.request._
-import unfiltered.response._
-import unfiltered.netty._
-import argonaut._, Argonaut._
+import oncue.svc.funnel.{Units,Instrument,Instruments,Counter,Timer,Periodic,Stats}
+import scalaz.concurrent.Task
+import java.util.concurrent.ConcurrentHashMap
+import scalaz.\/
 
-object JsonRequest {
-  def apply[T](r: HttpRequest[T]) =
-    new ParseWrap(r, new Parse[HttpRequest[T]] {
-      def parse(req: HttpRequest[T]) = JsonParser.parse(Body.string(req))
-    })
-}
+object RemoteInstruments {
+  import collection.JavaConverters._
+  import scala.reflect.runtime.universe._
+  import scala.concurrent.duration._
 
-object JsonResponse {
-  def apply[A: EncodeJson](a: A, params: PrettyParams = PrettyParams.nospace) =
-    JsonContent ~> ResponseString(a.jencode.pretty(params))
-}
+  type MetricName = String
 
-@io.netty.channel.ChannelHandler.Sharable
-object RemoteInstruments extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
-  import JSON._
-  import concurrent.duration._
+  private val counters = new ConcurrentHashMap[MetricName, Counter[Periodic[Double]]]
+  private val timers   = new ConcurrentHashMap[MetricName, Timer[Periodic[Stats]]]
 
-  implicit val instruments = new Instruments(1.minute)
+  private def lookup[A](key: MetricName)(hash: ConcurrentHashMap[MetricName, A]): Option[A] =
+    Option(hash.get(key))
 
-  private def decode[A : DecodeJson](req: HttpRequest[Any])(f: A => ResponseFunction[Any]) =
-    JsonRequest(req).decodeEither[A].map(f).fold(fail => BadRequest ~> ResponseString(fail), identity)
+  def metricsFromRequest(r: InstrumentRequest)(I: Instruments): Task[Unit] = {
+    for {
+      _ <- Task.gatherUnordered(r.counters.map(counter(_)(I)))
+      _ <- Task.gatherUnordered(r.timers.map(timer(_)(I)))
+    } yield ()
+  }
 
-  def intent = {
-    case r@Path("/metrics") => r match {
-      case POST(_) =>
-        decode[InstrumentRequest](r){ typed =>
-
-          println(">>> " + typed)
-
-          Ok ~> JsonResponse("test")
-        }
-      case _ => BadRequest
+  def counter(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
+    val counter = lookup[Counter[Periodic[Double]]](m.name)(counters).getOrElse {
+      val c = I.counter(m.name)
+      counters.putIfAbsent(m.name, c)
+      c
     }
+
+    Task.now(counter.increment)
+  }
+
+  def timer(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
+    val timer = lookup[Timer[Periodic[Stats]]](m.name)(timers).getOrElse {
+      val t = I.timer(m.name)
+      timers.putIfAbsent(m.name, t)
+      t
+    }
+
+    for {
+      d <- Task.now(Duration(m.value.get))
+      _ <- Task.now(timer.record(d))
+    } yield ()
   }
 }
