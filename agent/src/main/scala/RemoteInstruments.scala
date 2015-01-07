@@ -1,6 +1,6 @@
-package oncue.svc.funnel.agent
+package oncue.svc.funnel
+package agent
 
-import oncue.svc.funnel.{Units,Instrument,Instruments,Counter,Timer,Periodic,Stats}
 import scalaz.concurrent.Task
 import java.util.concurrent.ConcurrentHashMap
 import scalaz.\/
@@ -10,19 +10,51 @@ object RemoteInstruments {
   import scala.reflect.runtime.universe._
   import scala.concurrent.duration._
 
-  type MetricName = String
+  type Name = String
 
-  private val counters = new ConcurrentHashMap[MetricName, Counter[Periodic[Double]]]
-  private val timers   = new ConcurrentHashMap[MetricName, Timer[Periodic[Stats]]]
+  private val counters     = new ConcurrentHashMap[Name, Counter[Periodic[Double]]]
+  private val timers       = new ConcurrentHashMap[Name, Timer[Periodic[Stats]]]
+  private val stringGauges = new ConcurrentHashMap[Name, Gauge[Continuous[String],String]]
+  private val doubleGauges = new ConcurrentHashMap[Name, Gauge[Periodic[Stats],Double]]
 
-  private def lookup[A](key: MetricName)(hash: ConcurrentHashMap[MetricName, A]): Option[A] =
+  def keys: Set[Name] =
+    counters.keySet.asScala.toSet ++
+    timers.keySet.asScala.toSet ++
+    stringGauges.keySet.asScala.toSet ++
+    doubleGauges.keySet.asScala.toSet
+
+  private def lookup[A](key: Name)(hash: ConcurrentHashMap[Name, A]): Option[A] =
     Option(hash.get(key))
 
   def metricsFromRequest(r: InstrumentRequest)(I: Instruments): Task[Unit] = {
     for {
       _ <- Task.gatherUnordered(r.counters.map(counter(_)(I)))
       _ <- Task.gatherUnordered(r.timers.map(timer(_)(I)))
+      _ <- Task.gatherUnordered(r.stringGauges.map(gaugeString(_)(I)))
+      _ <- Task.gatherUnordered(r.doubleGauges.map(gaugeDouble(_)(I)))
     } yield ()
+  }
+
+  def gaugeString(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
+    val gauge = lookup[Gauge[Continuous[String],String]](m.name)(stringGauges).getOrElse {
+      val g = I.gauge[String](m.name, "")
+      stringGauges.putIfAbsent(m.name, g)
+      g
+    }
+
+    m.value.map(v => Task.now(gauge.set(v))
+      ).getOrElse(Task.now(()))
+  }
+
+  def gaugeDouble(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
+    val gauge = lookup[Gauge[Periodic[Stats],Double]](m.name)(doubleGauges).getOrElse {
+      val g = I.numericGauge(m.name, 0d)
+      doubleGauges.putIfAbsent(m.name, g)
+      g
+    }
+
+    m.value.map(v => Task.now(gauge.set(v.toDouble))
+      ).getOrElse(Task.now(()))
   }
 
   def counter(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {

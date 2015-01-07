@@ -12,21 +12,22 @@ case class ArbitraryMetric(
   name: String,
   kind: InstrumentKind,
   value: Option[String]
-)   // units: String,
+)
 
 case class InstrumentRequest(
   cluster: String,
   counters: List[ArbitraryMetric] = Nil,
-  timers: List[ArbitraryMetric] = Nil
+  timers: List[ArbitraryMetric] = Nil,
+  stringGauges: List[ArbitraryMetric] = Nil,
+  doubleGauges: List[ArbitraryMetric] = Nil
 )
 
 trait InstrumentKind
 object InstrumentKinds {
   case object Counter extends InstrumentKind
   case object Timer extends InstrumentKind
-// case object GaugeNumeric extends InstrumentKind
-// case object GaugeString extends InstrumentKind
-// case object TrafficLight extends InstrumentKind
+  case object GaugeString extends InstrumentKind
+  case object GaugeDouble extends InstrumentKind
 }
 
 object JSON {
@@ -38,8 +39,8 @@ object JSON {
   //   "metrics": [
   //     {
   //       "name": "ntp/whatever",
-  //       "kind": "timer",
-  //       "value": 0.1234
+  //       "kind": "gauge-double",
+  //       "value": "0.1234"
   //     }
   //   ]
   // }
@@ -49,9 +50,11 @@ object JSON {
       k <- (c --\ "cluster").as[String]
       m <- (c --\ "metrics").as[List[ArbitraryMetric]]
     } yield InstrumentRequest(
-      cluster = k,
-      counters = m.filter(_.kind == Counter),
-      timers   = m.filter(_.kind == Timer)
+      cluster      = k,
+      counters     = m.filter(_.kind == Counter),
+      timers       = m.filter(_.kind == Timer),
+      stringGauges = m.filter(_.kind == GaugeString),
+      doubleGauges = m.filter(_.kind == GaugeDouble)
     ))
 
   implicit val JsonToArbitraryMetric: DecodeJson[ArbitraryMetric] =
@@ -63,15 +66,11 @@ object JSON {
 
   implicit val JsonToInstrumentKind: DecodeJson[InstrumentKind] = DecodeJson { c =>
     c.as[String].map(_.toLowerCase).flatMap {
-      case "counter"           => DecodeResult.ok { Counter }
-      case "timer"             => DecodeResult.ok { Timer }
-      // case "gauge-with-double" => DecodeResult.ok { GaugeWithDouble }
-      // case "gauge-with-long"   => DecodeResult.ok { GaugeWithLong }
-      // case "gauge-with-string" => DecodeResult.ok { GaugeWithString }
-      // case "traffic-light"     => DecodeResult.ok { TrafficLight }
+      case "counter"      => DecodeResult.ok { Counter }
+      case "timer"        => DecodeResult.ok { Timer }
+      case "gauge-string" => DecodeResult.ok { GaugeString }
+      case "gauge-double" => DecodeResult.ok { GaugeDouble }
     }
   }
-
-
 }
 
