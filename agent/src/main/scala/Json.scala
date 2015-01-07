@@ -14,7 +14,6 @@ case class ArbitraryMetric(
   value: String
 )   // units: String,
 
-
 case class TypedRequest(
   cluster: String,
   counters: List[Counter[Periodic[Double]]] = Nil,
@@ -30,32 +29,12 @@ object InstrumentKinds {
 // case object TrafficLight extends InstrumentKind
 }
 
-trait InstrumentBuilder[A]{ // fucking terrible name.
-  def apply(in: ArbitraryMetric): Option[A]
-  def filter: InstrumentKind => Boolean
-}
-object InstrumentBuilder {
-  import InstrumentKinds._
-
-  implicit val counterBuilder: InstrumentBuilder[Counter[Periodic[Double]]] =
-    new InstrumentBuilder[Counter[Periodic[Double]]]{
-      def apply(a: ArbitraryMetric): Option[Counter[Periodic[Double]]] = ???
-      val filter: InstrumentKind => Boolean = _ == Counter
-    }
-
-  implicit val timerBuilder: InstrumentBuilder[Timer[Periodic[Stats]]] =
-    new InstrumentBuilder[Timer[Periodic[Stats]]]{
-      def apply(a: ArbitraryMetric): Option[Timer[Periodic[Stats]]] = ???
-      val filter: InstrumentKind => Boolean = _ == Timer
-    }
-}
-
 object JSON {
   import InstrumentKinds._, InstrumentBuilder._
   import concurrent.duration._
 
   // TIM: this really should not be here. Move elsewhere; pass as an argument
-  val I = new Instruments(1.minute)
+  // val I = new Instruments(1.minute)
 
   // {
   //   "cluster": "foo-whatever",
@@ -68,19 +47,19 @@ object JSON {
   //   ]
   // }
 
-  private def toTypedInstrument[A : InstrumentBuilder](a: List[ArbitraryMetric])(I: Instruments): List[A] = {
+  private def toTypedInstrument[A : InstrumentBuilder](a: List[ArbitraryMetric]): List[A] = {
     val B = implicitly[InstrumentBuilder[A]]
-    a.filter(m => B.filter(m.kind)).flatMap(B.apply)
+    a.filter(m => B.filter(m.kind)).flatMap(x => List(B.apply(x)))
   }
 
-  implicit val JsonToTypedRequest: DecodeJson[TypedRequest] =
+  implicit def JsonToTypedRequest(implicit I: Instruments): DecodeJson[TypedRequest] =
     DecodeJson(c => for {
       k <- (c --\ "cluster").as[String]
       m <- (c --\ "metrics").as[List[ArbitraryMetric]]
     } yield TypedRequest(
       cluster = k,
-      counters = toTypedInstrument[Counter[Periodic[Double]]](m)(I),
-      timers   = toTypedInstrument[Timer[Periodic[Stats]]](m)(I)
+      counters = toTypedInstrument[Counter[Periodic[Double]]](m),
+      timers   = toTypedInstrument[Timer[Periodic[Stats]]](m)
     ))
 
   implicit val JsonToArbitraryMetric: DecodeJson[ArbitraryMetric] =

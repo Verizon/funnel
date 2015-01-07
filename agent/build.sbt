@@ -16,9 +16,7 @@ SbtMultiJvm.multiJvmSettings
 
 libraryDependencies ++= Seq(
   "net.databinder" %% "unfiltered-filter"       % "0.8.3",
-  "net.databinder" %% "unfiltered-netty-server" % "0.8.3",
-  "net.databinder" %% "unfiltered-directives"   % "0.8.3",
-  "org.slf4j"       % "slf4j-simple"            % "1.6.0"
+  "net.databinder" %% "unfiltered-netty-server" % "0.8.3"
 )
 
 mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.Main")
