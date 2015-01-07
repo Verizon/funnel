@@ -2,7 +2,6 @@ package oncue.svc.funnel
 package agent
 
 import argonaut._, Argonaut._
-// import oncue.svc.funnel.instruments.Counter
 
 case class Request(
   cluster: String,
@@ -34,17 +33,18 @@ object JSON {
   import InstrumentKinds._
   import concurrent.duration._
 
-  // {
-  //   "cluster": "foo-whatever",
-  //   "metrics": [
-  //     {
-  //       "name": "ntp/whatever",
-  //       "kind": "gauge-double",
-  //       "value": "0.1234"
-  //     }
-  //   ]
-  // }
-
+  /**
+   * {
+   *   "cluster": "foo-whatever",
+   *   "metrics": [
+   *     {
+   *       "name": "ntp/whatever",
+   *       "kind": "gauge-double",
+   *       "value": "0.1234"
+   *     }
+   *   ]
+   * }
+   */
   implicit def JsonToInstrumentRequest: DecodeJson[InstrumentRequest] =
     DecodeJson(c => for {
       k <- (c --\ "cluster").as[String]

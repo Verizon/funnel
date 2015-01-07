@@ -23,9 +23,6 @@ object RemoteInstruments {
     stringGauges.keySet.asScala.toSet ++
     doubleGauges.keySet.asScala.toSet
 
-  private def lookup[A](key: Name)(hash: ConcurrentHashMap[Name, A]): Option[A] =
-    Option(hash.get(key))
-
   def metricsFromRequest(r: InstrumentRequest)(I: Instruments): Task[Unit] = {
     for {
       _ <- Task.gatherUnordered(r.counters.map(counter(_)(I)))
@@ -35,7 +32,10 @@ object RemoteInstruments {
     } yield ()
   }
 
-  def gaugeString(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
+  private[agent] def lookup[A](key: Name)(hash: ConcurrentHashMap[Name, A]): Option[A] =
+    Option(hash.get(key))
+
+  private[agent] def gaugeString(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
     val gauge = lookup[Gauge[Continuous[String],String]](m.name)(stringGauges).getOrElse {
       val g = I.gauge[String](m.name, "")
       stringGauges.putIfAbsent(m.name, g)
@@ -46,7 +46,7 @@ object RemoteInstruments {
       ).getOrElse(Task.now(()))
   }
 
-  def gaugeDouble(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
+  private[agent] def gaugeDouble(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
     val gauge = lookup[Gauge[Periodic[Stats],Double]](m.name)(doubleGauges).getOrElse {
       val g = I.numericGauge(m.name, 0d)
       doubleGauges.putIfAbsent(m.name, g)
@@ -57,7 +57,7 @@ object RemoteInstruments {
       ).getOrElse(Task.now(()))
   }
 
-  def counter(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
+  private[agent] def counter(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
     val counter = lookup[Counter[Periodic[Double]]](m.name)(counters).getOrElse {
       val c = I.counter(m.name)
       counters.putIfAbsent(m.name, c)
@@ -67,7 +67,7 @@ object RemoteInstruments {
     Task.now(counter.increment)
   }
 
-  def timer(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
+  private[agent] def timer(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
     val timer = lookup[Timer[Periodic[Stats]]](m.name)(timers).getOrElse {
       val t = I.timer(m.name)
       timers.putIfAbsent(m.name, t)
