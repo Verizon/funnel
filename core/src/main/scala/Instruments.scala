@@ -14,9 +14,9 @@ import scalaz.stream.Process
  * may update multiple metrics, see `counter`, `gauge` and
  * `timer` methods for more information.
  */
-class Instruments(window: Duration,
-                  monitoring: Monitoring = Monitoring.default,
-                  bufferTime: Duration = 200 milliseconds) {
+class Instruments(val window: Duration,
+                  val monitoring: Monitoring = Monitoring.default,
+                  val bufferTime: Duration = 200 milliseconds) {
 
   private def nowL(s: String) = if (s == "") s else s"$s (now)"
   private def previousL(s: String) = if (s == "") s else s"$s ($window ago)"

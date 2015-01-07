@@ -1,5 +1,6 @@
 
 import oncue.build._
+import spray.revolver.RevolverPlugin._
 import com.typesafe.sbt.SbtMultiJvm
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 
@@ -9,18 +10,21 @@ ScalaCheck.settings
 
 ScalaTest.settings
 
+Revolver.settings
+
 SbtMultiJvm.multiJvmSettings
 
-libraryDependencies += "org.zeromq" % "jeromq" % "0.3.4"
+libraryDependencies ++= Seq(
+  "net.databinder" %% "unfiltered-filter"       % "0.8.3",
+  "net.databinder" %% "unfiltered-netty-server" % "0.8.3"
+)
 
-// make sure that MultiJvm test are compiled by the default test compilation
+mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.Main")
+
 compile in MultiJvm <<= (compile in MultiJvm) triggeredBy (compile in Test)
 
-// disable parallel tests
 parallelExecution in Test := false
 
-// make sure that MultiJvm tests are executed by the default test target,
-// and combine the results from ordinary test and multi-jvm tests
 executeTests in Test <<= (executeTests in Test, executeTests in MultiJvm) map {
   case (testResults, multiNodeResults)  =>
     val overall =

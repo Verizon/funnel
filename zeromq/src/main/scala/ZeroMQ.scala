@@ -57,7 +57,7 @@ object Versions {
 
 case class Transported(
   version: Version,
-  payload: String
+  bytes: Array[Byte]
 )
 object Transported {
   import Versions._
@@ -68,7 +68,7 @@ object Transported {
       b <- Versions.fromString(a)
     } yield b
 
-    Transported(v.getOrElse(Versions.unknown), body)
+    Transported(v.getOrElse(Versions.unknown), body.getBytes)
   }
 }
 
@@ -96,15 +96,15 @@ object ZeroMQ {
       }
     }
 
-  def consume(socket: Socket): Process[Task, Transported] = {
+  def receive(socket: Socket): Process[Task, Transported] = {
     Process.eval(Task.now {
       val header = socket.recvStr
       val body   = socket.recvStr
       Transported(header, body)
-    }) ++ consume(socket)
+    }) ++ receive(socket)
   }
 
-  def channel(socket: Socket): Channel[Task, Array[Byte], Boolean] =
+  def write(socket: Socket): Channel[Task, Array[Byte], Boolean] =
     io.channel(bytes =>
       Task.delay {
         log.debug(s"Sending ${bytes.length}")
