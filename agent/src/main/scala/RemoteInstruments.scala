@@ -31,7 +31,7 @@ object RemoteInstruments extends cycle.Plan with cycle.SynchronousExecution with
   def intent = {
     case r@Path("/metrics") => r match {
       case POST(_) =>
-        decode[TypedRequest](r){ typed =>
+        decode[InstrumentRequest](r){ typed =>
 
           println(">>> " + typed)
 

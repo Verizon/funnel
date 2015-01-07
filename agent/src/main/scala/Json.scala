@@ -11,13 +11,13 @@ case class Request(
 case class ArbitraryMetric(
   name: String,
   kind: InstrumentKind,
-  value: String
+  value: Option[String]
 )   // units: String,
 
-case class TypedRequest(
+case class InstrumentRequest(
   cluster: String,
-  counters: List[Counter[Periodic[Double]]] = Nil,
-  timers: List[Timer[Periodic[Stats]]] = Nil
+  counters: List[ArbitraryMetric] = Nil,
+  timers: List[ArbitraryMetric] = Nil
 )
 
 trait InstrumentKind
@@ -30,11 +30,8 @@ object InstrumentKinds {
 }
 
 object JSON {
-  import InstrumentKinds._, InstrumentBuilder._
+  import InstrumentKinds._
   import concurrent.duration._
-
-  // TIM: this really should not be here. Move elsewhere; pass as an argument
-  // val I = new Instruments(1.minute)
 
   // {
   //   "cluster": "foo-whatever",
@@ -47,26 +44,26 @@ object JSON {
   //   ]
   // }
 
-  private def toTypedInstrument[A : InstrumentBuilder](a: List[ArbitraryMetric]): List[A] = {
-    val B = implicitly[InstrumentBuilder[A]]
-    a.filter(m => B.filter(m.kind)).flatMap(x => List(B.apply(x)))
-  }
+  // private def toTypedInstrument[A : InstrumentBuilder](a: List[ArbitraryMetric]): List[A] = {
+  //   val B = implicitly[InstrumentBuilder[A]]
+  //   a.filter(m => B.filter(m.kind)).flatMap(x => List(B.apply(x)))
+  // }
 
-  implicit def JsonToTypedRequest(implicit I: Instruments): DecodeJson[TypedRequest] =
+  implicit def JsonToInstrumentRequest: DecodeJson[InstrumentRequest] =
     DecodeJson(c => for {
       k <- (c --\ "cluster").as[String]
       m <- (c --\ "metrics").as[List[ArbitraryMetric]]
-    } yield TypedRequest(
+    } yield InstrumentRequest(
       cluster = k,
-      counters = toTypedInstrument[Counter[Periodic[Double]]](m),
-      timers   = toTypedInstrument[Timer[Periodic[Stats]]](m)
+      counters = m.filter(_.kind == Counter),
+      timers   = m.filter(_.kind == Timer)
     ))
 
   implicit val JsonToArbitraryMetric: DecodeJson[ArbitraryMetric] =
     DecodeJson(c => for {
       n <- (c --\ "name").as[String]
       k <- (c --\ "kind").as[InstrumentKind]
-      v <- (c --\ "value").as[String]
+      v <- (c --\ "value").as[String].option
     } yield ArbitraryMetric(n, k, v))
 
   implicit val JsonToInstrumentKind: DecodeJson[InstrumentKind] = DecodeJson { c =>

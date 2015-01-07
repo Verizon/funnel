@@ -32,6 +32,47 @@ case class Connection(
   context: Context
 )
 
+abstract class Version(val number: Int)
+object Versions {
+  def fromInt(i: Int): Option[Version] =
+    i match {
+      case 1 => Option(v1)
+      case 2 => Option(v2)
+      case _ => None
+    }
+
+  def fromString(s: String): Option[Version] =
+    try fromInt(s.toInt)
+    catch {
+      case e: NumberFormatException => None
+    }
+
+  val all: Seq[Version] = v1 :: v2 :: Nil
+
+  case object `v1` extends Version(1)
+  case object `v2` extends Version(2)
+  case object `unknown` extends Version(0)
+}
+
+
+case class Transported(
+  version: Version,
+  bytes: Array[Byte]
+)
+object Transported {
+  import Versions._
+
+  def apply(h: String, body: String): Transported = {
+    val v = for {
+      a <- h.split('/').lastOption
+      b <- Versions.fromString(a)
+    } yield b
+
+    Transported(v.getOrElse(Versions.unknown), body.getBytes)
+  }
+}
+
+
 /**
  * Model 0mq as a set of streams. Primary API should be the `link` function.
  * Example usage:
@@ -55,14 +96,19 @@ object ZeroMQ {
       }
     }
 
-  def receive(socket: Socket): Process[Task, Array[Byte]] = {
-    Process.eval(Task(socket.recv)) ++ receive(socket)
+  def receive(socket: Socket): Process[Task, Transported] = {
+    Process.eval(Task.now {
+      val header = socket.recvStr
+      val body   = socket.recvStr
+      Transported(header, body)
+    }) ++ receive(socket)
   }
 
   def write(socket: Socket): Channel[Task, Array[Byte], Boolean] =
     io.channel(bytes =>
       Task.delay {
-        // log.debug(s"Sending ${bytes.length}")
+        log.debug(s"Sending ${bytes.length}")
+        socket.sendMore("FMS/1")
         socket.send(bytes)
       }
     )
