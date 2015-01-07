@@ -1,33 +1,14 @@
 package oncue.svc.funnel.agent
 
-import oncue.svc.funnel.{Units,Instrument,Instruments,Reportable,Counter,Timer,Periodic,Stats}
+import oncue.svc.funnel.{Units,Instrument,Instruments,Counter,Timer,Periodic,Stats}
 import scalaz.concurrent.Task
 import java.util.concurrent.ConcurrentHashMap
 import scalaz.\/
 
-// trait InstrumentBuilder[A]{ // fucking terrible name.
-//   // def apply(in: ArbitraryMetric): A
-//   def filter: InstrumentKind => Boolean
-// }
-// object InstrumentBuilder {
-//   import InstrumentKinds._
-
-//   implicit def counterBuilder: InstrumentBuilder[Counter[Periodic[Double]]] =
-//     new InstrumentBuilder[Counter[Periodic[Double]]]{
-//       // def apply(a: ArbitraryMetric): Counter[Periodic[Double]] = Operations.loadCounter(a.name)(I)
-//       val filter: InstrumentKind => Boolean = _ == Counter
-//     }
-
-//   implicit def timerBuilder(implicit I: Instruments): InstrumentBuilder[Timer[Periodic[Stats]]] =
-//     new InstrumentBuilder[Timer[Periodic[Stats]]]{
-//       // def apply(a: ArbitraryMetric): Timer[Periodic[Stats]] = Operations.loadTimer(a.name)(I)
-//       val filter: InstrumentKind => Boolean = _ == Timer
-//     }
-// }
-
-object Operations {
+object Remote {
   import collection.JavaConverters._
   import scala.reflect.runtime.universe._
+  import scala.concurrent.duration._
 
   type MetricName = String
 
@@ -37,17 +18,33 @@ object Operations {
   private def lookup[A](key: MetricName)(hash: ConcurrentHashMap[MetricName, A]): Option[A] =
     Option(hash.get(key))
 
-  def loadCounter(m: ArbitraryMetric)(I: Instruments): Counter[Periodic[Double]] =
-    lookup[Counter[Periodic[Double]]](m.name)(counters).getOrElse {
+  def fromRequest(r: InstrumentRequest)(I: Instruments): Task[Unit] = {
+    for {
+      _ <- Task.gatherUnordered(r.counters.map(counter(_)(I)))
+      _ <- Task.gatherUnordered(r.timers.map(timer(_)(I)))
+    } yield ()
+  }
+
+  def counter(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
+    val counter = lookup[Counter[Periodic[Double]]](m.name)(counters).getOrElse {
       val c = I.counter(m.name)
       counters.putIfAbsent(m.name, c)
       c
     }
 
-  def loadTimer(m: ArbitraryMetric)(I: Instruments): Timer[Periodic[Stats]] =
-    lookup[Timer[Periodic[Stats]]](m.name)(timers).getOrElse {
+    Task.now(counter.increment)
+  }
+
+  def timer(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
+    val timer = lookup[Timer[Periodic[Stats]]](m.name)(timers).getOrElse {
       val t = I.timer(m.name)
       timers.putIfAbsent(m.name, t)
       t
     }
+
+    for {
+      d <- Task.now(Duration(m.value.get))
+      _ <- Task.now(timer.record(d))
+    } yield ()
+  }
 }

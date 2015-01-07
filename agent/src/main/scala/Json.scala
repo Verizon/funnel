@@ -44,11 +44,6 @@ object JSON {
   //   ]
   // }
 
-  // private def toTypedInstrument[A : InstrumentBuilder](a: List[ArbitraryMetric]): List[A] = {
-  //   val B = implicitly[InstrumentBuilder[A]]
-  //   a.filter(m => B.filter(m.kind)).flatMap(x => List(B.apply(x)))
-  // }
-
   implicit def JsonToInstrumentRequest: DecodeJson[InstrumentRequest] =
     DecodeJson(c => for {
       k <- (c --\ "cluster").as[String]
