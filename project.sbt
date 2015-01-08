@@ -13,6 +13,8 @@ lazy val core = project
 
 lazy val http = project.dependsOn(core)
 
+lazy val flask = project.dependsOn(aws, riemann, elastic)
+
 lazy val riemann = project.dependsOn(core)
 
 lazy val elastic = project.dependsOn(core, http)
@@ -20,6 +22,10 @@ lazy val elastic = project.dependsOn(core, http)
 lazy val zeromq = project.dependsOn(http).configs(MultiJvm)
 
 lazy val agent = project.dependsOn(zeromq % "test->test;compile->compile", http).configs(MultiJvm)
+
+lazy val chemist = project.dependsOn(core, http, aws)
+
+lazy val aws = project
 
 OnCue.baseSettings
 
