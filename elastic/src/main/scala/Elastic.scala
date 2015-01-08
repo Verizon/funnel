@@ -2,10 +2,13 @@ package oncue.svc.funnel
 package elastic
 
 import scalaz.stream._
+import scalaz.\/
+import \/._
+import Mapping._
+import knobs.IORef
 
 /* Elastic Event format:
 {
-  "@timestamp": "2014-08-22T17:37:54.201855",
   "cluster": "imqa-maestro-1-0-279-F6Euts",  #This allows for a Kibana search, cluster: x
   "host": "ec2-107-22-118-178.compute-1.amazonaws.com",
   "jvm": {
@@ -27,7 +30,10 @@ import scalaz.stream._
 }
 */
 
-case class ElasticCfg(url: String, indexName: String, typeName: String, dateFormat: String)
+case class ElasticCfg(url: String,
+                      indexName: String,
+                      typeName: String,
+                      ttl: Option[Int] = None)
 
 object Elastic {
   type Name = String
@@ -70,28 +76,27 @@ object Elastic {
   import argonaut._
   import Argonaut._
   import http.JSON._
-  import java.util.Date
-  import java.text.SimpleDateFormat
 
   /**
-   * Emits one JSON document per mirror URL.
+   * Emits one JSON document per mirror URL, on the right,
+   * first emitting the ES mapping properties for their keys, on the left.
    * Once grouped by `elasticGroup`, this process emits one document per URL
    * with all the key/value pairs that were seen for that mirror in the group.
    */
-  def elasticUngroup[A](flaskName: String): Process1[ESGroup[A], Json] =
+  def elasticUngroup[A](flaskName: String): Process1[ESGroup[A], Properties \/ Json] =
     await1[ESGroup[A]].flatMap { g =>
+      emit(left(Properties(g.values.flatMap(_.values.map(p =>
+          keyField(p.key))).toList))) ++
       emitAll(g.toSeq.map { case (name, m) =>
         ("host" := name.getOrElse(flaskName)) ->:
-        ("@timestamp" :=
-          new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
-        m.toList.foldLeft(jEmptyObject) {
-          case (o, (ps, dp)) =>
-            dp.key.attributes.get("bucket").map(x => ("cluster" := x) ->: jEmptyObject).
-              getOrElse(jEmptyObject) deepmerge
-                (o deepmerge ps.foldRight((dp.asJson -| "value").get)((a, b) =>
-                  (a := b) ->: jEmptyObject))
-        }
-      })
+          m.toList.foldLeft(jEmptyObject) {
+            case (o, (ps, dp)) =>
+              dp.key.attributes.get("bucket").map(x => ("cluster" := x) ->: jEmptyObject).
+                getOrElse(jEmptyObject) deepmerge
+                  (o deepmerge ps.foldRight((dp.asJson -| "value").get)((a, b) =>
+                    (a := b) ->: jEmptyObject))
+          }
+      }).map(right(_))
     }.repeat
 
   import Events._
@@ -105,18 +110,69 @@ object Elastic {
       a.onComplete {
         t => k(\/.fromTryCatchThrowable[A,Throwable](t.get)) }}
 
+  def initMapping(es: ElasticCfg, keys: List[Key[Any]])(
+    implicit log: String => Unit): Task[Unit] = {
+    val json = Json(
+      es.typeName := jObjectAssocList(List(
+        "_timestamp" -> Json("enabled" := true),
+        "properties" -> Properties(List(
+          Field("host", StringField),
+          Field("cluster", StringField)) ++ (keys map keyField)).asJson) ++
+      (es.ttl.map(t => List(
+          "_ttl" -> Json("enabled" := true, "default" := s"${t}d"))) getOrElse Nil)))
+    elasticPut(mappingURL(es), json, es)
+  }
+
+  def elasticPut(req: Req, json: Json, es: ElasticCfg)(
+    implicit log: String => Unit): Task[Unit] =
+    fromScalaFuture(Http((req << json.nospaces) OK as.String)).attempt.map(
+      _.fold(e => {log(s"Unable to send document to elastic search due to '$e'.")
+                   log(s"Configuration was $es. Document was: \n ${json.nospaces}")}, _ => ()))
+
+  def updateMapping(ps: Properties, es: ElasticCfg)(
+    implicit log: String => Unit): Task[Unit] = {
+    val json = Mappings(List(Mapping(es.typeName, ps))).asJson
+    elasticPut(mappingURL(es), json, es)
+  }
+
+  def keyField(k: Key[Any]): Field = {
+    import Reportable._
+    val path = k.name.split("/")
+    val last = path.last
+    val init = path.init
+    init.foldRight(
+      Field(last, k typeOf match {
+        case B => BoolField
+        case D => DoubleField
+        case S => StringField
+        case Stats =>
+          ObjectField(Properties(List(
+            "last", "mean", "count", "variance", "skewness", "kurtosis"
+          ).map(Field(_, DoubleField))))
+      }))((a, r) => Field(a, ObjectField(Properties(List(r)))))
+  }
+
+  def mappingURL(es: ElasticCfg): Req =
+    url(s"${es.url}/${es.indexName}/_mapping/${es.typeName}").
+      setContentType("application/json", "UTF-8")
+
+  def esURL(es: ElasticCfg): Req =
+    url(s"${es.url}/${es.indexName}/${es.typeName}").
+      setContentType("application/json", "UTF-8")
+
   /**
    * Publishes to an ElasticSearch URL at `esURL`.
    */
   def publish(M: Monitoring, es: ElasticCfg, flaskName: String)(
-    implicit log: String => Unit): Task[Unit] =
-      (Monitoring.subscribe(M)(k => k.attributes.contains("host") || k.name.matches("previous/.*")) |>
-        elasticGroup |> elasticUngroup(flaskName)).evalMap { json =>
-          val date = new SimpleDateFormat(es.dateFormat).format(new Date)
-          val req = url(s"${es.url}/${es.indexName}-${date}/${es.typeName}").
-            setContentType("application/json", "UTF-8") << json.nospaces
-          fromScalaFuture(Http(req OK as.String)).attempt.map(
-            _.fold(e => log(s"Unable to send document to elastic search due to '$e'. \nConfiguration was $es. Document was: \n ${json.nospaces}"), _ => ()))
-        }.run
+    implicit log: String => Unit): Task[Unit] = for {
+      _   <- M.keys.continuous.once.evalMap(x => initMapping(es, x)).run
+      ref <- IORef(Set[Key[Any]]())
+      -   <- (Monitoring.subscribe(M)(k => k.attributes.contains("host") ||
+                                    k.name.matches("previous/.*")) |>
+               elasticGroup |> elasticUngroup(flaskName)).evalMap(_.fold(
+                 props => updateMapping(props, es),
+                 json => elasticPut(esURL(es), json, es)
+               )).run
+    } yield ()
 }
 
