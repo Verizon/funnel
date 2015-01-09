@@ -3,6 +3,7 @@ package elastic
 
 import scalaz.stream._
 import scalaz.\/
+import scalaz.syntax.monad._
 import \/._
 import Mapping._
 import knobs.IORef
@@ -114,25 +115,28 @@ object Elastic {
     implicit log: String => Unit): Task[Unit] = {
     val json = Json(
       es.typeName := jObjectAssocList(List(
-        "_timestamp" -> Json("enabled" := true),
+        "_timestamp" -> Json("enabled" := true, "store" := true),
         "properties" -> Properties(List(
           Field("host", StringField),
           Field("cluster", StringField)) ++ (keys map keyField)).asJson) ++
       (es.ttl.map(t => List(
           "_ttl" -> Json("enabled" := true, "default" := s"${t}d"))) getOrElse Nil)))
-    elasticPut(mappingURL(es), json, es)
+    ensureIndex(es) >> elastic(mappingURL(es).PUT, json, es)
   }
 
-  def elasticPut(req: Req, json: Json, es: ElasticCfg)(
+  def elasticString(req: Req): Task[String] =
+    fromScalaFuture(Http(req OK as.String))
+
+  def elastic(req: Req, json: Json, es: ElasticCfg)(
     implicit log: String => Unit): Task[Unit] =
-    fromScalaFuture(Http((req << json.nospaces) OK as.String)).attempt.map(
+    elasticString(req << json.nospaces).attempt.map(
       _.fold(e => {log(s"Unable to send document to elastic search due to '$e'.")
                    log(s"Configuration was $es. Document was: \n ${json.nospaces}")}, _ => ()))
 
   def updateMapping(ps: Properties, es: ElasticCfg)(
     implicit log: String => Unit): Task[Unit] = {
     val json = Mappings(List(Mapping(es.typeName, ps))).asJson
-    elasticPut(mappingURL(es), json, es)
+    elastic(mappingURL(es).PUT, json, es)
   }
 
   def keyField(k: Key[Any]): Field = {
@@ -151,6 +155,21 @@ object Elastic {
           ).map(Field(_, DoubleField))))
       }))((a, r) => Field(a, ObjectField(Properties(List(r)))))
   }
+
+  def ensureIndex(es: ElasticCfg)(implicit log: String => Unit): Task[Unit] =
+    elasticString(indexURL(es).HEAD).attempt.flatMap(_.fold(
+      e => e.getCause match {
+        case StatusCode(404) => createIndex(es)
+        case _ => Task.fail(e) // SPLODE!
+      },
+      _ => Task.now(())
+    ))
+
+  def createIndex(es: ElasticCfg)(implicit log: String => Unit): Task[Unit] =
+    elastic(indexURL(es).PUT, Json(), es)
+
+  def indexURL(es: ElasticCfg): Req =
+    url(s"${es.url}/${es.indexName}")
 
   def mappingURL(es: ElasticCfg): Req =
     url(s"${es.url}/${es.indexName}/_mapping/${es.typeName}").
@@ -171,7 +190,7 @@ object Elastic {
                                     k.name.matches("previous/.*")) |>
                elasticGroup |> elasticUngroup(flaskName)).evalMap(_.fold(
                  props => updateMapping(props, es),
-                 json => elasticPut(esURL(es), json, es)
+                 json => elastic(esURL(es).POST, json, es)
                )).run
     } yield ()
 }
