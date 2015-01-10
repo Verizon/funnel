@@ -82,14 +82,14 @@ object Transported {
  * ```
  */
 object ZeroMQ {
-
   private[zeromq] val log = Logger[ZeroMQ.type]
+  private[zeromq] val UTF8 = java.nio.charset.Charset.forName("UTF-8")
 
   def link[O](e: Endpoint
     )(k: Process[Task,Boolean]
     )(f: Socket => Process[Task,O]
   ): Process[Task, O] =
-    resource(setup(e))(r => destroy(r)){ connection =>
+    resource(setup(e))(r => destroy(r, e)){ connection =>
       haltWhen(k){
         Process.eval(e.configure(connection.socket)
           ).flatMap(_ => f(connection.socket))
@@ -98,8 +98,12 @@ object ZeroMQ {
 
   def receive(socket: Socket): Process[Task, Transported] = {
     Process.eval(Task.now {
-      val header = socket.recvStr
-      val body   = socket.recvStr
+      // for the native c++ implementation:
+      val header = socket.recvStr(UTF8)
+      val body   = socket.recvStr(UTF8)
+      // for the java implementation:
+      // val header = socket.recvStr(0)
+      // val body   = socket.recvStr(0)
       Transported(header, body)
     }) ++ receive(socket)
   }
@@ -107,9 +111,9 @@ object ZeroMQ {
   def write(socket: Socket): Channel[Task, Array[Byte], Boolean] =
     io.channel(bytes =>
       Task.delay {
-        log.debug(s"Sending ${bytes.length}")
+        // log.debug(s"Sending ${bytes.length}")
         socket.sendMore("FMS/1")
-        socket.send(bytes)
+        socket.send(bytes, 0) // the zero here is "flags"
       }
     )
 
@@ -140,9 +144,9 @@ object ZeroMQ {
     Connection(socket,context)
   }
 
-  private[zeromq] def destroy(c: Connection): Task[Unit] =
+  private[zeromq] def destroy(c: Connection, e: Endpoint): Task[Unit] =
     Task.delay {
-      log.info("Destroying connection...")
+      log.info(s"Destroying connection for endpoint: $e")
       try {
         c.socket.close()
         c.context.close()
