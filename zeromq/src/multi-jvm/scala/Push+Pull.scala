@@ -7,22 +7,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process
 import scala.concurrent.duration._
 
-object Fixtures {
-  def data = large
-
-  def makeBytes(max: Int): Array[Byte] =
-    (0 to max).toSeq.map(_.toByte).toArray
-
-  val tiny: Array[Byte] = makeBytes(2)
-  val small: Array[Byte] = makeBytes(15)
-  val medium: Array[Byte] = makeBytes(150)
-  val large: Array[Byte] = makeBytes(1500)
-  val megabitInBytes = 125000D
-}
-
 abstract class Pusher(name: String) {
   def main(args: Array[String]): Unit = {
-    val E = Endpoint(`Push+Connect`, Address(IPC, host = "/tmp/feeds/0"))
+    val E = Endpoint(`Push+Connect`, Address(IPC, host = "/tmp/feeds"))
     val close = new AtomicBoolean(false)
     val K = Process.repeatEval(Task.delay(close.get))
 
@@ -34,6 +21,8 @@ abstract class Pusher(name: String) {
 
     Ø.link(E)(K)(s =>
       proc.through(Ø.write(s))).run.runAsync(_ => ())
+
+    Thread.sleep(10000)
 
     println(s"$name - Stopping the task...")
 
@@ -59,7 +48,7 @@ object PerfMultiJvmPuller {
   def main(args: Array[String]): Unit = {
     val start = System.currentTimeMillis
 
-    val E = Endpoint(`Pull+Bind`, Address(IPC, host = "/tmp/feeds/0"))
+    val E = Endpoint(`Pull+Bind`, Address(IPC, host = "/tmp/feeds"))
 
     val close = new AtomicBoolean(false)
     val K = Process.repeatEval(Task.delay(close.get))
@@ -75,7 +64,7 @@ object PerfMultiJvmPuller {
     println("Press [Enter] to stop the task")
 
     Ø.link(E)(K)(Ø.receive)
-      .map(new String(_))
+      .map(_.toString)
       .through(printer)
       .run.runAsync(_ => ())
 

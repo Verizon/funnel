@@ -11,7 +11,12 @@ ScalaTest.settings
 
 SbtMultiJvm.multiJvmSettings
 
-libraryDependencies += "org.zeromq" % "jeromq" % "0.3.4"
+// pure-java implementation:
+// libraryDependencies += "org.zeromq" % "jeromq" % "0.3.4"
+// native c++ implementation with jni:
+libraryDependencies += "org.zeromq" % "jzmq" % "3.1.0"
+
+scalacOptions := Compilation.flags.filterNot(_ == "-Xlint")
 
 // make sure that MultiJvm test are compiled by the default test compilation
 compile in MultiJvm <<= (compile in MultiJvm) triggeredBy (compile in Test)
