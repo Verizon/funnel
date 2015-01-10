@@ -7,7 +7,7 @@ organization in Global  := "oncue.svc.funnel"
 
 scalaVersion in Global  := "2.10.4"
 
-lazy val funnel = project.in(file(".")).aggregate(core, http, elastic, riemann)
+lazy val funnel = project.in(file(".")).aggregate(core, http, elastic, riemann, zeromq, agent)
 
 lazy val core = project
 
