@@ -7,29 +7,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process
 import scala.concurrent.duration._
 
-abstract class ExamplePusher(name: String, aliveFor: FiniteDuration = 12.seconds) {
-  def main(args: Array[String]): Unit = {
-    import instruments._
-
-    implicit val log: String => Unit = println _
-
-    val M = Monitoring.default
-    val T = counter("testing/foo")
-
-    T.incrementBy(2)
-
-    println(s"$name - Press [Enter] to stop the task")
-
-    Ø.monitoring.toUnixSocket(Settings.socket)
-
-    Process.sleep(aliveFor)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
-      .onComplete(Process.eval_(Ø.monitoring.stop)).run.run
-
-    Ø.log.info(s"Stopping the $name process...")
-  }
-}
-
-object ExampleMultiJvmPusher1 extends ExamplePusher("push-1")
+object ExampleMultiJvmPusher1 extends ApplicationPusher("push-1")
 
 object ExampleMultiJvmPuller {
   import scalaz.stream.io

@@ -1,42 +1,14 @@
 package oncue.svc.funnel.agent
 
 import oncue.svc.funnel._, zeromq._
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Task,Strategy}
 import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process
 import scala.concurrent.duration._
 
-abstract class Pusher(name: String, alive: Duration = 12.seconds) {
-  def main(args: Array[String]): Unit = {
-    import instruments._
+object TestingMultiJvmPusher1 extends ApplicationPusher("push-1")
 
-    implicit val log: String => Unit = println _
-
-    val E = Endpoint(`Push+Connect`, Address(IPC, host = "/tmp/feeds/0"))
-
-    val M = Monitoring.default
-    val T = counter("testing/foo")
-    val close = new AtomicBoolean(false)
-    val K = Process.repeatEval(Task.delay(close.get))
-
-    println(s"$name - Press [Enter] to stop the task")
-
-    Ø.link(E)(K)(s =>
-      stream.from(M).through(Ø.write(s))).run.runAsync(_ => ())
-
-    Thread.sleep(alive.toMillis) // block to keep the test JVM running
-
-    println(s"$name - Stopping the task...")
-
-    close.set(true) // stops the task.
-
-    println(s"$name - Stopped (${close.get})")
-  }
-}
-
-object TestingMultiJvmPusher1 extends Pusher("push-1")
-
-object TestingMultiJvmPusher2 extends Pusher("push-2")
+object TestingMultiJvmPusher2 extends ApplicationPusher("push-2")
 
 object TestingMultiJvmPublisher {
   def main(args: Array[String]): Unit = {
@@ -48,23 +20,17 @@ object TestingMultiJvmPublisher {
 
 object TestingMultiJvmSubscriber {
   import scalaz.stream.io
+  import scalaz.stream.async.signalOf
 
   def main(args: Array[String]): Unit = {
     val E = Endpoint(SubscribeAll, Address(TCP, port = Option(7390)))
+    val S = signalOf[Boolean](true)
 
-    val close = new AtomicBoolean(false)
-    val K = Process.repeatEval(Task.delay(close.get))
+    Ø.link(E)(S)(Ø.receive).map(t => new String(t.bytes)).to(io.stdOut).run.runAsync(_ => ())
 
-    Ø.link(E)(K)(Ø.receive).map(new String(_)).to(io.stdOut).run.runAsync(_ => ())
-
-    Thread.sleep(10.seconds.toMillis) // block to keep the test JVM running
+    Process.sleep(10.seconds)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
+      .onComplete(Process.eval_(Ø.monitoring.stop)).run.run
 
     println("Puller - Stopping the task...")
-
-    close.set(true) // stops the task.
-
-    println(s"Puller - Stopped (${close.get})")
   }
 }
-
-
