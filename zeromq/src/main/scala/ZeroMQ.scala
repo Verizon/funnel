@@ -139,7 +139,6 @@ object ZeroMQ {
         // log.debug(s"Sending ${bytes.length}")
         socket.sendMore("FMS/1")
         val bool = socket.send(bytes, 0) // the zero here is "flags"
-        // log.debug("::::::::: " + bool)
         bool
       }
     )

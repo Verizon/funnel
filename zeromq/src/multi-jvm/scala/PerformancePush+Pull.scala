@@ -5,12 +5,6 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scala.concurrent.duration._
 
-object Settings {
-  // we use a space in /tmp rather than /var/run because the
-  // sbt process does not have permissions to access /var/run
-  val socket = "/tmp/funnel-perf.socket"
-}
-
 object PerfMultiJvmPusher1 extends Pusher("pusher-1", Settings.socket)
 
 object PerfMultiJvmPusher2 extends Pusher("pusher-2", Settings.socket)
@@ -29,11 +23,7 @@ object PerfMultiJvmPuller {
     Ø.log.info(s"Booting Puller...")
 
     val start = System.currentTimeMillis
-
     val E = Endpoint(`Pull+Bind`, Address(IPC, host = Settings.socket))
-
-    // val alive = new AtomicBoolean(true)
-    // val K = Process.repeatEval(Task.delay(alive.get))
 
     val ledger: Channel[Task, String, Unit] = io.channel(
       _ => Task {
@@ -49,6 +39,10 @@ object PerfMultiJvmPuller {
       .through(ledger)
       .run.runAsync(_ => ())
 
+    // just stupidly wait around in this thread until the ledger says
+    // we've recieved the expected amount of items from the pushers,
+    // then continue on to dump the mini report. Never do this in your
+    // mainline code!
     while(received.get < 2999999){ }
 
     val finish = System.currentTimeMillis

@@ -7,10 +7,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process
 import scala.concurrent.duration._
 
-object ExampleSettings {
-  val socket = "/tmp/funnel-example"
-}
-
 abstract class ExamplePusher(name: String, aliveFor: FiniteDuration = 12.seconds) {
   def main(args: Array[String]): Unit = {
     import instruments._
@@ -24,7 +20,7 @@ abstract class ExamplePusher(name: String, aliveFor: FiniteDuration = 12.seconds
 
     println(s"$name - Press [Enter] to stop the task")
 
-    Ø.monitoring.toUnixSocket(ExampleSettings.socket)
+    Ø.monitoring.toUnixSocket(Settings.socket)
 
     Process.sleep(aliveFor)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
       .onComplete(Process.eval_(Ø.monitoring.stop)).run.run
@@ -45,7 +41,7 @@ object ExampleMultiJvmPuller {
   def main(args: Array[String]): Unit = {
     val start = System.currentTimeMillis
 
-    val E = Endpoint(`Pull+Bind`, Address(IPC, host = ExampleSettings.socket))
+    val E = Endpoint(`Pull+Bind`, Address(IPC, host = Settings.socket))
 
     Ø.link(E)(Ø.monitoring.alive)(Ø.receive)
       .map(_.toString)
