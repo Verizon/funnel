@@ -9,13 +9,13 @@ import scalaz.concurrent.Task
 class Proxy(I: Endpoint, O: Endpoint){
   private val alive: Signal[Boolean] = signal[Boolean]
   private val stream: Process[Task,Boolean] =
-    Ø.link(O)(alive.continuous)(s =>
-      Ø.link(I)(alive.continuous)(Ø.receive
+    Ø.link(O)(alive)(s =>
+      Ø.link(I)(alive)(Ø.receive
         ).map(_.bytes).through(Ø.write(s)))
 
   def task: Task[Unit] =
     for {
-      _ <- alive.set(false)
+      _ <- alive.set(true)
       _ <- stream.run
     } yield ()
 }
