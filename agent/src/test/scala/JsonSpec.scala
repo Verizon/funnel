@@ -14,14 +14,14 @@ class JsonSpec extends FlatSpec with Matchers {
   it should "decode json into an ArbitraryMetric" in {
     val in = """{"name":"ntp/whatever","kind":"counter","value": "123"}"""
     Parse.decodeEither[ArbitraryMetric](in) should equal (
-      \/-(ArbitraryMetric("ntp/whatever", InstrumentKinds.Counter, "123")))
+      \/-(ArbitraryMetric("ntp/whatever", InstrumentKinds.Counter, Option("123"))))
   }
 
-  it should "decode json into a TypedRequest" in {
+  it should "decode json into a InstrumentRequest" in {
     val in = """{"cluster":"foo-whatever","metrics":[{"name":"ntp/whatever","kind":"timer","value":"0.1234"}]}"""
-    Parse.decodeOption[TypedRequest](in).get.timers.length should equal (1)
+    Parse.decodeOption[InstrumentRequest](in).get.timers.length should equal (1)
     // should be idempotent
-    Parse.decodeOption[TypedRequest](in).get.timers.length should equal (1)
+    Parse.decodeOption[InstrumentRequest](in).get.timers.length should equal (1)
   }
 
 }
