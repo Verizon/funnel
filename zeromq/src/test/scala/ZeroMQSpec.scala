@@ -18,8 +18,6 @@ import java.util.concurrent.atomic.{AtomicBoolean,AtomicLong}
 //   }
 // }
 
-
-
 // class ZeroMQSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 //   val push  = Endpoint(`Push+Connect`, Address(IPC, host = "/tmp/feeds/0"))
 //   val pull  = Endpoint(`Pull+Bind`, Address(IPC, host = "/tmp/feeds/0"))
