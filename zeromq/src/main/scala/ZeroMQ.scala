@@ -4,6 +4,7 @@ package zeromq
 import org.zeromq.ZMQ, ZMQ.Context, ZMQ.Socket
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Channel,io}
+import scalaz.stream.async.mutable.Signal
 import journal.Logger
 
 case class Address(
@@ -32,33 +33,11 @@ case class Connection(
   context: Context
 )
 
-abstract class Version(val number: Int)
-object Versions {
-  def fromInt(i: Int): Option[Version] =
-    i match {
-      case 1 => Option(v1)
-      case 2 => Option(v2)
-      case _ => None
-    }
-
-  def fromString(s: String): Option[Version] =
-    try fromInt(s.toInt)
-    catch {
-      case e: NumberFormatException => None
-    }
-
-  val all: Seq[Version] = v1 :: v2 :: Nil
-
-  case object `v1` extends Version(1)
-  case object `v2` extends Version(2)
-  case object `unknown` extends Version(0)
-}
-
-
 case class Transported(
   version: Version,
   bytes: Array[Byte]
 )
+
 object Transported {
   import Versions._
 
@@ -71,8 +50,6 @@ object Transported {
     Transported(v.getOrElse(Versions.unknown), body.getBytes)
   }
 }
-
-
 /**
  * Model 0mq as a set of streams. Primary API should be the `link` function.
  * Example usage:
@@ -85,12 +62,60 @@ object ZeroMQ {
   private[zeromq] val log = Logger[ZeroMQ.type]
   private[zeromq] val UTF8 = java.nio.charset.Charset.forName("UTF-8")
 
+  /////////////////////////////// USAGE ///////////////////////////////////
+
+  object monitoring {
+    import http.JSON._
+    import argonaut.EncodeJson
+    import scalaz.stream.async.signalOf
+    import scalaz.{-\/,\/-}
+
+    // TODO: implement binary serialisation here rather than using the JSON from `http` module
+    private def dataEncode[A](a: A)(implicit A: EncodeJson[A]): String =
+      A(a).nospaces
+
+    private def datapointToWireFormat(d: Datapoint[Any]): Array[Byte] =
+      s"${dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes(UTF8)
+
+    def fromMonitoring(M: Monitoring)(implicit log: String => Unit): Process[Task, Array[Byte]] =
+      Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat)
+
+    def fromMonitoringDefault(implicit log: String => Unit): Process[Task, Array[Byte]] =
+      fromMonitoring(Monitoring.default)
+
+    private[zeromq] val alive: Signal[Boolean] = signalOf[Boolean](true)
+
+    def stop: Task[Unit] = {
+      for {
+        _ <- alive.set(false)
+        _ <- alive.close
+      } yield ()
+    }
+
+    // unsafe!
+    def to(endpoint: Endpoint): Unit =
+      link(endpoint)(alive)(socket =>
+        fromMonitoringDefault(m => log.debug(m))
+          .through(write(socket))
+          .onComplete(Process.eval(Ø.monitoring.stop))
+      ).run.runAsync(_ match {
+        case -\/(err) => log.error(s"Unable to stream monitoring events to the domain socket: $err")
+        case \/-(win) => log.info("Streaming monitoring datapoints to the domain socket.")
+      })
+
+    def toUnixSocket(socket: String): Unit =
+      to(Endpoint(`Push+Connect`, Address(IPC, host = socket)))
+
+    def toUnixSocket: Unit = toUnixSocket("/var/run/funnel.socket")
+  }
+
+  /////////////////////////////// PRIMITIVES ///////////////////////////////////
+
   def link[O](e: Endpoint
-    )(k: Process[Task,Boolean]
-    )(f: Socket => Process[Task,O]
-  ): Process[Task, O] =
+    )(k: Signal[Boolean]
+    )(f: Socket => Process[Task,O]): Process[Task, O] =
     resource(setup(e))(r => destroy(r, e)){ connection =>
-      haltWhen(k){
+      haltWhen(k.continuous){
         Process.eval(e.configure(connection.socket)
           ).flatMap(_ => f(connection.socket))
       }
@@ -113,7 +138,8 @@ object ZeroMQ {
       Task.delay {
         // log.debug(s"Sending ${bytes.length}")
         socket.sendMore("FMS/1")
-        socket.send(bytes, 0) // the zero here is "flags"
+        val bool = socket.send(bytes, 0) // the zero here is "flags"
+        bool
       }
     )
 
@@ -123,7 +149,7 @@ object ZeroMQ {
     kill: Process[Task,Boolean])(
     input: Process[Task,O]
   ): Process[Task,O] =
-    kill.zip(input).takeWhile(x => !x._1).map(_._2)
+    kill.zip(input).takeWhile(_._1).map(_._2)
 
   private[zeromq] def resource[F[_],R,O](
     acquire: F[R])(
@@ -155,20 +181,3 @@ object ZeroMQ {
       }
     }
 }
-
-object stream {
-  import http.JSON._
-  import argonaut.EncodeJson
-
-  // TODO: implement binary serialisation here rather than using the JSON from `http` module
-  private def dataEncode[A](a: A)(implicit A: EncodeJson[A]): String =
-    A(a).nospaces
-
-  private def datapointToWireFormat(d: Datapoint[Any]):  Array[Byte] =
-    s"${dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes("UTF-8")
-
-  def from(M: Monitoring)(implicit log: String => Unit): Process[Task,Array[Byte]] =
-    Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat)
-}
-
-
