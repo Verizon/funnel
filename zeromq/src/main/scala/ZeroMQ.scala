@@ -136,7 +136,7 @@ object ZeroMQ {
   def write(socket: Socket): Channel[Task, Array[Byte], Boolean] =
     io.channel(bytes =>
       Task.delay {
-        log.debug(s"Sending ${bytes.length}")
+        // log.debug(s"Sending ${bytes.length}")
         socket.sendMore("FMS/1")
         val bool = socket.send(bytes, 0) // the zero here is "flags"
         // log.debug("::::::::: " + bool)
