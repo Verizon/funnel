@@ -7,6 +7,8 @@ import scalaz.syntax.monad._
 import \/._
 import Mapping._
 import knobs.IORef
+import java.util.Date
+import java.text.SimpleDateFormat
 
 /* Elastic Event format:
 {
@@ -34,7 +36,7 @@ import knobs.IORef
 case class ElasticCfg(url: String,
                       indexName: String,
                       typeName: String,
-                      ttl: Option[Int] = None)
+                      dateFormat: String)
 
 object Elastic {
   type Name = String
@@ -90,6 +92,8 @@ object Elastic {
           keyField(p.key))).toList))) ++
       emitAll(g.toSeq.map { case (name, m) =>
         ("host" := name.getOrElse(flaskName)) ->:
+        ("@timestamp" :=
+          new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
           m.toList.foldLeft(jEmptyObject) {
             case (o, (ps, dp)) =>
               dp.key.attributes.get("bucket").map(x => ("cluster" := x) ->: jEmptyObject).
@@ -118,9 +122,8 @@ object Elastic {
         "_timestamp" -> Json("enabled" := true, "store" := true),
         "properties" -> Properties(List(
           Field("host", StringField),
-          Field("cluster", StringField)) ++ (keys map keyField)).asJson) ++
-      (es.ttl.map(t => List(
-          "_ttl" -> Json("enabled" := true, "default" := s"${t}d"))) getOrElse Nil)))
+          Field("cluster", StringField)) ++ (keys map keyField)).asJson)
+      ))
     ensureIndex(es) >> elastic(mappingURL(es).PUT, json, es)
   }
 
@@ -168,16 +171,17 @@ object Elastic {
   def createIndex(es: ElasticCfg)(implicit log: String => Unit): Task[Unit] =
     elastic(indexURL(es).PUT, Json(), es)
 
-  def indexURL(es: ElasticCfg): Req =
-    url(s"${es.url}/${es.indexName}")
+  def indexURL(es: ElasticCfg): Req = {
+    val date = new SimpleDateFormat(es.dateFormat).format(new Date)
+    url(s"${es.url}/${es.indexName}-$date")
+  }
 
   def mappingURL(es: ElasticCfg): Req =
-    url(s"${es.url}/${es.indexName}/_mapping/${es.typeName}").
+    (indexURL(es) / s"_mapping/${es.typeName}").
       setContentType("application/json", "UTF-8")
 
   def esURL(es: ElasticCfg): Req =
-    url(s"${es.url}/${es.indexName}/${es.typeName}").
-      setContentType("application/json", "UTF-8")
+    (indexURL(es) / es.typeName).setContentType("application/json", "UTF-8")
 
   /**
    * Publishes to an ElasticSearch URL at `esURL`.
