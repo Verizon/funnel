@@ -1,11 +1,11 @@
 package oncue.svc.funnel
 package elastic
 
-import org.scalacheck._
+import org.scalacheck.{Properties => P, _}
 import scalaz._
 import Scalaz._
 
-object ElasticTest extends Properties("elastic") {
+object ElasticTest extends P("elastic") {
   val genName = Gen.oneOf("k1", "k2")
 
   val genHost = Gen.oneOf("h1", "h2")
@@ -38,6 +38,6 @@ object ElasticTest extends Properties("elastic") {
   property("elasticUngroup") = Prop.forAll(Gen.listOf(datapoint)) { dps =>
     val gs = elasticGroup(dps ++ dps)
     val ug = elasticUngroup("flask")(gs)
-    ug.forall(_.isObject)
+    ug.forall(_.fold(!_.fields.isEmpty, _.isObject))
   }
 }
