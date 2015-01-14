@@ -127,8 +127,10 @@ object Elastic {
     ensureIndex(es) >> elastic(mappingURL(es).PUT, json, es)
   }
 
+  val Dispatch = Http.configure(_.setAllowPoolingConnection(true).setConnectionTimeoutInMs(5000))
+
   def elasticString(req: Req): Task[String] =
-    fromScalaFuture(Http(req OK as.String))
+    fromScalaFuture(Dispatch(req OK as.String))
 
   def elastic(req: Req, json: Json, es: ElasticCfg)(
     implicit log: String => Unit): Task[Unit] =
