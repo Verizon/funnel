@@ -12,7 +12,7 @@ object TestingMultiJvmPusher2 extends ApplicationPusher("push-2")
 
 object TestingMultiJvmPublisher {
   def main(args: Array[String]): Unit = {
-    val I = Endpoint(`Pull+Bind`, Address(IPC, host = "/tmp/feeds/0"))
+    val I = Endpoint(`Pull+Bind`, Address(IPC, host = Settings.socket))
     val O = Endpoint(Publish, Address(TCP, port = Option(7390)))
     new Proxy(I,O).task.run
   }
@@ -31,6 +31,6 @@ object TestingMultiJvmSubscriber {
     Process.sleep(10.seconds)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
       .onComplete(Process.eval_(Ø.monitoring.stop)).run.run
 
-    println("Puller - Stopping the task...")
+    println("Subscriber - Stopping the task...")
   }
 }

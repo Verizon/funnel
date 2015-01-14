@@ -15,7 +15,7 @@ abstract class Mode(val asInt: Int){
       Task.fail(e)
     }
     case e: Exception => {
-      Ø.log.error(s"Unable to configure the specified socket mode '$asInt': $e")
+      Ø.log.error(s"Unable to configure the specified socket mode '$asInt': $e - message: ${e.getMessage}")
       Task.fail(e)
     }
   }
