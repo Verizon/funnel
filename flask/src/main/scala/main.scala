@@ -134,7 +134,7 @@ object Main {
     runAsync(M.processMirroringEvents(SSE.readEvents, flaskName, retries))
 
     options.elastic.foreach { elastic =>
-      runAsync(Elastic(M).publish(elastic, flaskName))
+      runAsync(Elastic(M).publish(flaskName)(elastic))
     }
 
     options.riemann.foreach { riemann =>

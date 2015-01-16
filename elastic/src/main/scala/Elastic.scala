@@ -203,7 +203,7 @@ case class Elastic(M: Monitoring) {
   }
 
   def mappingURL: Reader[ElasticCfg, Req] = Reader { es =>
-    (indexURL(es) / s"_mapping/${es.typeName}").
+    (indexURL(es) / "_mapping" / s"${es.typeName}").
       setContentType("application/json", "UTF-8")
   }
 
