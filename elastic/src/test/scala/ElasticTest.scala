@@ -20,7 +20,9 @@ object ElasticTest extends P("elastic") {
     d <- Gen.posNum[Double]
   } yield Datapoint(k, d)
 
-  import Elastic._
+  val E = Elastic(Monitoring.default)
+
+  import E._
 
   // At least one group per key/host pair. I.e. no data is lost.
   property("elasticGroupTop") = Prop.forAll(Gen.listOf(datapoint)) { dps =>
