@@ -2,8 +2,10 @@ package oncue.svc.funnel
 package elastic
 
 import scalaz.stream._
-import scalaz.\/
-import scalaz.syntax.monad._
+import scalaz._
+import syntax.monad._
+import syntax.kleisli._
+import Kleisli._
 import \/._
 import Mapping._
 import knobs.IORef
@@ -36,9 +38,10 @@ import java.text.SimpleDateFormat
 case class ElasticCfg(url: String,
                       indexName: String,
                       typeName: String,
-                      dateFormat: String)
+                      dateFormat: String,
+                      connectionTimeoutMs: Int = 5000)
 
-object Elastic {
+case class Elastic(M: Monitoring) {
   type Name = String
   type Path = List[String]
 
@@ -108,39 +111,58 @@ object Elastic {
   import scala.concurrent.duration._
   import dispatch._, Defaults._
   import scalaz.\/
-  import concurrent.{Future,ExecutionContext}
+  import scala.concurrent.{Future,ExecutionContext}
 
-  implicit def fromScalaFuture[A](a: Future[A])(implicit e: ExecutionContext): Task[A] =
+  def fromScalaFuture[A](a: => Future[A])(implicit e: ExecutionContext): Task[A] =
     Task async { k =>
       a.onComplete {
         t => k(\/.fromTryCatchThrowable[A,Throwable](t.get)) }}
 
-  def initMapping(es: ElasticCfg, keys: List[Key[Any]])(
-    implicit log: String => Unit): Task[Unit] = {
-    val json = Json(
+  val getConfig: ES[ElasticCfg] = ask[Task, ElasticCfg]
+
+  type ES[A] = Kleisli[Task, ElasticCfg, A]
+
+  def putMapping(json: Json): ES[Unit] = for {
+    r <- mappingURL.lift[Task]
+    _ <- elastic(r.PUT, json)
+  } yield ()
+
+  def initMapping(keys: List[Key[Any]]): ES[Unit] = for {
+    es <- getConfig
+    json = Json(
       es.typeName := jObjectAssocList(List(
         "_timestamp" -> Json("enabled" := true, "store" := true),
         "properties" -> Properties(List(
           Field("host", StringField),
           Field("cluster", StringField)) ++ (keys map keyField)).asJson)
       ))
-    ensureIndex(es) >> elastic(mappingURL(es).PUT, json, es)
+    _ <- ensureIndex
+    _ <- putMapping(json)
+  } yield ()
+
+  def elasticString(req: Req): ES[String] = getConfig.flatMapK { c =>
+    fromScalaFuture(Http.configure(_.setAllowPoolingConnection(true).
+                    setConnectionTimeoutInMs(c.connectionTimeoutMs))(req OK as.String))
   }
 
-  def elasticString(req: Req): Task[String] =
-    fromScalaFuture(Http(req OK as.String))
+  // Not in Scalaz until 7.2 so duplicating here
+  def lower[M[_]:Monad,A,B](k: Kleisli[M,A,B]): Kleisli[M,A,M[B]] =
+    Kleisli(a => Monad[M].pure(k(a)))
 
-  def elastic(req: Req, json: Json, es: ElasticCfg)(
-    implicit log: String => Unit): Task[Unit] =
-    elasticString(req << json.nospaces).attempt.map(
-      _.fold(e => {log(s"Unable to send document to elastic search due to '$e'.")
-                   log(s"Configuration was $es. Document was: \n ${json.nospaces}")}, _ => ()))
+  def elastic(req: Req, json: Json): ES[Unit] = for {
+    es <- getConfig
+    ta <- lower(elasticString(req << json.nospaces))
+    _  <- lift(ta.attempt.map(_.fold(
+      e => {M.log(s"Unable to send document to elastic search due to '$e'.")
+            M.log(s"Configuration was $es. Document was: \n ${json.nospaces}")},
+      _ => ())))
+  } yield ()
 
-  def updateMapping(ps: Properties, es: ElasticCfg)(
-    implicit log: String => Unit): Task[Unit] = {
-    val json = Mappings(List(Mapping(es.typeName, ps))).asJson
-    elastic(mappingURL(es).PUT, json, es)
-  }
+  def updateMapping(ps: Properties): ES[Unit] = for {
+    es <- getConfig
+    json = Mappings(List(Mapping(es.typeName, ps))).asJson
+    _  <- putMapping(json)
+  } yield ()
 
   def keyField(k: Key[Any]): Field = {
     import Reportable._
@@ -159,43 +181,53 @@ object Elastic {
       }))((a, r) => Field(a, ObjectField(Properties(List(r)))))
   }
 
-  def ensureIndex(es: ElasticCfg)(implicit log: String => Unit): Task[Unit] =
-    elasticString(indexURL(es).HEAD).attempt.flatMap(_.fold(
-      e => e.getCause match {
-        case StatusCode(404) => createIndex(es)
-        case _ => Task.fail(e) // SPLODE!
-      },
-      _ => Task.now(())
-    ))
+  def ensureIndex: ES[Unit] = for {
+    url <- indexURL.lift[Task]
+    s   <- elasticString(url.HEAD).mapK(_.attempt)
+    _   <- s.fold(
+             e => e.getCause match {
+               case StatusCode(404) => createIndex
+               case _ => lift(Task.fail(e)) // SPLODE!
+             },
+             _ => lift(Task.now(())))
+  } yield ()
 
-  def createIndex(es: ElasticCfg)(implicit log: String => Unit): Task[Unit] =
-    elastic(indexURL(es).PUT, Json(), es)
+  def createIndex: ES[Unit] = for {
+    url <- indexURL.lift[Task]
+    _   <- elastic(url.PUT, Json("settings" := Json("index.cache.query.enable" := true)))
+  } yield ()
 
-  def indexURL(es: ElasticCfg): Req = {
+  def indexURL: Reader[ElasticCfg, Req] = Reader { es =>
     val date = new SimpleDateFormat(es.dateFormat).format(new Date)
     url(s"${es.url}/${es.indexName}-$date")
   }
 
-  def mappingURL(es: ElasticCfg): Req =
-    (indexURL(es) / s"_mapping/${es.typeName}").
+  def mappingURL: Reader[ElasticCfg, Req] = Reader { es =>
+    (indexURL(es) / "_mapping" / s"${es.typeName}").
       setContentType("application/json", "UTF-8")
+  }
 
-  def esURL(es: ElasticCfg): Req =
+  def esURL: Reader[ElasticCfg, Req] = Reader { es =>
     (indexURL(es) / es.typeName).setContentType("application/json", "UTF-8")
+  }
+
+  def lift: Task ~> ES = new (Task ~> ES) {
+    def apply[A](t: Task[A]) = t.liftKleisli
+  }
 
   /**
    * Publishes to an ElasticSearch URL at `esURL`.
    */
-  def publish(M: Monitoring, es: ElasticCfg, flaskName: String)(
-    implicit log: String => Unit): Task[Unit] = for {
-      _   <- M.keys.continuous.once.evalMap(x => initMapping(es, x)).run
-      ref <- IORef(Set[Key[Any]]())
-      -   <- (Monitoring.subscribe(M)(k => k.attributes.contains("host") ||
-                                    k.name.matches("previous/.*")) |>
-               elasticGroup |> elasticUngroup(flaskName)).evalMap(_.fold(
-                 props => updateMapping(props, es),
-                 json => elastic(esURL(es).POST, json, es)
-               )).run
+  def publish(flaskName: String): ES[Unit] = for {
+      _   <- M.keys.continuous.once.translate(lift).evalMap(initMapping).run
+      ref <- lift(IORef(Set[Key[Any]]()))
+      -   <- (Monitoring.subscribe(M)(k =>
+                k.attributes.contains("host") ||
+                k.name.matches("previous/.*")).translate(lift) |>
+              elasticGroup |> elasticUngroup(flaskName)).evalMap(_.fold(
+                props => updateMapping(props),
+                json => esURL.lift[Task] >>= (r => elastic(r.POST, json))
+              )).run
     } yield ()
 }
 
