@@ -113,7 +113,7 @@ case class Elastic(M: Monitoring) {
   import scalaz.\/
   import scala.concurrent.{Future,ExecutionContext}
 
-  implicit def fromScalaFuture[A](a: Future[A])(implicit e: ExecutionContext): Task[A] =
+  def fromScalaFuture[A](a: => Future[A])(implicit e: ExecutionContext): Task[A] =
     Task async { k =>
       a.onComplete {
         t => k(\/.fromTryCatchThrowable[A,Throwable](t.get)) }}
@@ -194,7 +194,7 @@ case class Elastic(M: Monitoring) {
 
   def createIndex: ES[Unit] = for {
     url <- indexURL.lift[Task]
-    _   <- elastic(url.PUT, Json())
+    _   <- elastic(url.PUT, Json("settings" := Json("index.cache.query.enable" := true)))
   } yield ()
 
   def indexURL: Reader[ElasticCfg, Req] = Reader { es =>
