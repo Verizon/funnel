@@ -35,12 +35,13 @@ object Mapping {
 
   implicit def PropsCodec: CodecJson[Properties] = CodecJson(
     ps => jObjectAssocList(ps.fields.map { f =>
-      f.name -> jObjectAssocList(List("type" -> jString(f.tpe.name)) ++ (f.tpe match {
-        case DateField(Some(fmt)) => List("format" -> jString(fmt))
-        case ObjectField(props) => List("properties" -> props.asJson(PropsCodec))
-        case NestedField(props, inc) => List("properties" -> props.asJson(PropsCodec)) ++
-          inc.map(x => List("include_in_parent" -> x.asJson)).getOrElse(Nil)
-        case _ => Nil
+      f.name -> jObjectAssocList(
+        List("type" -> jString(f.tpe.name), "_meta" -> f.meta) ++ (f.tpe match {
+          case DateField(Some(fmt)) => List("format" -> jString(fmt))
+          case ObjectField(props) => List("properties" -> props.asJson(PropsCodec))
+          case NestedField(props, inc) => List("properties" -> props.asJson(PropsCodec)) ++
+            inc.map(x => List("include_in_parent" -> x.asJson)).getOrElse(Nil)
+          case _ => Nil
       }))
     }),
     c => c.fields.traverse(_.traverse { p =>
