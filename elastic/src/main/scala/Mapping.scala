@@ -11,7 +11,8 @@ import Scalaz._
 case class Mappings(types: List[Mapping])
 case class Mapping(name: String, properties: Properties)
 case class Properties(fields: List[Field])
-case class Field(name: String, tpe: FieldType)
+case class Field(name: String, tpe: FieldType, meta: Json = jEmptyObject)
+
 
 sealed abstract class FieldType(val name: String)
 case object StringField extends FieldType("string")
@@ -33,13 +34,14 @@ object Mapping {
   import DecodeResult._
 
   implicit def PropsCodec: CodecJson[Properties] = CodecJson(
-    ps => jObjectAssocList(ps.fields.map {f =>
-      f.name -> jObjectAssocList(List("type" -> jString(f.tpe.name)) ++ (f.tpe match {
-        case DateField(Some(fmt)) => List("format" -> jString(fmt))
-        case ObjectField(props) => List("properties" -> props.asJson(PropsCodec))
-        case NestedField(props, inc) => List("properties" -> props.asJson(PropsCodec)) ++
-          inc.map(x => List("include_in_parent" -> x.asJson)).getOrElse(Nil)
-        case _ => Nil
+    ps => jObjectAssocList(ps.fields.map { f =>
+      f.name -> jObjectAssocList(
+        List("type" -> jString(f.tpe.name), "_meta" -> f.meta) ++ (f.tpe match {
+          case DateField(Some(fmt)) => List("format" -> jString(fmt))
+          case ObjectField(props) => List("properties" -> props.asJson(PropsCodec))
+          case NestedField(props, inc) => List("properties" -> props.asJson(PropsCodec)) ++
+            inc.map(x => List("include_in_parent" -> x.asJson)).getOrElse(Nil)
+          case _ => Nil
       }))
     }),
     c => c.fields.traverse(_.traverse { p =>
@@ -66,7 +68,8 @@ object Mapping {
             incl   <- (prop --\ "include_in_parent").as[Option[Boolean]]
           } yield NestedField(fields, incl)
         }
-      } yield Field(p, r)
+        meta <- (prop --\ "_meta").as[Json] ||| ok(jEmptyObject)
+      } yield Field(p, r, meta)
     }).map(x => Properties(x.toList.flatten))
   )
 

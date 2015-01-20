@@ -169,16 +169,19 @@ case class Elastic(M: Monitoring) {
     val path = k.name.split("/")
     val last = path.last
     val init = path.init
-    init.foldRight(
-      Field(last, k typeOf match {
-        case B => BoolField
-        case D => DoubleField
-        case S => StringField
-        case Stats =>
-          ObjectField(Properties(List(
-            "last", "mean", "count", "variance", "skewness", "kurtosis"
-          ).map(Field(_, DoubleField))))
-      }))((a, r) => Field(a, ObjectField(Properties(List(r)))))
+    val z = Field(last,
+                  k typeOf match {
+                    case B => BoolField
+                    case D => DoubleField
+                    case S => StringField
+                    case Stats =>
+                      ObjectField(Properties(List(
+                        "last", "mean", "count", "variance", "skewness", "kurtosis"
+                      ).map(Field(_, DoubleField))))
+                  }, Json("units" := k.units, "description" := k.description))
+    init.foldRight(z) { (a, r) =>
+      Field(a, ObjectField(Properties(List(r))))
+    }
   }
 
   def ensureIndex: ES[Unit] = for {
