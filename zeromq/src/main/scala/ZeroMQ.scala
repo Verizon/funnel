@@ -109,6 +109,27 @@ object ZeroMQ {
     def toUnixSocket: Unit = toUnixSocket("/var/run/funnel.socket")
   }
 
+  object remote {
+    def subscribe(from: Address): Process[Task, Datapoint[Any]] = {
+      Ø.link(Endpoint(SubscribeAll, from))(Ø.monitoring.alive)(Ø.receive)
+        .flatMap(fromTransported)
+    }
+
+    // fairly ugly hack, but it works for now
+    def fromTransported(t: Transported): Process[Task, Datapoint[Any]] = {
+      import http.JSON._, http.SSE
+      t.version match {
+        case Versions.v1 =>
+          try Process.emit(SSE.parseOrThrow[Datapoint[Any]](new String(t.bytes)))
+          catch {
+            case e: Exception => Process.fail(e)
+          }
+        case Versions.v2 => sys.error("not implemented yet!")
+      }
+    }
+
+  }
+
   /////////////////////////////// PRIMITIVES ///////////////////////////////////
 
   def link[O](e: Endpoint
@@ -124,8 +145,8 @@ object ZeroMQ {
   def receive(socket: Socket): Process[Task, Transported] = {
     Process.eval(Task.now {
       // for the native c++ implementation:
-      val header = socket.recvStr(UTF8)
-      val body   = socket.recvStr(UTF8)
+      val header: String = socket.recvStr(UTF8)
+      val body: String   = socket.recvStr(UTF8)
       // for the java implementation:
       // val header = socket.recvStr(0)
       // val body   = socket.recvStr(0)
