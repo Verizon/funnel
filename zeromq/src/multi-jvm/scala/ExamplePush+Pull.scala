@@ -6,6 +6,7 @@ import scalaz.concurrent.{Task,Strategy}
 import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process
 import scala.concurrent.duration._
+import java.net.URI
 
 object ExampleMultiJvmPusher1 extends ApplicationPusher("push-1")
 
@@ -19,7 +20,7 @@ object ExampleMultiJvmPuller {
   def main(args: Array[String]): Unit = {
     val start = System.currentTimeMillis
 
-    val E = Endpoint(`Pull+Bind`, Address(IPC, host = Settings.socket))
+    val E = Endpoint(`Pull+Bind`, Location(new URI(Settings.socket)))
 
     Ø.link(E)(Ø.monitoring.alive)(Ø.receive)
       .map(_.toString)

@@ -6,27 +6,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.{Process,Channel,io}
 import scalaz.stream.async.mutable.Signal
 import journal.Logger
-
-case class Address(
-  protocol: Protocol,
-  host: String = "*",
-  port: Option[Int] = None){
-  override def toString: String =
-    port.map(p => s"$protocol://$host:$p"
-      ).getOrElse(s"$protocol://$host")
-}
-
-object Address {
-  def apply(protocol: Protocol, host: String, port: Int): Address =
-    Address(protocol, host, Option(port))
-}
-
-case class Endpoint(
-  mode: Mode,
-  address: Address){
-  def configure(s: Socket): Task[Unit] =
-    mode.configure(address, s)
-}
+import java.net.URI
 
 case class Connection(
   socket: Socket,
@@ -103,17 +83,23 @@ object ZeroMQ {
         case \/-(win) => log.info("Streaming monitoring datapoints to the domain socket.")
       })
 
-    def toUnixSocket(socket: String): Unit =
-      to(Endpoint(`Push+Connect`, Address(IPC, host = socket)))
+    def toUnixSocket(path: String): Unit =
+      to(Endpoint(`Push+Connect`, Location(new URI("ipc://$path"))))
 
     def toUnixSocket: Unit = toUnixSocket("/var/run/funnel.socket")
   }
 
-  object remote {
-    def subscribe(from: Address): Process[Task, Datapoint[Any]] = {
-      Ø.link(Endpoint(SubscribeAll, from))(Ø.monitoring.alive)(Ø.receive)
-        .flatMap(fromTransported)
-    }
+  object mirror {
+
+    import java.net.URI
+    import java.util.concurrent.{ExecutorService,ScheduledExecutorService}
+
+    def subscribe(uri: URI
+      )(implicit S: ExecutorService = Monitoring.serverPool
+      ): Process[Task, Datapoint[Any]] =
+        Endpoint(SubscribeAll, uri).fold(Process.fail(_), l =>
+          Ø.link(l)(Ø.monitoring.alive)(Ø.receive).flatMap(fromTransported)
+        )
 
     // fairly ugly hack, but it works for now
     def fromTransported(t: Transported): Process[Task, Datapoint[Any]] = {

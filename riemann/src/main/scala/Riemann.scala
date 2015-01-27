@@ -4,12 +4,10 @@ package riemann
 import com.aphyr.riemann.client.RiemannClient
 import com.aphyr.riemann.Proto.{Event => REvent}
 import oncue.svc.funnel.Events.Event
-import java.net.URL
 import scala.concurrent.duration._
 import scalaz.\/
 import scalaz.concurrent.{Strategy,Task,Actor}
 import scalaz.stream.{async,Process}
-import Monitoring.prettyURL
 import scala.collection.JavaConverters._
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.signal
@@ -136,8 +134,6 @@ object Riemann {
       // )
     }.run
   }
-
-  private val urlSignals = new java.util.concurrent.ConcurrentHashMap[URL, Signal[Unit]]
 
   /**
    * Publish the values from the given monitoring instance to riemann in batches.

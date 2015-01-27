@@ -3,7 +3,8 @@ package funnel
 package http
 
 import org.scalacheck._, Prop._, Arbitrary._
-import java.net.URL
+import java.net.URI
+import Monitoring.formatURI
 
 object HttpMonitoringSpec extends Properties("monitoring.http"){
   import argonaut.{DecodeJson, EncodeJson, Parse}
@@ -26,11 +27,11 @@ object HttpMonitoringSpec extends Properties("monitoring.http"){
 
   property("prettyURL") = secure {
     import Monitoring._
-    val i1 = new URL("http://google.com:80/foo/bar/baz")
-    val i2 = new URL("http://google.com/foo/bar/baz")
-    val i3 = new URL("http://google.com:80")
-    val i4 = new URL("http://google.com")
-    val o = (prettyURL(i1), prettyURL(i2), prettyURL(i3), prettyURL(i4))
+    val i1 = new URI("http://google.com:80/foo/bar/baz")
+    val i2 = new URI("http://google.com/foo/bar/baz")
+    val i3 = new URI("http://google.com:80")
+    val i4 = new URI("http://google.com")
+    val o = (formatURI(i1), formatURI(i2), formatURI(i3), formatURI(i4))
     o._1 == "google.com-80/foo/bar/baz" &&
     o._2 == "google.com/foo/bar/baz" &&
     o._3 == "google.com-80" &&

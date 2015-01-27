@@ -4,19 +4,28 @@ package zeromq
 import org.scalatest._
 import scalaz.stream.{Process,Channel,io}
 import scalaz.concurrent.Task
-import java.util.concurrent.atomic.{AtomicBoolean,AtomicLong}
+// import java.util.concurrent.atomic.{AtomicBoolean,AtomicLong}
+import java.net.URI
+import scalaz.stream.async.signalOf
 
-// class ZeroMQSpec extends FlatSpec with Matchers {
-//   val E1 = Endpoint(`Push+Connect`, Address(IPC, host = "/tmp/feeds/0"))
+class ZeroMQSpec extends FlatSpec with Matchers {
+  val L = Location(new URI("ipc:///tmp/funneltest.socket"))
+  val E1 = Endpoint(`Push+Connect`, L)
+  val E2 = Endpoint(`Pull+Bind`, L)
 
-//   it should "foo" in {
-//     val task = for {
-//       _ <- Ø.foo(E1, Ø.stream.alive).run
-//     } yield ()
+  it should "foo" in {
+    val S = signalOf[Boolean](false)
+    val out: Process[Task, Array[Byte]] = Process.emitAll(Seq("foo","bar","baz").map(_.getBytes))
 
-//     task.run
-//   }
-// }
+    val task: Task[Unit] = for {
+      _ <- Ø.link(E1)(S)(s => out.through(Ø.write(s))).run
+      x <- Ø.link(E2)(S)(Ø.receive).run
+      _ <- S.set(false)
+    } yield x
+
+    task.run
+  }
+}
 
 // class ZeroMQSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 //   val push  = Endpoint(`Push+Connect`, Address(IPC, host = "/tmp/feeds/0"))

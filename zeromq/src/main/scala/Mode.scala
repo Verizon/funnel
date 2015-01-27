@@ -7,7 +7,7 @@ import scalaz.stream.{Process,Channel,io}
 import scalaz.\/
 
 abstract class Mode(val asInt: Int){
-  def configure(a: Address, s: Socket): Task[Unit]
+  def configure(a: Location, s: Socket): Task[Unit]
   def errorHandler: PartialFunction[Throwable,Task[Unit]] = {
     case e: java.io.FileNotFoundException => {
       Ø.log.error("Unable to bind to the spcified file location. "+
@@ -16,43 +16,43 @@ abstract class Mode(val asInt: Int){
     }
     case e: Exception => {
       Ø.log.error(s"Unable to configure the specified socket mode '$asInt': $e - message: ${e.getMessage}")
+      e.printStackTrace()
       Task.fail(e)
     }
   }
 }
 
 case object Publish extends Mode(ZMQ.PUB){
-  def configure(a: Address, s: Socket): Task[Unit] =
+  def configure(a: Location, s: Socket): Task[Unit] =
     Task.delay {
-      Ø.log.debug("Configuring Publish... " + a.toString)
-      s.bind(a.toString)
+      Ø.log.debug("Configuring Publish... " + a.uri.toString)
+      s.bind(a.uri.toString)
       ()
     }.handleWith(errorHandler)
 }
 
 case object SubscribeAll extends Mode(ZMQ.SUB){
-  def configure(a: Address, s: Socket): Task[Unit] =
+  def configure(a: Location, s: Socket): Task[Unit] =
     Task.delay {
-      Ø.log.debug("Configuring SubscribeAll... " + a.toString)
-      s.connect(a.toString)
+      Ø.log.debug("Configuring SubscribeAll... " + a.uri.toString)
+      s.connect(a.uri.toString)
       s.subscribe(Array.empty[Byte])
     }.handleWith(errorHandler)
 }
 
-case object `Push+Connect` extends Mode(ZMQ.PUSH) {
-  def configure(a: Address, s: Socket): Task[Unit] =
+case object `Push+Connect` extends Mode(ZMQ.PUSH){
+  def configure(a: Location, s: Socket): Task[Unit] =
     Task.delay {
-      Ø.log.debug("Configuring Push... " + a.toString)
-      s.connect(a.toString)
-      // sys.error("FUCK YOU!")
+      Ø.log.debug("Configuring Push+Connect... " + a.uri.toString)
+      s.connect(a.uri.toString)
     }.handleWith(errorHandler)
 }
 
 case object `Pull+Bind` extends Mode(ZMQ.PULL) {
-  def configure(a: Address, s: Socket): Task[Unit] =
+  def configure(a: Location, s: Socket): Task[Unit] =
     Task.delay {
-      Ø.log.debug("Configuring Pull... " + a.toString)
-      s.bind(a.toString)
+      Ø.log.debug("Configuring Pull+Bind... " + a.uri.toString)
+      s.bind(a.uri.toString)
       ()
     }.handleWith(errorHandler)
 }
