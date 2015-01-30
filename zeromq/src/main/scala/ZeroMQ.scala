@@ -83,58 +83,57 @@ object ZeroMQ {
         case \/-(win) => log.info("Streaming monitoring datapoints to the domain socket.")
       })
 
-    def toUnixSocket(path: String): Unit =
-      to(Endpoint(`Push+Connect`, Location(new URI("ipc://$path"))))
+    // def toUnixSocket(path: String): Unit =
+      // to(Endpoint(`Push+Connect`, Location(new URI("ipc://$path"))))
 
-    def toUnixSocket: Unit = toUnixSocket("/var/run/funnel.socket")
+    // def toUnixSocket: Unit = toUnixSocket("/var/run/funnel.socket")
   }
 
-  object mirror {
+  // object mirror {
 
-    import java.net.URI
-    import java.util.concurrent.{ExecutorService,ScheduledExecutorService}
+  //   import java.net.URI
+  //   import java.util.concurrent.{ExecutorService,ScheduledExecutorService}
 
-    def subscribe(uri: URI
-      )(implicit S: ExecutorService = Monitoring.serverPool
-      ): Process[Task, Datapoint[Any]] =
-        Endpoint(SubscribeAll, uri).fold(Process.fail(_), l =>
-          Ø.link(l)(Ø.monitoring.alive)(Ø.receive).flatMap(fromTransported)
-        )
+  //   def subscribe(uri: URI
+  //     )(implicit S: ExecutorService = Monitoring.serverPool
+  //     ): Process[Task, Datapoint[Any]] =
+  //       Endpoint(SubscribeAll, uri).fold(Process.fail(_), l =>
+  //         Ø.link(l)(Ø.monitoring.alive)(Ø.receive).flatMap(fromTransported)
+  //       )
 
-    // fairly ugly hack, but it works for now
-    def fromTransported(t: Transported): Process[Task, Datapoint[Any]] = {
-      import http.JSON._, http.SSE
-      t.version match {
-        case Versions.v1 =>
-          try Process.emit(SSE.parseOrThrow[Datapoint[Any]](new String(t.bytes)))
-          catch {
-            case e: Exception => Process.fail(e)
-          }
-        case Versions.v2 => sys.error("not implemented yet!")
-      }
-    }
+  //   // fairly ugly hack, but it works for now
+  //   def fromTransported(t: Transported): Process[Task, Datapoint[Any]] = {
+  //     import http.JSON._, http.SSE
+  //     t.version match {
+  //       case Versions.v1 =>
+  //         try Process.emit(SSE.parseOrThrow[Datapoint[Any]](new String(t.bytes)))
+  //         catch {
+  //           case e: Exception => Process.fail(e)
+  //         }
+  //       case Versions.v2 => sys.error("not implemented yet!")
+  //     }
+  //   }
 
-  }
+  // }
 
   /////////////////////////////// PRIMITIVES ///////////////////////////////////
 
-  def linkP[O](e: Endpoint
-    )(k: Process[Task,Boolean]
-    )(f: Socket => Process[Task,O]): Process[Task, O] =
-    resource(setup(e))(r => destroy(r, e)){ connection =>
-      haltWhen(k){
-        Process.eval(e.configure(connection.socket)
-          ).flatMap(_ => f(connection.socket))
-      }
-    }
+  // def linkP[O](e: Endpoint
+  //   )(k: Process[Task,Boolean]
+  //   )(f: Socket => Process[Task,O]): Process[Task, O] =
+  //   resource(setup(e))(r => destroy(r, e)){ connection =>
+  //     haltWhen(k){
+  //       Process.eval(e.configure(connection.socket)
+  //         ).flatMap(_ => f(connection.socket))
+  //     }
+  //   }
 
   def link[O](e: Endpoint
     )(k: Signal[Boolean]
     )(f: Socket => Process[Task,O]): Process[Task, O] =
     resource(setup(e))(r => destroy(r, e)){ connection =>
       haltWhen(k.continuous){
-        Process.eval(e.configure(connection.socket)
-          ).flatMap(_ => f(connection.socket))
+        f(connection.socket)
       }
     }
 
@@ -183,11 +182,12 @@ object ZeroMQ {
   private[zeromq] def setup(
     endpoint: Endpoint,
     threadCount: Int = 1
-  ): Task[Connection] = Task.delay {
-    log.info("Setting up endpoint = " + endpoint)
-    val context: Context = ZMQ.context(threadCount)
-    val socket: Socket = context.socket(endpoint.mode.asInt)
-    Connection(socket,context)
+  ): Task[Connection] = {
+    log.info("Setting up endpoint '$endpoint'...")
+    for {
+      a <- Task.delay(ZMQ.context(threadCount))
+      b <- endpoint.configure(a)
+    } yield Connection(b,a)
   }
 
   /**
