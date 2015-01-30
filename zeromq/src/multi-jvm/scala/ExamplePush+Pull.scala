@@ -14,22 +14,23 @@ object ExampleMultiJvmPuller {
   import scalaz.stream.io
   import scalaz.stream.Channel
   import java.util.concurrent.atomic.AtomicLong
+  import sockets._
 
   val received = new AtomicLong(0L)
 
   def main(args: Array[String]): Unit = {
     val start = System.currentTimeMillis
 
-    val E = Endpoint(`Pull+Bind`, Location(new URI(Settings.socket)))
+    val E = Endpoint(pull &&& bind, Location(new URI(Settings.socket)))
 
-    Ø.link(E)(Ø.monitoring.alive)(Ø.receive)
+    Ø.link(E)(Fixtures.signal)(Ø.receive)
       .map(_.toString)
       .to(io.stdOut)
       .run.runAsync(_ => ())
 
     Thread.sleep(10.seconds.toMillis)
 
-    Ø.monitoring.stop.run
+    stop(Fixtures.signal).run
 
     Ø.log.info("Stopping the pulling process...")
   }

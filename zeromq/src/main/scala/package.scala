@@ -2,12 +2,20 @@ package oncue.svc.funnel
 package object zeromq {
   import scalaz.concurrent.Task
   import org.zeromq.ZMQ.{Context,Socket}
+  import scalaz.stream.async.mutable.Signal
+
+  type SocketBuilder = org.zeromq.ZMQ.Context => Location => Task[Socket]
 
   val Ø = ZeroMQ
 
   object sockets extends SocketActions with SocketModes
 
-  type SocketBuilder = org.zeromq.ZMQ.Context => Location => Task[Socket]
+  private[zeromq] def stop(signal: Signal[Boolean]): Task[Unit] = {
+    for {
+      _ <- signal.set(false)
+      _ <- signal.close
+    } yield ()
+  }
 
   private[zeromq] def errorHandler: PartialFunction[Throwable,Task[Socket]] = {
     case e: java.io.FileNotFoundException => {

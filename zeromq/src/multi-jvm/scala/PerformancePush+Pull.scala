@@ -2,7 +2,7 @@ package oncue.svc.funnel
 package zeromq
 
 import scalaz.concurrent.Task
-import scalaz.stream.Process
+import scalaz.stream.{io,Channel,Process}
 import scala.concurrent.duration._
 import java.net.URI
 
@@ -13,10 +13,9 @@ object PerfMultiJvmPusher2 extends Pusher("pusher-2")
 object PerfMultiJvmPusher3 extends Pusher("pusher-3")
 
 object PerfMultiJvmPuller {
-  import scalaz.stream.io
-  import scalaz.stream.Channel
   import java.util.concurrent.atomic.AtomicLong
   import concurrent.duration.FiniteDuration
+  import sockets._
 
   val received = new AtomicLong(0L)
 
@@ -24,7 +23,7 @@ object PerfMultiJvmPuller {
     Ø.log.info(s"Booting Puller...")
 
     val start = System.currentTimeMillis
-    val E = Endpoint(`Pull+Bind`, Location(Settings.uri))
+    val E = Endpoint(pull &&& bind, Location(Settings.uri))
 
     val ledger: Channel[Task, String, Unit] = io.channel(
       _ => Task {
@@ -35,7 +34,7 @@ object PerfMultiJvmPuller {
       }
     )
 
-    Ø.link(E)(Ø.monitoring.alive)(Ø.receive)
+    Ø.link(E)(Fixtures.signal)(Ø.receive)
       .map(_.toString)
       .through(ledger)
       .run.runAsync(_ => ())
