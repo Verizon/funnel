@@ -5,6 +5,8 @@ package object zeromq {
 
   val Ø = ZeroMQ
 
+  object sockets extends SocketActions with SocketModes
+
   type SocketBuilder = org.zeromq.ZMQ.Context => Location => Task[Socket]
 
   private[zeromq] def errorHandler: PartialFunction[Throwable,Task[Socket]] = {

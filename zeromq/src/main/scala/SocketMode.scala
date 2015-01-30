@@ -12,7 +12,7 @@ abstract class SocketMode(val asInt: Int) extends (Context => Task[Socket]){
     ctx => location => apply(ctx).flatMap(socket => f(socket)(location))
 }
 
-object SocketMode {
+trait SocketModes {
   object push extends SocketMode(ZMQ.PUSH)
   object pull extends SocketMode(ZMQ.PULL)
   object publish extends SocketMode(ZMQ.PUB)

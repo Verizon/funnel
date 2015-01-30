@@ -15,7 +15,7 @@ abstract class SocketAction extends (Socket => Location => Task[Socket]){ self =
     }
 }
 
-object SocketAction {
+trait SocketActions {
   object connect extends SocketAction { self =>
     def apply(s: Socket): Location => Task[Socket] =
       location => Task.delay { s.connect(location.uri.toString); s } //.handleWith(errorHandler)
@@ -37,7 +37,7 @@ object SocketAction {
 
 object Foo {
   def main(args: Array[String]): Unit = {
-    import SocketAction._, SocketMode._
+    import sockets._
 
     push &&& (connect ~ topics.all)
     pull &&& bind

@@ -12,6 +12,7 @@ case class Endpoint(
   def configure(ctx: Context): Task[Socket] =
     builder(ctx)(location)
 }
+
 object Endpoint {
   def apply(m: SocketBuilder, u: URI): Throwable \/ Endpoint = {
     \/.fromTryCatchNonFatal(Endpoint(m, Location(u)))
