@@ -34,13 +34,3 @@ trait SocketActions {
       specific(Array.empty[Byte])
   }
 }
-
-object Foo {
-  def main(args: Array[String]): Unit = {
-    import sockets._
-
-    push &&& (connect ~ topics.all)
-    pull &&& bind
-    pull &&& connect
-  }
-}
