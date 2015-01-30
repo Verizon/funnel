@@ -143,6 +143,9 @@ object ZeroMQ {
       // for the native c++ implementation:
       val header: Array[Byte] = socket.recv
       val body: Array[Byte]   = socket.recv
+
+      // println(">>" + header)
+
       // for the java implementation:
       // val header = socket.recvStr(0)
       // val body   = socket.recvStr(0)
