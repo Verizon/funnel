@@ -14,7 +14,10 @@ case class Endpoint(
 }
 
 object Endpoint {
-  def apply(m: SocketBuilder, u: URI): Throwable \/ Endpoint = {
-    \/.fromTryCatchNonFatal(Endpoint(m, Location(u)))
-  }
+  def apply(m: SocketBuilder, u: URI): Throwable \/ Endpoint =
+    Location(u).map(Endpoint(m, _))
+
+  def unsafeApply(m: SocketBuilder, u: URI): Endpoint =
+    apply(m,u).getOrElse(sys.error(
+      "Threw an exception whilst using unsafeApply. Check your arguments."))
 }

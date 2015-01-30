@@ -5,9 +5,14 @@ import scalaz.concurrent.Task
 import scalaz.\/
 import java.net.URI
 
-case class Location(uri: URI){
-  val protocol: Option[Protocol] = Protocol.fromString(uri.getScheme)
-  val hostOrPath: Option[String] = {
+case class Location(
+  uri: URI,
+  protocol: Protocol,
+  hostOrPath: String
+)
+object Location {
+
+  private def hostOrPath(uri: URI): Option[String] = {
     val port = Option(uri.getPort).flatMap {
       case -1 => Option.empty[String]
       case o  => Option(o.toString)
@@ -16,6 +21,13 @@ case class Location(uri: URI){
       ) orElse Option(uri.getPath)
   }
 
-  assert(protocol.isDefined, "Unable to infer protocol scheme from URI.")
-  assert(hostOrPath.isDefined, "URI contained no discernible host or path.")
+  private def go[A](o: Option[A])(errMsg: String): Throwable \/ A =
+    \/.fromEither(o.toRight(new RuntimeException(errMsg)))
+
+  def apply(uri: URI): Throwable \/ Location =
+    for {
+      a <- go(Protocol.fromString(uri.getScheme)
+            )("Unable to infer protocol scheme from URI.")
+      b <- go(hostOrPath(uri))("URI contained no discernible host:port or path.")
+    } yield Location(uri, a, b)
 }

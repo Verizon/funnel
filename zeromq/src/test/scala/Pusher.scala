@@ -12,7 +12,7 @@ abstract class Pusher(name: String, uri: URI = Settings.uri, size: Int = 1000000
 
     Ø.log.info(s"Booting $name...")
 
-    val E = Endpoint(push &&& connect, Location(uri))
+    val E = Endpoint.unsafeApply(push &&& connect, uri)
 
     val seq: Seq[Array[Byte]] = for(i <- 0 to size) yield Fixtures.data
     // stupid scalac cant handle this in-line.

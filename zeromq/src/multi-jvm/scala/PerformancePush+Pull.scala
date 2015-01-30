@@ -23,7 +23,7 @@ object PerfMultiJvmPuller {
     Ø.log.info(s"Booting Puller...")
 
     val start = System.currentTimeMillis
-    val E = Endpoint(pull &&& bind, Location(Settings.uri))
+    val E = Endpoint.unsafeApply(pull &&& bind, Settings.uri)
 
     val ledger: Channel[Task, String, Unit] = io.channel(
       _ => Task {

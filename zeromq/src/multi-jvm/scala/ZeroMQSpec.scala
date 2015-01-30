@@ -9,7 +9,7 @@ import sockets._
 
 class SpecMultiJvmNodeA extends FlatSpec with Matchers {
 
-  lazy val E = Endpoint(pull &&& bind, Location(Settings.uri))
+  lazy val E = Endpoint.unsafeApply(pull &&& bind, Settings.uri)
 
   "receiving streams" should "pull all the sent messages" in {
     Ø.link(E)(Fixtures.signal)(Ø.receive)
@@ -27,7 +27,7 @@ class SpecMultiJvmNodeB extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   implicit val B = scalaz.std.anyVal.booleanInstance.conjunction
 
-  val E = Endpoint(push &&& connect, Location(Settings.uri))
+  val E = Endpoint.unsafeApply(push &&& connect, Settings.uri)
 
   val seq: Seq[Array[Byte]] = for(i <- 0 to 10000) yield Fixtures.data
   val k: Seq[Boolean] = seq.map(_ => true) ++ Seq(false)
