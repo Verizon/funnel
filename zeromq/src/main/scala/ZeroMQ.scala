@@ -19,6 +19,11 @@ import java.net.URI
 object ZeroMQ {
   private[zeromq] val log = Logger[ZeroMQ.type]
 
+  /**
+   * A simple pair of Context and Socket. This makes referencing these two things
+   * just a bit nicer when it comes to doing resource deallocation upon
+   * stream completation.
+   */
   case class Connection(
     socket: Socket,
     context: Context
@@ -67,12 +72,18 @@ object ZeroMQ {
 
   /////////////////////////////// INTERNALS ///////////////////////////////////
 
+  /**
+   *
+   */
   private[zeromq] def haltWhen[O](
     kill: Process[Task,Boolean])(
     input: Process[Task,O]
   ): Process[Task,O] =
     kill.zip(input).takeWhile(_._1).map(_._2)
 
+  /**
+   *
+   */
   private[zeromq] def resource[F[_],R,O](
     acquire: F[R])(
     release: R => F[Unit])(
@@ -82,11 +93,14 @@ object ZeroMQ {
       proc(r).onComplete(Process.eval_(release(r)))
     }
 
+  /**
+   *
+   */
   private[zeromq] def setup(
     endpoint: Endpoint,
     threadCount: Int = 1
   ): Task[Connection] = {
-    log.info("Setting up endpoint '$endpoint'...")
+    log.info(s"Setting up endpoint '${endpoint.location.uri}'...")
     for {
       a <- Task.delay(ZMQ.context(threadCount))
       b <- endpoint.configure(a)

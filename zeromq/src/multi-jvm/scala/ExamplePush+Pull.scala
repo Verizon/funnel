@@ -21,7 +21,7 @@ object ExampleMultiJvmPuller {
   def main(args: Array[String]): Unit = {
     val start = System.currentTimeMillis
 
-    val E = Endpoint(pull &&& bind, Location(new URI(Settings.socket)))
+    val E = Endpoint(pull &&& bind, Location(Settings.uri))
 
     Ø.link(E)(Fixtures.signal)(Ø.receive)
       .map(_.toString)

@@ -10,7 +10,7 @@ abstract class Pusher(name: String, uri: URI = Settings.uri, size: Int = 1000000
   def main(args: Array[String]): Unit = {
     import sockets._
 
-    Ø.log.info(s"Booting $name")
+    Ø.log.info(s"Booting $name...")
 
     val E = Endpoint(push &&& connect, Location(uri))
 
@@ -30,6 +30,8 @@ abstract class ApplicationPusher(name: String, aliveFor: FiniteDuration = 12.sec
   def main(args: Array[String]): Unit = {
     import instruments._
 
+    Ø.log.info(s"Booting $name...")
+
     implicit val log: String => Unit = println _
 
     val M = Monitoring.default
@@ -37,13 +39,11 @@ abstract class ApplicationPusher(name: String, aliveFor: FiniteDuration = 12.sec
 
     T.incrementBy(2)
 
-    println(s"$name - Press [Enter] to stop the task")
-
     Publish.toUnixSocket(Settings.socket, Fixtures.signal)
 
     Process.sleep(aliveFor)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
       .onComplete(Process.eval_(Fixtures.signal.get)).run.run
 
-    Ø.log.info(s"Stopping the $name process...")
+    Ø.log.info(s"Stopping the '$name' process...")
   }
 }

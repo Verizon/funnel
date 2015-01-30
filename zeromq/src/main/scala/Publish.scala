@@ -17,19 +17,7 @@ object Publish {
   private[zeromq] val alive: Signal[Boolean] = signalOf[Boolean](true)
   val defaultUnixSocket = "/var/run/funnel.socket"
 
-  // TODO: implement binary serialisation here rather than using the JSON from `http` module
-  private def dataEncode[A](a: A)(implicit A: EncodeJson[A]): String =
-    A(a).nospaces
-
-  private def datapointToWireFormat(d: Datapoint[Any]): Array[Byte] =
-    s"${dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes(UTF8)
-
-  def fromMonitoring(M: Monitoring)(implicit log: String => Unit): Process[Task, Array[Byte]] =
-    Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat)
-
-  def fromMonitoringDefault(implicit log: String => Unit): Process[Task, Array[Byte]] =
-    fromMonitoring(Monitoring.default)
-
+  /////////////////////////////// USAGE ///////////////////////////////////
 
   // unsafe!
   def to(endpoint: Endpoint, signal: Signal[Boolean]): Unit =
@@ -45,8 +33,24 @@ object Publish {
   import sockets._
 
   def toUnixSocket(path: String = defaultUnixSocket, signal: Signal[Boolean] = alive): Unit =
-    Endpoint(push &&& connect, new URI("ipc://$path")) match {
+    Endpoint(push &&& connect, new URI(s"ipc://$path")) match {
       case \/-(e) => to(e, signal)
       case -\/(f) => sys.error(s"Unable to create endpoint; the specified URI is likley malformed: $f")
     }
+
+  /////////////////////////////// INTERNALS ///////////////////////////////////
+
+  // TODO: implement binary serialisation here rather than using the JSON from `http` module
+  private def dataEncode[A](a: A)(implicit A: EncodeJson[A]): String =
+    A(a).nospaces
+
+  private def datapointToWireFormat(d: Datapoint[Any]): Array[Byte] =
+    s"${dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes(UTF8)
+
+  def fromMonitoring(M: Monitoring)(implicit log: String => Unit): Process[Task, Array[Byte]] =
+    Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat)
+
+  def fromMonitoringDefault(implicit log: String => Unit): Process[Task, Array[Byte]] =
+    fromMonitoring(Monitoring.default)
+
 }
