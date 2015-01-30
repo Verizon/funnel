@@ -15,20 +15,6 @@ case object UDP extends Protocol("udp")
 case object InProc extends Protocol("proc")
 case object Pair extends Protocol("pair")
 
-// case class Address(
-//   protocol: Protocol,
-//   host: String = "*",
-//   port: Option[Int] = None){
-//   override def toString: String =
-//     port.map(p => s"$protocol://$host:$p"
-//       ).getOrElse(s"$protocol://$host")
-// }
-
-// object Address {
-//   def apply(protocol: Protocol, host: String, port: Int): Address =
-//     Address(protocol, host, Option(port))
-// }
-
 import scalaz.concurrent.Task
 import org.zeromq.ZMQ, ZMQ.Socket
 import scalaz.\/

@@ -16,13 +16,15 @@ SbtMultiJvm.multiJvmSettings
 // native c++ implementation with jni:
 libraryDependencies += "org.zeromq" % "jzmq" % "3.1.0"
 
-scalacOptions := Compilation.flags.filterNot(_ == "-Xlint")
+scalacOptions := Compilation.flags.filterNot(_ == "-Xlint") ++ Seq("-language:reflectiveCalls")
 
 // make sure that MultiJvm test are compiled by the default test compilation
 compile in MultiJvm <<= (compile in MultiJvm) triggeredBy (compile in Test)
 
 // disable parallel tests
 parallelExecution in Test := false
+
+// fork in Test := true
 
 // make sure that MultiJvm tests are executed by the default test target,
 // and combine the results from ordinary test and multi-jvm tests
