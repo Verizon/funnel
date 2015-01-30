@@ -21,13 +21,13 @@ case class Transported(
 object Transported {
   import Versions._
 
-  def apply(h: String, body: String): Transported = {
+  def apply(h: String, bytes: Array[Byte]): Transported = {
     val v = for {
       a <- h.split('/').lastOption
       b <- Versions.fromString(a)
     } yield b
 
-    Transported(v.getOrElse(Versions.unknown), body.getBytes)
+    Transported(v.getOrElse(Versions.unknown), bytes)
   }
 }
 /**
@@ -141,15 +141,12 @@ object ZeroMQ {
   def receive(socket: Socket): Process[Task, Transported] = {
     Process.eval(Task.delay {
       // for the native c++ implementation:
-      val header: String = socket.recvStr(UTF8)
-      val body: String   = socket.recvStr(UTF8)
-
-      println("===== " + Thread.currentThread.getName)
-
+      val header: Array[Byte] = socket.recv
+      val body: Array[Byte]   = socket.recv
       // for the java implementation:
       // val header = socket.recvStr(0)
       // val body   = socket.recvStr(0)
-      Transported(header, body)
+      Transported(new String(header), body)
     }) ++ receive(socket)
   }
 
@@ -212,7 +209,7 @@ object ZeroMQ {
         Task {
           log.warn(s"Trying to close context in thread '${Thread.currentThread.getName}'")
           c.context.close()
-        }.runAsync(e => log.warn(s"Closing context there was an error: $e"))
+        }.runAsync(e => log.warn(s"Result of closing context was: $e"))
       } catch {
         case e: java.nio.channels.ClosedChannelException => ()
       }

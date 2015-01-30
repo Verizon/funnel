@@ -6,11 +6,11 @@ import scalaz.stream.Process
 import scala.concurrent.duration._
 import java.net.URI
 
-object PerfMultiJvmPusher1 extends Pusher("pusher-1", Settings.socket)
+object PerfMultiJvmPusher1 extends Pusher("pusher-1")
 
-object PerfMultiJvmPusher2 extends Pusher("pusher-2", Settings.socket)
+object PerfMultiJvmPusher2 extends Pusher("pusher-2")
 
-object PerfMultiJvmPusher3 extends Pusher("pusher-3", Settings.socket)
+object PerfMultiJvmPusher3 extends Pusher("pusher-3")
 
 object PerfMultiJvmPuller {
   import scalaz.stream.io
@@ -24,7 +24,7 @@ object PerfMultiJvmPuller {
     Ø.log.info(s"Booting Puller...")
 
     val start = System.currentTimeMillis
-    val E = Endpoint(`Pull+Bind`, Location(new URI(Settings.socket)))
+    val E = Endpoint(`Pull+Bind`, Location(Settings.uri))
 
     val ledger: Channel[Task, String, Unit] = io.channel(
       _ => Task {

@@ -3,12 +3,13 @@ package zeromq
 
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.Process
+import java.net.URI
 
-abstract class Pusher(name: String, fd: String, size: Int = 1000000) {
+abstract class Pusher(name: String, uri: URI = Settings.uri, size: Int = 1000000) {
   def main(args: Array[String]): Unit = {
     Ø.log.info(s"Booting $name")
 
-    val E = Endpoint(`Push+Connect`, Location(new java.net.URI(fd)))
+    val E = Endpoint(`Push+Connect`, Location(uri))
 
     val seq: Seq[Array[Byte]] = for(i <- 0 to size) yield Fixtures.data
     // stupid scalac cant handle this in-line.

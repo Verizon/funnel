@@ -14,32 +14,18 @@ class ZeroMQSpec extends FlatSpec with Matchers {
   val E2 = Endpoint(`Pull+Bind`, L)
 
   it should "foo" in {
-    // val S = signalOf[Boolean](false)
-
-    val kill: Process[Task,Boolean] = Process.emitAll(Seq(true,true,true))
+    val alive = signalOf[Boolean](true)
 
     val out: Process[Task, Array[Byte]] =
-      Process.emitAll(Seq("foo","bar","baz").map(_.getBytes))
+      Process.emitAll((1 to 100).map(_ => Fixtures.small))
 
-    val sockout: Process[Task, Boolean] =
-      Ø.linkP(E1)(kill)(s => out.through(Ø.write(s)))
+    Ø.link(E2)(alive)(Ø.receive).map(t => new String(t.bytes)).to(io.stdOut).run.run
 
-    val sockin: Process[Task,Transported] =
-      Ø.linkP(E2)(kill)(Ø.receive)
+    Ø.link(E1)(alive)(s => out.through(Ø.write(s))).run.run
 
-    println(">>><<<<>>>>>")
 
-    println(sockout.run.run)
-    println(sockin.run.run)
-    println(">>><<<<>>>>>")
-
-    // val task: Task[Unit] = for {
-    //   _ <- Ø.link(E1)(S)(s => out.through(Ø.write(s))).run
-    //   x <- Ø.link(E2)(S)(Ø.receive).run
-    //   _ <- S.set(false)
-    // } yield x
-
-    // task.run
+    // alive.set(false).run
+    // alive.close.run
   }
 }
 

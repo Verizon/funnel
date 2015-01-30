@@ -1,10 +1,13 @@
 package oncue.svc.funnel
 package zeromq
 
-abstract class Protocol(override val toString: String)
+abstract class Protocol(name: String){
+  override def toString: String = name
+}
 object Protocol {
-  val all: Seq[Protocol] =
+  lazy val all: Seq[Protocol] =
     TCP :: IPC :: UDP :: InProc :: Pair :: Nil
+
   def fromString(s: String): Option[Protocol] =
     all.find(_.toString == s.toLowerCase)
 }
