@@ -6,7 +6,25 @@ import java.net.URI
 import scalaz.stream.Process
 import scalaz.concurrent.Task
 
-class SpecMultiJvmNode2 extends FlatSpec with Matchers with BeforeAndAfterAll {
+class SpecMultiJvmNodeA extends FlatSpec with Matchers {
+  import scalaz.stream.io
+  import scalaz.stream.Channel
+
+  lazy val E = Endpoint(`Pull+Bind`, Location(Settings.uri))
+
+  "receiving streams" should "pull all the sent messages" in {
+    Ø.link(E)(Ø.monitoring.alive)(Ø.receive)
+      .map(_.toString)
+      .to(scalaz.stream.io.stdOut)
+      .run.run
+
+    Thread.sleep(5000)
+
+    true should equal (false)
+  }
+}
+
+class SpecMultiJvmNodeB extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   implicit val B = scalaz.std.anyVal.booleanInstance.conjunction
 
@@ -18,30 +36,10 @@ class SpecMultiJvmNode2 extends FlatSpec with Matchers with BeforeAndAfterAll {
   val proc: Process[Task, Array[Byte]] = Process.emitAll(seq)
   val alive: Process[Task, Boolean] = Process.emitAll(k)
 
-  it should "bar" in {
-    println(k.length)
-
+  "publishing streams" should "send the entire fixture set" in {
     val result: Boolean = Ø.linkP(E)(alive)(socket =>
       proc.through(Ø.write(socket))).runFoldMap(identity).run
 
     result should equal (true)
-  }
-}
-
-class SpecMultiJvmNode1 extends FlatSpec with Matchers {
-  import scalaz.stream.io
-  import scalaz.stream.Channel
-
-  lazy val E = Endpoint(`Pull+Bind`, Location(Settings.uri))
-
-  it should "foo" in {
-    Ø.link(E)(Ø.monitoring.alive)(Ø.receive)
-      .map(_.toString)
-      .to(scalaz.stream.io.stdOut)
-      .run.run
-
-    Thread.sleep(5000)
-
-    true should equal (false)
   }
 }
