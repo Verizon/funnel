@@ -6,20 +6,26 @@ import scalaz.concurrent.Task
 import scalaz.stream.{Channel,Process,io}
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
 import sockets._
+import java.util.concurrent.atomic.AtomicLong
 
 class SpecMultiJvmNodeA extends FlatSpec with Matchers {
 
-  lazy val E = Endpoint.unsafeApply(pull &&& bind, Settings.uri)
+  val E = Endpoint.unsafeApply(pull &&& bind, Settings.uri)
+  val received = new AtomicLong(0L)
+  val ledger: Channel[Task, String, Unit] =
+    io.channel(_ => Task(received.incrementAndGet))
 
   "receiving streams" should "pull all the sent messages" in {
     Ø.link(E)(Fixtures.signal)(Ø.receive)
       .map(_.toString)
-      .to(scalaz.stream.io.stdOut)
-      .run.run
+      .through(ledger)
+      .run.runAsync(_ => ())
 
-    Thread.sleep(5000)
+    Thread.sleep(5000) // oh. so. terrible.
 
-    true should equal (false)
+    stop(Fixtures.signal).run
+    // check that all the items made it here
+    received.get should equal (10001l)
   }
 }
 
