@@ -39,7 +39,7 @@ abstract class ApplicationPusher(name: String, aliveFor: FiniteDuration = 12.sec
 
     T.incrementBy(2)
 
-    Publish.toUnixSocket(Settings.socket, Fixtures.signal)
+    Publish.toUnixSocket(Settings.uri.toString, Fixtures.signal)
 
     Process.sleep(aliveFor)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
       .onComplete(Process.eval_(Fixtures.signal.get)).run.run
