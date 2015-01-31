@@ -5,7 +5,10 @@ import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 
 OnCue.baseSettings
 
-libraryDependencies += "org.zeromq" % "jeromq" % "0.3.4"
+libraryDependencies ++= Seq(
+  "net.databinder" %% "unfiltered-filter"       % "0.8.3",
+  "net.databinder" %% "unfiltered-netty-server" % "0.8.3"
+)
 
 /* this is basically a hack so that the windows agent can be compiled against jeromq */
 scalaSource in Compile := baseDirectory.value / ".." / "agent" / "src" / "main" / "scala"
