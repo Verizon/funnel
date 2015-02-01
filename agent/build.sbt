@@ -23,8 +23,6 @@ mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.Main")
 
 compile in MultiJvm <<= (compile in MultiJvm) triggeredBy (compile in Test)
 
-parallelExecution in Test := false
-
 executeTests in Test <<= (executeTests in Test, executeTests in MultiJvm) map {
   case (testResults, multiNodeResults)  =>
     val overall =
