@@ -1,10 +1,10 @@
 package oncue.svc.funnel
 
-import java.net.URL
+import java.net.URI
 
 sealed trait Command
-case class Mirror(url: URL, bucket: BucketName) extends Command
-case class Discard(url: URL) extends Command
+case class Mirror(uri: URI, bucket: BucketName) extends Command
+case class Discard(uri: URI) extends Command
 
 trait ControlServer {
   import scalaz.stream.Process

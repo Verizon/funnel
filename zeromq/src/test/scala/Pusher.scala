@@ -2,21 +2,25 @@ package oncue.svc.funnel
 package zeromq
 
 import scalaz.concurrent.{Task,Strategy}
+import scalaz.stream.async.signalOf
 import scalaz.stream.Process
+import java.net.URI
 
-abstract class Pusher(name: String, fd: String, size: Int = 1000000) {
+abstract class Pusher(name: String, uri: URI = Settings.uri, size: Int = 1000000) {
   def main(args: Array[String]): Unit = {
-    Ø.log.info(s"Booting $name")
+    import sockets._
 
-    val E = Endpoint(`Push+Connect`, Address(IPC, host = fd))
+    Ø.log.info(s"Booting $name...")
+
+    val E = Endpoint.unsafeApply(push &&& connect, uri)
 
     val seq: Seq[Array[Byte]] = for(i <- 0 to size) yield Fixtures.data
     // stupid scalac cant handle this in-line.
     val proc: Process[Task, Array[Byte]] = Process.emitAll(seq)
 
-    Ø.link(E)(Ø.monitoring.alive)(socket =>
+    Ø.link(E)(Fixtures.signal)(socket =>
       proc.through(Ø.write(socket)
-        ).onComplete(Process.eval(Ø.monitoring.stop))).run.run
+        ).onComplete(Process.eval(stop(Fixtures.signal)))).run.run
   }
 }
 
@@ -26,6 +30,8 @@ abstract class ApplicationPusher(name: String, aliveFor: FiniteDuration = 12.sec
   def main(args: Array[String]): Unit = {
     import instruments._
 
+    Ø.log.info(s"Booting $name...")
+
     implicit val log: String => Unit = println _
 
     val M = Monitoring.default
@@ -33,13 +39,11 @@ abstract class ApplicationPusher(name: String, aliveFor: FiniteDuration = 12.sec
 
     T.incrementBy(2)
 
-    println(s"$name - Press [Enter] to stop the task")
-
-    Ø.monitoring.toUnixSocket(Settings.socket)
+    Publish.toUnixSocket(Settings.uri.toString, Fixtures.signal)
 
     Process.sleep(aliveFor)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
-      .onComplete(Process.eval_(Ø.monitoring.stop)).run.run
+      .onComplete(Process.eval_(Fixtures.signal.get)).run.run
 
-    Ø.log.info(s"Stopping the $name process...")
+    Ø.log.info(s"Stopping the '$name' process...")
   }
 }

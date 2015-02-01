@@ -6,130 +6,57 @@ import scalaz.concurrent.Task
 import scalaz.stream.{Process,Channel,io}
 import scalaz.stream.async.mutable.Signal
 import journal.Logger
+import java.net.URI
 
-case class Address(
-  protocol: Protocol,
-  host: String = "*",
-  port: Option[Int] = None){
-  override def toString: String =
-    port.map(p => s"$protocol://$host:$p"
-      ).getOrElse(s"$protocol://$host")
-}
-
-object Address {
-  def apply(protocol: Protocol, host: String, port: Int): Address =
-    Address(protocol, host, Option(port))
-}
-
-case class Endpoint(
-  mode: Mode,
-  address: Address){
-  def configure(s: Socket): Task[Unit] =
-    mode.configure(address, s)
-}
-
-case class Connection(
-  socket: Socket,
-  context: Context
-)
-
-case class Transported(
-  version: Version,
-  bytes: Array[Byte]
-)
-
-object Transported {
-  import Versions._
-
-  def apply(h: String, body: String): Transported = {
-    val v = for {
-      a <- h.split('/').lastOption
-      b <- Versions.fromString(a)
-    } yield b
-
-    Transported(v.getOrElse(Versions.unknown), body.getBytes)
-  }
-}
 /**
  * Model 0mq as a set of streams. Primary API should be the `link` function.
  * Example usage:
  *
  * ```
- * Ø.link(E)(K)(Ø.consume).to(io.stdOut)
+ * Ø.link(E)(K)(Ø.receive).map(new String(_)).to(io.stdOut)
  * ```
  */
 object ZeroMQ {
   private[zeromq] val log = Logger[ZeroMQ.type]
-  private[zeromq] val UTF8 = java.nio.charset.Charset.forName("UTF-8")
 
-  /////////////////////////////// USAGE ///////////////////////////////////
-
-  object monitoring {
-    import http.JSON._
-    import argonaut.EncodeJson
-    import scalaz.stream.async.signalOf
-    import scalaz.{-\/,\/-}
-
-    // TODO: implement binary serialisation here rather than using the JSON from `http` module
-    private def dataEncode[A](a: A)(implicit A: EncodeJson[A]): String =
-      A(a).nospaces
-
-    private def datapointToWireFormat(d: Datapoint[Any]): Array[Byte] =
-      s"${dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes(UTF8)
-
-    def fromMonitoring(M: Monitoring)(implicit log: String => Unit): Process[Task, Array[Byte]] =
-      Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat)
-
-    def fromMonitoringDefault(implicit log: String => Unit): Process[Task, Array[Byte]] =
-      fromMonitoring(Monitoring.default)
-
-    private[zeromq] val alive: Signal[Boolean] = signalOf[Boolean](true)
-
-    def stop: Task[Unit] = {
-      for {
-        _ <- alive.set(false)
-        _ <- alive.close
-      } yield ()
-    }
-
-    // unsafe!
-    def to(endpoint: Endpoint): Unit =
-      link(endpoint)(alive)(socket =>
-        fromMonitoringDefault(m => log.debug(m))
-          .through(write(socket))
-          .onComplete(Process.eval(Ø.monitoring.stop))
-      ).run.runAsync(_ match {
-        case -\/(err) => log.error(s"Unable to stream monitoring events to the domain socket: $err")
-        case \/-(win) => log.info("Streaming monitoring datapoints to the domain socket.")
-      })
-
-    def toUnixSocket(socket: String): Unit =
-      to(Endpoint(`Push+Connect`, Address(IPC, host = socket)))
-
-    def toUnixSocket: Unit = toUnixSocket("/var/run/funnel.socket")
-  }
+  /**
+   * A simple pair of Context and Socket. This makes referencing these two things
+   * just a bit nicer when it comes to doing resource deallocation upon
+   * stream completation.
+   */
+  case class Connection(
+    socket: Socket,
+    context: Context
+  )
 
   /////////////////////////////// PRIMITIVES ///////////////////////////////////
+
+  def linkP[O](e: Endpoint
+    )(k: Process[Task,Boolean]
+    )(f: Socket => Process[Task,O]): Process[Task, O] =
+    resource(setup(e))(r => destroy(r, e)){ connection =>
+      haltWhen(k){
+        f(connection.socket)
+      }
+    }
 
   def link[O](e: Endpoint
     )(k: Signal[Boolean]
     )(f: Socket => Process[Task,O]): Process[Task, O] =
-    resource(setup(e))(r => destroy(r, e)){ connection =>
-      haltWhen(k.continuous){
-        Process.eval(e.configure(connection.socket)
-          ).flatMap(_ => f(connection.socket))
-      }
-    }
+    linkP(e)(k.continuous)(f)
 
   def receive(socket: Socket): Process[Task, Transported] = {
-    Process.eval(Task.now {
+    Process.eval(Task.delay {
       // for the native c++ implementation:
-      val header = socket.recvStr(UTF8)
-      val body   = socket.recvStr(UTF8)
+      val header: Array[Byte] = socket.recv
+      val body: Array[Byte]   = socket.recv
+
+      // println(">>" + header)
+
       // for the java implementation:
       // val header = socket.recvStr(0)
       // val body   = socket.recvStr(0)
-      Transported(header, body)
+      Transported(new String(header), body)
     }) ++ receive(socket)
   }
 
@@ -145,12 +72,18 @@ object ZeroMQ {
 
   /////////////////////////////// INTERNALS ///////////////////////////////////
 
+  /**
+   *
+   */
   private[zeromq] def haltWhen[O](
     kill: Process[Task,Boolean])(
     input: Process[Task,O]
   ): Process[Task,O] =
     kill.zip(input).takeWhile(_._1).map(_._2)
 
+  /**
+   *
+   */
   private[zeromq] def resource[F[_],R,O](
     acquire: F[R])(
     release: R => F[Unit])(
@@ -160,22 +93,43 @@ object ZeroMQ {
       proc(r).onComplete(Process.eval_(release(r)))
     }
 
+  /**
+   *
+   */
   private[zeromq] def setup(
     endpoint: Endpoint,
     threadCount: Int = 1
-  ): Task[Connection] = Task.delay {
-    log.info("Setting up endpoint = " + endpoint)
-    val context: Context = ZMQ.context(threadCount)
-    val socket: Socket = context.socket(endpoint.mode.asInt)
-    Connection(socket,context)
+  ): Task[Connection] = {
+    log.info(s"Setting up endpoint '${endpoint.location.uri}'...")
+    for {
+      a <- Task.delay(ZMQ.context(threadCount))
+      b <- endpoint.configure(a)
+    } yield Connection(b,a)
   }
 
+  /**
+   * This is truly a totally unmaintainable function, and as such, it needs
+   * some documentation to explain what the fuck is going on here.
+   *
+   * As it turns out, ZeroMQ takes a dump if you try to close the socket context on
+   * the same thread from which you terminated the socket itself. So, given
+   * that all Tasks in this module use `delay` to delegate thread control to the
+   * caller (and subsequently have that Task blocked by whomever is running),
+   * we just start an inner Task that we use to dispatch to another thread
+   * simply to close the socket.
+   *
+   * This is ugly, and as far as I can tell, it works.
+   */
   private[zeromq] def destroy(c: Connection, e: Endpoint): Task[Unit] =
     Task.delay {
       log.info(s"Destroying connection for endpoint: $e")
       try {
+        log.warn(s"Trying to close socket in thread '${Thread.currentThread.getName}'")
         c.socket.close()
-        c.context.close()
+        Task {
+          log.warn(s"Trying to close context in thread '${Thread.currentThread.getName}'")
+          c.context.close()
+        }.runAsync(e => log.warn(s"Result of closing context was: $e"))
       } catch {
         case e: java.nio.channels.ClosedChannelException => ()
       }

@@ -12,7 +12,6 @@ import scalaz.stream._
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.signal
 import oncue.svc.funnel.Events.Event
-import Monitoring.prettyURL
 
 object MonitoringServer {
 
@@ -116,7 +115,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
       Parse.decodeEither[List[Bucket]](json).fold(
         error => flush(400, error.toString, req),
         blist => {
-          val cs: List[Command] = blist.flatMap(b => b.urls.map(u => Mirror(new URL(u), b.label)))
+          val cs: List[Command] = blist.flatMap(b => b.urls.map(u => Mirror(new URI(u), b.label)))
           val p0: Process[Task, Command] = Process.emitAll(cs)
           val p = p0 to M.mirroringQueue.enqueue
           p.run.run
@@ -134,7 +133,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
       Parse.decodeEither[List[String]](json).fold(
         error => flush(400, error.toString, req),
         list => {
-          val p0: Process[Task, Command] = Process.emitAll(list.map(u => Discard(new URL(u))))
+          val p0: Process[Task, Command] = Process.emitAll(list.map(u => Discard(new URI(u))))
           val p = p0 to M.mirroringQueue.enqueue
           p.run.run
 

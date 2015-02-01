@@ -1,6 +1,6 @@
 package oncue.svc.funnel
 
-import java.net.{URL,URLEncoder}
+import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory, ConcurrentHashMap}
 import scala.concurrent.duration._
@@ -112,9 +112,9 @@ trait Monitoring {
 
   private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue
 
-  private val urlSignals = new ConcurrentHashMap[URL, Signal[Unit]]
+  private val urlSignals = new ConcurrentHashMap[URI, Signal[Unit]]
 
-  private val bucketUrls = new Ref[BucketName ==>> Set[URL]](==>>())
+  private val bucketUrls = new Ref[BucketName ==>> Set[URI]](==>>())
 
   /**
    * Fetch a list of all the URLs that are currently being mirrored.
@@ -138,50 +138,50 @@ trait Monitoring {
   )(implicit log: String => Unit): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
     val alive     = signal[Unit](S)
-    val active    = signal[Set[URL]](S)
+    val active    = signal[Set[URI]](S)
 
     /**
      * Update the running state of the world by updating the URLs we know about
      * to mirror, and the bucket -> url mapping.
      */
-    def modifyActive(b: BucketName, f: Set[URL] => Set[URL]): Task[Unit] =
+    def modifyActive(b: BucketName, f: Set[URI] => Set[URI]): Task[Unit] =
       for {
-        _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set()))) )
-        _ <- Task( bucketUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty))))) )
+        _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))) )
+        _ <- Task( bucketUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))) )
       } yield ()
 
     for {
       _ <- active.set(Set.empty)
       _ <- alive.set(())
       _ <- mirroringCommands.evalMap {
-        case Mirror(url,bucket) => Task.delay {
+        case Mirror(source, bucket) => Task.delay {
           val S = Strategy.Executor(Monitoring.serverPool)
           val hook = signal[Unit](S)
           hook.set(()).runAsync(_ => ())
 
-          urlSignals.put(url, hook)
+          urlSignals.put(source, hook)
 
           // adding the `localName` onto the key here so that later in the
           // process its possible to find the key we're specifically looking for
-          val localName = prettyURL(url)
+          val localName = formatURI(source) // TIM: remove this; keeping for now until we figure out how the source needs sanitising
 
           val received: Process[Task,Unit] = link(hook) {
             attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
-              url, Map("bucket" -> bucket, "url" -> localName))
+              source, Map("bucket" -> bucket, "source" -> localName))
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
-            if (urls.contains(url)) Process.halt // skip it, alread running
-            else Process.eval_(modifyActive(bucket, _ + url)) ++ // add to active at start
+            if (urls.contains(source)) Process.halt // skip it, alread running
+            else Process.eval_(modifyActive(bucket, _ + source)) ++ // add to active at start
               // and remove it when done
-              received.onComplete(Process.eval_(modifyActive(bucket, _ - url)))
+              received.onComplete(Process.eval_(modifyActive(bucket, _ - source)))
           }
 
           Task.fork(receivedIdempotent.run).runAsync(_.fold(
             err => log(err.getMessage), identity))
         }
-        case Discard(url) => Task.delay {
-          Option(urlSignals.get(url)).foreach(_.close.runAsync(_ => ()))
+        case Discard(source) => Task.delay {
+          Option(urlSignals.get(source)).foreach(_.close.runAsync(_ => ()))
         }
       }.run
       _ <- alive.close
@@ -193,9 +193,9 @@ trait Monitoring {
    * all loaded keys. `url` is assumed to be a stream of datapoints in SSE format.
    */
   def mirrorAll(parse: DatapointParser)(
-                url: URL, attrs: Map[String,String] = Map())(
+                source: URI, attrs: Map[String,String] = Map())(
                 implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
-    parse(url).evalMap { pt =>
+    parse(source).evalMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
       val k = pt.key.withAttributes(attrs)
       for {
@@ -219,14 +219,14 @@ trait Monitoring {
    * 5 attempts before raising the most recent exception.
    */
   def attemptMirrorAll(
-      parse: DatapointParser)(breaker: Event)(url: URL, attrs: Map[String, String] = Map())(
+      parse: DatapointParser)(breaker: Event)(source: URI, attrs: Map[String, String] = Map())(
         implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
     val report = (e: Throwable) => {
-      log(s"attemptMirrorAll.ERROR: url: $url, error: $e")
+      log(s"attemptMirrorAll.ERROR: source: $source, error: $e")
       ()
     }
     Monitoring.attemptRepeatedly(report)(
-      mirrorAll(parse)(url, attrs))(breaker(this))
+      mirrorAll(parse)(source, attrs))(breaker(this))
   }
 
   private def initialize[O](key: Key[O]): Task[Unit] = for {
@@ -504,10 +504,10 @@ object Monitoring {
     }
   }
 
-  private[funnel] def prettyURL(url: URL): String = {
-    val host = url.getHost
-    val path = url.getPath
-    val port = url.getPort match {
+  private[funnel] def formatURI(uri: URI): String = {
+    val host = uri.getHost
+    val path = uri.getPath
+    val port = uri.getPort match {
       case -1 => ""
       case x => "-"+x
     }

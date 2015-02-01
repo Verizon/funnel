@@ -1,7 +1,7 @@
 package oncue.svc.funnel
 package http
 
-import java.net.URL
+import java.net.URI
 import scala.concurrent.duration._
 import scalaz.stream.Process
 import org.scalatest._, matchers.ShouldMatchers
@@ -15,7 +15,7 @@ class MirroringIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfte
 
   private def mirrorFrom(port: Int): Unit =
     MI.mirrorAll(SSE.readEvents)(
-      new URL(s"http://localhost:$port/stream/previous"),
+      new URI(s"http://localhost:$port/stream/previous"),
       Map("port" -> port.toString)
     ).run.runAsync(_ => ())
 

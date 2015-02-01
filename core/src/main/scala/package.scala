@@ -9,7 +9,6 @@ package oncue.svc.funnel {
     JVM.instrument(this)
     Sigar(this).foreach { _.instrument }
   }
-
 }
 
 package oncue.svc {
@@ -18,8 +17,7 @@ package oncue.svc {
   import scalaz.stream.Process
 
   package object funnel {
-    type DatapointParser = java.net.URL => Process[Task,Datapoint[Any]]
-    type BucketName = String
+    type DatapointParser = java.net.URI => Process[Task,Datapoint[Any]]
+    type BucketName      = String
   }
-
 }

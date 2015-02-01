@@ -4,7 +4,7 @@ package http
 import argonaut.{DecodeJson, EncodeJson}
 import java.io.InputStream
 import java.util.concurrent.ExecutorService
-import java.net.URL
+import java.net.{URL,URI}
 import scalaz.concurrent.Task
 import scalaz.stream._
 import scalaz.stream.{Process => P}
@@ -115,36 +115,12 @@ object SSE {
   }
 
   /**
-   * Attempt to read a unique event from the given URL/prefix.
-   * Example: `readEvent("http://localhost:8001", "sliding/response-time")`
-   * If successful, returns the unique `Key`, along with the event
-   * stream for that `Key`. Raises an exception withing the `Task`
-   * in the event of an error, or if the given prefix does not
-   * uniquely determine a `Key`.
-   */
-  def readEvent[O](url: URL, prefix: String)(implicit R: Reportable[O], S: ExecutorService, log: String => Unit):
-      Task[(Key[O], Process[Task, Datapoint[O]])] =
-    urlDecode[List[Key[Any]]](new URL(s"${url.toString}/keys/$prefix"))
-    .map { ks =>
-      ks.filter(_.startsWith(prefix)) match {
-        case List(k) if k.typeOf == R =>
-          val kURL = new URL(s"${url.toString}/stream/${k.name}")
-          val s = readEvents(kURL).map { pt =>
-            pt.cast(R).filter(_.units == k.units)
-              .getOrElse(sys.error(s"mismatch! expected $R ${k.units}, got ${pt.typeOf} ${pt.units}"))
-          }
-          (k.asInstanceOf[Key[O]], s)
-        case ks2 => sys.error(s"'$prefix' did not return unique key set: $ks2")
-      }
-    }
-
-  /**
    * Return a stream of all events from the given URL.
    * Example: `readEvents("http://localhost:8001/stream/sliding/jvm")`.
    */
-  def readEvents(url: URL)(implicit S: ExecutorService = Monitoring.serverPool):
+  def readEvents(uri: URI)(implicit S: ExecutorService = Monitoring.serverPool):
       Process[Task, Datapoint[Any]] =
-    urlLinesR(url)(S).attempt().pipeO(blockParser.map {
+    urlLinesR(uri.toURL)(S).attempt().pipeO(blockParser.map {
       case (_,data) => parseOrThrow[Datapoint[Any]](data)
     }).flatMap(_.fold(Process.fail, Process.emit))
 

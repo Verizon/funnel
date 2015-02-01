@@ -12,4 +12,6 @@ object Fixtures {
   val medium: Array[Byte] = makeBytes(150)
   val large: Array[Byte] = makeBytes(1500)
   val megabitInBytes = 125000D
+
+  val signal = scalaz.stream.async.signalOf[Boolean](true)
 }
