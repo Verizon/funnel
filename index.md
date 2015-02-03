@@ -21,19 +21,27 @@ To get started, please read the most appropriate documentation:
 
 # Design Overview
 
-This section outlines some of the specific design choices within *Funnel*, both from a single machine perspective and as the wider system architecture: 
+This section outlines some of the specific design choices within *Funnel* - from a single machine perspective - that make it specifically different to other systems that are avalible in the market today. Above all else, Funnel is a stream processor and all metric keys are modeled as a stream internally, and their values are updated with instruments over time. At a high-level, the design can be visulized as four discrete parts:
 
-1. [Scalability](#scalability) - discusses funnels scaling properties
-1. [Time Periods](#time-periods) - how funnel handles time and local periodic aggregation.
-1. [Units](#units) - overview of the types of units that funnel is aware of. 
+![design]({{ site.baseurl }}img/funnel-internals.png)
 
-<a name="scalability"></a>
+Each part of this pipeline has a distinct function:
 
-## Scalability 
+* **Importers** are needed when integrating *Funnel* with existing systems, importers are needed to translate the third-party world into instruments *Funnel* understands. When using the native Funnel instruments in Scala, this step is entirely ommited. 
 
-Several design choices were made specifically with goal of giving *Funnel* the ability to scale linearly. Probably the most obvious is the pull-based model the system employs by default: by pulling metrics and conducting service-local aggregation of samples, the aggregating systems never see load-spikes that might cause cascading failure: they instead see a consistent load that only increases with the number of metric keys in total that *Flask* instance is being asked to monitor. Put another way: increases in local sampling on a given host adds overhead to that host, but it doesn't affect the wider system.
+* **Instruments** represent the kinds of metric operations that are avalible with *Funnel*. Instruments create updates to metric key streams. 
 
-The [operational instructions](getting-started/operations.html) contain some insight into how the system handles automatic load-sharding and rebalancing.
+* **Core** is the primary part of the *Funnel* system, and is essentially a stateful container for all the metric key streams. The `Monitoring` instance internally allows for a range of operations on the world of metric streams, such as listing, searching, creating topics etc.
+
+* **Exporters** are the last peice of the puzzle. Exporters consume the streams in the core of *Funnel* and typically execute some kind of effectful transduction on that stream. In practice this might be transforming the streams into JSON to send to elastic search, or sending to a network socket. This section is highly extensible and simpy needs the implementor to provide a function `URI => Process[Task, Datapoint[Any]]`.
+
+This is the view of the system from a single machine perspective, but conveniently it turns out that this design composes accross the network to create a large distributed system. Viewed at a larger scale, the system can be vizulised like this:
+
+![design]({{ site.baseurl }}img/chemist-flask-funnel.png)
+
+The specifics of this diagram are covered in the [operatations guide]({{ site.baseurl }}services/) section. From the high-level, the pushing and pulling of data is simply a combintation of various importers and exporters.
+
+Several design choices were made specifically with goal of giving *Funnel* the ability to scale linearly. Probably the most obvious is the pull-based model the system employed by the agent <-> flask reltationship: by pulling metrics and conducting service-local aggregation of samples, the aggregating systems never see load-spikes that might cause cascading failure: they instead see a consistent load that only increases with the number of metric keys in total that *Flask* instance is being asked to monitor. Put another way: increases in local sampling on a given host adds overhead to that host, but it doesn't affect the wider system.
 
 <a name="time-periods"></a>
 
@@ -67,7 +75,7 @@ Any given metric has the notion of reporting the `Units` that the specific metri
 * `Megabytes`
 * `None`
 
-Generally speaking, this is not something that users ever specifically need to extend, but when using the `gauge` instrument the engineer will need to specify the units for that gauge. 
+Generally speaking, this is not something that users ever specifically need to extend, but when using the `gauge` instrument the engineer will need to specify the units for that gauge.
 
 
 
