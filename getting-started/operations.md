@@ -8,11 +8,11 @@ section: "getting-started"
 
 The *Funnel* monitoring system is an umbrella for several components:
 
-* [Funnel](#funnel): runs on each and every service and provides an instrumentation API for engineers to publish metrics about their application.
+* [Funnel]({{ site.baseurl }}/services/#funnel): runs on each and every service and provides an instrumentation API for engineers to publish metrics about their application.
 
-* [Flask](#flask): collects metrics coming out of funnels and stores them in local memory, partitioned by a given "bucket" (more on this later).
+* [Flask]({{ site.baseurl }}/services/#flask): collects metrics coming out of funnels and stores them in local memory, partitioned by a given "bucket" (more on this later).
 
-* [Chemist](#chemist): organising what funnels are pouring which metrics into which flasks. In essence this component is a job manager. Chemist can automatically detect failures in flasks and repartition the load amongst the remaining flasks in the operational cluster.
+* [Chemist]({{ site.baseurl }}/services/#chemist): organising what funnels are pouring which metrics into which flasks. In essence this component is a job manager. Chemist can automatically detect failures in flasks and repartition the load amongst the remaining flasks in the operational cluster.
 
 At a high-level, the system can be visualised like this:
 

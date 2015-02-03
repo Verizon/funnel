@@ -8,12 +8,6 @@ section: "modules"
 
 <a name="agent"></a>
 
-## Agent
-
-sdfsdfsdfsdf
-
-<a name="agent"></a>
-
 ## Elastic Search
 
 sdfsdfsdfsdf

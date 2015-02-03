@@ -43,12 +43,11 @@
             </li>
           {% endif %}
 
-          <!-- getting started -->
+          <!-- modules -->
           <li><a href="{{ site.baseurl }}modules">Modules</a></li>
           {% if page.section == 'modules' %}
             <li>
               <ol>
-                <li><a href="{{ site.baseurl }}modules/#agent">Agent</a></li>
                 <li><a href="{{ site.baseurl }}modules/#elastic">Elastic Search</a></li>
                 <li><a href="{{ site.baseurl }}modules/#riemann">Riemann</a></li>
                 <li><a href="{{ site.baseurl }}modules/#zeromq">ZeroMQ</a></li>
@@ -56,13 +55,14 @@
             </li>
           {% endif %}
 
-          <!-- details -->
-          <li><a href="{{ site.baseurl }}details">Detailed Information</a></li>
-          {% if page.section == 'details' %}
+          <!-- services -->
+          <li><a href="{{ site.baseurl }}services">Services</a></li>
+          {% if page.section == 'services' %}
             <li>
               <ol>
-                <li><a href="{{ site.baseurl }}details/#top">Built-in Metrics</a></li>
-                <li><a href="{{ site.baseurl }}details/#control-server">Control Server</a></li>
+                <li><a href="{{ site.baseurl }}services/#agent">Agent</a></li>
+                <li><a href="{{ site.baseurl }}services/#flask">Flask</a></li>
+                <li><a href="{{ site.baseurl }}services/#chemist">Chemist</a></li>
               </ol>
             </li>
           {% endif %}
