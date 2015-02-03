@@ -47,15 +47,8 @@ object ZeroMQ {
 
   def receive(socket: Socket): Process[Task, Transported] = {
     Process.eval(Task.delay {
-      // for the native c++ implementation:
       val header: Array[Byte] = socket.recv
       val body: Array[Byte]   = socket.recv
-
-      // println(">>" + header)
-
-      // for the java implementation:
-      // val header = socket.recvStr(0)
-      // val body   = socket.recvStr(0)
       Transported(new String(header), body)
     }) ++ receive(socket)
   }
@@ -100,7 +93,7 @@ object ZeroMQ {
     endpoint: Endpoint,
     threadCount: Int = 1
   ): Task[Connection] = {
-    log.info(s"Setting up endpoint '${endpoint.location.uri}'...")
+    log.info(s"Setting up endpoint '${endpoint.location}'...")
     for {
       a <- Task.delay(ZMQ.context(threadCount))
       b <- endpoint.configure(a)
