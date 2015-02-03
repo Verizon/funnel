@@ -101,7 +101,7 @@ header {
   position:fixed;
 }
 
-/*header ul {
+header ul {
   list-style:none;
   height:40px;
 
@@ -120,14 +120,14 @@ header {
   box-shadow:inset #fff 0 1px 0, inset rgba(0,0,0,0.03) 0 -1px 0;
   width:270px;
 }
-*/
-/*header li {
+
+header li {
   width:89px;
   float:left;
   border-right:1px solid #d2d2d2;
   height:40px;
-}*/
-/*
+}
+
 header ul a {
   line-height:1;
   font-size:11px;
@@ -136,13 +136,13 @@ header ul a {
   text-align:center;
   padding-top:6px;
   height:40px;
-}*/
+}
 
 strong {
   color:#222;
   font-weight:700;
 }
-/*
+
 header ul li + li {
   width:88px;
   border-left:1px solid #fff;
@@ -157,7 +157,7 @@ header ul a strong {
   font-size:14px;
   display:block;
   color:#222;
-}*/
+}
 
 section {
   width:500px;
