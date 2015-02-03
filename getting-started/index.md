@@ -4,7 +4,7 @@ title:  "Getting Started"
 section: "getting-started"
 ---
 
-# Getting Started
+# {{ page.title }}
 
 We currently have two getting started guides avalible:
 

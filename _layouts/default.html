@@ -31,6 +31,7 @@
           <!-- home -->
           <li><a href="{{ site.baseurl }}">Home</a></li>
           <li><a href="{{ site.baseurl }}#overview">Overview</a></li>
+
           <!-- getting started -->
           <li><a href="{{ site.baseurl }}getting-started">Getting Started</a></li>
           {% if page.section == 'getting-started' %}
@@ -41,6 +42,20 @@
               </ol>
             </li>
           {% endif %}
+
+          <!-- getting started -->
+          <li><a href="{{ site.baseurl }}modules">Modules</a></li>
+          {% if page.section == 'modules' %}
+            <li>
+              <ol>
+                <li><a href="{{ site.baseurl }}modules/#agent">Agent</a></li>
+                <li><a href="{{ site.baseurl }}modules/#elastic">Elastic Search</a></li>
+                <li><a href="{{ site.baseurl }}modules/#riemann">Riemann</a></li>
+                <li><a href="{{ site.baseurl }}modules/#zeromq">ZeroMQ</a></li>
+              </ol>
+            </li>
+          {% endif %}
+
           <!-- details -->
           <li><a href="{{ site.baseurl }}details">Detailed Information</a></li>
           {% if page.section == 'details' %}
