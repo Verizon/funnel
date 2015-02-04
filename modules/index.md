@@ -8,7 +8,7 @@ section: "modules"
 
 *Funnel* comes with a range of modules that allows composistion of the system in a variety of ways. Some modules are straight exporters, others provide both importing and exporting functionality.
 
-<a name="agent"></a>
+<a name="elastic"></a>
 
 ## Elastic Search
 
@@ -42,8 +42,7 @@ Primarily for visualisation, this consumer takes the stream and aggregates into 
 
 Using this document format enables Elastic Search to reason about both aggregate time queries, and top-n queries - the two primary use cases for monitoring visualisation.
 
-
-<a name="agent"></a>
+<a name="riemann"></a>
 
 ## Riemann
 
@@ -55,4 +54,4 @@ Riemann is a great choice for small teams using *Funnel*, but in larger organisa
 
 ## ZeroMQ
 
-sdfsdfsdfsdf
+The ZeroMQ module 

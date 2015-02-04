@@ -118,15 +118,16 @@ That's about it for the HTTP API. Whilst it should be able to tollerate a good b
 
 # Flask
 
+*Flask* takes the role of a collector. It reaches out to nodes that have the *Funnel Agent* running and consumes their metrics which it turn were gathered from the application(s) running on that host.
 
-Flask is - perhaps confusingly - also a funnel, as it too is a service. This section includes several sub-sections which are of interest:
+Whilst *Flask* is a fairly small process, this section includes several sub-sections:
 
 * [Configuration](#flask-configuration): details about configuring *Flask*.
 * [Error Reporting](#flask-error-reporting): how does *Flask* report on errors
 * [Stream Consumers](#flask-stream-consumers): how does *Flask* push data to 3rd party systems for visualisation and analysis.
 * [System Metrics](#flask-system-metrics): enabling / disabling *Flask*'s built-in *Funnel*.
 
-*Flask*'s sole job is to mirror the *Funnel* hosts by taking mirroring instructions. This is achieved with a simple HTTP `POST` to `http://<host>:<port>/mirror` on the *Flask* host. For example:
+*Flask*'s sole job is to "mirror" the metrics from application hosts by taking mirroring instructions from an external orchestrating process (i.e. *Flask* only ever mirrors nodes it is instructed to mirror - it never figures this out itself). This is achieved with a simple HTTP `POST` to `http://<host>:<port>/mirror` on the *Flask* host. For example:
 
 ````
 [
@@ -160,14 +161,25 @@ flask {
 
   network {
     host = "localhost"
-    port = 5777
+    port = 6777
   }
 
-  Riemann {
-    host = "localhost"
-    port = 5555
-    ttl-in-minutes  = 5
-  }
+# elastic-search {
+#   url = "http://localhost:9200"
+#   index-name = "eee"
+#   type-name = "fff"
+#
+#   # Optional Parameters:
+#   partition-date-format = "yyyy.MM.dd"
+#   connection-timeout-in-ms = 5000
+# }
+
+# riemann {
+#   host = "localhost"
+#   port = 5555
+#   ttl-in-minutes = 5
+# }
+
 }
 
 aws {
