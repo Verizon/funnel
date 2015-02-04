@@ -37,8 +37,7 @@ object ZeroMQ {
    * that the OS has the correct native dependencies installed properly.
    */
   def isEnabled: Boolean =
-    \/.fromTryCatchThrowable[String, UnsatisfiedLinkError](ZMQ.getVersionString
-      ).map(_ => true).getOrElse(false)
+    \/.fromTryCatchThrowable[String, UnsatisfiedLinkError](ZMQ.getVersionString).isRight
 
   /**
    * Create a `Process` that automatically does setup and tear-down for a 0mq socket
