@@ -6,6 +6,7 @@ import com.aphyr.riemann.client.RiemannClient
 import scala.concurrent.duration._
 import scalaz.concurrent.{Task,Strategy,Actor}
 import scalaz.stream.Process
+import scalaz.stream.async.mutable.Signal
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import knobs.{Config, Required, ClassPathResource, FileResource}
@@ -13,10 +14,12 @@ import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
 import com.amazonaws.services.sns.{AmazonSNSClient,AmazonSNS}
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.regions.{Region, Regions}
-import oncue.svc.funnel.{Events,DatapointParser,Names,Sigar,Monitoring,Instruments}
+import oncue.svc.funnel.{Events,DatapointParser,Datapoint,Names,Sigar,Monitoring,Instruments}
 import oncue.svc.funnel.riemann.Riemann
 import oncue.svc.funnel.http.{MonitoringServer,SSE}
 import oncue.svc.funnel.elastic._
+import oncue.svc.funnel.zeromq.Mirror
+import java.net.URI
 
 /**
   * How to use: Modify oncue/flask.cfg on the classpath
@@ -28,18 +31,11 @@ object Main {
   import Events.Event
   import scalaz.\/._
 
-  case class HostPort(host: String, port: Int)
-
-  case class Options(
-    elastic: Option[ElasticCfg] = None,
-    riemann: Option[HostPort] = None,
-    riemannTTL: Duration = 5 minutes,
-    funnelPort: Int = 5775,
-    transport: DatapointParser = SSE.readEvents _
-  )
+  lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)
 
   private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
     server.stop()
+    signal.set(false).flatMap(_ => signal.close).run
     R.disconnect
   }
 
@@ -48,7 +44,7 @@ object Main {
     Process.eval(SNS.publish(cfg.require[String]("flask.sns-error-topic"), msg)(sns))
   }
 
-  private def riemannErrorAndQuit(rm: HostPort, f: () => Unit): Unit = {
+  private def riemannErrorAndQuit(rm: RiemannCfg, f: () => Unit): Unit = {
     val msg = s"# Riemann is not running at the specified location (${rm.host}:${rm.port}) #"
     val padding = (for(_ <- 1 to msg.length) yield "#").mkString
     Console.err.println(padding)
@@ -64,7 +60,16 @@ object Main {
     log(e.getStackTrace.toList.mkString("\n","\t\n",""))
   }, identity _))
 
+  private def httpOrZmtp(alive: Signal[Boolean])(uri: URI): Process[Task,Datapoint[Any]] =
+    Option(uri.getScheme).map(_.toLowerCase) match {
+      case Some("http") => SSE.readEvents(uri)
+      case Some("tcp")  => Mirror.from(alive)(uri)
+      case _            => Process.fail(new RuntimeException("Unknown URI scheme submitted."))
+    }
+
   def main(args: Array[String]): Unit = {
+
+
     // merge the file config with the aws config
     val config: Task[Config] = for {
       a <- knobs.loadImmutable(List(Required(
@@ -84,11 +89,11 @@ object Main {
       val elasticTimeout = cfg.lookup[Int]("flask.elastic-search.connection-timeout-in-ms").getOrElse(5000)
       val riemannHost = cfg.lookup[String]("flask.riemann.host")
       val riemannPort = cfg.lookup[Int]("flask.riemann.port")
-      val ttl         = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").getOrElse(5).minutes
-      val riemann     = (riemannHost |@| riemannPort)(HostPort)
+      val ttl         = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").map(_.minutes)
+      val riemann     = (riemannHost |@| riemannPort |@| ttl)(RiemannCfg)
       val elastic     = (elasticURL |@| elasticIx |@| elasticTy)(
         ElasticCfg(_, _, _, elasticDf, elasticTimeout))
-      Task((Options(elastic, riemann, ttl, port), cfg))
+      Task((Options(elastic, riemann, port), cfg))
     }.run
 
     val logger = LoggerFactory.getLogger("flask")
@@ -131,7 +136,7 @@ object Main {
 
     val flaskName = cfg.lookup[String]("flask.name").getOrElse(localhost)
 
-    runAsync(M.processMirroringEvents(SSE.readEvents, flaskName, retries))
+    runAsync(M.processMirroringEvents(httpOrZmtp(signal), flaskName, retries))
 
     options.elastic.foreach { elastic =>
       runAsync(Elastic(M).publish(flaskName)(elastic))
@@ -148,7 +153,7 @@ object Main {
       }
 
       runAsync(Riemann.publishToRiemann(
-        M, options.riemannTTL.toSeconds.toFloat)(
+        M, riemann.ttl.toSeconds.toFloat)(
         R, s"${riemann.host}:${riemann.port}", retries)(flaskName))
     }
   }
