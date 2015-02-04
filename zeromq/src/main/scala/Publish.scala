@@ -20,21 +20,29 @@ object Publish {
   /////////////////////////////// USAGE ///////////////////////////////////
 
   // unsafe!
-  def to(endpoint: Endpoint, signal: Signal[Boolean]): Unit =
+  def to(endpoint: Endpoint)(signal: Signal[Boolean], instance: Monitoring): Unit =
     link(endpoint)(signal)(socket =>
-      fromMonitoringDefault(m => log.debug(m))
+      fromMonitoring(instance)(m => log.debug(m))
         .through(write(socket))
         .onComplete(Process.eval(stop(signal)))
     ).run.runAsync(_ match {
-      case -\/(err) => log.error(s"Unable to stream monitoring events to the domain socket: $err")
-      case \/-(win) => log.info("Streaming monitoring datapoints to the domain socket.")
+      case -\/(err) =>
+        log.error(s"Unable to stream monitoring events to the socket ${endpoint.location.uri}")
+        log.error(s"Error was: $err")
+
+      case \/-(win) =>
+        log.info(s"Streaming monitoring datapoints to the socket at ${endpoint.location.uri}")
     })
 
   import sockets._
 
-  def toUnixSocket(path: String = defaultUnixSocket, signal: Signal[Boolean] = alive): Unit =
+  def toUnixSocket(
+    path: String = defaultUnixSocket,
+    signal: Signal[Boolean] = alive,
+    instance: Monitoring = Monitoring.default
+  ): Unit =
     Endpoint(push &&& connect, new URI(s"ipc://$path")) match {
-      case \/-(e) => to(e, signal)
+      case \/-(e) => to(e)(signal, instance)
       case -\/(f) => sys.error(s"Unable to create endpoint; the specified URI is likley malformed: $f")
     }
 
@@ -48,9 +56,6 @@ object Publish {
     s"${dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes(UTF8)
 
   def fromMonitoring(M: Monitoring)(implicit log: String => Unit): Process[Task, Array[Byte]] =
-    Monitoring.subscribe(M)(_ => true).map(datapointToWireFormat)
-
-  def fromMonitoringDefault(implicit log: String => Unit): Process[Task, Array[Byte]] =
-    fromMonitoring(Monitoring.default)
+    Monitoring.subscribe(M)(Key.StartsWith("previous")).map(datapointToWireFormat)
 
 }
