@@ -1,7 +1,7 @@
 
 resolvers += "im.nexus" at "http://nexus.svc.oncue.com/nexus/content/groups/intel_media_maven/"
 
-addSbtPlugin("oncue.build" %% "sbt-oncue" % "6.5.+")
+addSbtPlugin("oncue.build" %% "sbt-oncue" % "7.0.+")
 
 addSbtPlugin("io.spray" % "sbt-revolver" % "0.7.2")
 

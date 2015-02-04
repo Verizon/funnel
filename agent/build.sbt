@@ -10,9 +10,13 @@ ScalaCheck.settings
 
 ScalaTest.settings
 
+Bundle.settings
+
 Revolver.settings
 
 SbtMultiJvm.multiJvmSettings
+
+normalizedName := "funnel"
 
 libraryDependencies ++= Seq(
   "net.databinder" %% "unfiltered-filter"       % "0.8.3",
