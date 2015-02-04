@@ -4,7 +4,7 @@ This module uses the native ZeroMQ library, but is API compatible with the pure-
 
 ### Installing native support
 
-1. Install ZeroMQ. Be sure to install ZeroMQ 4.0.4 (4.1 is NOT compatible)
+1. Install ZeroMQ. Be sure to install ZeroMQ 4.0.+ (4.1 is NOT compatible)
 
 ```
 brew update && brew install zeromq
@@ -17,7 +17,7 @@ The job is here: [https://jenkins.oncue.verizon.net:8443/job/ThirdParty-jzmq/lab
 3. Unzip the file and execute the following shell
 
 ```
-cd jzmq-3.1.0 && sudo mv libjzmq* /Library/Java/Extensions
+cd jzmq-3.1.0 && sudo mv libjzmq* /Library/Java/Extensions/
 
 ```
 
