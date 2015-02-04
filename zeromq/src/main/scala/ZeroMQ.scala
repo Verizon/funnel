@@ -7,6 +7,7 @@ import scalaz.stream.{Process,Channel,io}
 import scalaz.stream.async.mutable.Signal
 import journal.Logger
 import java.net.URI
+import scalaz.\/
 
 /**
  * Model 0mq as a set of streams. Primary API should be the `link` function.
@@ -31,6 +32,19 @@ object ZeroMQ {
 
   /////////////////////////////// PRIMITIVES ///////////////////////////////////
 
+  /**
+   * Use this to see if the 0mq module can actually be used. This is useful to verify
+   * that the OS has the correct native dependencies installed properly.
+   */
+  def isEnabled: Boolean =
+    \/.fromTryCatchThrowable[String, UnsatisfiedLinkError](ZMQ.getVersionString).isRight
+
+  /**
+   * Create a `Process` that automatically does setup and tear-down for a 0mq socket
+   * when the stream `k` emits `false`. All the while `k` is `true` the 0mq stream
+   * will be active and executing the function `f` on the specified socket (in practice
+   * this is using the `receive` or `write` functions).
+   */
   def linkP[O](e: Endpoint
     )(k: Process[Task,Boolean]
     )(f: Socket => Process[Task,O]): Process[Task, O] =
@@ -40,11 +54,28 @@ object ZeroMQ {
       }
     }
 
+  /**
+   * Rather than using a manually defined `Process` as the kill stream, extract a stream
+   * from a `Signal`.
+   */
   def link[O](e: Endpoint
     )(k: Signal[Boolean]
     )(f: Socket => Process[Task,O]): Process[Task, O] =
     linkP(e)(k.continuous)(f)
 
+  /**
+   * Given a `org.zeromq.ZMQ.Socket` pull bytes off of the wire. This particular function
+   * assumes that there is a message framing system like this:
+   *
+   * +---------------+
+   * |     Header    |
+   * +---------------+
+   * |      Body     |
+   * +---------------+
+   *
+   * If another framing stratagy is needed, another can easily be created by user-level
+   * engineers. Simply make another `Socket => Process[Task, Transported]`.
+   */
   def receive(socket: Socket): Process[Task, Transported] = {
     Process.eval(Task.delay {
       val header: Array[Byte] = socket.recv
@@ -53,6 +84,13 @@ object ZeroMQ {
     }) ++ receive(socket)
   }
 
+  /**
+   * Similar to `receive` but pushing messages to the socket. A `Channel` is essentially
+   * an effectfull stream, that when given a `Array[Byte]` will write that payload to the
+   * 0mq socket. The idea here is that any messages one wishes to send are converted to
+   * `Array[Byte]` using `map` or similar on the input stream; this makes the 0mq streams
+   * not care about serialisation at all.
+   */
   def write(socket: Socket): Channel[Task, Array[Byte], Boolean] =
     io.channel(bytes =>
       Task.delay {
