@@ -43,28 +43,29 @@ class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
         s"Error mirroring $uri: ${e.getMessage}"), identity))
 
   override def beforeAll(){
-    addInstruments(I1)
-    addInstruments(I2)
+    if(Ø.isEnabled){
+      addInstruments(I1)
+      addInstruments(I2)
 
-    Publish.to(E1)(S,M1)
-    Publish.to(E2)(S,M2)
+      Publish.to(E1)(S,M1)
+      Publish.to(E2)(S,M2)
 
-    Thread.sleep(2.seconds.toMillis)
+      Thread.sleep(2.seconds.toMillis)
 
-    mirrorFrom(U1)
-    mirrorFrom(U2)
+      mirrorFrom(U1)
+      mirrorFrom(U2)
 
-    Thread.sleep(W.toMillis*2)
-
+      Thread.sleep(W.toMillis*2)
+    }
   }
 
   override def afterAll(){
     stop(S).run
   }
 
-  "zeromq mirroring" should "pull values from the specified monitoring instance" in {
-    (countKeys(M1) + countKeys(M2)) should equal (MI.keys.get.run.length)
+  if(Ø.isEnabled){
+    "zeromq mirroring" should "pull values from the specified monitoring instance" in {
+      (countKeys(M1) + countKeys(M2)) should equal (MI.keys.get.run.length)
+    }
   }
-
 }
-
