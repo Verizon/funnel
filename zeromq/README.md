@@ -4,44 +4,21 @@ This module uses the native ZeroMQ library, but is API compatible with the pure-
 
 ### Installing native support
 
-1. Install ZeroMQ. 
+1. Install ZeroMQ. Be sure to install ZeroMQ 4.0.4 (4.1 is NOT compatible)
 
 ```
-brew install zeromq
+brew update && brew install zeromq
 ```
 
-2. Install pkg-config.
+2. Download the JZMQ binaries from Jenkins
+
+The job is here: [https://jenkins.oncue.verizon.net:8443/job/ThirdParty-jzmq/label=MacOSX-10.8.5/](https://jenkins.oncue.verizon.net:8443/job/ThirdParty-jzmq/label=MacOSX-10.8.5/)
+
+3. Unzip the file and execute the following shell
 
 ```
-brew install pkg-config
-```
-
-3. Symlink pkg.m4 into /usr/share/aclocal, which is needed for the jzmq build
+cd jzmq-3.1.0 && sudo mv libjzmq* /Library/Java/Extensions
 
 ```
-sudo mkdir /usr/share/aclocal
-sudo ln -s /usr/local/share/aclocal/pkg.m4 /usr/share/aclocal/pkg.m4
-```
 
-4. Clone the jzmq source code
-
-```
-git clone git@github.com:zeromq/jzmq.git
-cd jzmq
-```
-
-5. Run the build
-
-```
-./autogen.sh
-./configure
-make
-make install
-```
-
-You’ll end up with the zmq.jar in `/usr/local/share/java/` and the native lib in `/usr/local/lib`
-
-
-
-
-
+That's it, you're done.
