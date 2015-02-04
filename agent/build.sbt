@@ -10,7 +10,7 @@ ScalaCheck.settings
 
 ScalaTest.settings
 
-RPM.settings
+Bundle.settings
 
 Revolver.settings
 
