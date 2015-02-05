@@ -38,7 +38,7 @@ object Main {
       Options(
         cfg.require[String]("agent.http.host"),
         cfg.lookup[Int]("agent.http.port").getOrElse(8080),
-        cfg.lookup[String]("agent.proxy.socket").getOrElse("/var/run/funnel.socket"),
+        cfg.require[String]("agent.proxy.socket"),
         cfg.lookup[String]("aws.network.local-ipv4")
           .orElse(cfg.lookup[String]("agent.proxy.host"))
           .getOrElse("0.0.0.0"),
@@ -46,12 +46,11 @@ object Main {
       )
     }.run
 
-    val (a,i,o) =
+    val (i,o) =
       (for {
-        x <- \/.fromTryCatchThrowable[String,Exception](InetAddress.getLocalHost.getHostAddress)
-        y <- Endpoint(pull &&& bind, new URI("ipc:///var/run/funnel.socket"))
-        z <- Endpoint(publish &&& bind, new URI(s"tcp://$x:7390"))
-      } yield (x,y,z)).getOrElse(sys.error("Bootstrapping the agent was not possible due to a fatal error."))
+        y <- Endpoint(pull &&& bind, new URI(s"ipc://${options.proxySocket}"))
+        z <- Endpoint(publish &&& bind, new URI(s"tcp://${options.proxyHost}:${options.proxyPort}"))
+      } yield (y,z)).getOrElse(sys.error("Bootstrapping the agent was not possible due to a fatal error."))
 
     // start the streaming 0MQ proxy
     new Proxy(i,o).task.runAsync(_.fold(
