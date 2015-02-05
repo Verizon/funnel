@@ -16,7 +16,7 @@ Revolver.settings
 
 SbtMultiJvm.multiJvmSettings
 
-normalizedName := "funnel"
+normalizedName := "funnel-agent"
 
 libraryDependencies ++= Seq(
   "net.databinder" %% "unfiltered-filter"       % "0.8.3",
