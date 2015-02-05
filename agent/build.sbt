@@ -19,8 +19,9 @@ SbtMultiJvm.multiJvmSettings
 normalizedName := "funnel-agent"
 
 libraryDependencies ++= Seq(
-  "net.databinder" %% "unfiltered-filter"       % "0.8.3",
-  "net.databinder" %% "unfiltered-netty-server" % "0.8.3"
+  "net.databinder"  %% "unfiltered-filter"       % "0.8.3",
+  "net.databinder"  %% "unfiltered-netty-server" % "0.8.3",
+  "oncue.svc.knobs" %% "core"                    % "2.0.+"
 )
 
 mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.Main")
