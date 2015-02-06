@@ -46,6 +46,11 @@ object Main {
       )
     }.run
 
+    /**
+     * attempt to create and bind endpoints for both the domain socket
+     * AND the TCP socket going outbound. If this cannot be achived, the
+     * agent is critically failed.
+     */
     val (i,o) =
       (for {
         y <- Endpoint(pull &&& bind, new URI(s"ipc://${options.proxySocket}"))
@@ -57,6 +62,15 @@ object Main {
       e => log.error(s"0mq proxy resulted in failure: $e"),
       _ => ()
     ))
+
+    /**
+     * For metrics that are produced by the agent itself, publish them to the
+     * local domain socket like any other application such that they will
+     * then be consumed by the very same agent proxy to TCP.
+     *
+     * This is a bit of a hack, but it works!
+     */
+    zeromq.Publish.toUnixSocket()
 
     // start the remote instruments server
     unfiltered.netty.Server.http(options.httpPort, options.httpHost)
