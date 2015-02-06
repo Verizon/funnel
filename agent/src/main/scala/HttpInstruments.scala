@@ -23,8 +23,10 @@ object JsonResponse {
 object HttpInstruments extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
   import JSON._
   import concurrent.duration._
+  import instruments._
+  import metrics._
 
-  implicit val instruments = new Instruments(1.minute)
+  implicit val I = new Instruments(1.minute)
 
   private def decode[A : DecodeJson](req: HttpRequest[Any])(f: A => ResponseFunction[Any]) =
     JsonRequest(req).decodeEither[A].map(f).fold(fail => BadRequest ~> ResponseString(fail), identity)
@@ -32,10 +34,12 @@ object HttpInstruments extends cycle.Plan with cycle.SynchronousExecution with S
   def intent = {
     case r@Path("/metrics") => r match {
       case POST(_) =>
-        decode[InstrumentRequest](r){ typed =>
-          RemoteInstruments.metricsFromRequest(typed)(instruments).map { _ =>
-            Ok ~> JsonResponse("ok.")
-          }.or(Task.now(InternalServerError ~> JsonResponse("failed."))).run
+        http.MetricLatency.time {
+          decode[InstrumentRequest](r){ typed =>
+            RemoteInstruments.metricsFromRequest(typed)(I).map { _ =>
+              Ok ~> JsonResponse("ok.")
+            }.or(Task.now(InternalServerError ~> JsonResponse("failed."))).run
+          }
         }
       case _ => BadRequest
     }
