@@ -70,7 +70,7 @@ object Main {
      *
      * This is a bit of a hack, but it works!
      */
-    zeromq.Publish.toUnixSocket()
+    zeromq.Publish.toUnixSocket(path = s"${options.proxySocket}")
 
     // start the remote instruments server
     unfiltered.netty.Server.http(options.httpPort, options.httpHost)
