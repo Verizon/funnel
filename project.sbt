@@ -33,6 +33,8 @@ lazy val flask = project.dependsOn(aws, riemann, elastic, zeromq)
 
 lazy val http = project.dependsOn(core)
 
+lazy val nginx = project.dependsOn(core)
+
 lazy val riemann = project.dependsOn(core)
 
 lazy val zeromq = project.dependsOn(http).configs(MultiJvm)
