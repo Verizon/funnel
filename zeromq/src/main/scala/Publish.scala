@@ -41,10 +41,12 @@ object Publish {
     signal: Signal[Boolean] = alive,
     instance: Monitoring = Monitoring.default
   ): Unit =
-    Endpoint(push &&& connect, new URI(s"ipc://$path")) match {
-      case \/-(e) => to(e)(signal, instance)
-      case -\/(f) => sys.error(s"Unable to create endpoint; the specified URI is likley malformed: $f")
-    }
+    if(Ø.isEnabled){
+      Endpoint(push &&& connect, new URI(s"ipc://$path")) match {
+        case \/-(e) => to(e)(signal, instance)
+        case -\/(f) => sys.error(s"Unable to create endpoint; the specified URI is likley malformed: $f")
+      }
+    } else Ø.log.warn("ZeroMQ binaries not installed. No Funnel telemetry will be published.")
 
   /////////////////////////////// INTERNALS ///////////////////////////////////
 
