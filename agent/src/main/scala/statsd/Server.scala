@@ -1,5 +1,6 @@
 package oncue.svc.funnel
-package agent.statsd
+package agent
+package statsd
 
 import java.net.InetSocketAddress
 import java.util.concurrent.Executors
