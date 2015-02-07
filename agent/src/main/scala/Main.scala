@@ -5,9 +5,12 @@ import knobs._
 import scalaz.\/
 import java.io.File
 import journal.Logger
-import zeromq._, sockets._
 import scalaz.concurrent.Task
 import java.net.{InetAddress,URI}
+import oncue.svc.funnel.zeromq._, sockets._
+import oncue.svc.funnel.agent.zeromq._
+import oncue.svc.funnel.agent.http._
+import oncue.svc.funnel.agent.statsd._
 
 object Main {
   private val log = Logger[Main.type]
@@ -70,11 +73,11 @@ object Main {
      *
      * This is a bit of a hack, but it works!
      */
-    zeromq.Publish.toUnixSocket(path = s"${options.proxySocket}")
+    Publish.toUnixSocket(path = s"${options.proxySocket}")
 
     // start the remote instruments server
     unfiltered.netty.Server.http(options.httpPort, options.httpHost)
-      .handler(HttpInstruments)
+      .handler(http.Server)
       .run
   }
 }

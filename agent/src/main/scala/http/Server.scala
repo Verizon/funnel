@@ -1,5 +1,6 @@
 package oncue.svc.funnel
 package agent
+package http
 
 import unfiltered.request._
 import unfiltered.response._
@@ -20,7 +21,7 @@ object JsonResponse {
 }
 
 @io.netty.channel.ChannelHandler.Sharable
-object HttpInstruments extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
+object Server extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
   import JSON._
   import concurrent.duration._
   import instruments._
