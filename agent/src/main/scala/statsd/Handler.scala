@@ -2,9 +2,6 @@ package oncue.svc.funnel
 package agent
 package statsd
 
-// import scala.math.round
-// import util.matching.Regex
-// import java.util.concurrent.TimeUnit
 import scalaz.concurrent.Task
 import io.netty.channel.{SimpleChannelInboundHandler,ChannelHandlerContext}
 
