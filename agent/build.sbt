@@ -22,8 +22,11 @@ libraryDependencies ++= Seq(
   "net.databinder"  %% "unfiltered-filter"       % "0.8.3",
   "net.databinder"  %% "unfiltered-netty-server" % "0.8.3",
   "oncue.svc.knobs" %% "core"                    % "2.0.+",
-  "io.netty"         % "netty"                   % "3.6.2.Final"
+  "io.netty"         % "netty-handler"           % "4.0.25.Final",
+  "io.netty"         % "netty-codec"             % "4.0.25.Final"
 )
+
+scalacOptions := Compilation.flags.filterNot(_ == "-Xlint")
 
 mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.Main")
 
