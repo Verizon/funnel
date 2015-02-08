@@ -27,8 +27,6 @@ class Server(I: Instruments) extends cycle.Plan with cycle.SynchronousExecution 
   import instruments._
   import metrics._
 
-  // implicit val I = new Instruments(1.minute)
-
   private def decode[A : DecodeJson](req: HttpRequest[Any])(f: A => ResponseFunction[Any]) =
     JsonRequest(req).decodeEither[A].map(f).fold(fail => BadRequest ~> ResponseString(fail), identity)
 
