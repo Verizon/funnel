@@ -19,7 +19,7 @@ object Server {
         .option[java.lang.Boolean](ChannelOption.SO_BROADCAST, true)
         .handler(new Handler(prefix,I))
 
-      b.bind(new InetSocketAddress(port))
+      b.bind(new InetSocketAddress(host,port))
        .sync()
        .channel()
        .closeFuture()
