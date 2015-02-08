@@ -12,14 +12,14 @@ import io.netty.channel.socket.nio.NioDatagramChannel
 object Server {
   val DefaultPort = 8125
 
-  def apply(port: Int, prefix: String){
+  def apply(port: Int, prefix: String)(cluster: String, I: Instruments){
     val group = new NioEventLoopGroup
     try {
       val b = new Bootstrap
       b.group(group)
         .channel(classOf[NioDatagramChannel])
         .option[java.lang.Boolean](ChannelOption.SO_BROADCAST, true)
-        .handler(new Handler(prefix))
+        .handler(new Handler(prefix)(cluster,I))
 
       b.bind(new InetSocketAddress(port))
        .sync()

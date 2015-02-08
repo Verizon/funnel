@@ -30,7 +30,7 @@ object Parser {
     }.leftMap(err => new RuntimeException(s"Unable to parse input. Check the formating and ensure you are using valid statsd syntax. Error was: $err"))
   }
 
-  private def toInstrumentKind(s: String): Throwable \/ InstrumentKind = {
+  private[statsd] def toInstrumentKind(s: String): Throwable \/ InstrumentKind = {
     s.trim match {
       case "c"  => \/.right(InstrumentKinds.Counter)
       case "ms" => \/.right(InstrumentKinds.Timer)
@@ -40,7 +40,7 @@ object Parser {
     }
   }
 
-  private def toValue(s: String, rate: Double): Throwable \/ Long = {
+  private[statsd] def toValue(s: String, rate: Double): Throwable \/ Long = {
     for {
       a <- \/.fromTryCatchThrowable[String,Throwable](s.trim.toLowerCase)
       _ <- if(a == "delete") \/.left(new Exception("Deletion is not supported.")) else \/.right(a)
@@ -48,7 +48,7 @@ object Parser {
     } yield round(b * 1 / rate)
   }
 
-  private def toSampleRate(s: String): Throwable \/ Double =
+  private[statsd] def toSampleRate(s: String): Throwable \/ Double =
     Option(s).map(_.toDouble).map(\/.right(_))
       .getOrElse(\/.right(1.0))
 
