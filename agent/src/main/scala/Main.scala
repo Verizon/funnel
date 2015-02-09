@@ -2,7 +2,7 @@ package oncue.svc.funnel
 package agent
 
 import knobs._
-import scalaz.\/
+import scalaz.{\/,-\/,\/-}
 import java.io.File
 import journal.Logger
 import scalaz.std.option._
@@ -19,7 +19,7 @@ object Main {
   private val log = Logger[Main.type]
 
   case class HttpConfig(host: String, port: Int)
-  case class StatsdConfig(host: String, port: Int, prefix: String)
+  case class StatsdConfig(port: Int, prefix: String)
   case class ProxyConfig(host: String, port: Int, socket: String)
 
   case class Options(
@@ -29,6 +29,8 @@ object Main {
   )
 
   def main(args: Array[String]): Unit = {
+    log.info("Loading agent configuation from disk.")
+
     val config: Task[Config] = for {
       a <- knobs.loadImmutable(List(Required(
         FileResource(new File("/usr/share/oncue/etc/agent.cfg")) or
@@ -45,7 +47,6 @@ object Main {
     val options: Options = config.map { cfg =>
       val httpHost    = cfg.lookup[String]("agent.http.host")
       val httpPort    = cfg.lookup[Int]("agent.http.port")
-      val statsdHost  = cfg.lookup[String]("agent.statsd.host")
       val statsdPort  = cfg.lookup[Int]("agent.statsd.port")
       val statsdPfx   = cfg.lookup[String]("agent.statsd.prefix")
       val proxySocket = cfg.lookup[String]("agent.proxy.socket")
@@ -55,7 +56,7 @@ object Main {
 
       Options(
         http = (httpHost |@| httpPort)(HttpConfig),
-        statsd = (statsdHost |@| statsdPort |@| statsdPfx)(StatsdConfig),
+        statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
         proxy = (proxyHost |@| proxyPort |@| proxySocket)(ProxyConfig)
       )
     }.run
@@ -72,6 +73,8 @@ object Main {
      * agent is critically failed.
      */
     options.proxy.foreach { proxy =>
+      log.info("Launching the 0mq proxy.")
+
       val (i,o) =
         (for {
           y <- Endpoint(pull &&& bind, new URI(s"ipc://${proxy.socket}"))
@@ -84,6 +87,7 @@ object Main {
         _ => ()
       ))
 
+      log.info(s"Enabling 0mq metric publication to ${proxy.socket}.")
       /**
        * For metrics that are produced by the agent itself, publish them to the
        * local domain socket like any other application such that they will
@@ -96,11 +100,16 @@ object Main {
 
     // start the statsd instruments server
     options.statsd.foreach { stats =>
-      statsd.Server(stats.host, stats.port, stats.prefix)(I)
+      log.info("Launching the StatsD instrument interface.")
+      statsd.Server(stats.port, stats.prefix)(I).runAsync {
+        case -\/(e) => log.error(s"Unable to start the StatsD interface: ${e.getMessage}")
+        case _      => ()
+      }
     }
 
     // start the http instruments server
     options.http.foreach { config =>
+      log.info("Launching the HTTP instrument interface.")
       unfiltered.netty.Server.http(config.port, config.host)
         .handler(new http.Server(I))
         .run
