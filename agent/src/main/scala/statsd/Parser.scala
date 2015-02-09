@@ -3,12 +3,13 @@ package agent
 package statsd
 
 import scala.math.round
-// import java.util.concurrent.TimeUnit
 import util.matching.Regex
 import scalaz.\/
 
 object Parser {
 
+  // borrowed this from the bsd work here:
+  // https://github.com/mojodna/metricsd
   private[statsd] val matcher =
     new Regex("""([^:]+)(:((-?\d+|delete)?(\|((\w+)(\|@(\d+\.\d+))?)?)?)?)?""")
 
@@ -24,7 +25,7 @@ object Parser {
     } yield ArbitraryMetric(a._1,b,Option(d.toString))
 
   private[statsd] def fromString(line: String): Throwable \/ (String,String,String,String) = {
-    \/.fromTryCatchThrowable[(String,String,String,String), MatchError] {
+    \/.fromTryCatchNonFatal {
       val matcher(name,_,_,value,_,_,kind,_, sampleRate) = line
       (name, value, kind, sampleRate)
     }.leftMap(err => new RuntimeException(s"Unable to parse input. Check the formating and ensure you are using valid statsd syntax. Error was: $err"))
@@ -42,9 +43,9 @@ object Parser {
 
   private[statsd] def toValue(s: String, rate: Double): Throwable \/ Long = {
     for {
-      a <- \/.fromTryCatchThrowable[String,Throwable](s.trim.toLowerCase)
+      a <- \/.fromTryCatchNonFatal(s.trim.toLowerCase)
       _ <- if(a == "delete") \/.left(new Exception("Deletion is not supported.")) else \/.right(a)
-      b <- \/.fromTryCatchThrowable[Long,Throwable](a.toLong)
+      b <- \/.fromTryCatchNonFatal(a.toLong)
     } yield round(b * 1 / rate)
   }
 
