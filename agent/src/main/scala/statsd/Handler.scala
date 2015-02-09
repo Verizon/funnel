@@ -13,10 +13,7 @@ class Handler(prefix: String, I: Instruments) extends SimpleChannelInboundHandle
     msg.trim.split("\n").foreach { line: String =>
       val task = Parser.toRequest(line)(prefix).fold(
         a => Task.fail(a),
-        b => {
-          println(">>>>>> " +b+ " <<<<<<<")
-          RemoteInstruments.metricsFromRequest(b)(I)
-        })
+        b => RemoteInstruments.metricsFromRequest(b)(I))
 
       task.run // unsafe!
     }
