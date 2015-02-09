@@ -19,7 +19,7 @@ object TestingMultiJvmPublisher {
       b <- Endpoint(publish &&& bind, Settings.tcp)
     } yield (a,b)).getOrElse(sys.error("Unable to configure the endpoints for the agent."))
 
-    new Proxy(i,o).task.run
+    new zeromq.Proxy(i,o).task.run
   }
 }
 

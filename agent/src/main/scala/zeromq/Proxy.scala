@@ -1,4 +1,5 @@
 package oncue.svc.funnel.agent
+package zeromq
 
 import oncue.svc.funnel.zeromq._
 import scalaz.stream.async.signal

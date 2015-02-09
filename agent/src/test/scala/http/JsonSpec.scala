@@ -1,5 +1,6 @@
 package oncue.svc.funnel
 package agent
+package http
 
 import org.scalatest._
 import scalaz._

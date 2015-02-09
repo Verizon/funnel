@@ -11,9 +11,9 @@ ScalaTest.settings
 
 ContinuousIntegration.produceCoverageReport := false
 
-scalacOptions := Compilation.flags.filterNot(_ == "-Xlint") ++ Seq(
-  "-language:postfixOps"
-)
+Custom.compilation
+
+scalacOptions += "-language:postfixOps"
 
 libraryDependencies ++= Seq(
   "org.scalaz.stream"    %% "scalaz-stream"    % "0.6a",

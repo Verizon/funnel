@@ -131,7 +131,7 @@ object ZeroMQ {
     endpoint: Endpoint,
     threadCount: Int = 1
   ): Task[Connection] = {
-    log.info(s"Setting up endpoint '${endpoint.location}'...")
+    log.debug(s"Setting up endpoint '${endpoint.location.uri}'...")
     for {
       a <- Task.delay(ZMQ.context(threadCount))
       b <- endpoint.configure(a)
