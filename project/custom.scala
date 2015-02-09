@@ -22,4 +22,19 @@ object Custom {
           testResults.summaries ++ multiNodeResults.summaries)
     }
   )
+
+  val toolsJar = {
+    val javaHome = Path(Path.fileProperty("java.home").asFile.getParent)
+    val toolsJar = Option(javaHome / "lib" / "tools.jar").filter { _.exists }
+    if (toolsJar.isEmpty && !appleJdk6OrPrior) sys.error("tools.jar not in $JAVA_HOME/lib")
+    toolsJar.toSeq
+  }
+
+  def appleJdk6OrPrior: Boolean = {
+    (sys.props("java.vendor") contains "Apple") && {
+      val JavaVersion = """^(\d+)\.(\d+)\..*$""".r
+      val JavaVersion(major, minor) = sys.props("java.version")
+      major.toInt == 1 && minor.toInt < 7
+    }
+  }
 }

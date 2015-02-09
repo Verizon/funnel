@@ -27,7 +27,12 @@ libraryDependencies ++= Seq(
   "net.databinder"  %% "unfiltered-netty-server" % "0.8.3",
   "oncue.svc.knobs" %% "core"                    % "2.0.+",
   "io.netty"         % "netty-handler"           % "4.0.25.Final",
-  "io.netty"         % "netty-codec"             % "4.0.25.Final"
+  "io.netty"         % "netty-codec"             % "4.0.25.Final",
+  "com.github.cjmx" %% "cjmx"                    % "2.2.+" exclude("org.scala-sbt","completion") exclude("com.google.code.gson","gson")
 )
 
 mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.Main")
+
+unmanagedClasspath in Compile ++= Custom.toolsJar
+
+unmanagedClasspath in Test ++= Custom.toolsJar
