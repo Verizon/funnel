@@ -16,6 +16,10 @@ Revolver.settings
 
 SbtMultiJvm.multiJvmSettings
 
+Custom.testing
+
+Custom.compilation
+
 normalizedName := "funnel-agent"
 
 libraryDependencies ++= Seq(
@@ -26,20 +30,4 @@ libraryDependencies ++= Seq(
   "io.netty"         % "netty-codec"             % "4.0.25.Final"
 )
 
-scalacOptions := Compilation.flags.filterNot(_ == "-Xlint")
-
 mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.Main")
-
-compile in MultiJvm <<= (compile in MultiJvm) triggeredBy (compile in Test)
-
-executeTests in Test <<= (executeTests in Test, executeTests in MultiJvm) map {
-  case (testResults, multiNodeResults)  =>
-    val overall =
-      if (testResults.overall.id < multiNodeResults.overall.id)
-        multiNodeResults.overall
-      else
-        testResults.overall
-    Tests.Output(overall,
-      testResults.events ++ multiNodeResults.events,
-      testResults.summaries ++ multiNodeResults.summaries)
-}
