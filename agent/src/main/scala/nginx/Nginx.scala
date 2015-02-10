@@ -2,43 +2,22 @@ package oncue.svc.funnel
 package agent
 package nginx
 
-import util.matching.Regex
-import scalaz.\/
-import journal.Logger
+import java.net.URI
+import scala.io.Source
+import scalaz.stream.Process
+import scalaz.concurrent.{Task,Strategy}
+import scala.concurrent.duration._
 
 object Nginx {
+  import Monitoring.{defaultPool,schedulingPool}
 
-  private val log = Logger[Nginx.type]
+  private[nginx] def statistics(from: URI): Task[Stats] =
+    for {
+      a <- Task(Source.fromURL(from.toURL).mkString)
+      b <- Parser.parse(a).fold(e => Task.fail(e), Task.delay(_))
+    } yield b
 
-  case class Stats(
-    connections: Long = 0,
-    accepts: Long = 0,
-    handled: Long = 0,
-    requests: Long = 0,
-    reading: Long = 0,
-    writing: Long = 0,
-    waiting: Long = 0
-  )
-
-  private[nginx] val activeR = """^Active connections:\s+(\d+)""".r
-  private[nginx] val handledR = """^\s+(\d+)\s+(\d+)\s+(\d+)""".r
-  private[nginx] val currentR = """^Reading:\s+(\d+).*Writing:\s+(\d+).*Waiting:\s+(\d+)""".r
-
-  def parse(input: String): Throwable \/ Stats = \/.fromTryCatchNonFatal {
-    val Array(line1, line2, line3, line4) = input.split('\n')
-
-    val activeR(connections)                 = line1
-    val handledR(accepts, handled, requests) = line3
-    val currentR(reading, writing, waiting)  = line4
-
-    Stats(
-      connections.toLong,
-      accepts.toLong,
-      handled.toLong,
-      requests.toLong,
-      reading.toLong,
-      writing.toLong,
-      waiting.toLong)
-  }
-
+  def periodic(from: URI)(frequency: Duration = 10.seconds): Process[Task,Stats] =
+    Process.awakeEvery(frequency)(Strategy.Executor(defaultPool), schedulingPool
+      ).evalMap(_ => statistics(from))
 }
