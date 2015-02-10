@@ -1,9 +1,11 @@
 
 import oncue.build._
-import com.typesafe.sbt.SbtMultiJvm
-import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 
 OnCue.baseSettings
+
+Custom.testing
+
+Custom.compilation
 
 libraryDependencies ++= Seq(
   "net.databinder" %% "unfiltered-filter"       % "0.8.3",

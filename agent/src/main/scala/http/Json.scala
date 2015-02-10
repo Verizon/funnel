@@ -1,5 +1,6 @@
 package oncue.svc.funnel
 package agent
+package http
 
 import argonaut._, Argonaut._
 
@@ -7,27 +8,6 @@ case class Request(
   cluster: String,
   metrics: List[ArbitraryMetric]
 )
-case class ArbitraryMetric(
-  name: String,
-  kind: InstrumentKind,
-  value: Option[String]
-)
-
-case class InstrumentRequest(
-  cluster: String,
-  counters: List[ArbitraryMetric] = Nil,
-  timers: List[ArbitraryMetric] = Nil,
-  stringGauges: List[ArbitraryMetric] = Nil,
-  doubleGauges: List[ArbitraryMetric] = Nil
-)
-
-trait InstrumentKind
-object InstrumentKinds {
-  case object Counter extends InstrumentKind
-  case object Timer extends InstrumentKind
-  case object GaugeString extends InstrumentKind
-  case object GaugeDouble extends InstrumentKind
-}
 
 object JSON {
   import InstrumentKinds._

@@ -12,6 +12,8 @@ Revolver.settings
 
 ScalaTest.settings
 
+Custom.compilation
+
 fork in test := true
 
 libraryDependencies ++= Seq(
@@ -26,6 +28,4 @@ mainClass in Compile := Some("oncue.svc.laboratory.Main")
 
 mainClass in Revolver.reStart := Some("oncue.svc.laboratory.Main")
 
-scalacOptions := Compilation.flags.filterNot(_ == "-Xlint") ++ Seq(
-  "-language:postfixOps"
-)
+scalacOptions += "-language:postfixOps"
