@@ -2,9 +2,10 @@ package oncue.svc.funnel
 package agent
 
 import knobs._
-import scalaz.{\/,-\/,\/-}
+import java.net.URI
 import java.io.File
 import journal.Logger
+import scalaz.{\/,-\/,\/-}
 import scalaz.std.option._
 import scalaz.concurrent.Task
 import java.net.{InetAddress,URI}
@@ -22,7 +23,7 @@ object Main {
   case class HttpConfig(host: String, port: Int)
   case class StatsdConfig(port: Int, prefix: String)
   case class ProxyConfig(host: String, port: Int, socket: String)
-  case class NginxConfig(frequency: Duration)
+  case class NginxConfig(uri: String, frequency: Duration)
 
   case class Options(
     http: Option[HttpConfig],
@@ -58,21 +59,26 @@ object Main {
      * known interfaces host if that fails.
      */
     val options: Options = config.map { cfg =>
+      // http
       val httpHost    = cfg.lookup[String]("agent.http.host")
       val httpPort    = cfg.lookup[Int]("agent.http.port")
+      // statsd
       val statsdPort  = cfg.lookup[Int]("agent.statsd.port")
       val statsdPfx   = cfg.lookup[String]("agent.statsd.prefix")
+      // zeromq
       val proxySocket = cfg.lookup[String]("agent.proxy.socket")
       val proxyHost   = cfg.lookup[String]("aws.network.local-ipv4")
         .orElse(cfg.lookup[String]("agent.proxy.host"))
       val proxyPort   = cfg.lookup[Int]("agent.proxy.port")
+      // nginx
       val nginxFreq   = cfg.lookup[Duration]("agent.nginx.poll-frequency")
+      val nginxUrl    = cfg.lookup[String]("agent.nginx.url")
 
       Options(
         http   = (httpHost |@| httpPort)(HttpConfig),
         statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
         proxy  = (proxyHost |@| proxyPort |@| proxySocket)(ProxyConfig),
-        nginx  = (nginxFreq)(NginxConfig)
+        nginx  = (nginxUrl |@| nginxFreq)(NginxConfig)
       )
     }.run
 
@@ -103,6 +109,7 @@ object Main {
       ))
 
       log.info(s"Enabling 0mq metric publication to ${proxy.socket}.")
+
       /**
        * For metrics that are produced by the agent itself, publish them to the
        * local domain socket like any other application such that they will
@@ -111,6 +118,14 @@ object Main {
        * This is a bit of a hack, but it works!
        */
       Publish.toUnixSocket(path = s"${proxy.socket}")
+    }
+
+    // start the nginx statistics importer
+    options.nginx.foreach { n =>
+      nginx.Import.periodicly(new URI(n.uri))(n.frequency).run.runAsync {
+        case -\/(e) => log.error(s"An error occoured with the nginx import: $e")
+        case _      => ()
+      }
     }
 
     // start the statsd instruments server
