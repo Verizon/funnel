@@ -9,7 +9,7 @@ fork in (run in Test) := true
 
 libraryDependencies ++= Seq(
   "net.databinder.dispatch" %% "dispatch-core" % "0.11.2",
-  "oncue.svc.knobs"      %% "core"          % "2.0.+"
+  "oncue.svc.knobs"         %% "core"          % V.knobs
 )
 
 scalacOptions += "-language:postfixOps"
