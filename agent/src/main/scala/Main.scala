@@ -22,13 +22,13 @@ object Main {
 
   case class HttpConfig(host: String, port: Int)
   case class StatsdConfig(port: Int, prefix: String)
-  case class ProxyConfig(host: String, port: Int, socket: String)
+  case class ZeromqConfig(socket: String, proxy: Option[ProxyConfig])
   case class NginxConfig(uri: String, frequency: Duration)
 
   case class Options(
     http: Option[HttpConfig],
     statsd: Option[StatsdConfig],
-    proxy: Option[ProxyConfig],
+    zeromq: Option[ZeromqConfig],
     nginx: Option[NginxConfig]
   )
 
@@ -66,18 +66,18 @@ object Main {
       val statsdPort  = cfg.lookup[Int]("agent.statsd.port")
       val statsdPfx   = cfg.lookup[String]("agent.statsd.prefix")
       // zeromq
-      val proxySocket = cfg.lookup[String]("agent.proxy.socket")
+      val proxySocket = cfg.lookup[String]("agent.zeromq.socket")
       val proxyHost   = cfg.lookup[String]("aws.network.local-ipv4")
-        .orElse(cfg.lookup[String]("agent.proxy.host"))
-      val proxyPort   = cfg.lookup[Int]("agent.proxy.port")
+        .orElse(cfg.lookup[String]("agent.zeromq.proxy.host"))
+      val proxyPort   = cfg.lookup[Int]("agent.zeromq.proxy.port")
       // nginx
       val nginxFreq   = cfg.lookup[Duration]("agent.nginx.poll-frequency")
       val nginxUrl    = cfg.lookup[String]("agent.nginx.url")
 
       Options(
-        http   = (httpHost |@| httpPort)(HttpConfig),
+        http = (httpHost |@| httpPort)(HttpConfig),
         statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
-        proxy  = (proxyHost |@| proxyPort |@| proxySocket)(ProxyConfig),
+        zeromq = proxySocket.map(ZeromqConfig(_, (proxyHost |@| proxyPort)(ProxyConfig))),
         nginx  = (nginxUrl |@| nginxFreq)(NginxConfig)
       )
     }.run
@@ -93,22 +93,25 @@ object Main {
      * AND the TCP socket going outbound. If this cannot be achived, the
      * agent is critically failed.
      */
-    options.proxy.foreach { proxy =>
-      log.info("Launching the 0mq proxy.")
+    options.zeromq.foreach { zero =>
 
-      val (i,o) =
-        (for {
-          y <- Endpoint(pull &&& bind, new URI(s"ipc://${proxy.socket}"))
-          z <- Endpoint(publish &&& bind, new URI(s"tcp://${proxy.host}:${proxy.port}"))
-        } yield (y,z)).getOrElse(sys.error("Bootstrapping the agent was not possible due to a fatal error."))
+      zero.proxy.foreach { proxy =>
+        log.info("Launching the 0mq proxy.")
 
-      // start the streaming 0MQ proxy
-      new Proxy(i,o).task.runAsync(_.fold(
-        e => log.error(s"0mq proxy resulted in failure: $e"),
-        _ => ()
-      ))
+        val (i,o) =
+          (for {
+            y <- Endpoint(pull &&& bind, new URI(s"ipc://${zero.socket}"))
+            z <- Endpoint(publish &&& bind, new URI(s"tcp://${proxy.host}:${proxy.port}"))
+          } yield (y,z)).getOrElse(sys.error("Bootstrapping the agent was not possible due to a fatal error."))
 
-      log.info(s"Enabling 0mq metric publication to ${proxy.socket}.")
+        // start the streaming 0MQ proxy
+        new Proxy(i,o).task.runAsync(_.fold(
+          e => log.error(s"0mq proxy resulted in failure: $e"),
+          _ => ()
+        ))
+      }
+
+      log.info(s"Enabling 0mq metric publication to ${zero.socket}.")
 
       /**
        * For metrics that are produced by the agent itself, publish them to the
@@ -117,7 +120,7 @@ object Main {
        *
        * This is a bit of a hack, but it works!
        */
-      Publish.toUnixSocket(path = s"${proxy.socket}")
+      Publish.toUnixSocket(path = s"${zero.socket}")
     }
 
     // start the nginx statistics importer
