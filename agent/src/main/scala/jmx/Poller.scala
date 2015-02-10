@@ -5,5 +5,5 @@ package jmx
 import cjmx.util.jmx.Attach
 
 object Poller {
-  def listVMs = Attach.localVMIDs
+  def listVMs = Attach.localVMs
 }
