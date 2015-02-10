@@ -19,6 +19,7 @@ object Main {
 
   case class HttpConfig(host: String, port: Int)
   case class StatsdConfig(port: Int, prefix: String)
+  case class ProxyConfig(host: String, port: Int)
   case class ZeromqConfig(socket: String, proxy: Option[ProxyConfig])
   case class NginxConfig(uri: String, frequency: Duration)
 
