@@ -13,9 +13,6 @@ import scalaz.syntax.applicative._
 import scala.concurrent.duration._
 import oncue.svc.funnel.zeromq._, sockets._
 import agent.zeromq._
-// import agent.http._
-// import agent.statsd._
-// import agent.nginx.Nginx
 
 object Main {
   private val log = Logger[Main.type]
