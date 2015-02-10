@@ -30,16 +30,6 @@ object Main {
     nginx: Option[NginxConfig]
   )
 
-  // remove this once the PR to knobs has been accepted.
-  // implicit val configuredDuration: Configured[Duration] = new Configured[Duration]{
-  //   def apply(a: CfgValue) = a match {
-  //     case CfgText(b) =>
-  //       \/.fromTryCatchNonFatal(Duration(b)
-  //         ).fold(_ => Option.empty,Option(_))
-  //     case _ => None
-  //   }
-  // }
-
   def main(args: Array[String]): Unit = {
     log.info("Loading agent configuation from disk.")
 
