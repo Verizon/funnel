@@ -1,4 +1,4 @@
-Active connections: 1
+Active connections: 1 
 server accepts handled requests
- 43 44 45
-Reading: 0 Writing: 1 Waiting: 2
+ 43 44 45 
+Reading: 0 Writing: 1 Waiting: 2 

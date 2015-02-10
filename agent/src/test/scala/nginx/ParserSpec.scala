@@ -29,19 +29,19 @@ class ParserSpec extends FlatSpec with Matchers {
   }
 
   "activeR" should "parse the active connections line" in {
-    val Parser.activeR(o) = "Active connections: 1"
+    val Parser.activeR(o) = "Active connections: 1 "
     o should equal ("1")
   }
 
   "handledR" should "parse the handled line" in {
-    val Parser.handledR(a,b,c) = " 5 6 7"
+    val Parser.handledR(a,b,c) = " 5 6 7 "
     a should equal ("5")
     b should equal ("6")
     c should equal ("7")
   }
 
   "currentR" should "parse the current line" in {
-    val Parser.currentR(a,b,c) = "Reading: 0 Writing: 1 Waiting: 9"
+    val Parser.currentR(a,b,c) = "Reading: 0 Writing: 1 Waiting: 9 "
     a should equal ("0")
     b should equal ("1")
     c should equal ("9")

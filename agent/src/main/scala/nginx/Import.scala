@@ -23,7 +23,7 @@ object Import {
     val Requests    = gauge("nginx/lifetime/requests", 0d, Units.Count,  description = "Number of recieved requests this server has seen since bootup")
   }
 
-  private[nginx] def statistics(from: URI): Task[Stats] =
+  def statistics(from: URI): Task[Stats] =
     for {
       a <- Task(Source.fromURL(from.toURL).mkString)
       b <- Parser.parse(a).fold(e => Task.fail(e), Task.delay(_))

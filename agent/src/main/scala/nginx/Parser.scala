@@ -15,9 +15,9 @@ object Parser {
 
   private val log = Logger[Parser.type]
 
-  private[nginx] val activeR = """^Active connections:\s+(\d+)""".r
-  private[nginx] val handledR = """^\s+(\d+)\s+(\d+)\s+(\d+)""".r
-  private[nginx] val currentR = """^Reading:\s+(\d+).*Writing:\s+(\d+).*Waiting:\s+(\d+)""".r
+  private[nginx] val activeR = """^Active connections:\s+(\d+)\s+""".r
+  private[nginx] val handledR = """^\s+(\d+)\s+(\d+)\s+(\d+)\s+""".r
+  private[nginx] val currentR = """^Reading:\s+(\d+).*Writing:\s+(\d+).*Waiting:\s+(\d+)\s+""".r
 
   def parse(input: String): Throwable \/ Stats = \/.fromTryCatchNonFatal {
     val Array(line1, line2, line3, line4) = input.split('\n')
@@ -35,5 +35,4 @@ object Parser {
       writing.toLong,
       waiting.toLong)
   }
-
 }
