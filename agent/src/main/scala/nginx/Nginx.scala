@@ -25,24 +25,20 @@ object Nginx {
   private[nginx] val currentR = """^Reading:\s+(\d+).*Writing:\s+(\d+).*Waiting:\s+(\d+)""".r
 
   def parse(input: String): Throwable \/ Stats = \/.fromTryCatchNonFatal {
-    val Array(line1, line2, line3) = input.split('\n')
-
-    log.debug(s"line 1 = $line1")
-    log.debug(s"line 2 = $line2")
-    log.debug(s"line 3 = $line3")
+    val Array(line1, line2, line3, line4) = input.split('\n')
 
     val activeR(connections)                 = line1
-    // val handledR(accepts, handled, requests) = line2
-    // val currentR(reading, writing, waiting)  = line3
+    val handledR(accepts, handled, requests) = line3
+    val currentR(reading, writing, waiting)  = line4
 
     Stats(
-      connections.toLong)//,
-      // accepts.toLong,
-      // handled.toLong,
-      // requests.toLong,
-      // reading.toLong,
-      // writing.toLong,
-      // waiting.toLong)
+      connections.toLong,
+      accepts.toLong,
+      handled.toLong,
+      requests.toLong,
+      reading.toLong,
+      writing.toLong,
+      waiting.toLong)
   }
 
 }

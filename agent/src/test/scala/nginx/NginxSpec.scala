@@ -3,6 +3,7 @@ package agent
 package nginx
 
 import org.scalatest.{FlatSpec,Matchers}
+import scalaz.syntax.either._
 
 class NginxSpec extends FlatSpec with Matchers {
 
@@ -11,11 +12,21 @@ class NginxSpec extends FlatSpec with Matchers {
       getClass.getClassLoader.getResource(name)
         ).mkString
 
-  // "nginx parser" should "parse response-1.txt" in {
-  //   println {
-  //     Nginx.parse(fromFile("oncue/response-1.txt"))
-  //   }
-  // }
+  behavior of "parse"
+
+  it should "parse response-1.txt" in {
+    Nginx.parse(fromFile("oncue/response-1.txt")) should equal (
+      Nginx.Stats(1,43,44,45,0,1,2).right)
+  }
+
+  it should "parse response-2.txt" in {
+    Nginx.parse(fromFile("oncue/response-2.txt")) should equal (
+      Nginx.Stats(0,100,111,222,7,6,5).right)
+  }
+
+  it should "parse response-3.txt" in {
+    Nginx.parse(fromFile("oncue/response-3.txt")).isLeft should equal (true)
+  }
 
   "activeR" should "parse the active connections line" in {
     val Nginx.activeR(o) = "Active connections: 1"
