@@ -31,14 +31,14 @@ object Main {
   )
 
   // remove this once the PR to knobs has been accepted.
-  implicit val configuredDuration: Configured[Duration] = new Configured[Duration]{
-    def apply(a: CfgValue) = a match {
-      case CfgText(b) =>
-        \/.fromTryCatchNonFatal(Duration(b)
-          ).fold(_ => Option.empty,Option(_))
-      case _ => None
-    }
-  }
+  // implicit val configuredDuration: Configured[Duration] = new Configured[Duration]{
+  //   def apply(a: CfgValue) = a match {
+  //     case CfgText(b) =>
+  //       \/.fromTryCatchNonFatal(Duration(b)
+  //         ).fold(_ => Option.empty,Option(_))
+  //     case _ => None
+  //   }
+  // }
 
   def main(args: Array[String]): Unit = {
     log.info("Loading agent configuation from disk.")
@@ -123,8 +123,9 @@ object Main {
 
     // start the nginx statistics importer
     options.nginx.foreach { n =>
-      nginx.Import.periodicly(new URI(n.uri))(n.frequency).run.runAsync {
-        case -\/(e) => log.error(s"An error occoured with the nginx import: $e")
+      log.info(s"Launching the Nginx statistics collection from ${n.uri}.")
+      nginx.Import.periodicly(new URI(n.uri))(n.frequency, log).run.runAsync {
+        case -\/(e) => log.error("Fatal error with the nginx import from ${n.uri}")
         case _      => ()
       }
     }

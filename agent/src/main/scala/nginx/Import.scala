@@ -2,7 +2,8 @@ package oncue.svc.funnel
 package agent
 package nginx
 
-import java.net.URI
+import scalaz.\/
+import java.net.{URI,URL}
 import scala.io.Source
 import scalaz.stream.Process
 import scalaz.concurrent.{Task,Strategy}
@@ -23,23 +24,35 @@ object Import {
     val Requests    = gauge("nginx/lifetime/requests", 0d, Units.Count,  description = "Number of recieved requests this server has seen since bootup")
   }
 
-  def statistics(from: URI): Task[Stats] =
-    for {
-      a <- Task(Source.fromURL(from.toURL).mkString)
-      b <- Parser.parse(a).fold(e => Task.fail(e), Task.delay(_))
-    } yield b
-
-  private[nginx] def updateMetrics(s: Stats): Unit = {
-    metrics.Connections.set(s.connections)
-    metrics.Reading.set(s.reading)
-    metrics.Writing.set(s.writing)
-    metrics.Waiting.set(s.waiting)
-    metrics.Accepts.set(s.accepts)
-    metrics.Handled.set(s.handled)
-    metrics.Requests.set(s.requests)
+  private def fetch(url: URL): Throwable \/ String = \/.fromTryCatchNonFatal {
+    Source.fromInputStream(url.openConnection.getInputStream).mkString
   }
 
-  def periodicly(from: URI)(frequency: Duration = 10.seconds): Process[Task,Unit] =
+  def statistics(from: URI): Task[Option[Stats]] = Task {
+    println(s"calling $from")
+    fetch(from.toURL)
+      .flatMap(Parser.parse)
+      .fold(e => Option.empty, w => Option(w))
+  }
+
+  private[nginx] def updateMetrics(stats: Option[Stats]): Unit = {
+    stats.foreach { s =>
+      metrics.Connections.set(s.connections)
+      metrics.Reading.set(s.reading)
+      metrics.Writing.set(s.writing)
+      metrics.Waiting.set(s.waiting)
+      metrics.Accepts.set(s.accepts)
+      metrics.Handled.set(s.handled)
+      metrics.Requests.set(s.requests)
+    }
+  }
+
+  def periodicly(from: URI)(frequency: Duration = 10.seconds, log: journal.Logger): Process[Task,Unit] =
     Process.awakeEvery(frequency)(Strategy.Executor(defaultPool), schedulingPool
-      ).evalMap(_ => statistics(from).map(updateMetrics))
+      ).evalMap(_ => statistics(from).handleWith {
+        case e: java.io.FileNotFoundException =>
+          log.error(s"An error occoured with the nginx import from $from")
+          e.printStackTrace
+          Task.now(Option.empty[Stats])
+      }.map(updateMetrics))
 }
