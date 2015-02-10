@@ -8,7 +8,7 @@ import scalaz.stream.Process
 import scalaz.concurrent.{Task,Strategy}
 import scala.concurrent.duration._
 
-object Nginx {
+object Import {
   import Monitoring.{defaultPool,schedulingPool}
 
   private[nginx] def statistics(from: URI): Task[Stats] =
@@ -17,7 +17,7 @@ object Nginx {
       b <- Parser.parse(a).fold(e => Task.fail(e), Task.delay(_))
     } yield b
 
-  def periodic(from: URI)(frequency: Duration = 10.seconds): Process[Task,Stats] =
+  def periodicly(from: URI)(frequency: Duration = 10.seconds): Process[Task,Stats] =
     Process.awakeEvery(frequency)(Strategy.Executor(defaultPool), schedulingPool
       ).evalMap(_ => statistics(from))
 }

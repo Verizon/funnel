@@ -11,9 +11,10 @@ import java.net.{InetAddress,URI}
 import scalaz.syntax.applicative._
 import scala.concurrent.duration._
 import oncue.svc.funnel.zeromq._, sockets._
-import oncue.svc.funnel.agent.zeromq._
-import oncue.svc.funnel.agent.http._
-import oncue.svc.funnel.agent.statsd._
+import agent.zeromq._
+// import agent.http._
+// import agent.statsd._
+// import agent.nginx.Nginx
 
 object Main {
   private val log = Logger[Main.type]
@@ -21,12 +22,24 @@ object Main {
   case class HttpConfig(host: String, port: Int)
   case class StatsdConfig(port: Int, prefix: String)
   case class ProxyConfig(host: String, port: Int, socket: String)
+  case class NginxConfig(frequency: Duration)
 
   case class Options(
     http: Option[HttpConfig],
     statsd: Option[StatsdConfig],
-    proxy: Option[ProxyConfig]
+    proxy: Option[ProxyConfig],
+    nginx: Option[NginxConfig]
   )
+
+  // remove this once the PR to knobs has been accepted.
+  implicit val configuredDuration: Configured[Duration] = new Configured[Duration]{
+    def apply(a: CfgValue) = a match {
+      case CfgText(b) =>
+        \/.fromTryCatchNonFatal(Duration(b)
+          ).fold(_ => Option.empty,Option(_))
+      case _ => None
+    }
+  }
 
   def main(args: Array[String]): Unit = {
     log.info("Loading agent configuation from disk.")
@@ -53,11 +66,13 @@ object Main {
       val proxyHost   = cfg.lookup[String]("aws.network.local-ipv4")
         .orElse(cfg.lookup[String]("agent.proxy.host"))
       val proxyPort   = cfg.lookup[Int]("agent.proxy.port")
+      val nginxFreq   = cfg.lookup[Duration]("agent.nginx.poll-frequency")
 
       Options(
-        http = (httpHost |@| httpPort)(HttpConfig),
+        http   = (httpHost |@| httpPort)(HttpConfig),
         statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
-        proxy = (proxyHost |@| proxyPort |@| proxySocket)(ProxyConfig)
+        proxy  = (proxyHost |@| proxyPort |@| proxySocket)(ProxyConfig),
+        nginx  = (nginxFreq)(NginxConfig)
       )
     }.run
 
