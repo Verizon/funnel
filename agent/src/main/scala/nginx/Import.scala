@@ -24,16 +24,15 @@ object Import {
     val Requests    = gauge("nginx/lifetime/requests", 0d, Units.Count,  description = "Number of recieved requests this server has seen since bootup")
   }
 
-  private def fetch(url: URL): Throwable \/ String = \/.fromTryCatchNonFatal {
-    Source.fromInputStream(url.openConnection.getInputStream).mkString
-  }
+  private[this] def fetch(url: URL): Throwable \/ String =
+    \/.fromTryCatchNonFatal(Source.fromInputStream(url.openConnection.getInputStream).mkString)
 
-  def statistics(from: URI): Task[Option[Stats]] = Task {
-    println(s"calling $from")
-    fetch(from.toURL)
-      .flatMap(Parser.parse)
-      .fold(e => Option.empty, w => Option(w))
-  }
+  def statistics(from: URI): Task[Option[Stats]] =
+    Task {
+      fetch(from.toURL)
+        .flatMap(Parser.parse)
+        .fold(e => Option.empty, w => Option(w))
+    }(defaultPool)
 
   private[nginx] def updateMetrics(stats: Option[Stats]): Unit = {
     stats.foreach { s =>
