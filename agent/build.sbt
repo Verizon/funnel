@@ -22,10 +22,16 @@ Custom.compilation
 
 normalizedName := "funnel-agent"
 
+artifact in makePom := Artifact.pom("funnel-agent").copy(classifier = Some(name.value))
+
+mappings in Universal ++= Seq(
+  file("agent/deploy/agent/etc/agent.cfg") -> "etc/agent.cfg"
+)
+
 libraryDependencies ++= Seq(
-  "net.databinder"  %% "unfiltered-filter"       % "0.8.3",
-  "net.databinder"  %% "unfiltered-netty-server" % "0.8.3",
-  "oncue.svc.knobs" %% "core"                    % "2.0.+",
+  "net.databinder"  %% "unfiltered-filter"       % V.unfiltered,
+  "net.databinder"  %% "unfiltered-netty-server" % V.unfiltered,
+  "oncue.svc.knobs" %% "core"                    % V.knobs,
   "io.netty"         % "netty-handler"           % "4.0.25.Final",
   "io.netty"         % "netty-codec"             % "4.0.25.Final",
   "com.github.cjmx" %% "cjmx"                    % "2.2.+" exclude("org.scala-sbt","completion") exclude("com.google.code.gson","gson")
