@@ -22,6 +22,8 @@ Custom.compilation
 
 normalizedName := "funnel-agent"
 
+artifact in makePom := Artifact.pom("funnel-agent").copy(classifier = Some(name.value))
+
 libraryDependencies ++= Seq(
   "net.databinder"  %% "unfiltered-filter"       % V.unfiltered,
   "net.databinder"  %% "unfiltered-netty-server" % V.unfiltered,
