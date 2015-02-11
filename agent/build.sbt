@@ -25,7 +25,7 @@ normalizedName := "funnel-agent"
 artifact in makePom := Artifact.pom("funnel-agent").copy(classifier = Some(name.value))
 
 mappings in Universal ++= Seq(
-  file("agent/deploy/agent/etc/agent.cfg") -> "etc/agent.cfg"
+  file("agent/deploy/etc/agent.cfg") -> "etc/agent.cfg"
 )
 
 libraryDependencies ++= Seq(
