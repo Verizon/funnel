@@ -136,5 +136,9 @@ object Main {
         .handler(new http.Server(I))
         .run
     }
+
+    // basically block the world - need a better solution
+    // for this; potentially make the other threads non-daemon?
+    Thread.currentThread.join()
   }
 }
