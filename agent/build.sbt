@@ -24,6 +24,10 @@ normalizedName := "funnel-agent"
 
 artifact in makePom := Artifact.pom("funnel-agent").copy(classifier = Some(name.value))
 
+mappings in Universal ++= Seq(
+  file("flask/deploy/agent/etc/agent.cfg") -> "etc/agent.cfg"
+)
+
 libraryDependencies ++= Seq(
   "net.databinder"  %% "unfiltered-filter"       % V.unfiltered,
   "net.databinder"  %% "unfiltered-netty-server" % V.unfiltered,

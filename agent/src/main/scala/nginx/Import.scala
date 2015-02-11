@@ -10,7 +10,7 @@ import scalaz.concurrent.{Task,Strategy}
 import scala.concurrent.duration._
 
 object Import {
-  import Monitoring.{defaultPool,schedulingPool}
+  import Monitoring.{serverPool,schedulingPool}
 
   object metrics {
     import instruments._
@@ -32,7 +32,7 @@ object Import {
       fetch(from.toURL)
         .flatMap(Parser.parse)
         .fold(e => Option.empty, w => Option(w))
-    }(defaultPool)
+    }(serverPool)
 
   private[nginx] def updateMetrics(stats: Option[Stats]): Unit = {
     stats.foreach { s =>
@@ -47,7 +47,7 @@ object Import {
   }
 
   def periodicly(from: URI)(frequency: Duration = 10.seconds, log: journal.Logger): Process[Task,Unit] =
-    Process.awakeEvery(frequency)(Strategy.Executor(defaultPool), schedulingPool
+    Process.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool
       ).evalMap(_ => statistics(from).handleWith {
         case e: java.io.FileNotFoundException =>
           log.error(s"An error occoured with the nginx import from $from")
