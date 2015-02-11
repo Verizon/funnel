@@ -12,12 +12,65 @@ Whilst *Funnel* is mainly a library, in order to compose the core of the system 
 
 # Agent
 
-*Funnel* agent is primarily designed to run on any given host and provide two pieces of functionality:
+*Funnel* agent is primarily designed to run on any given host and provides several pieces of functionality:
 
-* A stable network interface for flask to later consume a metrics from.
+* A stable network interface for flask to later consume a metrics from via ZeroMQ.
 * Simplistic HTTP API that on-machine scripts / processes can send metrics too in order to integrate with *Funnel* (e.g. a native C++ daemon).
+* [StatsD](https://github.com/etsy/statsd/) bridge interface so that existing StatsD tools can integrate with *Funnel*.
+* [Nginx](http://nginx.org/) statistic importer to pull utilisation data from the specific nginx stub_status module.
 
 The agent process makes heavy use of the <a href="{{ site.baseurl }}modules/#zeromq">ZeroMQ</a> module in order to provide communication locally, and remotely. Specifically applications running on that host may connect to the appropriate local domain socket to submit their metrics, and in turn, the agent will consume from that domain socket and transparently emit those metrics on a TCP socket bound to the host adaptor. This provides a convenient mechanism for the application to report metrics irrespective of if this particular host is mulit-tennant (e.g. using containers and a resource manager) or not.
+
+#### Configuration
+
+The agent does not have a huge number of configuration options, but what is avalible can be controlled via a [Knobs](https://github.oncue.verizon.net/pages/intelmedia/knobs/) configuration file. The agent can be controlled simply by commenting out sections of the configuration file. For example commenting out `agent.http` will disable the HTTP server when the agent boots. The default looks like this:
+
+```
+agent {
+
+  #############################################
+  #                   Proxy                   #
+  #############################################
+
+  zeromq {
+    # local file path of the domain socket incoming
+    # metrics will arrive on.
+    socket = "/tmp/funnel.socket"
+
+    proxy {
+      # network address to bind to from which the flask
+      # will later connect. Must be accessible from the LAN
+      host = "0.0.0.0"
+      port = 7390
+    }
+  }
+
+  #############################################
+  #                 Importers                 #
+  #############################################
+
+  # recomended to keep network host to 127.0.0.1 as
+  # each node should only ever be publishing metrics
+  # to its loopback network address.
+
+  # http {
+  #   host = "127.0.0.1"
+  #   port = 8080
+  # }
+
+  # statsd {
+  #   port   = 8125
+  #   prefix = "oncue"
+  # }
+
+  # nginx {
+  #   url = "http://127.0.0.1:8080/nginx_status"
+  #   poll-frequency = 15 seconds
+  # }
+}
+```
+
+#### HTTP
 
 As for the HTTP API, it supports reporting of various types of metrics and the agent HTTP process is always bound to `127.0.0.1:7557`. The structure of the JSON payload is as follows: 
 
@@ -83,36 +136,25 @@ The structure is very simple, but lets take a moment to just walk through the va
   </tr>
 </table>
 
-#### Configuration
-
-The agent does not have a huge number of configuration options, but what is avalible can be controlled via a [Knobs](https://github.oncue.verizon.net/pages/intelmedia/knobs/) configuration file. The default looks like this:
-
-```
-agent {
-  # configuration settings for the 0mq proxy
-  proxy {
-    # local file path of the domain socket incoming
-    # metrics will arrive on.
-    socket = "/var/run/funnel.socket"
-    # network address to bind to from which the flask
-    # will later connect. Must be accessible from the LAN
-    host = "0.0.0.0"
-    port = 7390
-  }
-
-  # configuration settings for the http api
-  http {
-    # recomended to keep this to 127.0.0.1 as each node
-    # should only ever be publishing metrics to its loopback
-    # network address.
-    host = "127.0.0.1"
-    port = 8080
-  }
-}
-
-```
-
 That's about it for the HTTP API. Whilst it should be able to tollerate a good beating performance wise, it will likley not be as performant as the native Scala bindings, so keep that in mind because of the extra layers of indirection. 
+
+#### StatsD
+
+The StatsD interface provided by the agent uses UDP and supports `c`,`ms`,`g` and `m` metric types. The StatsD interface is entirely optioanl.
+
+#### Nginx
+
+The Nginx importer periodically fetches to the specified Nginx URL and extracts the opertaional data into the agent's *Funnel*. The following metrics are exposed if this feature is enabled:
+
+* `nginx/connections`,
+* `nginx/reading`
+* `nginx/writing`
+* `nginx/waiting`
+* `nginx/lifetime/accepts`
+* `nginx/lifetime/handled`
+* `nginx/lifetime/requests`
+
+The `nginx/lifetime/*` keys are essentially gauges that detail the state of nginx *since it was first booted*. These values will not reset over time, and this is how they are extracted from Nginx, so seeing these numbers grow over time is entirely normal. The remainder of the metrics behave exactly how normal gauges work: their values reflect current usage and are rolled up into the *Funnel* windowing.
 
 <a name="flask"></a>
 
