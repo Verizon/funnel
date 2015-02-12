@@ -7,6 +7,7 @@ import journal.Logger
 import scalaz.stream.{Process,Channel,io}
 import scalaz.concurrent.Task
 import javax.management.remote.JMXConnector
+import javax.management.MBeanServerConnection
 import java.util.concurrent.ConcurrentHashMap
 
 case class JMXImportException(override val getMessage: String) extends RuntimeException
@@ -36,9 +37,11 @@ object Import {
       }
     }
 
-  def foo(cache: ConnectorCache): Process[Task, JMXConnector] = {
-    localVMs.through(loadConnector(cache))
+  def foo(cache: ConnectorCache): Process[Task, MBeanServerConnection] = {
+    localVMs.through(loadConnector(cache)).map(_.getMBeanServerConnection)
   }
+
+  
 
   // def periodicly(from: Seq[VMID])(frequency: Duration = 10.seconds): Process[Task,Unit] =
 // Process.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool
