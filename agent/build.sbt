@@ -37,7 +37,7 @@ libraryDependencies ++= Seq(
   "com.github.cjmx" %% "cjmx"                    % "2.2.+" exclude("org.scala-sbt","completion") exclude("com.google.code.gson","gson")
 )
 
-mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.jmx.Testing")
+mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.Main")
 
 unmanagedClasspath in Compile ++= Custom.toolsJar
 

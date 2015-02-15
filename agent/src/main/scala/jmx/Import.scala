@@ -98,7 +98,9 @@ object Import {
   )(frequency: Duration = 10.seconds
   ): Process[Task,Unit] =
     Process.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool)
-      .evalMap { _ => for {
+      .evalMap { _ =>
+        println("==============================")
+      for {
         a <- retrieve(location, queries, exclusions)(cache)
         _ <- Task.now(())
       } yield ()

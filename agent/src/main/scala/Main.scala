@@ -65,6 +65,7 @@ object Main {
       val nginxUrl    = cfg.lookup[String]("agent.nginx.url")
       // jmx
       val jmxUri      = cfg.lookup[String]("agent.jmx.uri")
+      val jmxFreq     = cfg.lookup[Duration]("agent.jmx.poll-frequency")
       val jmxQueries  = cfg.lookup[List[String]]("agent.jmx.queries")
       val jmxExcludes = cfg.lookup[List[String]]("agent.jmx.exclude-attribute-patterns")
 
@@ -136,19 +137,14 @@ object Main {
       }
     }
 
-    // start the http instruments server
-    options.http.foreach { config =>
-      log.info("Launching the HTTP instrument interface.")
-      unfiltered.netty.Server.http(config.port, config.host)
-        .handler(new http.Server(I))
-        .run
-    }
-
     import cjmx.util.jmx.MBeanQuery
     import javax.management.ObjectName
 
+    // start the jmx importer
     options.jmx.foreach { config =>
-      log.info("Launching the JMX source")
+      log.info(s"Launching the JMX source '${config.uri}', using "+
+               s"'${config.queries.mkString(",")}' queries and " +
+               s"excluding ${config.exclusions.mkString(",")}.")
 
       jmx.Import.periodicly(
         config.uri,
@@ -158,6 +154,14 @@ object Main {
           (s: String) => a(s) || b(s)
         }
       )(new java.util.concurrent.ConcurrentHashMap)(30.seconds)
+    }
+
+    // start the http instruments server
+    options.http.foreach { config =>
+      log.info("Launching the HTTP instrument interface.")
+      unfiltered.netty.Server.http(config.port, config.host)
+        .handler(new http.Server(I))
+        .run
     }
 
     // basically block the world - need a better solution
