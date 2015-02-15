@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 import scala.concurrent.duration._
+import InstrumentKinds._
 
 case class JMXImportException(override val getMessage: String) extends RuntimeException
 
@@ -40,7 +41,13 @@ object Import {
     Process.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool)
       .evalMap { _ => for {
         a <- now(location, queries, exclusions)(cache)
-        _ <- Task.now(())
+        s  = a.filter(_.kind == GaugeString)
+        d  = a.filter(_.kind == GaugeDouble)
+        // _ <- RemoteInstruments.metricsFromRequest(InstrumentRequest(
+        //        cluster = ""
+        //        stringGauges = s,
+        //        doubleGauges = d
+        //      ))
       } yield ()
     }
 
@@ -62,8 +69,11 @@ object Import {
       .flatMap { case (a,b) => toArbitraryMetric(a,b) })
   }
 
+  /**
+   * Convert the JMX types to the primitive ArbitraryMetric so
+   * that it can be injected into the RemoteInstruments API.
+   */
   private[jmx] def toArbitraryMetric(obj: ObjectName, attribute: Attribute): Option[ArbitraryMetric] = {
-    import InstrumentKinds._
     for {
       n <- Parser.parse(obj.getCanonicalName, JMX.humanizeKey(attribute.getName)).toOption
       v <- Option(attribute.getValue)
