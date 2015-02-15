@@ -22,7 +22,11 @@ object Main {
   case class ProxyConfig(host: String, port: Int)
   case class ZeromqConfig(socket: String, proxy: Option[ProxyConfig])
   case class NginxConfig(uri: String, frequency: Duration)
-  case class JmxConfig(uri: String, queries: List[String] = Nil, exclusions: List[String] = Nil)
+  case class JmxConfig(
+    uri: String,
+    frequency: Duration,
+    queries: List[String] = Nil,
+    exclusions: List[String] = Nil)
 
   case class Options(
     http: Option[HttpConfig],
@@ -74,7 +78,7 @@ object Main {
         statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
         zeromq = proxySocket.map(ZeromqConfig(_, (proxyHost |@| proxyPort)(ProxyConfig))),
         nginx  = (nginxUrl |@| nginxFreq)(NginxConfig),
-        jmx    = (jmxUri |@| jmxQueries |@| jmxExcludes)(JmxConfig)
+        jmx    = (jmxUri |@| jmxFreq |@| jmxQueries |@| jmxExcludes)(JmxConfig)
       )
     }.run
 
@@ -153,7 +157,10 @@ object Main {
         .foldLeft((_: String) => false){ (a,b) =>
           (s: String) => a(s) || b(s)
         }
-      )(new java.util.concurrent.ConcurrentHashMap)(30.seconds)
+      )(new java.util.concurrent.ConcurrentHashMap)(config.frequency).run.runAsync {
+        case -\/(e) => log.error("Fatal error with the JMX import from ${config.uri}")
+        case _      => ()
+      }
     }
 
     // start the http instruments server

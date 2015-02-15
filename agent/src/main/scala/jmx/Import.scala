@@ -25,7 +25,31 @@ object Import {
 
   type ConnectorCache = ConcurrentHashMap[String, JMXConnector]
 
-  def retrieve(
+  /**
+   * Periodically fetch metrics from the specified JMX location.
+   * See the configuration agent.cfg for details on specifiying queries
+   * and attribute exclusion rules.
+   */
+  def periodicly(
+    location: String,
+    queries: Seq[MBeanQuery],
+    exclusions: String => Boolean
+  )(cache: ConnectorCache
+  )(frequency: Duration = 10.seconds
+  ): Process[Task,Unit] =
+    Process.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool)
+      .evalMap { _ => for {
+        a <- now(location, queries, exclusions)(cache)
+        _ <- Task.now(())
+      } yield ()
+    }
+
+  /**
+   * Fetch metrics from the specified JMX location.
+   * See the configuration agent.cfg for details on specifiying queries
+   * and attribute exclusion rules.
+   */
+  def now(
     location: String,
     queries: Seq[MBeanQuery],
     exclusions: String => Boolean
@@ -38,7 +62,7 @@ object Import {
       .flatMap { case (a,b) => toArbitraryMetric(a,b) })
   }
 
-  def toArbitraryMetric(obj: ObjectName, attribute: Attribute): Option[ArbitraryMetric] = {
+  private[jmx] def toArbitraryMetric(obj: ObjectName, attribute: Attribute): Option[ArbitraryMetric] = {
     import InstrumentKinds._
     for {
       n <- Parser.parse(obj.getCanonicalName, JMX.humanizeKey(attribute.getName)).toOption
@@ -58,7 +82,7 @@ object Import {
    * so instead we will keep some state around about the connectors that are already avalible
    * and use those instead. It's basically a cache to avoid needless re-evaluation.
    */
-  def remoteConnector(location: String)(cache: ConnectorCache): Task[JMXConnector] =
+  private[jmx] def remoteConnector(location: String)(cache: ConnectorCache): Task[JMXConnector] =
     if(cache.containsKey(location)) Task.now(cache.get(location))
     else {
       for {
@@ -67,7 +91,7 @@ object Import {
       } yield a
     }
 
-  def specific(query: MBeanQuery)(svr: MBeanServerConnection): Set[(ObjectName, Attribute)] = {
+  private[jmx] def specific(query: MBeanQuery)(svr: MBeanServerConnection): Set[(ObjectName, Attribute)] = {
     val getAttributeNames: ObjectName => Set[(ObjectName,Attribute)] = { on =>
       val info = svr.getMBeanInfo(on).getAttributes
       info.filter(_.isReadable)
@@ -77,10 +101,10 @@ object Import {
     svr.toScala.queryNames(query).flatMap(getAttributeNames)
   }
 
-  def all(svr: MBeanServerConnection): Set[(ObjectName, Attribute)] =
+  private[jmx] def all(svr: MBeanServerConnection): Set[(ObjectName, Attribute)] =
     specific(MBeanQuery.All)(svr)
 
-  def readableAttributeNames(svr: MBeanServerConnection, query: Option[MBeanQuery]): Set[String] = {
+  private[jmx] def readableAttributeNames(svr: MBeanServerConnection, query: Option[MBeanQuery]): Set[String] = {
     val getAttributeNames: ObjectName => Set[String] = on =>
       svr.getMBeanInfo(on).getAttributes.filter(_.isReadable).map { _.getName }.toSet
     query.cata(q => safely(Set.empty[String]){
@@ -89,21 +113,5 @@ object Import {
 
   private[this] def safely[A](onError: => A)(f: => A): A =
     try f catch { case NonFatal(e) => onError }
-
-  def periodicly(
-    location: String,
-    queries: Seq[MBeanQuery],
-    exclusions: String => Boolean
-  )(cache: ConnectorCache
-  )(frequency: Duration = 10.seconds
-  ): Process[Task,Unit] =
-    Process.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool)
-      .evalMap { _ =>
-        println("==============================")
-      for {
-        a <- retrieve(location, queries, exclusions)(cache)
-        _ <- Task.now(())
-      } yield ()
-    }
 
 }
