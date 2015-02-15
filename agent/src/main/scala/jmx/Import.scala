@@ -16,34 +16,6 @@ import scala.util.control.NonFatal
 
 case class JMXImportException(override val getMessage: String) extends RuntimeException
 
-object Testing {
-  def main(args: Array[String]): Unit = {
-    val zookeeper = "service:jmx:rmi:///jndi/rmi://127.0.0.1:8153/jmxrmi"
-    val zooquery = MBeanQuery(new ObjectName("org.apache.ZooKeeperService:*"))
-
-    val cassandra = "service:jmx:rmi:///jndi/rmi://127.0.0.1:7199/jmxrmi"
-    val cassquery = MBeanQuery(new ObjectName("org.apache.cassandra.db:*"))
-
-    val cache = new ConcurrentHashMap[String, JMXConnector]
-
-    val exclusions = (s: String) =>
-      Glob("*HistogramMicros").matches(s) ||
-      Glob("*Histogram").matches(s)
-
-    Import.foo(cassandra, Vector(cassquery), exclusions)(cache).run
-
-    // println {
-    //   Import.remoteConnector("service:jmx:rmi:///jndi/rmi://127.0.0.1:8153/jmxrmi")(new ConcurrentHashMap)
-    //     .map(_.getMBeanServerConnection)
-    //     .map(c => {
-    //       val query = MBeanQuery(new ObjectName("org.apache.ZooKeeperService:*"))
-    //       Import.specific(query)(c).foreach(println)
-    //       ()
-    //     }).run
-    // }
-  }
-}
-
 object Import {
   import JMXConnection._
 
@@ -51,40 +23,30 @@ object Import {
 
   type ConnectorCache = ConcurrentHashMap[String, JMXConnector]
 
-  def foo(location: String, queries: Seq[MBeanQuery], exclusions: String => Boolean)(cache: ConnectorCache) =
+  def foo(location: String, queries: Seq[MBeanQuery], exclusions: String => Boolean)(cache: ConnectorCache): Task[Seq[ArbitraryMetric]] =
     remoteConnector(location)(cache).map(connector =>
       queries.flatMap(q => specific(q)(connector.mbeanServer))
       .filterNot { case (a,b) => exclusions(JMX.humanizeKey(b.getName)) }
       .flatMap { case (a,b) => toArbitraryMetric(a,b) })
 
   def toArbitraryMetric(obj: ObjectName, attribute: Attribute): Option[ArbitraryMetric] = {
+    import InstrumentKinds._
 
-    val name = Parser.parse(obj.getCanonicalName, attribute.getName)
-
-    println(name + " = " + JMX.humanizeValue(attribute.getValue))
-
-
-    // val kind = klass match {
-    //   case _: javax.management.openmbean.TabularDataSupport => None
-    //   case _: =>
-    // }
-
-
-    // .getClass match {
-    //   case _: java.lang.Boolean =>
-    //   case _:  =>
-    //   case _:  =>
-    //   case _:  =>
-    //   case _:  =>
-    //   case _:  =>
-    //   case _:  =>
-    // } catch {
-    //   case e: Throwable => ()
-    // }
+    for {
+      n <- Parser.parse(obj.getCanonicalName, JMX.humanizeKey(attribute.getName)).toOption
+      v <- Option(attribute.getValue)
+      k  = v.getClass.getSimpleName.toLowerCase
+    } yield {
+      val kind = k match {
+        case "double" | "long" | "integer" => GaugeDouble
+        case _                             => GaugeString
+      }
+      ArbitraryMetric(n, kind, Option(JMX.humanizeValue(v)))
+    }
 
     // println(s"name = $name, class = ${attribute.getValue.getClass}")
 
-    None
+    // None
   }
 
   case class JMXMetric(
