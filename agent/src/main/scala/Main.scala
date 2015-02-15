@@ -22,12 +22,14 @@ object Main {
   case class ProxyConfig(host: String, port: Int)
   case class ZeromqConfig(socket: String, proxy: Option[ProxyConfig])
   case class NginxConfig(uri: String, frequency: Duration)
+  case class JmxConfig(uri: String, queries: List[String] = Nil, exclusions: List[String] = Nil)
 
   case class Options(
     http: Option[HttpConfig],
     statsd: Option[StatsdConfig],
     zeromq: Option[ZeromqConfig],
-    nginx: Option[NginxConfig]
+    nginx: Option[NginxConfig],
+    jmx: Option[JmxConfig]
   )
 
   def main(args: Array[String]): Unit = {
@@ -61,12 +63,17 @@ object Main {
       // nginx
       val nginxFreq   = cfg.lookup[Duration]("agent.nginx.poll-frequency")
       val nginxUrl    = cfg.lookup[String]("agent.nginx.url")
+      // jmx
+      val jmxUri      = cfg.lookup[String]("agent.jmx.uri")
+      val jmxQueries  = cfg.lookup[List[String]]("agent.jmx.queries")
+      val jmxExcludes = cfg.lookup[List[String]]("agent.jmx.exclude-attribute-patterns")
 
       Options(
-        http = (httpHost |@| httpPort)(HttpConfig),
+        http   = (httpHost |@| httpPort)(HttpConfig),
         statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
         zeromq = proxySocket.map(ZeromqConfig(_, (proxyHost |@| proxyPort)(ProxyConfig))),
-        nginx  = (nginxUrl |@| nginxFreq)(NginxConfig)
+        nginx  = (nginxUrl |@| nginxFreq)(NginxConfig),
+        jmx    = (jmxUri |@| jmxQueries |@| jmxExcludes)(JmxConfig)
       )
     }.run
 
@@ -135,6 +142,22 @@ object Main {
       unfiltered.netty.Server.http(config.port, config.host)
         .handler(new http.Server(I))
         .run
+    }
+
+    import cjmx.util.jmx.MBeanQuery
+    import javax.management.ObjectName
+
+    options.jmx.foreach { config =>
+      log.info("Launching the JMX source")
+
+      jmx.Import.periodicly(
+        config.uri,
+        config.queries.map(q => MBeanQuery(new ObjectName(q))),
+        config.exclusions.map(Glob(_).matches _)
+        .foldLeft((_: String) => false){ (a,b) =>
+          (s: String) => a(s) || b(s)
+        }
+      )(new java.util.concurrent.ConcurrentHashMap)(30.seconds)
     }
 
     // basically block the world - need a better solution

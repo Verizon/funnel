@@ -5,7 +5,7 @@ package jmx
 import cjmx.util.jmx.{Attach, MBeanQuery, RichMBeanServerConnection, JMXConnection, JMX}
 import journal.Logger
 import scalaz.stream.{Process,Channel,io}
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Task,Strategy}
 import scalaz.std.option._
 import scalaz.syntax.std.option._
 import javax.management.remote.JMXConnector
@@ -13,25 +13,33 @@ import javax.management.{MBeanServerConnection, ObjectName, Attribute, MBeanInfo
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
+import scala.concurrent.duration._
 
 case class JMXImportException(override val getMessage: String) extends RuntimeException
 
 object Import {
   import JMXConnection._
+  import Monitoring.{serverPool,schedulingPool}
 
   private[this] val log = Logger[Import.type]
 
   type ConnectorCache = ConcurrentHashMap[String, JMXConnector]
 
-  def foo(location: String, queries: Seq[MBeanQuery], exclusions: String => Boolean)(cache: ConnectorCache): Task[Seq[ArbitraryMetric]] =
+  def retrieve(
+    location: String,
+    queries: Seq[MBeanQuery],
+    exclusions: String => Boolean
+  )(cache: ConnectorCache
+  ): Task[Seq[ArbitraryMetric]] = {
+    log.debug("Retrieving metrics from the JMX endpoint...")
     remoteConnector(location)(cache).map(connector =>
       queries.flatMap(q => specific(q)(connector.mbeanServer))
       .filterNot { case (a,b) => exclusions(JMX.humanizeKey(b.getName)) }
       .flatMap { case (a,b) => toArbitraryMetric(a,b) })
+  }
 
   def toArbitraryMetric(obj: ObjectName, attribute: Attribute): Option[ArbitraryMetric] = {
     import InstrumentKinds._
-
     for {
       n <- Parser.parse(obj.getCanonicalName, JMX.humanizeKey(attribute.getName)).toOption
       v <- Option(attribute.getValue)
@@ -43,16 +51,7 @@ object Import {
       }
       ArbitraryMetric(n, kind, Option(JMX.humanizeValue(v)))
     }
-
-    // println(s"name = $name, class = ${attribute.getValue.getClass}")
-
-    // None
   }
-
-  case class JMXMetric(
-    obj: ObjectName,
-    info: MBeanInfo,
-    attribute: Attribute)
 
   /**
    * We dont want to constantly thrash making connections to other VMs on the same host
@@ -91,8 +90,18 @@ object Import {
   private[this] def safely[A](onError: => A)(f: => A): A =
     try f catch { case NonFatal(e) => onError }
 
-  // def periodicly(from: Seq[VMID])(frequency: Duration = 10.seconds): Process[Task,Unit] =
-    // Process.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool)
-
+  def periodicly(
+    location: String,
+    queries: Seq[MBeanQuery],
+    exclusions: String => Boolean
+  )(cache: ConnectorCache
+  )(frequency: Duration = 10.seconds
+  ): Process[Task,Unit] =
+    Process.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool)
+      .evalMap { _ => for {
+        a <- retrieve(location, queries, exclusions)(cache)
+        _ <- Task.now(())
+      } yield ()
+    }
 
 }

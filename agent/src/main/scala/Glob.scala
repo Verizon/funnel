@@ -20,7 +20,6 @@
 \**********************************************************************************************/
 package oncue.svc.funnel
 package agent
-package jmx
 
 import java.util.regex._
 
