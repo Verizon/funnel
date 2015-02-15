@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 
 case class Datapoint[A](key: Key[A], value: A) {
 

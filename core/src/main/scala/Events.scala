@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 
 import java.util.concurrent.{ExecutorService, ScheduledExecutorService}
 import scala.concurrent.duration._

@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 package nginx
 
 case class Stats(

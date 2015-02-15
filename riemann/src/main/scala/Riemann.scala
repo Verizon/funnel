@@ -1,9 +1,9 @@
-package oncue.svc.funnel
+package funnel
 package riemann
 
 import com.aphyr.riemann.client.RiemannClient
 import com.aphyr.riemann.Proto.{Event => REvent}
-import oncue.svc.funnel.Events.Event
+import Events.Event
 import scala.concurrent.duration._
 import scalaz.\/
 import scalaz.concurrent.{Strategy,Task,Actor}

@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 
 /**
  * A `Key` represents a variable from Funnel that changes over time.

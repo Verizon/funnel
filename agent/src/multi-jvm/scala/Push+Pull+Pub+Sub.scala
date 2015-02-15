@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 package agent
 
 import oncue.svc.funnel.zeromq._, sockets._

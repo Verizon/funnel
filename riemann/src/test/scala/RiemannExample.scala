@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 package riemann
 
 import scalaz.stream.Process

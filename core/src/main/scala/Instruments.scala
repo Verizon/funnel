@@ -1,7 +1,7 @@
-package oncue.svc.funnel
+package funnel
 
 import com.twitter.algebird.Group
-import oncue.svc.funnel.{Buffers => B}
+import funnel.{Buffers => B}
 import java.net.URL
 import java.util.concurrent.{ExecutorService,TimeUnit}
 import scala.concurrent.duration._

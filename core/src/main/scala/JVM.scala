@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 
 import java.lang.management.GarbageCollectorMXBean
 import java.lang.management.ManagementFactory

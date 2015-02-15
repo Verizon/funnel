@@ -1,4 +1,4 @@
-package oncue.svc.funnel {
+package funnel {
 
   import scala.concurrent.duration._
 
@@ -11,13 +11,10 @@ package oncue.svc.funnel {
   }
 }
 
-package oncue.svc {
+import scalaz.concurrent.Task
+import scalaz.stream.Process
 
-  import scalaz.concurrent.Task
-  import scalaz.stream.Process
-
-  package object funnel {
-    type DatapointParser = java.net.URI => Process[Task,Datapoint[Any]]
-    type BucketName      = String
-  }
+package object funnel {
+  type DatapointParser = java.net.URI => Process[Task,Datapoint[Any]]
+  type BucketName      = String
 }

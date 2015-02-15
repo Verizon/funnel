@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 
 import scala.concurrent.duration._
 import scala.language.higherKinds

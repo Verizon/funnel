@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 
 package object internals {
   import java.util.concurrent.atomic.AtomicReference
