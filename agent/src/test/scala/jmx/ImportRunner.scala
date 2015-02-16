@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 package agent
 package jmx
 
@@ -21,7 +21,7 @@ object Testing {
       Glob("*HistogramMicros").matches(s) ||
       Glob("*Histogram").matches(s)
 
-    Import.retrieve(cassandra, Vector(cassquery), exclusions)(cache).run.foreach(println)
+    Import.fetch(cassandra, Vector(cassquery), exclusions)(cache).run.foreach(println)
 
   }
 }

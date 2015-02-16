@@ -1,4 +1,3 @@
-package oncue.svc
 package funnel
 
 import com.twitter.algebird.Group
