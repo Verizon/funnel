@@ -31,7 +31,7 @@ object Import {
    * See the configuration agent.cfg for details on specifiying queries
    * and attribute exclusion rules.
    */
-  def periodicly(
+  def periodically(
     location: String,
     queries: Seq[MBeanQuery],
     exclusions: String => Boolean,
