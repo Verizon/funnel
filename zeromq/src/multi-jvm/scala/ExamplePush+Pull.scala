@@ -1,7 +1,7 @@
 package funnel
 package zeromq
 
-import oncue.svc.funnel._, zeromq._
+import funnel._, zeromq._
 import scalaz.concurrent.{Task,Strategy}
 import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process

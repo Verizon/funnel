@@ -1,6 +1,6 @@
 package oncue.svc.laboratory
 
-import oncue.svc.funnel.elastic.ElasticCfg
+import funnel.elastic.ElasticCfg
 import scala.concurrent.duration._
 
 case class RiemannCfg(

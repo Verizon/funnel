@@ -49,7 +49,7 @@ object Deployed {
 
   /**
    * Lookup the `Instace` metadata for a set of `InstanceID`.
-   * @see oncue.svc.funnel.chemist.Deployed.lookupOne
+   * @see funnel.chemist.Deployed.lookupOne
    */
   def lookupMany(ids: Seq[InstanceID])(ec2: AmazonEC2): Task[Seq[Instance]] =
     for {

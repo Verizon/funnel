@@ -15,11 +15,11 @@ import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
 import com.amazonaws.services.sns.{AmazonSNSClient,AmazonSNS}
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.regions.{Region, Regions}
-import oncue.svc.funnel.{Events,DatapointParser,Datapoint,Names,Sigar,Monitoring,Instruments}
-import oncue.svc.funnel.riemann.Riemann
-import oncue.svc.funnel.http.{MonitoringServer,SSE}
-import oncue.svc.funnel.elastic._
-import oncue.svc.funnel.zeromq.Mirror
+import funnel.{Events,DatapointParser,Datapoint,Names,Sigar,Monitoring,Instruments}
+import funnel.riemann.Riemann
+import funnel.http.{MonitoringServer,SSE}
+import funnel.elastic._
+import funnel.zeromq.Mirror
 import java.net.URI
 
 /**

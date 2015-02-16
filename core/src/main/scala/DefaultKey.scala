@@ -4,7 +4,7 @@ package funnel
 /**
  * This type is just used for syntax, to pick out a default `Key`
  * from a `Historical`, `Continuous`, or `Periodic`.
- * See the instances in [[oncue.svc.funnel.DefaultKeys]].
+ * See the instances in [[funnel.DefaultKeys]].
  * For example, given: {{{
  *   val healthy: Metric[Boolean] = for {
  *     n <- reqs.key
