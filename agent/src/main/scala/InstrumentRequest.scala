@@ -17,4 +17,12 @@ object InstrumentRequest {
       case Timer       => InstrumentRequest(cluster, timers = metric :: Nil)
       case GaugeDouble => InstrumentRequest(cluster, doubleGauges = metric :: Nil)
     }
+
+  def apply(cluster: String, metrics: ArbitraryMetric*): InstrumentRequest =
+    InstrumentRequest(cluster,
+      counters     = metrics.filter(_.kind == Counter).toList,
+      timers       = metrics.filter(_.kind == Timer).toList,
+      stringGauges = metrics.filter(_.kind == GaugeString).toList,
+      doubleGauges = metrics.filter(_.kind == GaugeDouble).toList
+    )
 }

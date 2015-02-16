@@ -22,21 +22,36 @@ object Main {
   case class ProxyConfig(host: String, port: Int)
   case class ZeromqConfig(socket: String, proxy: Option[ProxyConfig])
   case class NginxConfig(uri: String, frequency: Duration)
+  case class JmxConfig(
+    name: String,
+    uri: String,
+    frequency: Duration,
+    queries: List[String] = Nil,
+    exclusions: List[String] = Nil)
 
   case class Options(
     http: Option[HttpConfig],
     statsd: Option[StatsdConfig],
     zeromq: Option[ZeromqConfig],
-    nginx: Option[NginxConfig]
+    nginx: Option[NginxConfig],
+    jmx: Option[JmxConfig]
   )
 
   def main(args: Array[String]): Unit = {
     log.info("Loading agent configuation from disk.")
 
-    val config: Task[Config] = for {
-      a <- knobs.loadImmutable(List(Required(
+    /**
+     * Accepting argument on the command line is really just a
+     * convenience for testing and ad-hoc ops trial of the agent.
+     */
+    val sources = args.toList.map(p =>
+      Optional(FileResource(new File(p)))) :::
+      Required(
         FileResource(new File("/usr/share/oncue/etc/agent.cfg")) or
-        ClassPathResource("oncue/agent.cfg"))))
+        ClassPathResource("oncue/agent.cfg")) :: Nil
+
+    val config: Task[Config] = for {
+      a <- knobs.loadImmutable(sources)
       b <- knobs.aws.config
     } yield a ++ b
 
@@ -61,12 +76,19 @@ object Main {
       // nginx
       val nginxFreq   = cfg.lookup[Duration]("agent.nginx.poll-frequency")
       val nginxUrl    = cfg.lookup[String]("agent.nginx.url")
+      // jmx
+      val jmxName     = cfg.lookup[String]("agent.jmx.name")
+      val jmxUri      = cfg.lookup[String]("agent.jmx.uri")
+      val jmxFreq     = cfg.lookup[Duration]("agent.jmx.poll-frequency")
+      val jmxQueries  = cfg.lookup[List[String]]("agent.jmx.queries")
+      val jmxExcludes = cfg.lookup[List[String]]("agent.jmx.exclude-attribute-patterns")
 
       Options(
-        http = (httpHost |@| httpPort)(HttpConfig),
+        http   = (httpHost |@| httpPort)(HttpConfig),
         statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
         zeromq = proxySocket.map(ZeromqConfig(_, (proxyHost |@| proxyPort)(ProxyConfig))),
-        nginx  = (nginxUrl |@| nginxFreq)(NginxConfig)
+        nginx  = (nginxUrl |@| nginxFreq)(NginxConfig),
+        jmx    = (jmxName |@| jmxUri |@| jmxFreq |@| jmxQueries |@| jmxExcludes)(JmxConfig)
       )
     }.run
 
@@ -125,6 +147,29 @@ object Main {
       log.info("Launching the StatsD instrument interface.")
       statsd.Server(stats.port, stats.prefix)(I).runAsync {
         case -\/(e) => log.error(s"Unable to start the StatsD interface: ${e.getMessage}")
+        case _      => ()
+      }
+    }
+
+    import cjmx.util.jmx.MBeanQuery
+    import javax.management.ObjectName
+
+    // start the jmx importer
+    options.jmx.foreach { config =>
+      log.info(s"Launching the JMX source '${config.uri}', using "+
+               s"'${config.queries.mkString(",")}' queries and " +
+               s"excluding ${config.exclusions.mkString(",")}.")
+
+      jmx.Import.periodicly(
+        config.uri,
+        config.queries.map(q => MBeanQuery(new ObjectName(q))),
+        config.exclusions.map(Glob(_).matches _)
+        .foldLeft((_: String) => false){ (a,b) =>
+          (s: String) => a(s) || b(s)
+        },
+        config.name
+      )(new java.util.concurrent.ConcurrentHashMap, I)(config.frequency).run.runAsync {
+        case -\/(e) => log.error(s"Fatal error with the JMX import from ${config.uri}. $e")
         case _      => ()
       }
     }

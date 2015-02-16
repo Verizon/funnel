@@ -33,7 +33,18 @@ libraryDependencies ++= Seq(
   "net.databinder"  %% "unfiltered-netty-server" % V.unfiltered,
   "oncue.svc.knobs" %% "core"                    % V.knobs,
   "io.netty"         % "netty-handler"           % "4.0.25.Final",
-  "io.netty"         % "netty-codec"             % "4.0.25.Final"
+  "io.netty"         % "netty-codec"             % "4.0.25.Final",
+  "com.github.cjmx" %% "cjmx"                    % "2.2.+" exclude("org.scala-sbt","completion") exclude("com.google.code.gson","gson")
 )
 
 mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.Main")
+
+javaOptions in Revolver.reStart += "-Xmx4g"
+
+Revolver.reStartArgs :=
+  ((sourceDirectory in Test).value / "resources/oncue/agent-jmx-cassandra.cfg"
+    ).getCanonicalPath :: Nil
+
+unmanagedClasspath in Compile ++= Custom.toolsJar
+
+unmanagedClasspath in Test ++= Custom.toolsJar
