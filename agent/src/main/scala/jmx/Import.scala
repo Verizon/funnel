@@ -57,6 +57,7 @@ object Import {
       a <- fetch(location, queries, exclusions)(cache)
       r  = InstrumentRequest(cluster, a:_*)
       _ <- RemoteInstruments.metricsFromRequest(r)(inst)
+      _  = log.debug(s"Imported ${a.length} metrics from $location")
     } yield ()
 
   /**
@@ -75,7 +76,12 @@ object Import {
     remoteConnector(location)(cache).map(connector =>
       queries.flatMap(q => specific(q)(connector.mbeanServer))
       .filterNot { case (a,b) => exclusions(JMX.humanizeKey(b.getName)) }
-      .flatMap { case (a,b) => toArbitraryMetric(a,b) })
+      .flatMap { case (a,b) => toArbitraryMetric(a,b) }).handleWith {
+        case NonFatal(e) =>
+          log.error(s"An error occoured with the JMX import from $location")
+          e.printStackTrace
+          Task.now(Seq.empty[ArbitraryMetric])
+      }
   }
 
   /**

@@ -40,10 +40,18 @@ object Main {
   def main(args: Array[String]): Unit = {
     log.info("Loading agent configuation from disk.")
 
-    val config: Task[Config] = for {
-      a <- knobs.loadImmutable(List(Required(
+    /**
+     * Accepting argument on the command line is really just a
+     * convenience for testing and ad-hoc ops trial of the agent.
+     */
+    val sources = args.toList.map(p =>
+      Optional(FileResource(new File(p)))) :::
+      Required(
         FileResource(new File("/usr/share/oncue/etc/agent.cfg")) or
-        ClassPathResource("oncue/agent.cfg"))))
+        ClassPathResource("oncue/agent.cfg")) :: Nil
+
+    val config: Task[Config] = for {
+      a <- knobs.loadImmutable(sources)
       b <- knobs.aws.config
     } yield a ++ b
 
@@ -161,7 +169,7 @@ object Main {
         },
         config.name
       )(new java.util.concurrent.ConcurrentHashMap, I)(config.frequency).run.runAsync {
-        case -\/(e) => log.error("Fatal error with the JMX import from ${config.uri}")
+        case -\/(e) => log.error(s"Fatal error with the JMX import from ${config.uri}. $e")
         case _      => ()
       }
     }

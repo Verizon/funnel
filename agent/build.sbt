@@ -39,6 +39,10 @@ libraryDependencies ++= Seq(
 
 mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.Main")
 
+Revolver.reStartArgs :=
+  ((sourceDirectory in Test).value / "resources/oncue/agent-jmx-cassandra.cfg"
+    ).getCanonicalPath :: Nil
+
 unmanagedClasspath in Compile ++= Custom.toolsJar
 
 unmanagedClasspath in Test ++= Custom.toolsJar
