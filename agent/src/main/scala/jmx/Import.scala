@@ -34,29 +34,38 @@ object Import {
   def periodicly(
     location: String,
     queries: Seq[MBeanQuery],
-    exclusions: String => Boolean
-  )(cache: ConnectorCache
+    exclusions: String => Boolean,
+    cluster: String
+  )(cache: ConnectorCache, inst: Instruments
   )(frequency: Duration = 10.seconds
   ): Process[Task,Unit] =
     Process.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool)
-      .evalMap { _ => for {
-        a <- now(location, queries, exclusions)(cache)
-        s  = a.filter(_.kind == GaugeString)
-        d  = a.filter(_.kind == GaugeDouble)
-        // _ <- RemoteInstruments.metricsFromRequest(InstrumentRequest(
-        //        cluster = ""
-        //        stringGauges = s,
-        //        doubleGauges = d
-        //      ))
-      } yield ()
-    }
+      .evalMap(_ => now(location, queries, exclusions, cluster)(cache, inst))
 
   /**
-   * Fetch metrics from the specified JMX location.
+   * Fetch metrics from the specified JMX location and import them right now.
    * See the configuration agent.cfg for details on specifiying queries
    * and attribute exclusion rules.
    */
   def now(
+    location: String,
+    queries: Seq[MBeanQuery],
+    exclusions: String => Boolean,
+    cluster: String
+  )(cache: ConnectorCache, inst: Instruments): Task[Unit] =
+    for {
+      a <- fetch(location, queries, exclusions)(cache)
+      r  = InstrumentRequest(cluster, a:_*)
+      _ <- RemoteInstruments.metricsFromRequest(r)(inst)
+    } yield ()
+
+  /**
+   * Fetch metrics from the specified JMX location and return all the
+   * metrics as an in-memory set.
+   * See the configuration agent.cfg for details on specifiying queries
+   * and attribute exclusion rules.
+   */
+  def fetch(
     location: String,
     queries: Seq[MBeanQuery],
     exclusions: String => Boolean

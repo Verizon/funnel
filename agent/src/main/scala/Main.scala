@@ -23,6 +23,7 @@ object Main {
   case class ZeromqConfig(socket: String, proxy: Option[ProxyConfig])
   case class NginxConfig(uri: String, frequency: Duration)
   case class JmxConfig(
+    name: String,
     uri: String,
     frequency: Duration,
     queries: List[String] = Nil,
@@ -68,6 +69,7 @@ object Main {
       val nginxFreq   = cfg.lookup[Duration]("agent.nginx.poll-frequency")
       val nginxUrl    = cfg.lookup[String]("agent.nginx.url")
       // jmx
+      val jmxName     = cfg.lookup[String]("agent.jmx.name")
       val jmxUri      = cfg.lookup[String]("agent.jmx.uri")
       val jmxFreq     = cfg.lookup[Duration]("agent.jmx.poll-frequency")
       val jmxQueries  = cfg.lookup[List[String]]("agent.jmx.queries")
@@ -78,7 +80,7 @@ object Main {
         statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
         zeromq = proxySocket.map(ZeromqConfig(_, (proxyHost |@| proxyPort)(ProxyConfig))),
         nginx  = (nginxUrl |@| nginxFreq)(NginxConfig),
-        jmx    = (jmxUri |@| jmxFreq |@| jmxQueries |@| jmxExcludes)(JmxConfig)
+        jmx    = (jmxName |@| jmxUri |@| jmxFreq |@| jmxQueries |@| jmxExcludes)(JmxConfig)
       )
     }.run
 
@@ -156,8 +158,9 @@ object Main {
         config.exclusions.map(Glob(_).matches _)
         .foldLeft((_: String) => false){ (a,b) =>
           (s: String) => a(s) || b(s)
-        }
-      )(new java.util.concurrent.ConcurrentHashMap)(config.frequency).run.runAsync {
+        },
+        config.name
+      )(new java.util.concurrent.ConcurrentHashMap, I)(config.frequency).run.runAsync {
         case -\/(e) => log.error("Fatal error with the JMX import from ${config.uri}")
         case _      => ()
       }
