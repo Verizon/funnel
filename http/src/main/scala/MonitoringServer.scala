@@ -1,9 +1,7 @@
-package oncue.svc.funnel
+package funnel
 package http
 
-import com.sun.net.httpserver.HttpExchange
-import com.sun.net.httpserver.HttpHandler
-import com.sun.net.httpserver.HttpServer
+import com.sun.net.httpserver.{HttpExchange,HttpHandler,HttpServer}
 import java.io.{BufferedWriter, IOException, OutputStream, OutputStreamWriter}
 import java.net.{InetSocketAddress, URL, URI}
 import scala.concurrent.duration._
@@ -11,7 +9,8 @@ import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.signal
-import oncue.svc.funnel.Events.Event
+import Events.Event
+import oncue.svc.funnel.BuildInfo
 
 object MonitoringServer {
 

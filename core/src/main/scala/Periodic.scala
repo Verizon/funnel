@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 
 /**
  * A key set for a periodic metric. Periodic metrics

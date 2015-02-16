@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 package object zeromq {
   import scalaz.concurrent.Task
   import org.zeromq.ZMQ.{Context,Socket}

@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 package agent
 
 import knobs._
@@ -11,7 +11,7 @@ import scalaz.concurrent.Task
 import java.net.{InetAddress,URI}
 import scalaz.syntax.applicative._
 import scala.concurrent.duration._
-import oncue.svc.funnel.zeromq._, sockets._
+import funnel.zeromq._, sockets._
 import agent.zeromq._
 
 object Main {

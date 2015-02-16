@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 package nginx
 
 import org.scalatest.{FlatSpec,Matchers}

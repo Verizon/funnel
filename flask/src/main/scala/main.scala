@@ -1,4 +1,5 @@
-package oncue.svc.laboratory
+package funnel
+package flask
 
 import java.io.File
 import org.slf4j.LoggerFactory

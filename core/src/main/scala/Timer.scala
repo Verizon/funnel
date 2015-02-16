@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 
 import java.util.concurrent.atomic._
 import java.util.concurrent.TimeUnit

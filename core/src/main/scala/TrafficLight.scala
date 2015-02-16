@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 
 case class TrafficLight(gauge: Gauge[Continuous[String], String]){
   import TrafficLight._

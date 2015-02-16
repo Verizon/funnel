@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 
 trait Instrument[K] {
   def keys: K

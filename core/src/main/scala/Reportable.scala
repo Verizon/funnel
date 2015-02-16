@@ -1,4 +1,3 @@
-package oncue.svc
 package funnel
 
 /**

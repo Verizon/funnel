@@ -1,4 +1,4 @@
-package oncue.svc.funnel
+package funnel
 package zeromq
 
 import oncue.svc.funnel._, zeromq._
