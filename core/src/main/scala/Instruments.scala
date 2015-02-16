@@ -26,7 +26,7 @@ class Instruments(val window: Duration,
    * Return a `Counter` with the given starting count.
    * Keys updated by this `Counter` are `now/label`,
    * `previous/label` and `sliding/label`.
-   * See [[oncue.svc.funnel.Periodic]].
+   * See [[funnel.Periodic]].
    */
   def counter(label: String,
               init: Int = 0,
@@ -129,7 +129,7 @@ class Instruments(val window: Duration,
    * Return a `Gauge` with the given starting value.
    * Unlike `gauge`, keys updated by this `Counter` are
    * `now/label`, `previous/label` and `sliding/label`.
-   * See [[oncue.svc.funnel.Periodic]].
+   * See [[funnel.Periodic]].
    */
   def numericGauge(label: String, init: Double,
                    units: Units[Stats] = Units.None,
@@ -156,7 +156,7 @@ class Instruments(val window: Duration,
   /**
    * Return a `Timer` which updates the following keys:
    * `now/label`, `previous/label`, and `sliding/label`.
-   * See [[oncue.svc.funnel.Periodic]].
+   * See [[funnel.Periodic]].
    */
   def timer(label: String, description: String = ""): Timer[Periodic[Stats]] = {
     val t = new Timer[Periodic[Stats]] {

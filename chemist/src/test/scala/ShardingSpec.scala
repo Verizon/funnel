@@ -1,8 +1,8 @@
 package oncue.svc.laboratory
 
 import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterAll}
-import oncue.svc.funnel.Monitoring
-import oncue.svc.funnel.http.MonitoringServer
+import funnel.Monitoring
+import funnel.http.MonitoringServer
 import scalaz.==>>
 import scalaz.std.string._
 

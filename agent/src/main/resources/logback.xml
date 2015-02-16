@@ -10,7 +10,7 @@
   <logger name="com.amazonaws" level="WARN" />
   <logger name="io.netty" level="WARN" />
   <logger name="com.ning.http" level="WARN" />
-  <logger name="oncue.svc.funnel.zeromq" level="WARN" />
+  <logger name="funnel.zeromq" level="WARN" />
 
   <root level="DEBUG">
     <appender-ref ref="STDOUT" />
