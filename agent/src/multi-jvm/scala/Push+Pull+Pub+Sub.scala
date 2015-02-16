@@ -1,7 +1,7 @@
 package funnel
 package agent
 
-import oncue.svc.funnel.zeromq._, sockets._
+import funnel.zeromq._, sockets._
 import scalaz.concurrent.{Task,Strategy}
 import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process

@@ -10,7 +10,7 @@ object Example {
   def main(args: Array[String]): Unit = {
 
     object metrics {
-      import oncue.svc.funnel.instruments._
+      import funnel.instruments._
       val reqs = counter("requests#")
       val dbOk = gauge("db-up?", true)
       val query = timer("query-speed")

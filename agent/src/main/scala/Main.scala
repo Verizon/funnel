@@ -160,7 +160,7 @@ object Main {
                s"'${config.queries.mkString(",")}' queries and " +
                s"excluding ${config.exclusions.mkString(",")}.")
 
-      jmx.Import.periodicly(
+      jmx.Import.periodically(
         config.uri,
         config.queries.map(q => MBeanQuery(new ObjectName(q))),
         config.exclusions.map(Glob(_).matches _)
