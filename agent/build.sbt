@@ -39,6 +39,8 @@ libraryDependencies ++= Seq(
 
 mainClass in Revolver.reStart := Some("oncue.svc.funnel.agent.Main")
 
+javaOptions in Revolver.reStart += "-Xmx4g"
+
 Revolver.reStartArgs :=
   ((sourceDirectory in Test).value / "resources/oncue/agent-jmx-cassandra.cfg"
     ).getCanonicalPath :: Nil
