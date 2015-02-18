@@ -5,7 +5,7 @@ import argonaut.EncodeJson
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.Process
 import scalaz.concurrent.Task
-import scalaz.{-\/,\/-}
+import scalaz.{\/,-\/,\/-}
 import java.net.URI
 
 object Publish {
@@ -16,6 +16,7 @@ object Publish {
   private[zeromq] val UTF8 = java.nio.charset.Charset.forName("UTF-8")
   private[zeromq] val alive: Signal[Boolean] = signalOf[Boolean](true)
   val defaultUnixSocket = "/var/run/funnel.socket"
+  val defaultTcpSocket  = "127.0.0.1:7390"
 
   /////////////////////////////// USAGE ///////////////////////////////////
 
@@ -36,17 +37,25 @@ object Publish {
 
   import sockets._
 
+  private def use(e: Throwable \/ Endpoint)(s: Signal[Boolean])(m: Monitoring): Unit =
+    if(Ø.isEnabled){
+      e match {
+        case \/-(e) => to(e)(s, m)
+        case -\/(f) => sys.error(s"Unable to create endpoint; the specified URI is likley malformed: $f")
+      }
+    } else Ø.log.warn("ZeroMQ binaries not installed. No Funnel telemetry will be published.")
+
+  def toTcpSocket(
+    host: String = defaultTcpSocket,
+    signal: Signal[Boolean] = alive,
+    instance: Monitoring = Monitoring.default
+  ): Unit = use(Endpoint(push &&& connect, new URI(s"tcp://$host")))(signal)(instance)
+
   def toUnixSocket(
     path: String = defaultUnixSocket,
     signal: Signal[Boolean] = alive,
     instance: Monitoring = Monitoring.default
-  ): Unit =
-    if(Ø.isEnabled){
-      Endpoint(push &&& connect, new URI(s"ipc://$path")) match {
-        case \/-(e) => to(e)(signal, instance)
-        case -\/(f) => sys.error(s"Unable to create endpoint; the specified URI is likley malformed: $f")
-      }
-    } else Ø.log.warn("ZeroMQ binaries not installed. No Funnel telemetry will be published.")
+  ): Unit = use(Endpoint(push &&& connect, new URI(s"ipc://$path")))(signal)(instance)
 
   /////////////////////////////// INTERNALS ///////////////////////////////////
 
