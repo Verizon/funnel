@@ -26,7 +26,7 @@ The following subsections cover these in more detail.
 
 ## JVM and Clock Metrics
 
-The default set of instruments (`oncue.svc.funnel.instruments`) will automatically collect the following JVM statistics (where `:period` is one of either `now`, `sliding` or `previous`):
+The default set of instruments (`funnel.instruments`) will automatically collect the following JVM statistics (where `:period` is one of either `now`, `sliding` or `previous`):
 
 * `:period/jvm/memory/nonheap/init`
 * `:period/jvm/memory/heap/committed`
@@ -56,7 +56,7 @@ In addition to these JVM metrics, the default instruments also provide the follo
 These are keys provided by the default instruments, but if you would like to create a custom `Instruments` instance, this is entirely possible. The only reason you would typically want to do this is to specify a custom boundary for time periods. **This is not generally advisable** as the operation logic expects the time period defined by the library. 
 
 ````
-import oncue.svc.funnel._
+import funnel._
 import scala.concurrent.duration._
 
 val I = new Instruments(2 minutes, Monitoring.default) with DefaultKeys {
@@ -69,7 +69,7 @@ val I = new Instruments(2 minutes, Monitoring.default) with DefaultKeys {
 
 ## System metrics
 
-The default set of instruments (`oncue.svc.funnel.instruments`) will also automatically collect operating system statistics if the Hyperic SIGAR library is available on the `java.library.path` (by default on Linux systems this maps to the `LD_LIBRARY_PATH` environment variable).
+The default set of instruments (`funnel.instruments`) will also automatically collect operating system statistics if the Hyperic SIGAR library is available on the `java.library.path` (by default on Linux systems this maps to the `LD_LIBRARY_PATH` environment variable).
 
 Download the library here: [http://sourceforge.net/projects/sigar/files/](http://sourceforge.net/projects/sigar/files/).
 

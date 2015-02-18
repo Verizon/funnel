@@ -9,7 +9,7 @@ section: "getting-started"
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
 ````
-libraryDependencies += "oncue.svc.funnel" %% "http" % "x.y.z"
+libraryDependencies += "funnel" %% "http" % "x.y.z"
 ````
 (check for the latest release by [looking on the nexus](http://nexus.svc.oncue.com/nexus/content/repositories/releases/oncue/svc/funnel/http_2.10/))
 
@@ -54,7 +54,7 @@ At first blush, clearly having a single namespace for the entire world of applic
 ````
 package oncue.svc.su
 
-import oncue.svc.funnel.instruments._
+import funnel.instruments._
 
 object metrics {
 

@@ -76,7 +76,7 @@ That's all there is to it!
 In order to publish your metrics using ZeroMQ, ensure that you have the following in your `build.sbt`:
 
 ```
-libraryDependencies += "oncue.svc.funnel" %% "zeromq" % "x.x.x"
+libraryDependencies += "funnel" %% "zeromq" % "x.x.x"
 ```
 
 This will allow you to setup the publishing of metrics. Technically, this publishing happens on a background daemon thread, so its typically best to put this line at the very edge of your work (typically the application main):
@@ -86,7 +86,7 @@ package foo
 
 object Foo {
   def main(args: Array[String]): Unit = {
-    oncue.svc.funnel.zeromq.Publish.toUnixSocket()
+    funnel.zeromq.Publish.toUnixSocket()
   }
 }
 
@@ -102,7 +102,7 @@ package foo
 import scalaz.stream.async.signalOf
 import scalaz.stream.async.mutable.Signal
 import scalaz.concurrent.Task
-import oncue.svc.funnel.zeromq.Publish
+import funnel.zeromq.Publish
 
 object Foo {
 
@@ -132,8 +132,8 @@ Similarly, importing metrics is trival. Please note this documentation is intend
 package foo
 
 import scalaz.stream.async.signalOf
-import oncue.svc.funnel.zeromq.Publish
-import oncue.svc.funnel.DatapointParser
+import funnel.zeromq.Publish
+import funnel.DatapointParser
 
 object Foo {
 
@@ -152,7 +152,7 @@ When using the ZeroMQ module primitives to do anything with sockets, you will ne
 package foo
 
 import scalaz.stream.async.signalOf
-import oncue.svc.funnel.zeromq.{Endpoint,sockets}, sockets._
+import funnel.zeromq.{Endpoint,sockets}, sockets._
 import java.net.URI
 
 object Foo {
