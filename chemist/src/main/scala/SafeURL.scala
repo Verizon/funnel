@@ -1,4 +1,6 @@
-package oncue.svc.laboratory
+package funnel
+package chemist
+
 
 /**
  * Whatever genius decided that java.net.URL would actually

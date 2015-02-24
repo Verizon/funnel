@@ -16,7 +16,9 @@ lazy val funnel = project.in(file(".")).aggregate(
   zeromq,
   agent,
   `zeromq-java`,
-  `agent-windows`)
+  `agent-windows`,
+  flask,
+  chemist)
 
 lazy val agent = project.dependsOn(zeromq % "test->test;compile->compile", http, nginx).configs(MultiJvm)
 

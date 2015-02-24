@@ -1,4 +1,4 @@
-package oncue.svc.laboratory
+package funnel
 
 import com.amazonaws.services.sqs.{AmazonSQS,AmazonSQSClient}
 import com.amazonaws.services.sqs.model.{
