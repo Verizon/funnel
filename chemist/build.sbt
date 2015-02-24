@@ -24,8 +24,8 @@ libraryDependencies ++= Seq(
 
 name in Universal := "chemist"
 
-mainClass in Compile := Some("oncue.svc.laboratory.Main")
+mainClass in Compile := Some("funnel.chemist.Main")
 
-mainClass in Revolver.reStart := Some("oncue.svc.laboratory.Main")
+mainClass in Revolver.reStart := Some("funnel.chemist.Main")
 
 scalacOptions += "-language:postfixOps"
