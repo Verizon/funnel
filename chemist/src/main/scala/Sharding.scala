@@ -1,4 +1,5 @@
-package oncue.svc.laboratory
+package funnel
+package chemist
 
 import scalaz.==>>
 import scalaz.std.string._
@@ -102,7 +103,7 @@ object Sharding {
    * Given the new set of urls to monitor, compute how said urls
    * should be distributed over the known flask instances
    */
-  private[laboratory] def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
+  private[chemist] def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
     val servers = shards(d)
     val ss      = servers.size
     val input   = deduplicate(s)(d)
@@ -128,7 +129,7 @@ object Sharding {
    * that we're not already monitoring the inputs (thus ensuring that
    * the cluster is not having duplicated monitoring items)
    */
-  private[laboratory] def deduplicate(next: Set[Target])(d: Distribution): Set[Target] = {
+  private[chemist] def deduplicate(next: Set[Target])(d: Distribution): Set[Target] = {
     // get the full list of targets we currently know about
     val existing = targets(d)
 

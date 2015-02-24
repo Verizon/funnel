@@ -1,4 +1,5 @@
-package oncue.svc.laboratory
+package funnel
+package chemist
 
 import com.amazonaws.services.ec2.model.{Instance => EC2Instance}
 import com.amazonaws.services.ec2.model.{Placement,Tag}

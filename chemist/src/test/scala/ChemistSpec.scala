@@ -1,4 +1,5 @@
-package oncue.svc.laboratory
+package funnel
+package chemist
 
 import journal.Logger
 

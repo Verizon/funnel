@@ -1,4 +1,5 @@
-package oncue.svc.laboratory
+package funnel
+package chemist
 
 object Main {
   def main(args: Array[String]): Unit = {

@@ -1,4 +1,5 @@
-package oncue.svc.laboratory
+package funnel
+package chemist
 
 import org.scalatest.{FlatSpec,Matchers}
 import scalaz.\/

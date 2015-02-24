@@ -1,6 +1,6 @@
-package oncue.svc
+package funnel
 
-package object laboratory {
+package object chemist {
   type InstanceID  = String
   type HostAndPort = String
 

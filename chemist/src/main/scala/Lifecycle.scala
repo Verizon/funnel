@@ -1,4 +1,5 @@
-package oncue.svc.laboratory
+package funnel
+package chemist
 
 import scalaz.{\/,-\/,\/-}
 import scalaz.syntax.traverse._
