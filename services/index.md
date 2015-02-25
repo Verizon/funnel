@@ -21,6 +21,8 @@ Whilst *Funnel* is mainly a library, in order to compose the core of the system 
 
 The agent process makes heavy use of the <a href="{{ site.baseurl }}modules/#zeromq">ZeroMQ</a> module in order to provide communication locally, and remotely. Specifically applications running on that host may connect to the appropriate local domain socket to submit their metrics, and in turn, the agent will consume from that domain socket and transparently emit those metrics on a TCP socket bound to the host adaptor. This provides a convenient mechanism for the application to report metrics irrespective of if this particular host is mulit-tennant (e.g. using containers and a resource manager) or not.
 
+<a name="agent-config"></a>
+
 #### Configuration
 
 The agent does not have a huge number of configuration options, but what is avalible can be controlled via a [Knobs](https://github.oncue.verizon.net/pages/intelmedia/knobs/) configuration file. The agent can be controlled simply by commenting out sections of the configuration file. For example commenting out `agent.http` will disable the HTTP server when the agent boots. The default looks like this:
@@ -67,8 +69,46 @@ agent {
   #   url = "http://127.0.0.1:8080/nginx_status"
   #   poll-frequency = 15 seconds
   # }
+  
+  # currently only supports non-authenticated, non-ssl connections
+  # designed to be use locally within a docker container or host.
+  # processes running jmx typically need the following set:
+  #
+  # -Dcom.sun.management.jmxremote
+  # -Dcom.sun.management.jmxremote.authenticate=false
+  # -Dcom.sun.management.jmxremote.ssl=false
+  # -Djava.rmi.server.hostname=?????
+  # -Dcom.sun.management.jmxremote.port=????
+  # jmx {
+  #   # Name this jmx resource so that a "cluster" field can be specified
+  #   # at query time which references the metrics imported via this source.
+  #   # Exmaple would be: "dev-accounts-db-west-1a"
+  #   name = "example"
+  #
+  #   uri = "service:jmx:rmi:///jndi/rmi://127.0.0.1:7199/jmxrmi"
+  #
+  #   poll-frequency = 28 seconds
+  #
+  #   # Examples of jmx queries are:
+  #   # *:type=Foo,name=Bar to match names in any domain whose exact set of keys is type=Foo,name=Bar.
+  #   # d:type=Foo,name=Bar,* to match names in the domain d that have the keys type=Foo,name=Bar plus zero or more other keys.
+  #   # *:type=Foo,name=Bar,* to match names in any domain that has the keys type=Foo,name=Bar plus zero or more other keys.
+  #   # d:type=F?o,name=Bar will match e.g. d:type=Foo,name=Bar and d:type=Fro,name=Bar.
+  #   # d:type=F*o,name=Bar will match e.g. d:type=Fo,name=Bar and d:type=Frodo,name=Bar.
+  #   # d:type=Foo,name="B*" will match e.g. d:type=Foo,name="Bling". Wildcards are recognized even inside quotes, and like other special characters can be escaped with \.
+  #   queries = [ "org.apache.cassandra.db:*" ]
+  #
+  #   # Use glob syntax to specify patterns of attributes that you do not wish to
+  #   # collect from the JMX endpoint. An example are:
+  #   # "*HistogramMicros"
+  #   # "*Histogram"
+  #   # etc
+  #   exclude-attribute-patterns = [ "*HistogramMicros", "*Histogram" ]
+  # }
+  
 }
 ```
+<a name="agent-http"></a>
 
 #### HTTP
 
@@ -138,9 +178,13 @@ The structure is very simple, but lets take a moment to just walk through the va
 
 That's about it for the HTTP API. Whilst it should be able to tollerate a good beating performance wise, it will likley not be as performant as the native Scala bindings, so keep that in mind because of the extra layers of indirection. 
 
+<a name="agent-statsd"></a>
+
 #### StatsD
 
 The StatsD interface provided by the agent uses UDP and supports `c`,`ms`,`g` and `m` metric types. The StatsD interface is entirely optioanl.
+
+<a name="agent-nginx"></a>
 
 #### Nginx
 
@@ -155,6 +199,24 @@ The Nginx importer periodically fetches to the specified Nginx URL and extracts 
 * `nginx/lifetime/requests`
 
 The `nginx/lifetime/*` keys are essentially gauges that detail the state of nginx *since it was first booted*. These values will not reset over time, and this is how they are extracted from Nginx, so seeing these numbers grow over time is entirely normal. The remainder of the metrics behave exactly how normal gauges work: their values reflect current usage and are rolled up into the *Funnel* windowing.
+
+<a name="agent-jmx"></a>
+
+#### JMX
+
+The JMX module is designed to periodically import metrics from a specificed JMX RMI location. The agent does not support authenticated JMX endpoints at this time and assumes that it is operating on the same machine as the JMX service you wish to connect too (technically it could do remote monitoring too, but its less flexible in that regard by design as the intentino is not to deploy a central service that reaches out to remote JMX endpoints - hence only supporting a single RMI endpoint).
+
+The primary thing to understand about the JMX module is that you need to specify the MBean queries you are actually interested in. Examples of MBean queries (taken from the `ObjectName` JavaDoc in the JDK):
+
+* `*:type=Foo,name=Bar` to match names in any domain whose exact set of keys is `type=Foo,name=Bar`.
+* `d:type=Foo,name=Bar,*` to match names in the domain d that have the keys type=Foo,name=Bar plus zero or more other keys.
+* `*:type=Foo,name=Bar,*` to match names in any domain that has the keys type=Foo,name=Bar plus zero or more other keys.
+* `d:type=F?o,name=Bar` will match e.g. `d:type=Foo,name=Bar` and `d:type=Fro,name=Bar`.
+* `d:type=F*o,name=Bar` will match e.g. `d:type=Fo,name=Bar` and `d:type=Frodo,name=Bar`.
+* `d:type=Foo,name="B*"` will match e.g. `d:type=Foo,name="Bling"`. Wildcards are recognized even inside quotes, and like other special characters can be escaped with `\`.
+
+Whilst this is reasoanbly expressive, `ObjectName` queries do not really support negation, and in some JMX endpoints which publish huge numbers of metric vectors it is often desirable to run a set of filters to remove unwanted keys. This is supported by the `exclude-attribute-patterns` configuration paramater in the `agent.cfg` (detailed above). The paramter uses [glob syntax](http://en.wikipedia.org/wiki/Glob_%28programming%29) to select metrics names the user wishes to *not* import.
+
 
 <a name="flask"></a>
 
