@@ -1,4 +1,6 @@
 package funnel
 package chemist
 
-case class ChemistConfig(name: String)
+case class ChemistConfig(
+  repository: Repository
+)
