@@ -91,15 +91,16 @@ object ZeroMQ {
    * `Array[Byte]` using `map` or similar on the input stream; this makes the 0mq streams
    * not care about serialisation at all.
    */
-  def write(socket: Socket): Channel[Task, Array[Byte], Boolean] =
-    io.channel(bytes =>
+  def write[A](socket: Socket)(implicit T: Transportable[A]): Channel[Task, A, Boolean] = writeTrans(socket).contramap[A](T.apply)
+
+  private[funnel] def writeTrans(socket: Socket): Channel[Task, Transported, Boolean] =
+    io.channel { t =>
       Task.delay {
-        // log.debug(s"Sending ${bytes.length}")
-        socket.sendMore("FMS/1")
-        val bool = socket.send(bytes, 0) // the zero here is "flags"
-        bool
+        socket.sendMore(t.header)
+        socket.send(t.bytes, 0)
       }
-    )
+    }
+
 
   /////////////////////////////// INTERNALS ///////////////////////////////////
 
@@ -114,6 +115,7 @@ object ZeroMQ {
 
   /**
    *
+
    */
   private[zeromq] def resource[F[_],R,O](
     acquire: F[R])(

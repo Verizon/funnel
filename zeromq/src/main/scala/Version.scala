@@ -1,7 +1,7 @@
 package funnel
 package zeromq
 
-abstract class Version(val number: Int)
+class Version(val number: Int) extends AnyVal
 object Versions {
   def fromInt(i: Int): Option[Version] =
     i match {
@@ -18,7 +18,7 @@ object Versions {
 
   val all: Seq[Version] = v1 :: v2 :: Nil
 
-  case object `v1` extends Version(1)
-  case object `v2` extends Version(2)
-  case object `unknown` extends Version(0)
+  val v1 = new Version(1)
+  val v2 = new Version(2)
+  val unknown = new Version(0)
 }

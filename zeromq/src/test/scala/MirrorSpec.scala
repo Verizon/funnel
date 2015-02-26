@@ -65,7 +65,7 @@ class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   if(Ø.isEnabled){
     "zeromq mirroring" should "pull values from the specified monitoring instance" in {
-      (countKeys(M1) + countKeys(M2)) should equal (MI.keys.get.run.length)
+      (countKeys(M1) + countKeys(M2)) should equal (MI.keys.get.run.sie)
     }
   }
 }

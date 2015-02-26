@@ -34,9 +34,9 @@ trait Monitoring {
    * using a stream transducer to
    */
   def topic[I, O:Reportable](
-      name: String, units: Units[O], description: String)(
+      name: String, units: Units[O], description: String, keyMod: Key[O] => Key[O])(
       buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
-    val k = Key[O](name, units, description)
+    val k = keyMod(Key[O](name, units, description))
     (k, topic(k)(buf))
   }
 
@@ -248,7 +248,7 @@ trait Monitoring {
       log("Monitoring.aggregate: gathering values")
       Process.eval { evalFamily(family).flatMap { vs =>
         val v = f(vs)
-        log(s"Monitoring.aggregate: aggregated $v from ${vs.length} matching keys")
+        log(s"Monitoring.aggregate: aggregated $v from ${vs.size} matching keys")
         update(out, v)
       }}}.run)
   } yield out
@@ -291,7 +291,7 @@ trait Monitoring {
     get(k).continuous.once.runLast.map(_.get)
 
   /** The time-varying set of keys. */
-  def keys: Signal[List[Key[Any]]]
+  def keys: Signal[Set[Key[Any]]]
 
   /** get a count of all metric keys in the system broken down by their logical prefix **/
   def audit: Task[List[(String, Int)]] =
@@ -307,7 +307,7 @@ trait Monitoring {
 
   /** Returns `true` if the given key currently exists. */
   def exists[O](k: Key[O]): Task[Boolean] =
-    keys.continuous.once.runLastOr(List()).map(_.contains(k))
+    keys.continuous.once.runLastOr(Set()).map(_.contains(k))
 
   /** Attempt to uniquely resolve `name` to a key of some expected type. */
   def lookup[O](name: String)(implicit R: Reportable[O]): Task[Key[O]] =
@@ -321,15 +321,15 @@ trait Monitoring {
 
   /** The infinite discrete stream of unique keys, as they are added. */
   def distinctKeys: Process[Task, Key[Any]] =
-    keys.discrete.flatMap(Process.emitAll).pipe(Buffers.distinct)
+    keys.discrete.flatMap(keys => Process.emitAll(keys.toSeq)).pipe(Buffers.distinct)
 
   /** Create a new topic with the given name and discard the key. */
   def topic_[I, O:Reportable](
     name: String, units: Units[O], description: String,
-    buf: Process1[(I,Duration),O]): I => Unit = topic(name, units, description)(buf)._2
+    buf: Process1[(I,Duration),O]): I => Unit = topic(name, units, description, identity[Key[O]])(buf)._2
 
   def filterKeys(f: Key[Any] => Boolean): Process[Task, List[Key[Any]]] =
-    keys.continuous.map(_.filter(f))
+    keys.continuous.map(_.filter(f).toList)
 
   /**
    * Returns the continuous stream of values for keys whose type
@@ -339,7 +339,7 @@ trait Monitoring {
   def evalFamily[O](family: Key[O]): Task[Seq[O]] =
     filterKeys(Key.StartsWith(family.name)).once.runLastOr(List()).flatMap { ks =>
       val ksO: Seq[Key[O]] = ks.flatMap(_.cast(family.typeOf, family.units))
-      Nondeterminism[Task].gatherUnordered(ksO map (k => eval(k)))
+      Nondeterminism[Task].gatherUnordered(ksO map (k => eval(k)) toSeq)
     }
 }
 
@@ -380,8 +380,8 @@ object Monitoring {
     val t0 = System.nanoTime
     implicit val S = Strategy.Executor(ES)
     val P = Process
-    val keys_ = signal[List[Key[Any]]](S)
-    keys_.set(List()).run
+    val keys_ = signal[Set[Key[Any]]](S)
+    keys_.set(Set()).run
 
     case class Topic[I,O](
       publish: ((I,Duration)) => Unit,
@@ -401,7 +401,7 @@ object Monitoring {
         val (pub, v) = bufferedSignal(buf)(ES)
         val _ = topics += (k -> eraseTopic(Topic(pub, v)))
         val t = (k.typeOf, k.units)
-        val __ = keys_.compareAndSet(_.map(k :: _)).run
+        val __ = keys_.compareAndSet(_.map(_ + k)).run
         (i: I) => pub(i -> Duration.fromNanos(System.nanoTime - t0))
       }
 
@@ -446,12 +446,10 @@ object Monitoring {
     val m = collection.concurrent.TrieMap[Key[Any], Datapoint[Any]]()
     implicit val S = Strategy.Executor(ES)
     for {
-      ks <- M.keys.compareAndSet(identity).map(_.getOrElse(List()))
+      ks <- M.keys.compareAndSet(identity).map(_.getOrElse(Set()))
       t <- Nondeterminism[Task].gatherUnordered {
-        ks.map(k => M.get(k).compareAndSet(identity).map(
-          _.map(v => k -> Datapoint(k, v))
-        ).attempt.map(_.toOption))
-      }
+        ks.map(k => M.get(k).compareAndSet(identity).map(_.map(v => k -> Datapoint(k, v))).attempt.map(_.toOption)).toSeq
+      }.map(_.toSet)
       _ <- Task { t.flatten.flatten.foreach(m += _) }
     } yield m
   }
