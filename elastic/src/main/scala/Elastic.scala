@@ -148,8 +148,9 @@ case class Elastic(M: Monitoring) {
       es.typeName := jObjectAssocList(List(
         "_timestamp" -> Json("enabled" := true, "store" := true),
         "properties" -> Properties(List(
-          Field("host", StringField),
-          Field("cluster", StringField)) ++ (keys map keyField)).asJson)
+          Field("host", StringField, Json("index" -> "not_analyzed".asJson)),
+          Field("cluster", StringField, Json("index" -> "not_analyzed".asJson))) ++ 
+          (keys map keyField)).asJson)
       ))
     _ <- ensureIndex
     _ <- putMapping(json)
