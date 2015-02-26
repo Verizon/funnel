@@ -1,19 +1,34 @@
 package funnel
 package chemist
 
-import com.sun.net.httpserver.HttpExchange
-import com.sun.net.httpserver.HttpHandler
-import com.sun.net.httpserver.HttpServer
-import java.io.{BufferedWriter, IOException, OutputStream, OutputStreamWriter}
-import java.net.{InetSocketAddress, URL}
+import knobs.{loadImmutable,Required,FileResource,ClassPathResource}
+import java.io.File
 import journal.Logger
 import oncue.svc.funnel.BuildInfo
-import scalaz.{\/,-\/,\/-,Free}
+import scalaz.{\/,-\/,\/-,Kleisli}
 import scalaz.concurrent.Task
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 
 object Chemist {
   private val log = Logger[Chemist.type]
+
+  //////////////////////// PUBLIC API ////////////////////////////
+
+  val exe: Chemist[Unit] = for {
+    _ <- Kleisli[Task,ChemistConfig,Unit](_ => Task.now(()))
+  } yield ()
+
+  def main(args: Array[String]): Unit = {
+    (for {
+      a <- knobs.loadImmutable(Required(
+        FileResource(new File("/usr/share/oncue/etc/chemist.cfg")) or
+        ClassPathResource("oncue/chemist.cfg")) :: Nil)
+      b <- knobs.aws.config
+      _ <- exe.run(Config.readConfig(a ++ b))
+    } yield ()).run
+  }
+
+  //////////////////////// INTERNALS ////////////////////////////
 
   private def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {
@@ -35,7 +50,6 @@ object Chemist {
 
 }
 
-class Chemist
 
 
 // class Chemist(I: Interpreter[Server.ServerF], port: Int){
