@@ -17,3 +17,6 @@ Custom.testing
 // libraryDependencies += "org.zeromq" % "jeromq" % "0.3.4"
 // native c++ implementation with jni:
 libraryDependencies += "org.zeromq" % "jzmq" % "3.1.0"
+
+libraryDependencies += "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test"
+

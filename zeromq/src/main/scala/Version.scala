@@ -1,7 +1,9 @@
 package funnel
 package zeromq
 
-class Version(val number: Int) extends AnyVal
+class Version(val number: Int) extends AnyVal {
+  override def toString = number.toString
+}
 object Versions {
   def fromInt(i: Int): Option[Version] =
     i match {

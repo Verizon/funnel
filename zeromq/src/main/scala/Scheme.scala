@@ -1,7 +1,9 @@
 package funnel
 package zeromq
 
-case class Scheme(scheme: String) extends AnyVal
+case class Scheme(scheme: String) extends AnyVal {
+  override def toString = scheme
+}
 
 object Schemes {
   def fromString(str: String): Scheme = {
