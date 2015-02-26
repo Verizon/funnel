@@ -140,9 +140,12 @@ case class Elastic(M: Monitoring) {
     _ <- putMapping(json)
   } yield ()
 
+  lazy val http = Http.configure(
+      _.setAllowPoolingConnection(true)
+       .setConnectionTimeoutInMs(c.connectionTimeoutMs))
+
   def elasticString(req: Req): ES[String] = getConfig.flatMapK { c =>
-    fromScalaFuture(Http.configure(_.setAllowPoolingConnection(true).
-                    setConnectionTimeoutInMs(c.connectionTimeoutMs))(req OK as.String))
+    fromScalaFuture(http(req OK as.String))
   }
 
   // Not in Scalaz until 7.2 so duplicating here

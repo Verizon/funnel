@@ -6,10 +6,13 @@ import java.io.File
 import journal.Logger
 import oncue.svc.funnel.BuildInfo
 import scalaz.{\/,-\/,\/-,Kleisli}
+import scalaz.syntax.kleisli._
 import scalaz.concurrent.Task
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 
 object Chemist {
+  import Sharding.Target
+
   private val log = Logger[Chemist.type]
 
   //////////////////////// PUBLIC API ////////////////////////////
@@ -27,10 +30,82 @@ object Chemist {
   //////////////////////// SERVICE API ////////////////////////////
 
   val exe: Chemist[Unit] = for {
-    _ <- Kleisli[Task,ChemistConfig,Unit](_ => Task.now(()))
+    _ <- init()
   } yield ()
 
+  def bootstrap: Chemist[Unit] = for {
+    cfg <- config
+    // read the list of all deployed machines
+    l <- Deployed.list(cfg.asg, cfg.ec2).liftKleisli
+    _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
+
+    // filter out all the instances that are in private networks
+    // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
+    z  = l.filterNot(_.location.isPrivateNetwork)
+          .filterNot(Deployed.isFlask)
+    _  = log.info(s"located ${z.length} instances that appear to be monitorable")
+
+    // convert the instance list into reachable targets
+    t  = z.flatMap(Target.fromInstance(cfg.resources)).toSet
+    _  = log.debug(s"targets are: $t")
+
+    // set the result to an in-memory list of "the world"
+    _ <- Task.gatherUnordered(z.map(cfg.repository.addInstance)).liftKleisli
+    _  = log.info("added instances to the repository...")
+
+    // from the whole world, figure out which are flask instances
+    f  = l.filter(Deployed.isFlask)
+    _  = log.info(s"found ${f.length} flasks in the running instance list...")
+
+    // update the distribution with new capacity seeds
+    _ <- Task.gatherUnordered(f.map(cfg.repository.increaseCapacity)).liftKleisli
+    _  = log.debug("increased the known monitoring capactiy based on discovered flasks")
+
+    // ask those flasks for their current work and yield a `Distribution`
+    d <- Sharding.gatherAssignedTargets(f).liftKleisli
+    _  = log.debug("read the existing state of assigned work from the remote instances")
+
+    // update the distribution accordingly
+    _ <- cfg.repository.mergeDistribution(d).liftKleisli
+    _  = log.debug("merged the currently assigned work into the current distribution")
+
+    _ <- (for {
+      h <- Sharding.locateAndAssignDistribution(t, cfg.repository)
+      g <- Sharding.distribute(h)
+    } yield ()).liftKleisli
+
+    _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
+  } yield ()
+
+
+  protected def init(): Chemist[Unit] = {
+    log.debug("attempting to read the world of deployed instances")
+    for {
+      cfg <- config
+
+      // start to wire up the topics and subscriptions to queues
+      a <- SNS.create(cfg.queue.topicName)(cfg.sns).liftKleisli
+      _  = log.debug(s"created sns topic with arn = $a")
+
+      b <- SQS.create(cfg.queue.topicName, a)(cfg.sqs).liftKleisli
+      _  = log.debug(s"created sqs queue with arn = $b")
+
+      c <- SNS.subscribe(a, b)(cfg.sns).liftKleisli
+      _  = log.debug(s"subscribed sqs queue to the sns topic")
+
+      // now the queues are setup with the right permissions,
+      // start the lifecycle listener
+      _ <- Lifecycle.run(cfg.queue.topicName, cfg.resources, Lifecycle.sink
+            )(cfg.repository, cfg.sqs, cfg.asg, cfg.ec2).liftKleisli
+      _  = log.debug("lifecycle process started")
+
+      _ <- Task.delay(log.info(">>>>>>>>>>>> initilization complete <<<<<<<<<<<<")).liftKleisli
+    } yield ()
+  }
+
   //////////////////////// INTERNALS ////////////////////////////
+
+  private val config: Chemist[ChemistConfig] = Kleisli.ask[Task, ChemistConfig]
 
   private def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {
@@ -147,117 +222,7 @@ object Chemist {
 //     finally req.close
 //   }
 
-//   val indexHTML = s"""
-//     |<!DOCTYPE html>
-//     |<html lang="en">
-//     |  <head>
-//     |    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
-//     |    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
-//     |    <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
-//     |    <title>Chemist &middot; ${BuildInfo.version} &middot; ${BuildInfo.gitRevision}</title>
-//     |    <style type="text/css">
-//     |    /* Space out content a bit */
-//     |    body {
-//     |    padding-top: 20px;
-//     |    padding-bottom: 20px;
-//     |    }
-//     |
-//     |    /* Everything but the jumbotron gets side spacing for mobile first views */
-//     |    .header,
-//     |    .marketing,
-//     |    .footer {
-//     |    padding-right: 15px;
-//     |    padding-left: 15px;
-//     |    }
-//     |
-//     |    /* Custom page header */
-//     |    .header {
-//     |    border-bottom: 1px solid #e5e5e5;
-//     |    }
-//     |    /* Make the masthead heading the same height as the navigation */
-//     |    .header h3 {
-//     |    padding-bottom: 19px;
-//     |    margin-top: 0;
-//     |    margin-bottom: 0;
-//     |    line-height: 40px;
-//     |    }
-//     |
-//     |    /* Custom page footer */
-//     |    .footer {
-//     |    padding-top: 19px;
-//     |    color: #777;
-//     |    border-top: 1px solid #e5e5e5;
-//     |    }
-//     |
-//     |    /* Customize container */
-//     |    @media (min-width: 768px) {
-//     |    .container {
-//     |    max-width: 730px;
-//     |    }
-//     |    }
-//     |    /* Supporting marketing content */
-//     |    .marketing {
-//     |    margin: 40px 0;
-//     |    }
-//     |    .marketing p + h4 {
-//     |    margin-top: 28px;
-//     |    }
-//     |
-//     |    /* Responsive: Portrait tablets and up */
-//     |    @media screen and (min-width: 768px) {
-//     |    /* Remove the padding we set earlier */
-//     |    .header,
-//     |    .marketing,
-//     |    .footer {
-//     |    padding-right: 0;
-//     |    padding-left: 0;
-//     |    }
-//     |    /* Space out the masthead */
-//     |    .header {
-//     |    margin-bottom: 30px;
-//     |    }
-//     |    }
-//     |    </style>
-//     |  </head>
-//     |
-//     |  <body>
-//     |    <div class="container">
-//     |      <div class="header">
-//     |        <ul class="nav nav-pills pull-right">
-//     |          <li><a href="https://github.svc.oncue.com/pages/intelmedia/funnel/">About</a></li>
-//     |          <li><a href="mailto:timothy.m.perrett@oncue.com">Contact</a></li>
-//     |        </ul>
-//     |        <h3 class="text-muted">Chemist Control Panel</h3>
-//     |      </div>
-//     |
-//     |      <div class="row marketing">
-//     |
-//     |        <div class="col-lg-6">
-//     |          <h4>Distribution Resources</h4>
-//     |          <p><a href="/distribution">GET /distribution</a>: Display the current distribution of shards and associated work.</p>
-//     |          <p><a href="/lifecycle/history">GET /lifecycle/history</a>: View a rolling snapshot of the last lifecycle events to took place.</p>
-//     |          <p><a href="/distribute">POST /distribute</a>: Manually instruct a given set of inputs to be sharded over avalible Flask instances.</p>
-//     |          <p><a href="/bootstrap">POST /bootstrap</a>: Manually force Chemist to re-read its state of the world from AWS.</p>
-//     |        </div>
-//     |
-//     |        <div class="col-lg-6">
-//     |          <h4>Shard Resources</h4>
-//     |          <p><a href="/shards">GET /shards</a>: List all shards and known information about those hosts</p>
-//     |          <p><a href="/shard/:shardid">GET /shard/:shard-id</a>: Displays all known information about a given shard.</p>
-//     |          <p><a href="/shard/:shardid/include">POST /shard/:shard-id/include</a>: Manually specify a machine to use as a load-bearing shard.</p>
-//     |          <p><a href="/shard/:shardid/exclude">POST /shard/:shard-id/exclude</a>: Manually remove a shard from rotation and reshard its work.</p>
-//     |        </div>
-//     |
-//     |      </div>
-//     |
-//     |      <div class="footer">
-//     |        <p>&copy; Verizon OnCue 2014</p>
-//     |      </div>
-//     |
-//     |    </div>
-//     |  </body>
-//     |</html>
-//   """.stripMargin
+
 
 // }
 

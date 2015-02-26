@@ -15,6 +15,7 @@ case class QueueConfig(
 )
 
 case class ChemistConfig(
+  resources: List[String],
   queue: QueueConfig,
   sns: AmazonSNS,
   sqs: AmazonSQS,
@@ -31,6 +32,7 @@ object Config {
     val resources = cfg.require[List[String]]("chemist.resources-to-monitor")
     val aws       = cfg.subconfig("aws")
     ChemistConfig(
+      resources,
       queue = QueueConfig(topic, queue),
       sns   = readSNS(aws),
       sqs   = readSQS(aws),
