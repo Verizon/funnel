@@ -14,10 +14,6 @@ object Chemist {
 
   //////////////////////// PUBLIC API ////////////////////////////
 
-  val exe: Chemist[Unit] = for {
-    _ <- Kleisli[Task,ChemistConfig,Unit](_ => Task.now(()))
-  } yield ()
-
   def main(args: Array[String]): Unit = {
     (for {
       a <- knobs.loadImmutable(Required(
@@ -27,6 +23,12 @@ object Chemist {
       _ <- exe.run(Config.readConfig(a ++ b))
     } yield ()).run
   }
+
+  //////////////////////// SERVICE API ////////////////////////////
+
+  val exe: Chemist[Unit] = for {
+    _ <- Kleisli[Task,ChemistConfig,Unit](_ => Task.now(()))
+  } yield ()
 
   //////////////////////// INTERNALS ////////////////////////////
 
