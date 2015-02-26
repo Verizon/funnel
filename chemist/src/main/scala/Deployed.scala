@@ -1,4 +1,5 @@
-package oncue.svc.laboratory
+package funnel
+package chemist
 
 import java.net.URL
 import scala.collection.JavaConverters._

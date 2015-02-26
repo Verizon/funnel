@@ -1,4 +1,4 @@
-package oncue.svc.laboratory
+package funnel
 
 package object aws {
   type ARN = String

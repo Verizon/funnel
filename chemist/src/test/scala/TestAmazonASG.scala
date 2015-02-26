@@ -1,4 +1,5 @@
-package oncue.svc.laboratory
+package funnel
+package chemist
 
 import com.amazonaws.services.autoscaling.{AmazonAutoScaling,AmazonAutoScalingClient}
 import com.amazonaws.services.autoscaling.model.{

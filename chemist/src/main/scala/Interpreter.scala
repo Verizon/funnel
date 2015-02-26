@@ -1,4 +1,5 @@
-package oncue.svc.laboratory
+package funnel
+package chemist
 
 import scalaz.{Free,Functor,~>}
 import scalaz.concurrent.Task

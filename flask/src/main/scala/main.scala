@@ -126,7 +126,6 @@ object Main {
       implicit val duration = t.seconds
       Sigar(new Instruments(1.minute, M)).foreach { s =>
         s.instrument
-        // Flask.instrument(M, s)
       }
     }
 

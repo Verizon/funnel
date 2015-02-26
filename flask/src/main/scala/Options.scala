@@ -1,4 +1,4 @@
-package oncue.svc.laboratory
+package funnel
 
 import funnel.elastic.ElasticCfg
 import scala.concurrent.duration._

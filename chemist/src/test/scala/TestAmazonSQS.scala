@@ -1,4 +1,5 @@
-package oncue.svc.laboratory
+package funnel
+package chemist
 
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model._

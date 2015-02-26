@@ -23,4 +23,4 @@ mappings in Universal ++= Seq(
   file("flask/src/main/resources/oncue/flask.cfg") -> "etc/flask.cfg"
 )
 
-mainClass in Revolver.reStart := Some("oncue.svc.laboratory.Main")
+mainClass in Revolver.reStart := Some("funnel.flask.Main")
