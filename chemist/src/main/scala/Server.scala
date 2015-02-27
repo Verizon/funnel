@@ -23,15 +23,21 @@ object JsonResponse {
 object Server {
   private val log = Logger[Server.type]
 
-  def start(cfg: ChemistConfig): Unit =
+  def start(cfg: ChemistConfig): Task[Unit] =
     Task.reduceUnordered[Unit, Unit](Seq(
       Chemist.init(cfg),
-      Task(unfiltered.netty.Server.http(cfg.network.port, cfg.network.host)
-                                  .handler(Server(cfg)).run))
-    ).runAsync(_.fold(
-      e => log.error(s"Problem occoured during server initilization: $e"),
-      s => log.warn("Background process completed sucsessfully. This may have happened in error, as typically the process matches the lifecycle of the server.")
+      Task(unfiltered.netty.Server
+        .http(cfg.network.port, cfg.network.host)
+        .resources(getClass.getResource("/oncue/www/"), cacheSeconds = 3600)
+        .handler(Server(cfg))
+        .run
+      )
     ))
+
+    // .runAsync(_.fold(
+    //   e => log.error(s"Problem occoured during server initilization: $e"),
+    //   s => log.warn("Background process completed sucsessfully. This may have happened in error, as typically the process matches the lifecycle of the server.")
+    // ))
 }
 
 @io.netty.channel.ChannelHandler.Sharable
@@ -48,6 +54,9 @@ case class Server(cfg: ChemistConfig) extends cycle.Plan with cycle.SynchronousE
     JsonRequest(req).decodeEither[A].map(f).fold(fail => BadRequest ~> ResponseString(fail), identity)
 
   def intent = {
+    case GET(Path("/")) =>
+      Redirect("/index.html")
+
     case GET(Path("/status")) =>
       Ok ~> JsonResponse(Chemist.version)
 

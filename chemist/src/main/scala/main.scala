@@ -13,7 +13,7 @@ object Main {
       b <- knobs.aws.config
     } yield Config.readConfig(a ++ b)).run
 
-    Server.start(config)
+    Server.start(config).run
 
     // this should probally be called to release
     // the underlying resources.

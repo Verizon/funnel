@@ -37,7 +37,7 @@ object Config {
     val queue     = cfg.require[String]("chemist.sqs-queue-name")
     val resources = cfg.require[List[String]]("chemist.resources-to-monitor")
     val aws       = cfg.subconfig("aws")
-    val network   = cfg.subconfig("network")
+    val network   = cfg.subconfig("chemist.network")
     ChemistConfig(
       resources,
       network = readNetwork(network),
@@ -49,8 +49,10 @@ object Config {
     )
   }
 
-  private def readNetwork(cfg: Config): NetworkConfig =
+  private def readNetwork(cfg: Config): NetworkConfig = {
+    println(">>> " + cfg.toString)
     NetworkConfig(cfg.require[String]("host"), cfg.require[Int]("port"))
+  }
 
   private def readSNS(cfg: Config): AmazonSNS =
     SNS.client(
