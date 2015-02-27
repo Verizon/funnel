@@ -6,6 +6,7 @@ import unfiltered.response._
 import unfiltered.netty._
 import argonaut._, Argonaut._
 import scalaz.concurrent.Task
+import journal.Logger
 
 object JsonRequest {
   def apply[T](r: HttpRequest[T]) =
@@ -20,12 +21,17 @@ object JsonResponse {
 }
 
 object Server {
+  private val log = Logger[Server.type]
+
   def start(cfg: ChemistConfig): Unit =
     Task.reduceUnordered[Unit, Unit](Seq(
       Chemist.init(cfg),
       Task(unfiltered.netty.Server.http(cfg.network.port, cfg.network.host)
-                                  .handler(Server(cfg))
-                                  .run)))
+                                  .handler(Server(cfg)).run))
+    ).runAsync(_.fold(
+      e => log.error(s"Problem occoured during server initilization: $e"),
+      s => log.warn("Background process completed sucsessfully. This may have happened in error, as typically the process matches the lifecycle of the server.")
+    ))
 }
 
 @io.netty.channel.ChannelHandler.Sharable
@@ -33,7 +39,7 @@ case class Server(cfg: ChemistConfig) extends cycle.Plan with cycle.SynchronousE
   import JSON._
   import concurrent.duration._
 
-  private def json[A : EncodeJson](a: Chemist[A], cfg: ChemistConfig) =
+  private def json[A : EncodeJson](a: Chemist[A]) =
     a(cfg).attemptRun.fold(
       e => InternalServerError ~> JsonResponse(e.toString),
       o => Ok ~> JsonResponse(o))
@@ -42,24 +48,32 @@ case class Server(cfg: ChemistConfig) extends cycle.Plan with cycle.SynchronousE
     JsonRequest(req).decodeEither[A].map(f).fold(fail => BadRequest ~> ResponseString(fail), identity)
 
   def intent = {
-    case GET(Path("/status")) => Ok
-    case GET(Path("/distribution")) => Ok //json(Chemist.distribution, cfg)
-    case GET(Path("/lifecycle/history")) => Ok
-    case POST(Path("/distribute")) => Ok
-    case POST(Path("/bootstrap")) => Ok
-    case GET(Path(Seg("shards" :: Nil))) => Ok
-    case GET(Path(Seg("shards" :: id :: Nil))) => Ok
-    case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) => Ok
-    case POST(Path(Seg("shards" :: id :: "include" :: Nil))) => Ok
-    case _ => NotFound
+    case GET(Path("/status")) =>
+      Ok ~> JsonResponse(Chemist.version)
+
+    case GET(Path("/distribution")) =>
+      json(Chemist.distribution.map(_.toList))
+
+    case GET(Path("/lifecycle/history")) =>
+      json(Chemist.history.map(_.toList))
+
+    case POST(Path("/distribute")) =>
+      NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)")
+
+    case POST(Path("/bootstrap")) =>
+      json(Chemist.bootstrap)
+
+    case GET(Path(Seg("shards" :: Nil))) =>
+      json(Chemist.shards)
+
+    case GET(Path(Seg("shards" :: id :: Nil))) =>
+      json(Chemist.shard(id))
+
+    case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
+      json(Chemist.exclude(id))
+
+    case POST(Path(Seg("shards" :: id :: "include" :: Nil))) =>
+      json(Chemist.include(id))
+
   }
 }
-
-
-// object Server0 extends Server {
-//   init().runAsync(_.fold(
-//     e => log.error(s"Problem occoured during server initilization: $e"),
-//     s => log.warn("Background process completed sucsessfully. This may have happened in error, as typically the process matches the lifecycle of the server.")
-//   ))
-// }
-

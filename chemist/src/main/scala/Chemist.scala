@@ -9,6 +9,7 @@ import scalaz.{\/,-\/,\/-,Kleisli}
 import scalaz.syntax.kleisli._
 import scalaz.concurrent.Task
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
+import oncue.svc.funnel.BuildInfo
 
 object Chemist {
   import Sharding.Target
@@ -16,6 +17,9 @@ object Chemist {
   private val log = Logger[Chemist.type]
 
   //////////////////////// PUBLIC API ////////////////////////////
+
+  val version: String =
+    s"Chemist ${BuildInfo.version} (${BuildInfo.gitRevision})"
 
   /**
    * Of all known monitorable services, dispaly the current work assignments
