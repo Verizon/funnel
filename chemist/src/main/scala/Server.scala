@@ -19,30 +19,31 @@ object JsonResponse {
     JsonContent ~> ResponseString(a.jencode.pretty(params))
 }
 
+object Server {
+  def start(cfg: ChemistConfig): Unit =
+    Task.reduceUnordered[Unit, Unit](Seq(
+      Chemist.init(cfg),
+      Task(unfiltered.netty.Server.http(cfg.network.port, cfg.network.host)
+                                  .handler(Server(cfg))
+                                  .run)))
+}
+
 @io.netty.channel.ChannelHandler.Sharable
-class Server(I: Instruments)(cfg: ChemistConfig) extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
+case class Server(cfg: ChemistConfig) extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
   import JSON._
   import concurrent.duration._
 
-  // private def run[A : EncodeJson](
-  //   exe: Free[Server.ServerF, A],
-  //   req: HttpExchange
-  // ): Unit = {
-  //   I.run(exe).attemptRun match {
-  //     case \/-(a) => flush(200, a.asJson.nospaces, req)
-  //     case -\/(e) => flush(500, e.toString, req)
-  //   }
-  // }
-
-  // private def json[A : EncodeJson](a: Gong[A], cfg: GongConfig) =
-  //   Ok ~> JsonResponse(a(cfg).run)
+  private def json[A : EncodeJson](a: Chemist[A], cfg: ChemistConfig) =
+    a(cfg).attemptRun.fold(
+      e => InternalServerError ~> JsonResponse(e.toString),
+      o => Ok ~> JsonResponse(o))
 
   private def decode[A : DecodeJson](req: HttpRequest[Any])(f: A => ResponseFunction[Any]) =
     JsonRequest(req).decodeEither[A].map(f).fold(fail => BadRequest ~> ResponseString(fail), identity)
 
   def intent = {
     case GET(Path("/status")) => Ok
-    case GET(Path("/distribution")) => Ok
+    case GET(Path("/distribution")) => Ok //json(Chemist.distribution, cfg)
     case GET(Path("/lifecycle/history")) => Ok
     case POST(Path("/distribute")) => Ok
     case POST(Path("/bootstrap")) => Ok

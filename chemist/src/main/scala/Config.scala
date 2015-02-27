@@ -14,8 +14,14 @@ case class QueueConfig(
   topicName: String
 )
 
+case class NetworkConfig(
+  host: String,
+  port: Int
+)
+
 case class ChemistConfig(
   resources: List[String],
+  network: NetworkConfig,
   queue: QueueConfig,
   sns: AmazonSNS,
   sqs: AmazonSQS,
@@ -31,15 +37,20 @@ object Config {
     val queue     = cfg.require[String]("chemist.sqs-queue-name")
     val resources = cfg.require[List[String]]("chemist.resources-to-monitor")
     val aws       = cfg.subconfig("aws")
+    val network   = cfg.subconfig("network")
     ChemistConfig(
       resources,
-      queue = QueueConfig(topic, queue),
-      sns   = readSNS(aws),
-      sqs   = readSQS(aws),
-      ec2   = readEC2(aws),
-      asg   = readASG(aws)
+      network = readNetwork(network),
+      queue   = QueueConfig(topic, queue),
+      sns     = readSNS(aws),
+      sqs     = readSQS(aws),
+      ec2     = readEC2(aws),
+      asg     = readASG(aws)
     )
   }
+
+  private def readNetwork(cfg: Config): NetworkConfig =
+    NetworkConfig(cfg.require[String]("host"), cfg.require[Int]("port"))
 
   private def readSNS(cfg: Config): AmazonSNS =
     SNS.client(

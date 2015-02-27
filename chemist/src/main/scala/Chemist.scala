@@ -17,8 +17,6 @@ object Chemist {
 
   //////////////////////// PUBLIC API ////////////////////////////
 
-  // lazy val exe: Chemist[Unit] = init
-
   /**
    * Of all known monitorable services, dispaly the current work assignments
    * of funnel -> flask.
@@ -124,7 +122,7 @@ object Chemist {
    * Initilize the chemist serivce by trying to create the various AWS resources
    * that are required to operate. Once complete, execute the boostrap.
    */
-  def init: Chemist[Unit] = {
+  lazy val init: Chemist[Unit] = {
     log.debug("attempting to read the world of deployed instances")
     for {
       cfg <- config
@@ -180,103 +178,3 @@ object Chemist {
     Executors.newScheduledThreadPool(2, daemonThreads("chemist-scheduled-tasks"))
 
 }
-
-
-
-// class Chemist(I: Interpreter[Server.ServerF], port: Int){
-//   import Chemist.log
-//   import argonaut._, Argonaut._, JSON._
-
-//   private val S = Server
-//   private val server = HttpServer.create(new InetSocketAddress(port), 0)
-
-//   def start(): Unit = {
-//     server.setExecutor(Server.serverPool)
-//     val _ = server.createContext("/", handler)
-//     server.start()
-//   }
-
-//   def stop(): Unit = server.stop(0)
-
-//   private def run[A : EncodeJson](
-//     exe: Free[Server.ServerF, A],
-//     req: HttpExchange
-//   ): Unit = {
-//     I.run(exe).attemptRun match {
-//       case \/-(a) => flush(200, a.asJson.nospaces, req)
-//       case -\/(e) => flush(500, e.toString, req)
-//     }
-//   }
-
-//   private def flush(status: Int, body: String, req: HttpExchange): Unit = {
-//     val bytes = body.getBytes
-//     req.sendResponseHeaders(status,bytes.length)
-//     req.getResponseBody.write(bytes)
-//   }
-
-//   protected def handleIndex(req: HttpExchange): Unit = {
-//     req.sendResponseHeaders(200, indexHTML.length)
-//     req.getResponseBody.write(indexHTML.getBytes)
-//   }
-
-//   // Tim: this shouldnt be implemented, right? allocations of work to shards
-//   // should happen automatically. Unless we want some override / manual input?
-//   // protected def handleDistribute(req: HttpExchange): Unit = {
-//   //   req.sendResponseHeaders(200,0)
-//   //   req.getResponseBody.write("Nothing to see here yet.".getBytes)
-//   // }
-
-//   protected def handleBootstrap(req: HttpExchange): Unit = {
-//     if(req.getRequestMethod.toLowerCase == "post"){
-//       run(S.bootstrap, req)
-//       flush(200, "", req)
-//     } else flush(400, "Method not allowed. Use POST.",req)
-//   }
-
-//   protected def handleAlterShardState[A : EncodeJson](f: Free[Server.ServerF, A])(req: HttpExchange): Unit = {
-//     if(req.getRequestMethod.toLowerCase == "post"){
-//       run(f, req)
-//       flush(201, "", req)
-//     } else flush(400, "Method not allowed. Use POST.",req)
-//   }
-
-//   protected def handleNotImplemented(req: HttpExchange): Unit = {
-//     req.sendResponseHeaders(501,0)
-//   }
-
-//   protected def handleStatus(req: HttpExchange): Unit =
-//     req.sendResponseHeaders(200,0)
-
-//   protected def handler = new HttpHandler {
-//     def handle(req: HttpExchange): Unit = try {
-//       val path = req.getRequestURI.getPath match {
-//         case "/" => Nil
-//         case p   => p.split("/").toList.tail
-//       }
-
-//       path match {
-//         // GET
-//         case Nil                            => handleIndex(req)
-//         case "status"                :: Nil => handleStatus(req)
-//         case "distribution"          :: Nil => run(S.distribution.map(_.toList), req)
-//         case "shards"                :: Nil => run(S.shards.map(_.toList), req)
-//         case "shards" :: id          :: Nil => run(S.shard(id), req)
-//         case "lifecycle" :: "history" :: Nil => run(S.history.map(_.toList), req)
-//         // POST
-//         case "shards" :: id :: "exclude" :: Nil => handleAlterShardState(S.exclude(id))(req)
-//         case "shards" :: id :: "include" :: Nil => handleAlterShardState(S.include(id))(req)
-//         case "distribute"   :: Nil              => handleNotImplemented(req)
-//         case "bootstrap"    :: Nil              => handleBootstrap(req)
-//         case _                                  => handleNotImplemented(req)
-//       }
-//     }
-//     catch {
-//       case e: Exception => log.error("fatal error: " + e)
-//     }
-//     finally req.close
-//   }
-
-
-
-// }
-
