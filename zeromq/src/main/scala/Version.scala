@@ -5,17 +5,17 @@ class Version(val number: Int) extends AnyVal {
   override def toString = number.toString
 }
 object Versions {
-  def fromInt(i: Int): Option[Version] =
+  def fromInt(i: Int): Version =
     i match {
-      case 1 => Option(v1)
-      case 2 => Option(v2)
-      case _ => None
+      case 1 => v1
+      case 2 => v2
+      case _ => unknown
     }
 
-  def fromString(s: String): Option[Version] =
+  def fromString(s: String): Version =
     try fromInt(s.toInt)
     catch {
-      case e: NumberFormatException => None
+      case e: NumberFormatException => unknown
     }
 
   val all: Seq[Version] = v1 :: v2 :: Nil

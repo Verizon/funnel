@@ -16,5 +16,5 @@ object Schemes {
 
   val fsm = Scheme("fsm")
   val telemetry = Scheme("telem")
-  val unknown = Scheme("unkown")
+  val unknown = Scheme("unknown")
 }

@@ -9,6 +9,8 @@ case class Transported(
   scheme: Scheme,
   /** The version of the scheme */
   version: Version,
+  /** The version of the scheme */
+  window: Option[Window],
   /** An optional "topic" for this packet, which can be used for filtering subscriptions */
   topic: Option[Topic],
   /** The actual payload */
@@ -17,27 +19,68 @@ case class Transported(
   /**
    * construct the String for the header packet
    */
-  def header: String =
-    topic.fold(s"$scheme/$version")(t => s"$scheme/$version/$t")
+  def header: String = (window,topic) match {
+    case (None, None) => s"$scheme/$version"
+    case (Some(w), None) => s"$scheme/$version/$w"
+    case (None, Some(t)) => s"$scheme/$version/${Windows.unknown}/$t"
+    case (Some(w), Some(t)) => s"$scheme/$version/$w/$t"
+  }
 }
 
 object Transported {
   import Versions._
 
+  val P = new scalaparsers.Parsing[Unit] {}
+  import scalaparsers.ParseState
+  import scalaparsers.Supply
+  import scalaparsers.Pos
+  import scalaparsers.Err
+  import P._
+
+  val slash = ch('/')
+  val notSlash: Parser[String] = satisfy(_ != '/').many map(_.mkString)
+
+  val scheme: Parser[Scheme] = notSlash map Schemes.fromString
+  val version: Parser[Version] = notSlash map Versions.fromString
+  val window: Parser[Option[Window]] = notSlash map Windows.fromString
+
+  val topic: Parser[Option[Topic]] =
+    slash.optional flatMap { _ match {
+                              case None => unit(None)
+                              case Some(s) => (notSlash map {t => Some(Topic(t))}).orElse(Some(Topic("")))
+                            }
+    }
+
+  val windowTopic: Parser[(Option[Window], Option[Topic])] =
+    (slash.optional).flatMap { sl =>
+      sl match  {
+        case None => unit((None, None))
+        case Some(_) => for {
+          w <- window
+          t <- topic
+        } yield(w -> t)
+      }
+    }
+
+  val headerParse: Parser[Array[Byte] => Transported] =
+    for {
+      s <- scheme << slash
+      v <- version
+      wt <- windowTopic
+    } yield (bytes => Transported(s,v,wt._1, wt._2, bytes))
+
   /**
    * Reconstructed the Transported instance on the receive side given the header and payload
    */
   def apply(h: String, bytes: Array[Byte]): Transported = {
-    val a = h.split('/')
-    val v = (if(a.length > 1) Versions.fromString(a(1)) else None).getOrElse(Versions.unknown)
-    val topic = if(a.length > 2)
-      Some(Topic(a(2)))
-    else if(h.endsWith("/"))
-      Some(Topic(""))
-    else
-      None
-
-    Transported(Schemes.fromString(a(0)), v, topic, bytes)
+    headerParse.run(ParseState(
+                      loc = Pos.start("header", h),
+                      input = h,
+                      s = (),
+                      layoutStack = List()), Supply.create) match {
+      case Left(e) => Transported(Schemes.unknown, Versions.unknown, None, None, bytes)
+      case Right(f) => f._2(bytes)
+    }
   }
 }
 

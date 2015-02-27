@@ -7,8 +7,9 @@ import Arbitrary._
 import shapeless.contrib.scalacheck._
 
 object TransportedSpec extends Properties("Transported") {
-  implicit val arbitraryScheme = Arbitrary(Gen.oneOf(Schemes.fsm,Schemes.telemetry,Schemes.unknown))
-  implicit val arbitraryVersion = Arbitrary(Gen.oneOf(Versions.v1, Versions.v2, Versions.unknown))
+  implicit val arbitraryScheme = Arbitrary(Gen.oneOf(Schemes.fsm,Schemes.telemetry/*,Schemes.unknown*/))
+  implicit val arbitraryVersion = Arbitrary(Gen.oneOf(Versions.v1, Versions.v2/*, Versions.unknown*/))
+  implicit val arbitraryWindow = Arbitrary(Gen.oneOf(Windows.now, Windows.sliding, Windows.previous/*, Windows.unknown*/))
   implicit val arbitraryTopic = Arbitrary(arbitrary[String].map(Topic(_)))
   property("roundtrip")  = forAll { (t: Transported) =>
     val rt = Transported(t.header, t.bytes)

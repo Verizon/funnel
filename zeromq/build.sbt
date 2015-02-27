@@ -16,7 +16,8 @@ Custom.testing
 // pure-java implementation:
 // libraryDependencies += "org.zeromq" % "jeromq" % "0.3.4"
 // native c++ implementation with jni:
-libraryDependencies += "org.zeromq" % "jzmq" % "3.1.0"
-
-libraryDependencies += "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test"
-
+libraryDependencies ++= Seq(
+  "org.zeromq"      % "jzmq"                  % "3.1.0",
+  "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test",
+  "oncue.ermine"    %% "scala-parsers"        % "0.2.1-1"
+)

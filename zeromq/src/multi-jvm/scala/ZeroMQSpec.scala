@@ -16,7 +16,7 @@ class SpecMultiJvmNodeA extends FlatSpec with Matchers {
     io.channel(_ => Task(received.incrementAndGet))
 
   implicit val batransport: Transportable[Array[Byte]] = Transportable { ba =>
-    Transported(Schemes.unknown, Versions.unknown, None, ba)
+    Transported(Schemes.unknown, Versions.unknown, None, None, ba)
   }
 
   "receiving streams" should "pull all the sent messages" in {
@@ -40,7 +40,7 @@ class SpecMultiJvmNodeB extends FlatSpec with Matchers with BeforeAndAfterAll {
   val E = Endpoint.unsafeApply(push &&& connect, Settings.uri)
 
   implicit val batransport: Transportable[Array[Byte]] = Transportable { ba =>
-    Transported(Schemes.unknown, Versions.unknown, None, ba)
+    Transported(Schemes.unknown, Versions.unknown, None, None, ba)
   }
 
   val seq: Seq[Array[Byte]] = for(i <- 0 to 10000) yield Fixtures.data
