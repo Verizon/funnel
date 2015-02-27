@@ -69,11 +69,10 @@ object Publish {
 
   implicit val transportDatapoint: Transportable[Datapoint[Any]] = Transportable { d =>
     val (window,name) = d.key.name.partition(_ == '/')
-    val w = Windows.fromString(window)
 
     Transported(Schemes.fsm,
                 Versions.v1,
-                w,
+                Windows.fromString(window),
                 Some(Topic(d.key.attributes.get("kind").getOrElse("unknown"))),
                 s"${dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes(UTF8))
   }

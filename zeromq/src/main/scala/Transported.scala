@@ -44,6 +44,7 @@ object Transported {
   val version: Parser[Version] = notSlash map Versions.fromString
   val window: Parser[Option[Window]] = notSlash map Windows.fromString
 
+  // this is overly complicated in order to handle the case when we have a topic in an unknown window
   val topic: Parser[Option[Topic]] =
     slash.optional flatMap { _ match {
                               case None => unit(None)

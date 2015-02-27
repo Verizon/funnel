@@ -307,7 +307,7 @@ trait Monitoring {
 
   /** Returns `true` if the given key currently exists. */
   def exists[O](k: Key[O]): Task[Boolean] =
-    keys.continuous.once.runLastOr(Set()).map(_.contains(k))
+    keys.continuous.once.runLastOr(Set.empty).map(_.contains(k))
 
   /** Attempt to uniquely resolve `name` to a key of some expected type. */
   def lookup[O](name: String)(implicit R: Reportable[O]): Task[Key[O]] =
@@ -339,7 +339,7 @@ trait Monitoring {
   def evalFamily[O](family: Key[O]): Task[Seq[O]] =
     filterKeys(Key.StartsWith(family.name)).once.runLastOr(List()).flatMap { ks =>
       val ksO: Seq[Key[O]] = ks.flatMap(_.cast(family.typeOf, family.units))
-      Nondeterminism[Task].gatherUnordered(ksO map (k => eval(k)) toSeq)
+      Nondeterminism[Task].gatherUnordered(ksO map (k => eval(k)).toSeq)
     }
 }
 
@@ -381,7 +381,7 @@ object Monitoring {
     implicit val S = Strategy.Executor(ES)
     val P = Process
     val keys_ = signal[Set[Key[Any]]](S)
-    keys_.set(Set()).run
+    keys_.set(Set.empty).run
 
     case class Topic[I,O](
       publish: ((I,Duration)) => Unit,
@@ -446,9 +446,11 @@ object Monitoring {
     val m = collection.concurrent.TrieMap[Key[Any], Datapoint[Any]]()
     implicit val S = Strategy.Executor(ES)
     for {
-      ks <- M.keys.compareAndSet(identity).map(_.getOrElse(Set()))
+      ks <- M.keys.compareAndSet(identity).map(_.getOrElse(Set.empty))
       t <- Nondeterminism[Task].gatherUnordered {
-        ks.map(k => M.get(k).compareAndSet(identity).map(_.map(v => k -> Datapoint(k, v))).attempt.map(_.toOption)).toSeq
+        ks.map(k => M.get(k).compareAndSet(identity).map(
+                 _.map(v => k -> Datapoint(k, v))
+               ).attempt.map(_.toOption)).toSeq
       }.map(_.toSet)
       _ <- Task { t.flatten.flatten.foreach(m += _) }
     } yield m

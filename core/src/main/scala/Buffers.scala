@@ -61,7 +61,7 @@ object Buffers {
         if (seen(a)) go(seen)
         else P.emit(a) ++ go(seen + a)
       }
-    go(Set())
+    go(Set.empty)
   }
 
   /** Reset the buffer `p` after `d0, 2*d0, 3*d0, ...` elapsed duration. */

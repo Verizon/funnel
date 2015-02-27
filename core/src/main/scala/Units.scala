@@ -4,7 +4,6 @@ import java.util.concurrent.TimeUnit
 
 sealed trait Units[+A]
 
-
 object Units {
 
   // NB: Duration, Bytes, Count, Ratio can be units associated
