@@ -17,22 +17,65 @@ object Chemist {
 
   //////////////////////// PUBLIC API ////////////////////////////
 
-  def main(args: Array[String]): Unit = {
-    (for {
-      a <- knobs.loadImmutable(Required(
-        FileResource(new File("/usr/share/oncue/etc/chemist.cfg")) or
-        ClassPathResource("oncue/chemist.cfg")) :: Nil)
-      b <- knobs.aws.config
-      _ <- exe.run(Config.readConfig(a ++ b))
-    } yield ()).run
-  }
+  // lazy val exe: Chemist[Unit] = init
 
-  //////////////////////// SERVICE API ////////////////////////////
+  /**
+   * Of all known monitorable services, dispaly the current work assignments
+   * of funnel -> flask.
+   */
+  def distribution: Chemist[Map[InstanceID, Map[String, List[SafeURL]]]] =
+    config.flatMapK(_.repository.distribution.map(Sharding.snapshot))
 
-  val exe: Chemist[Unit] = for {
-    _ <- init()
-  } yield ()
+  /**
+   * manually ask chemist to assign the given urls to a flask in order
+   * to be monitored. This is not recomended as a daily-use function; chemist
+   * should be smart enough to figure out when things go on/offline automatically.
+   */
+  def distribute(targets: Set[Target]): Chemist[Unit] =
+    Task.now(()).liftKleisli
 
+  /**
+   * list all the shards currently known by chemist.
+   */
+  def shards: Chemist[List[Instance]] =
+    for {
+      cfg <- config
+      a <- cfg.repository.distribution.map(Sharding.shards).liftKleisli
+      b <- Task.gatherUnordered(a.map(cfg.repository.instance).toSeq).liftKleisli
+    } yield b
+
+  /**
+   * display all known node information about a specific shard
+   */
+  def shard(id: InstanceID): Chemist[Option[Instance]] =
+    shards.map(_.find(_.id.toLowerCase == id.trim.toLowerCase))
+
+  /**
+   * Instruct flask to specifcally take a given shard out of service and
+   * repartiion its given load to the rest of the system.
+   */
+  def exclude(shard: InstanceID): Chemist[Unit] =
+    alterShard(shard, Terminate)
+
+  /**
+   * Instruct flask to specifcally "launch" a given shard and
+   * start sending new load to the "new" shard.
+   *
+   * NOTE: Assumes all added instances here are free of work already.
+   */
+  def include(shard: InstanceID): Chemist[Unit] =
+    alterShard(shard, Launch)
+
+  /**
+   * List out the last 100 lifecycle events that this chemist has seen.
+   */
+  def history: Chemist[Seq[AutoScalingEvent]] =
+    config.flatMapK(_.repository.historicalEvents)
+
+  /**
+   * Force chemist to re-read the world from AWS. Useful if for some reason
+   * Chemist gets into a weird state at runtime.
+   */
   def bootstrap: Chemist[Unit] = for {
     cfg <- config
     // read the list of all deployed machines
@@ -77,8 +120,11 @@ object Chemist {
     _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
   } yield ()
 
-
-  protected def init(): Chemist[Unit] = {
+  /**
+   * Initilize the chemist serivce by trying to create the various AWS resources
+   * that are required to operate. Once complete, execute the boostrap.
+   */
+  def init: Chemist[Unit] = {
     log.debug("attempting to read the world of deployed instances")
     for {
       cfg <- config
@@ -105,7 +151,15 @@ object Chemist {
 
   //////////////////////// INTERNALS ////////////////////////////
 
-  private val config: Chemist[ChemistConfig] = Kleisli.ask[Task, ChemistConfig]
+  private val config: Chemist[ChemistConfig] =
+    Kleisli.ask[Task, ChemistConfig]
+
+  private def alterShard(id: InstanceID, state: AutoScalingEventKind): Chemist[Unit] =
+    for {
+      cfg <- config
+      e  = AutoScalingEvent(id.toLowerCase, state)
+      _ <- Lifecycle.event(e, cfg.resources)(cfg.repository, cfg.asg, cfg.ec2).liftKleisli
+    } yield ()
 
   private def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {
