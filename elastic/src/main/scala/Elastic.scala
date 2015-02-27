@@ -11,6 +11,7 @@ import Mapping._
 import knobs.IORef
 import java.util.Date
 import java.text.SimpleDateFormat
+import dispatch._, Defaults._
 
 /* Elastic Event format:
 {
@@ -39,7 +40,22 @@ case class ElasticCfg(url: String,
                       indexName: String,
                       typeName: String,
                       dateFormat: String,
-                      connectionTimeoutMs: Int = 5000)
+                      http: dispatch.Http)
+
+object ElasticCfg {
+  def apply(
+    url: String,
+    indexName: String,
+    typeName: String,
+    dateFormat: String,
+    connectionTimeoutMs: Int = 5000
+  ): ElasticCfg = {
+    val driver: Http = Http.configure(
+      _.setAllowPoolingConnection(true)
+       .setConnectionTimeoutInMs(connectionTimeoutMs))
+    ElasticCfg(url, indexName, typeName, dateFormat, driver)
+  }
+}
 
 case class Elastic(M: Monitoring) {
   type Name = String
@@ -109,7 +125,6 @@ case class Elastic(M: Monitoring) {
 
   import Events._
   import scala.concurrent.duration._
-  import dispatch._, Defaults._
   import scalaz.\/
   import scala.concurrent.{Future,ExecutionContext}
 
@@ -134,19 +149,17 @@ case class Elastic(M: Monitoring) {
         "_timestamp" -> Json("enabled" := true, "store" := true),
         "properties" -> Properties(List(
           Field("host", StringField),
-          Field("cluster", StringField)) ++ (keys map keyField)).asJson)
+          Field("cluster", StringField)) ++
+          (keys map keyField)).asJson)
       ))
     _ <- ensureIndex
     _ <- putMapping(json)
   } yield ()
 
-  lazy val http = Http.configure(
-      _.setAllowPoolingConnection(true)
-       .setConnectionTimeoutInMs(c.connectionTimeoutMs))
 
-  def elasticString(req: Req): ES[String] = getConfig.flatMapK { c =>
-    fromScalaFuture(http(req OK as.String))
-  }
+
+  def elasticString(req: Req): ES[String] =
+    getConfig.flatMapK(c => fromScalaFuture(c.http(req OK as.String)))
 
   // Not in Scalaz until 7.2 so duplicating here
   def lower[M[_]:Monad,A,B](k: Kleisli[M,A,B]): Kleisli[M,A,M[B]] =
