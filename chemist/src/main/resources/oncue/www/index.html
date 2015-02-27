@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <title>Chemist &middot; ${BuildInfo.version} &middot; ${BuildInfo.gitRevision}</title>
+    <style type="text/css">
+    /* Space out content a bit */
+    body {
+    padding-top: 20px;
+    padding-bottom: 20px;
+    }
+
+    /* Everything but the jumbotron gets side spacing for mobile first views */
+    .header,
+    .marketing,
+    .footer {
+    padding-right: 15px;
+    padding-left: 15px;
+    }
+
+    /* Custom page header */
+    .header {
+    border-bottom: 1px solid #e5e5e5;
+    }
+    /* Make the masthead heading the same height as the navigation */
+    .header h3 {
+    padding-bottom: 19px;
+    margin-top: 0;
+    margin-bottom: 0;
+    line-height: 40px;
+    }
+
+    /* Custom page footer */
+    .footer {
+    padding-top: 19px;
+    color: #777;
+    border-top: 1px solid #e5e5e5;
+    }
+
+    /* Customize container */
+    @media (min-width: 768px) {
+    .container {
+    max-width: 730px;
+    }
+    }
+    /* Supporting marketing content */
+    .marketing {
+    margin: 40px 0;
+    }
+    .marketing p + h4 {
+    margin-top: 28px;
+    }
+
+    /* Responsive: Portrait tablets and up */
+    @media screen and (min-width: 768px) {
+    /* Remove the padding we set earlier */
+    .header,
+    .marketing,
+    .footer {
+    padding-right: 0;
+    padding-left: 0;
+    }
+    /* Space out the masthead */
+    .header {
+    margin-bottom: 30px;
+    }
+    }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="header">
+        <ul class="nav nav-pills pull-right">
+          <li><a href="https://github.svc.oncue.com/pages/intelmedia/funnel/">About</a></li>
+          <li><a href="mailto:timothy.m.perrett@oncue.com">Contact</a></li>
+        </ul>
+        <h3 class="text-muted">Chemist Control Panel</h3>
+      </div>
+
+      <div class="row marketing">
+
+        <div class="col-lg-6">
+          <h4>Distribution Resources</h4>
+          <p><a href="/distribution">GET /distribution</a>: Display the current distribution of shards and associated work.</p>
+          <p><a href="/lifecycle/history">GET /lifecycle/history</a>: View a rolling snapshot of the last lifecycle events to took place.</p>
+          <p><a href="/distribute">POST /distribute</a>: Manually instruct a given set of inputs to be sharded over avalible Flask instances.</p>
+          <p><a href="/bootstrap">POST /bootstrap</a>: Manually force Chemist to re-read its state of the world from AWS.</p>
+        </div>
+
+        <div class="col-lg-6">
+          <h4>Shard Resources</h4>
+          <p><a href="/shards">GET /shards</a>: List all shards and known information about those hosts</p>
+          <p><a href="/shard/:shardid">GET /shard/:shard-id</a>: Displays all known information about a given shard.</p>
+          <p><a href="/shard/:shardid/include">POST /shard/:shard-id/include</a>: Manually specify a machine to use as a load-bearing shard.</p>
+          <p><a href="/shard/:shardid/exclude">POST /shard/:shard-id/exclude</a>: Manually remove a shard from rotation and reshard its work.</p>
+        </div>
+
+      </div>
+
+      <div class="footer">
+        <p>&copy; Verizon OnCue 2014</p>
+      </div>
+
+    </div>
+  </body>
+</html>

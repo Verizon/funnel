@@ -130,7 +130,7 @@ object Deployed {
   private def validate(instance: Instance): Task[Instance] = {
     if(instance.location.isPrivateNetwork) Task.now(instance)
     else for {
-      a <- Task(instance.asURL.flatMap(fetch))(Server.defaultPool)
+      a <- Task(instance.asURL.flatMap(fetch))(Chemist.defaultPool)
       b <- a.fold(e => Task.fail(e), o => Task.now(o))
     } yield instance
   }
