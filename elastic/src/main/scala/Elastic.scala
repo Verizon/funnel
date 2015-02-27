@@ -149,7 +149,8 @@ case class Elastic(M: Monitoring) {
         "_timestamp" -> Json("enabled" := true, "store" := true),
         "properties" -> Properties(List(
           Field("host", StringField),
-          Field("cluster", StringField)) ++ (keys map keyField)).asJson)
+          Field("cluster", StringField)) ++
+          (keys map keyField)).asJson)
       ))
     _ <- ensureIndex
     _ <- putMapping(json)
