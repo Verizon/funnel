@@ -14,10 +14,6 @@ abstract class Pusher(name: String, uri: URI = Settings.uri, size: Int = 1000000
 
     val E = Endpoint.unsafeApply(push &&& connect, uri)
 
-    implicit val batransport: Transportable[Array[Byte]] = Transportable { ba =>
-      Transported(Schemes.unknown, Versions.unknown, None, None, ba)
-    }
-
     val seq: Seq[Array[Byte]] = for(i <- 0 to size) yield Fixtures.data
     // stupid scalac cant handle this in-line.
     val proc: Process[Task, Array[Byte]] = Process.emitAll(seq)

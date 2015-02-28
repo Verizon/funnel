@@ -13,7 +13,7 @@ class Proxy(I: Endpoint, O: Endpoint){
   private val stream: Process[Task,Boolean] =
     Ø.link(O)(alive)(s =>
       Ø.link(I)(alive)(Ø.receive
-        ).through(Ø.writeTrans(s)))
+        ).map(_.bytes).through(Ø.write(s)))
 
   def task: Task[Unit] =
     for {
