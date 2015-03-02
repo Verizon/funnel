@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   lazy val S  = signalOf[Boolean](true)
-  lazy val W  = 30.seconds
+  lazy val W  = 20.seconds
 
   lazy val U1 = new URI("ipc:///tmp/u1.socket")
   lazy val E1 = Endpoint.unsafeApply(publish &&& bind, U1)
@@ -66,6 +66,7 @@ class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   if(Ø.isEnabled){
     "zeromq mirroring" should "pull values from the specified monitoring instance" in {
       (countKeys(M1) + countKeys(M2)) should equal (MI.keys.get.run.size)
+      MI.keys.get.run.size should be > 0
     }
   }
 }

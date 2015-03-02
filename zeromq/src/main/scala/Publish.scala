@@ -64,16 +64,15 @@ object Publish {
     A(a).nospaces
 
   def fromMonitoring(M: Monitoring)(implicit log: String => Unit): Process[Task, Datapoint[Any]] =
-    Monitoring.subscribe(M)(Key.StartsWith("previous"))//.map(datapointToWireFormat)
+    Monitoring.subscribe(M)(Key.StartsWith("previous"))
 
 
   implicit val transportDatapoint: Transportable[Datapoint[Any]] = Transportable { d =>
-    val (window,name) = d.key.name.partition(_ == '/')
-
-    Transported(Schemes.fsm,
+    val window = d.key.name.takeWhile(_ != '/')
+    new Transported(Schemes.fsm,
                 Versions.v1,
                 Windows.fromString(window),
                 Some(Topic(d.key.attributes.get("kind").getOrElse("unknown"))),
-                s"${dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes(UTF8))
+                    s"${dataEncode(d)(EncodeDatapoint[Any])}\n".getBytes(UTF8))
   }
 }

@@ -339,7 +339,7 @@ trait Monitoring {
   def evalFamily[O](family: Key[O]): Task[Seq[O]] =
     filterKeys(Key.StartsWith(family.name)).once.runLastOr(List()).flatMap { ks =>
       val ksO: Seq[Key[O]] = ks.flatMap(_.cast(family.typeOf, family.units))
-      Nondeterminism[Task].gatherUnordered(ksO map (k => eval(k)).toSeq)
+      Nondeterminism[Task].gatherUnordered(ksO.map(k => eval(k)).toSeq)
     }
 }
 
