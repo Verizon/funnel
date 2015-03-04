@@ -77,7 +77,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
   protected def handleKeys(M: Monitoring, prefix: String, req: HttpExchange): Unit = {
     import JSON._; import argonaut.EncodeJson._
     val query = keyQuery(req.getRequestURI)
-    val ks = M.keys.continuous.once.runLastOr(List()).run.filter(x =>
+    val ks = M.keys.continuous.once.runLastOr(Set.empty).run.filter(x =>
       x.startsWith(prefix) && query(x))
     val respBytes = JSON.prettyEncode(ks).getBytes
     req.getResponseHeaders.set("Content-Type", "application/json")

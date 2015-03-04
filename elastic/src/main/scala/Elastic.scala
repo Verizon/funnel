@@ -142,7 +142,7 @@ case class Elastic(M: Monitoring) {
     _ <- elastic(r.PUT, json)
   } yield ()
 
-  def initMapping(keys: List[Key[Any]]): ES[Unit] = for {
+  def initMapping(keys: Set[Key[Any]]): ES[Unit] = for {
     es <- getConfig
     json = Json(
       es.typeName := jObjectAssocList(List(
