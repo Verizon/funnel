@@ -34,7 +34,7 @@ class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   private def countKeys(m: Monitoring): Int =
-    m.keys.compareAndSet(identity).run.get.filter(_.startsWith("previous")).size
+    m.keys.compareAndSet(identity).run.get.filter(_.startsWith("previous")).length
 
   private def mirrorFrom(uri: URI): Unit =
     MI.mirrorAll(Mirror.from(S)

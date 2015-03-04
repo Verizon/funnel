@@ -23,12 +23,6 @@ class Instruments(val window: Duration,
   private def slidingL(s: String) = if (s == "") s else s"$s (past $window)"
 
   /**
-    * takes a Key => Key and also sets the kind attribute
-    */
-  private def andKind[A](kind: String, keyMod: Key[A] => Key[A]): Key[A] => Key[A] =
-    keyMod compose (k => k.copy(attributes = k.attributes + ("kind" -> "counter")))
-
-  /**
    * Return a `Counter` with the given starting count.
    * Keys updated by this `Counter` are `now/label`,
    * `previous/label` and `sliding/label`.
@@ -36,20 +30,18 @@ class Instruments(val window: Duration,
    */
   def counter(label: String,
               init: Int = 0,
-              description: String = "",
-              keyMod: Key[Double] => Key[Double] = identity): Counter[Periodic[Double]] = {
-    val kinded = andKind("counter", keyMod)
+              description: String = ""): Counter[Periodic[Double]] = {
     val c = new Counter[Periodic[Double]] {
       val count = B.resetEvery(window)(B.counter(init))
       val previousCount = B.emitEvery(window)(count)
       val slidingCount = B.sliding(window)(identity[Double])(Group.doubleGroup)
       val u: Units[Double] = Units.Count
       val (nowK, incrNow) =
-        monitoring.topic[Long,Double](s"now/$label", u, nowL(description), kinded)(count)
+        monitoring.topic(s"now/$label", u, nowL(description))(count)
       val (prevK, incrPrev) =
-        monitoring.topic[Long,Double](s"previous/$label", u, previousL(description), kinded)(previousCount)
+        monitoring.topic(s"previous/$label", u, previousL(description))(previousCount)
       val (slidingK, incrSliding) =
-        monitoring.topic[Double,Double](s"sliding/$label", u, slidingL(description), kinded)(slidingCount)
+        monitoring.topic(s"sliding/$label", u, slidingL(description))(slidingCount)
       def incrementBy(n: Int): Unit = {
         incrNow(n); incrPrev(n); incrSliding(n)
       }
@@ -68,11 +60,8 @@ class Instruments(val window: Duration,
    * Records the elapsed time in the current period whenever the
    * returned `Gauge` is set. See `Elapsed.scala`.
    */
-  private[funnel] def currentElapsed(label: String,
-                                     desc: String,
-                                     keyMod: Key[Double] => Key[Double] = identity): Gauge[Continuous[Double], Unit] = {
-    val kinded = andKind("timer", keyMod)
-    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds, desc, kinded)(
+  private[funnel] def currentElapsed(label: String, desc: String): Gauge[Continuous[Double], Unit] = {
+    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds, desc)(
       B.currentElapsed(window).map(_.toSeconds.toDouble))
     val g = new Gauge[Continuous[Double], Unit] {
       def set(u: Unit) = snk(u)
@@ -88,8 +77,7 @@ class Instruments(val window: Duration,
    */
   private[funnel] def currentRemaining(label: String,
                                        desc: String): Gauge[Continuous[Double], Unit] = {
-    val kinded = andKind("timer", identity[Key[Double]])
-    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds, desc, kinded)(
+    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds, desc)(
       B.currentRemaining(window).map(_.toSeconds.toDouble))
     val g = new Gauge[Continuous[Double], Unit] {
       def set(u: Unit) = snk(u)
@@ -104,11 +92,8 @@ class Instruments(val window: Duration,
    * been running whenver the returned `Gauge` is set. See `Elapsed.scala`.
    */
   private[funnel] def uptime(label: String): Gauge[Continuous[Double], Unit] = {
-    val kinded = andKind("timer", identity[Key[Double]])
-    val (k, snk) = monitoring.topic[Unit,Double](label,
-                                                 Units.Minutes,
-                                                 "Time elapsed since monitoring started",
-                                                 kinded)(
+    val (k, snk) = monitoring.topic[Unit,Double](label, Units.Minutes,
+      "Time elapsed since monitoring started")(
       B.elapsed.map(_.toSeconds.toDouble / 60))
     val g = new Gauge[Continuous[Double], Unit] {
       def set(u: Unit) = snk(u)
@@ -126,11 +111,9 @@ class Instruments(val window: Duration,
    */
   def gauge[A:Reportable](label: String, init: A,
                           units: Units[A] = Units.None,
-                          description: String = "",
-                          keyMod: Key[A] => Key[A] = {(k:Key[A]) => k}): Gauge[Continuous[A],A] = {
-    val kinded = andKind("gauge",keyMod)
+                          description: String = ""): Gauge[Continuous[A],A] = {
     val g = new Gauge[Continuous[A],A] {
-      val (key, snk) = monitoring.topic(s"now/$label", units, description, kinded)(B.resetEvery(window)(B.variable(init)))
+      val (key, snk) = monitoring.topic(s"now/$label", units, description)(B.resetEvery(window)(B.variable(init)))
       def set(a: A) = snk(_ => a)
       def keys = Continuous(key)
 
@@ -139,10 +122,8 @@ class Instruments(val window: Duration,
     g.buffer(bufferTime)
   }
 
-  def trafficLight(label: String,
-                   description: String = "",
-                   keyMod: Key[String] => Key[String] = identity[Key[String]]): TrafficLight =
-    TrafficLight(gauge(label, TrafficLight.Red, Units.TrafficLight, description, andKind("traffic", keyMod)))
+  def trafficLight(label: String, description: String = ""): TrafficLight =
+    TrafficLight(gauge(label, TrafficLight.Red, Units.TrafficLight, description))
 
   /**
    * Return a `Gauge` with the given starting value.
@@ -152,19 +133,17 @@ class Instruments(val window: Duration,
    */
   def numericGauge(label: String, init: Double,
                    units: Units[Stats] = Units.None,
-                   description: String = "",
-                   keyMod: Key[Stats] => Key[Stats] = identity): Gauge[Periodic[Stats],Double] = {
-    val kinded = andKind("numeric", keyMod)
+                   description: String = ""): Gauge[Periodic[Stats],Double] = {
     val g = new Gauge[Periodic[Stats],Double] {
       val now = B.resetEvery(window)(B.stats)
       val prev = B.emitEvery(window)(now)
       val sliding = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
       val (nowK, nowSnk) =
-        monitoring.topic[Double,Stats](s"now/$label", units, nowL(description), kinded)(now)
+        monitoring.topic(s"now/$label", units, nowL(description))(now)
       val (prevK, prevSnk) =
-        monitoring.topic[Double,Stats](s"previous/$label", units, previousL(description), kinded)(prev)
+        monitoring.topic(s"previous/$label", units, previousL(description))(prev)
       val (slidingK, slidingSnk) =
-        monitoring.topic[Double,Stats](s"sliding/$label", units, slidingL(description), kinded)(sliding)
+        monitoring.topic(s"sliding/$label", units, slidingL(description))(sliding)
       def keys = Periodic(nowK, prevK, slidingK)
       def set(d: Double): Unit = {
         nowSnk(d); prevSnk(d); slidingSnk(d)
@@ -179,21 +158,18 @@ class Instruments(val window: Duration,
    * `now/label`, `previous/label`, and `sliding/label`.
    * See [[funnel.Periodic]].
    */
-  def timer(label: String,
-            description: String = "",
-            keyMod: Key[Stats] => Key[Stats] = identity): Timer[Periodic[Stats]] = {
-    val kinded = andKind("timer", keyMod)
+  def timer(label: String, description: String = ""): Timer[Periodic[Stats]] = {
     val t = new Timer[Periodic[Stats]] {
       val timer = B.resetEvery(window)(B.stats)
       val previousTimer = B.emitEvery(window)(timer)
       val slidingTimer = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
       val u: Units[Stats] = Units.Duration(TimeUnit.MILLISECONDS)
       val (nowK, nowSnk) =
-        monitoring.topic[Double, Stats](s"now/$label", u, nowL(description), kinded)(timer)
+        monitoring.topic(s"now/$label", u, nowL(description))(timer)
       val (prevK, prevSnk) =
-        monitoring.topic[Double, Stats](s"previous/$label", u, previousL(description), kinded)(previousTimer)
+        monitoring.topic(s"previous/$label", u, previousL(description))(previousTimer)
       val (slidingK, slidingSnk) =
-        monitoring.topic[Double, Stats](s"sliding/$label", u, slidingL(description), kinded)(slidingTimer)
+        monitoring.topic(s"sliding/$label", u, slidingL(description))(slidingTimer)
       def keys = Periodic(nowK, prevK, slidingK)
       def recordNanos(nanos: Long): Unit = {
         // record time in milliseconds
