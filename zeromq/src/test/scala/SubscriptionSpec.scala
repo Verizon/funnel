@@ -70,13 +70,13 @@ class SubscriptionSpec extends FlatSpec
 
     Thread.sleep(2.seconds.toMillis)
 
-    mirror(U1, MN, Some(nowCounter))
-    mirror(U2, MP, Some(previous))
+    mirror(U1, MN, List(nowCounter))
+    mirror(U2, MP, List(previous))
 
     Thread.sleep(W.toMillis*2)
   }
 
-  private def mirror(uri: URI, to: Monitoring, discriminator: Option[Array[Byte]]): Unit =
+  private def mirror(uri: URI, to: Monitoring, discriminator: List[Array[Byte]]): Unit =
     to.mirrorAll(Mirror.from(S, discriminator)
     )(uri, Map("uri" -> uri.toString)
     ).run.runAsync(_.fold(e => Ø.log.error(
