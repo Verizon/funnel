@@ -18,19 +18,19 @@ abstract class SocketAction extends (Socket => Location => Task[Socket]){ self =
 trait SocketActions {
   object connect extends SocketAction { self =>
     def apply(s: Socket): Location => Task[Socket] =
-      location => Task.delay { s.connect(location.uri.toString); s } //.handleWith(errorHandler)
+      location => Task.delay { s.connect(location.uri.toString); s }
   }
 
   object bind extends SocketAction {
     def apply(s: Socket): Location => Task[Socket] =
-      location => Task.delay { s.bind(location.uri.toString); s } //.handleWith(errorHandler)
+      location => Task.delay { s.bind(location.uri.toString); s }
   }
 
   object topics {
-    def specific(discriminator: Array[Byte]): Socket => Task[Unit] =
-      s => Task.delay(s.subscribe(discriminator)) //.handleWith(errorHandler)
+    def specific(discriminator: List[Array[Byte]]): Socket => Task[Unit] =
+      s => Task.delay(discriminator.foreach(s.subscribe))
 
     def all: Socket => Task[Unit] =
-      specific(Array.empty[Byte])
+      specific(List(Array.empty[Byte]))
   }
 }

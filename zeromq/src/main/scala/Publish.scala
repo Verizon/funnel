@@ -66,8 +66,6 @@ object Publish {
   def fromMonitoring(M: Monitoring)(implicit log: String => Unit): Process[Task, Datapoint[Any]] =
     Monitoring.subscribe(M)(Key.StartsWith("previous"))
 
-  def fromMonitoring(M: Monitoring)(implicit log: String => Unit): Process[Task, Array[Byte]] =
-    Monitoring.subscribe(M)(Key.StartsWith("previous")).map(datapointToWireFormat)
 
   implicit val transportDatapoint: Transportable[Datapoint[Any]] = Transportable { d =>
     val window = d.key.name.takeWhile(_ != '/')

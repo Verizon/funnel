@@ -85,21 +85,28 @@ object ZeroMQ {
   }
 
   /**
-   * Similar to `receive` but pushing messages to the socket. A `Channel` is essentially
-   * an effectfull stream, that when given a `Array[Byte]` will write that payload to the
-   * 0mq socket. The idea here is that any messages one wishes to send are converted to
-   * `Array[Byte]` using `map` or similar on the input stream; this makes the 0mq streams
-   * not care about serialisation at all.
+   * Similar to `receive` but pushing messages to the socket. A
+   * `Channel` is essentially an effectfull stream, that when given a
+   * `Array[Byte]` will write that payload to the 0mq socket. The idea
+   * here is that any messages one wishes to send are converted to
+   * `Array[Byte]` using `map` or similar on the input stream; this
+   * makes the 0mq streams not care about serialisation at all. It can
+   * write any A for which we have a [[Transportable]] instance
    */
-  def write(socket: Socket): Channel[Task, Array[Byte], Boolean] =
-    io.channel(bytes =>
+  def write[A](socket: Socket)(implicit T: Transportable[A]): Channel[Task, A, Boolean] =
+    writeTrans(socket).contramap[A](T.apply)
+
+  /**
+   * An internal method for writing a Transported message
+   */
+  private[funnel] def writeTrans(socket: Socket): Channel[Task, Transported, Boolean] =
+    io.channel { t =>
       Task.delay {
-        // log.debug(s"Sending ${bytes.length}")
-        socket.sendMore("FMS/1")
-        val bool = socket.send(bytes, 0) // the zero here is "flags"
-        bool
+        socket.sendMore(t.header)
+        socket.send(t.bytes, 0)
       }
-    )
+    }
+
 
   /////////////////////////////// INTERNALS ///////////////////////////////////
 
@@ -114,6 +121,7 @@ object ZeroMQ {
 
   /**
    *
+
    */
   private[zeromq] def resource[F[_],R,O](
     acquire: F[R])(

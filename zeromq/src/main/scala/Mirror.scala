@@ -10,8 +10,8 @@ import scalaz.concurrent.Task
 object Mirror {
   import sockets._
 
-  def from(alive: Signal[Boolean], discriminator: Option[Array[Byte]] = None)(uri: URI): Process[Task, Datapoint[Any]] = {
-    val t = discriminator.fold(topics.all)(topics.specific)
+  def from(alive: Signal[Boolean], discriminator: List[Array[Byte]] = Nil)(uri: URI): Process[Task, Datapoint[Any]] = {
+    val t = if(discriminator.isEmpty) topics.all else topics.specific(discriminator)
     Endpoint(subscribe &&& (connect ~ t), uri).fold(Process.fail(_), l =>
       Ø.link(l)(alive)(Ø.receive).flatMap(fromTransported)
     )

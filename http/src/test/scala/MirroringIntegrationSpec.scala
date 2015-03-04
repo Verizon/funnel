@@ -68,11 +68,11 @@ class MirroringIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfte
   // this is a dirty hack to make some assertions about
   // the monitoring instances
   private def countKeys(m: Monitoring): Int =
-    m.keys.compareAndSet(identity).run.get.filter(_.startsWith("previous")).length
+    m.keys.compareAndSet(identity).run.get.filter(_.startsWith("previous")).size
 
   it should "be able to mirror all the keys from the other instances into the current state of 'MI'" in {
     (countKeys(M1) +
     countKeys(M2) +
-    countKeys(M3)) should equal (MI.keys.compareAndSet(identity).run.get.length)
+    countKeys(M3)) should equal (MI.keys.compareAndSet(identity).run.get.size)
   }
 }
