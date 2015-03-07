@@ -93,18 +93,20 @@ class SubscriptionSpec extends FlatSpec
   private def countKeys(m: Monitoring): Int =
     m.keys.compareAndSet(identity).run.get.size
 
-  "Subscription" should "discriminate" in {
-    val cn = countKeys(MN)
-    val cp = countKeys(MP)
-    val c1 = M1.keys.get.run.size
-    val c2 = M2.keys.get.run.size
-    c1 should be > cn
-    c2 should be > cp
+  if(Ø.isEnabled){
+    "Subscription" should "discriminate" in {
+      val cn = countKeys(MN)
+      val cp = countKeys(MP)
+      val c1 = M1.keys.get.run.size
+      val c2 = M2.keys.get.run.size
+      c1 should be > cn
+      c2 should be > cp
 
-    println(s"n: $cn, p: $cp, c1: $c1, c2: $c2")
-    println(s"${M1.keys.get.run}")
+      println(s"n: $cn, p: $cp, c1: $c1, c2: $c2")
+      println(s"${M1.keys.get.run}")
 
-    cn should be > 0
-    cp should be > 0
+      cn should be > 0
+      cp should be > 0
+    }
   }
 }
