@@ -11,16 +11,17 @@ import scalaz.stream.async.mutable.Signal
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import knobs.{Config, Required, ClassPathResource, FileResource}
-import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
-import com.amazonaws.services.sns.{AmazonSNSClient,AmazonSNS}
-import com.amazonaws.auth.BasicAWSCredentials
-import com.amazonaws.regions.{Region, Regions}
 import funnel.{Events,DatapointParser,Datapoint,Names,Sigar,Monitoring,Instruments}
 import funnel.riemann.Riemann
 import funnel.http.{MonitoringServer,SSE}
 import funnel.elastic._
 import funnel.zeromq.Mirror
 import java.net.URI
+import zeromq._
+import sockets._
+import scalaz.stream._
+import scalaz.\/
+import Telemetry._
 
 /**
   * How to use: Modify oncue/flask.cfg on the classpath
@@ -34,15 +35,25 @@ object Main {
 
   lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)
 
+  type TelemetrySink = Sink[Task, Telemetry]
+
+
   private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
     server.stop()
     signal.set(false).flatMap(_ => signal.close).run
     R.disconnect
   }
 
-  private def giveUp(names: Names, cfg: Config, sns: AmazonSNS, log: String => Unit) = {
-    val msg = s"${names.mine} gave up on ${names.kind} server ${names.theirs}"
-    Process.eval(SNS.publish(cfg.require[String]("flask.sns-error-topic"), msg)(sns))
+  private def giveUp(names: Names, telemetry: TelemetrySink): Process[Task,Unit] = {
+    (Process.eval(Task.now(Error(names))) to telemetry)
+  }
+
+  val keyChanges: Process1[Set[Key[Any]] => Key[Any]] = {
+    def go(old: Option[Set[Key]], current: Set[Key]) = old match {
+      case None => emitSeq(current.toSeq)
+      case Some(old) => emitSeq(current - old)
+    } ++ receive1[Set[Key]] { next => go(Some(current), next) }
+    go(None)
   }
 
   private def riemannErrorAndQuit(rm: RiemannCfg, f: () => Unit): Unit = {
@@ -69,7 +80,6 @@ object Main {
     }
 
   def main(args: Array[String]): Unit = {
-
 
     // merge the file config with the aws config
     val config: Task[Config] = for {
@@ -105,15 +115,17 @@ object Main {
 
     implicit val log: String => Unit = s => L(s)
 
-    val Q = SNS.client(
-      new BasicAWSCredentials(
-        cfg.require[String]("aws.access-key"),
-        cfg.require[String]("aws.secret-key")),
-      cfg.lookup[String]("aws.proxy-host"),
-      cfg.lookup[Int]("aws.proxy-port"),
-      cfg.lookup[String]("aws.proxy-protocol"),
-      Region.getRegion(Regions.fromName(cfg.require[String]("aws.region")))
-    )
+    def telemetryEndpoint(uri: URI): Throwable \/ Endpoint = Endpoint(publish &&& bind, uri)
+
+    def telemetrySocket(uri: URI): TelemetrySink =
+      telemetryEndpoint(uri).map { e: Endpoint =>
+        Ø.link(e)(signal) { socket =>
+          Ø.write(socket)
+        }
+      }.fold(e => { e.printStackTrace ; sys.error(e.getMessage) },
+             identity).mapOut(_ => ())
+
+    val Q = telemetrySocket(new URI("localhost", cfg.lookup[Int]("telemetryPort").getOrElse(5774)))
 
     val M = Monitoring.default
     val S = MonitoringServer.start(M, options.funnelPort)
@@ -130,7 +142,7 @@ object Main {
     }
 
     def retries(names: Names): Event =
-      Monitoring.defaultRetries andThen (_ ++ giveUp(names, cfg, Q, log))
+      Monitoring.defaultRetries andThen (_ ++ giveUp(names, Q))
 
     val localhost = java.net.InetAddress.getLocalHost.toString
 

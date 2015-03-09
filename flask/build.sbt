@@ -13,8 +13,9 @@ Revolver.settings
 fork in test := true
 
 libraryDependencies ++= Seq(
-  "intelmedia.ws.common" %% "logging-s3" % "8.0.+",
-  "oncue.svc.knobs"      %% "core"       % V.knobs
+  "intelmedia.ws.common" %% "logging-s3"  % "8.0.+",
+  "oncue.svc.knobs"      %% "core"        % V.knobs,
+  "org.typelevel"        %% "scodec-core" % "1.6.+"
 )
 
 name in Universal := "flask"
