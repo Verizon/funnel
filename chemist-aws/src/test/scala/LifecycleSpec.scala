@@ -1,5 +1,6 @@
 package funnel
 package chemist
+package aws
 
 import org.scalatest.{FlatSpec,Matchers}
 import com.amazonaws.services.sqs.AmazonSQS
