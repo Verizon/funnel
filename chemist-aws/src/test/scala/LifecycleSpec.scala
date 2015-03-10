@@ -20,13 +20,14 @@ class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {
   val asg1 = TestAmazonASG.single(_ => uuid)
   // val asg1 = TestAmazonASG.single(_ => "test-group")
 
-  val r = new StatefulRepository(ec2)
+  val dsc = new Discovery(ec2, asg1)
+  val r   = new StatefulRepository(dsc)
 
   val k1 = "i-dx947af7"
   val k2 = "i-15807647"
 
   private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): Throwable \/ Action =
-    Lifecycle.stream("name-of-queue", "stream/previous" :: Nil)(r, sqs, asg, ec2
+    Lifecycle.stream("name-of-queue", "stream/previous" :: Nil)(r, sqs, asg, ec2, dsc
       ).until(Process.emit(false)).runLast.run.get // never do this anywhere but tests
 
   // val s: Sink[Task,Action] = Lifecycle.sink(r) //Process.emit { case x => Task.now( println(x) ) }

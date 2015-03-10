@@ -29,7 +29,7 @@ lazy val aws = project
 
 lazy val chemist = project.dependsOn(core, http)
 
-lazy val `chemist-aws` = project.dependsOn(chemist, aws)
+lazy val `chemist-aws` = project.dependsOn(chemist % "test->test;compile->compile", aws)
 
 lazy val core = project
 

@@ -1,5 +1,6 @@
 package funnel
 package chemist
+package aws
 
 import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterAll}
 import funnel.{Monitoring,Instruments,Clocks,JVM}
@@ -27,7 +28,9 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
   val FS1 = MonitoringServer.start(F1, 5775)
 
   val E = TestAmazonEC2(Fixtures.instance(id = "i-localhost9090", publicDns = "localhost"))
-  val R = new StatefulRepository(E)
+  val A = TestAmazonASG.single(_ => java.util.UUID.randomUUID.toString)
+  val D = new Discovery(E,A)
+  val R = new StatefulRepository(D)
 
   val T1 = Set(
     Target("test1",SafeURL("http://127.0.0.1:8080/stream/uptime")),
