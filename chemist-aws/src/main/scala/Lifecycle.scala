@@ -1,5 +1,6 @@
 package funnel
 package chemist
+package aws
 
 import scalaz.{\/,-\/,\/-}
 import scalaz.syntax.traverse._
@@ -34,7 +35,9 @@ object Lifecycle {
   def parseMessage(msg: Message): Throwable \/ AutoScalingEvent =
     Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException(_))
 
-  def stream(queueName: String, resources: Seq[String])(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2): Process[Task, Throwable \/ Action] = {
+  def stream(queueName: String, resources: Seq[String]
+    )(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+    ): Process[Task, Throwable \/ Action] = {
     for {
       a <- SQS.subscribe(queueName)(sqs)(Chemist.defaultPool, Chemist.schedulingPool)
       _ <- Process.eval(Task(log.debug(s"stream, number messages recieved: ${a.length}")))
@@ -42,7 +45,7 @@ object Lifecycle {
       b <- Process.emitAll(a)
       _ <- Process.eval(Task(log.debug(s"stream, raw message recieved: $b")))
 
-      c <- Process.eval(parseMessage(b).traverseU(interpreter(_, resources)(r, asg, ec2)))
+      c <- Process.eval(parseMessage(b).traverseU(interpreter(_, resources)(r, asg, ec2, dsc)))
       _ <- Process.eval(Task(log.debug(s"stream, computed action: $c")))
 
       _ <- SQS.deleteMessages(queueName, a)(sqs)
@@ -53,7 +56,9 @@ object Lifecycle {
 
   // im really not sure what to say about this monster...
   // sorry reader.
-  def interpreter(e: AutoScalingEvent, resources: Seq[String])(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Action] = {
+  def interpreter(e: AutoScalingEvent, resources: Seq[String]
+    )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+    ): Task[Action] = {
     log.debug(s"interpreting event: $e")
 
     // terrible side-effect but we want to track the events
@@ -80,7 +85,7 @@ object Lifecycle {
           } else {
             // in any other case, its something new to monitor
             for {
-              i <- Deployed.lookupOne(id)(ec2)
+              i <- dsc.lookupOne(id)
               _  = log.debug(s"Found instance metadata from remote: $i")
 
               _ <- r.addInstance(i)
@@ -124,8 +129,10 @@ object Lifecycle {
       case _ => Task.now( () )
     }
 
-  def event(e: AutoScalingEvent, resources: Seq[String])(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Unit] = {
-    interpreter(e, resources)(r, asg, ec2).map {
+  def event(e: AutoScalingEvent, resources: Seq[String]
+    )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+    ): Task[Unit] = {
+    interpreter(e, resources)(r, asg, ec2, dsc).map {
       case Redistributed(seq) =>
         Sharding.distribute(seq).map(_ => ())
       case _ =>
@@ -133,8 +140,10 @@ object Lifecycle {
     }
   }
 
-  def run(queueName: String, resources: Seq[String], s: Sink[Task, Action])(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Unit] = {
-    stream(queueName, resources)(r,sqs,asg,ec2).flatMap {
+  def run(queueName: String, resources: Seq[String], s: Sink[Task, Action]
+    )(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+    ): Task[Unit] = {
+    stream(queueName, resources)(r,sqs,asg,ec2,dsc).flatMap {
       case -\/(fail) => Process.halt
       case \/-(win)  => s
     }.run

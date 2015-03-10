@@ -23,13 +23,13 @@ object JsonResponse {
 object Server {
   private val log = Logger[Server.type]
 
-  def start(cfg: ChemistConfig): Task[Unit] =
+  def start[U <: Platform](chemist: Chemist[U], platform: U): Task[Unit] =
     Task.reduceUnordered[Unit, Unit](Seq(
-      Chemist.init(cfg),
+      chemist.init(platform),
       Task(unfiltered.netty.Server
-        .http(cfg.network.port, cfg.network.host)
+        .http(platform.config.network.port, platform.config.network.host)
         .resources(getClass.getResource("/oncue/www/"), cacheSeconds = 3600)
-        .handler(Server(cfg))
+        .handler(Server(chemist, platform))
         .run
       )
     ))
@@ -41,12 +41,13 @@ object Server {
 }
 
 @io.netty.channel.ChannelHandler.Sharable
-case class Server(cfg: ChemistConfig) extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
+case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
   import JSON._
   import concurrent.duration._
+  import chemist.ChemistK
 
-  private def json[A : EncodeJson](a: Chemist[A]) =
-    a(cfg).attemptRun.fold(
+  private def json[A : EncodeJson](a: ChemistK[A]) =
+    a(platform).attemptRun.fold(
       e => InternalServerError ~> JsonResponse(e.toString),
       o => Ok ~> JsonResponse(o))
 
@@ -61,28 +62,28 @@ case class Server(cfg: ChemistConfig) extends cycle.Plan with cycle.SynchronousE
       Ok ~> JsonResponse(Chemist.version)
 
     case GET(Path("/distribution")) =>
-      json(Chemist.distribution.map(_.toList))
+      json(chemist.distribution.map(_.toList))
 
     case GET(Path("/lifecycle/history")) =>
-      json(Chemist.history.map(_.toList))
+      json(chemist.history.map(_.toList))
 
     case POST(Path("/distribute")) =>
       NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)")
 
     case POST(Path("/bootstrap")) =>
-      json(Chemist.bootstrap)
+      json(chemist.bootstrap)
 
     case GET(Path(Seg("shards" :: Nil))) =>
-      json(Chemist.shards)
+      json(chemist.shards)
 
     case GET(Path(Seg("shards" :: id :: Nil))) =>
-      json(Chemist.shard(id))
+      json(chemist.shard(id))
 
     case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
-      json(Chemist.exclude(id))
+      json(chemist.exclude(id))
 
     case POST(Path(Seg("shards" :: id :: "include" :: Nil))) =>
-      json(Chemist.include(id))
+      json(chemist.include(id))
 
   }
 }

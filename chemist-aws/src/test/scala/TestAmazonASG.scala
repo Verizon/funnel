@@ -1,5 +1,6 @@
 package funnel
 package chemist
+package aws
 
 import com.amazonaws.services.autoscaling.{AmazonAutoScaling,AmazonAutoScalingClient}
 import com.amazonaws.services.autoscaling.model.{

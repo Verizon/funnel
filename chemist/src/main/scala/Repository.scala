@@ -41,7 +41,7 @@ import journal.Logger
 
 case class MissingInstanceException(override val getMessage: String) extends RuntimeException(getMessage)
 
-class StatefulRepository(ec2: AmazonEC2) extends Repository {
+class StatefulRepository(discovery: Discovery) extends Repository {
   private val log = Logger[StatefulRepository]
 
   /**
@@ -104,7 +104,7 @@ class StatefulRepository(ec2: AmazonEC2) extends Repository {
   def increaseCapacity(instanceId: InstanceID): Task[(Distribution,InstanceM)] = {
     log.debug(s"increaseCapacity instanceId=$instanceId")
     for {
-      i <- Deployed.lookupOne(instanceId)(ec2)
+      i <- discovery.lookupOne(instanceId)
       a <- increaseCapacity(i)
     } yield a
   }

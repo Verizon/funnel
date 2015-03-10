@@ -1,5 +1,6 @@
 package funnel
 package chemist
+package aws
 
 import java.net.URL
 import scala.collection.JavaConverters._
@@ -21,26 +22,25 @@ import journal.Logger
  * 2. They are running a Funnel server on port 5775 - this is used to validate that
  *    the instance is in fact a useful server for the sake of work sharding.
  */
-object Deployed {
+class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discovery {
+
+  private val log = Logger[Discovery]
 
   ///////////////////////////// public api /////////////////////////////
-
-  private val log = Logger[Deployed.type]
 
   /**
    * List all of the instances in the given AWS account that respond to a rudimentry
    * verification that Funnel is running on port 5775 and is network accessible.
    */
-  def list(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
-    instances(_ => true)(asg,ec2)
-
+  def list: Task[Seq[Instance]] =
+    instances(_ => true)
 
   /**
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
-  def lookupOne(id: InstanceID)(ec2: AmazonEC2): Task[Instance] = {
-    lookupMany(Seq(id))(ec2).flatMap {
+  def lookupOne(id: InstanceID): Task[Instance] = {
+    lookupMany(Seq(id)).flatMap {
       _.filter(_.id == id).headOption match {
         case None => Task.fail(new Exception("No instance found with that key."))
         case Some(i) => Task.now(i)
@@ -52,7 +52,7 @@ object Deployed {
    * Lookup the `Instace` metadata for a set of `InstanceID`.
    * @see funnel.chemist.Deployed.lookupOne
    */
-  def lookupMany(ids: Seq[InstanceID])(ec2: AmazonEC2): Task[Seq[Instance]] =
+  def lookupMany(ids: Seq[InstanceID]): Task[Seq[Instance]] =
     for {
       a <- EC2.reservations(ids)(ec2)
       _  = log.debug(s"Deployed.lookupMany, a = ${a.length}")
@@ -60,18 +60,18 @@ object Deployed {
       _  = log.debug(s"Deployed.lookupMany b = ${b.length}")
     } yield b
 
+
   ///////////////////////////// filters /////////////////////////////
 
   def isFlask(i: Instance): Boolean =
     i.application.map(_.name.startsWith("flask")).getOrElse(false)
 
+
   ///////////////////////////// internal api /////////////////////////////
 
-  private def instances(f: Instance => Boolean
-    )(asg: AmazonAutoScaling, ec2: AmazonEC2
-    ): Task[Seq[Instance]] =
+  private def instances(f: Instance => Boolean): Task[Seq[Instance]] =
     for {
-      a <- readAutoScallingGroups(asg, ec2)
+      a <- readAutoScallingGroups
       // apply the specified filter if we want to remove specific groups for a reason
       x  = a.filter(f)
       // actually reach out to all the discovered hosts and check that their port is reachable
@@ -86,11 +86,11 @@ object Deployed {
    * This is kind of horrible, but it is what it is. The AWS api's really do not help here at all.
    * Sorry!
    */
-  private def readAutoScallingGroups(asg: AmazonAutoScaling, ec2: AmazonEC2): Task[Seq[Instance]] =
+  private def readAutoScallingGroups: Task[Seq[Instance]] =
     for {
       g <- ASG.list(asg)
       _  = log.debug(s"Found ${g.length} auto-scalling groups with ${g.map(_.instances.length).reduceLeft(_ + _)} instances...")
-      r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))(ec2)
+      r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))
     } yield r
 
   private def fromAWSInstance(in: AWSInstance): Instance = {
