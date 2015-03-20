@@ -137,25 +137,28 @@ case class Elastic(M: Monitoring) {
 
   type ES[A] = Kleisli[Task, ElasticCfg, A]
 
-  def putMapping(json: Json): ES[Unit] = for {
-    r <- mappingURL.lift[Task]
-    _ <- elastic(r.PUT, json)
+  def putMapping(json: Json, req: Req): ES[Unit] = for {
+    _ <- elastic(req.PUT, json)
   } yield ()
 
-  def initMapping(keys: Set[Key[Any]]): ES[Unit] = for {
-    es <- getConfig
-    json = Json(
-      es.typeName := jObjectAssocList(List(
-        "_timestamp" -> Json("enabled" := true, "store" := true),
-        "properties" -> Properties(List(
-          Field("host", StringField),
-          Field("cluster", StringField)) ++
-          (keys map keyField)).asJson)
-      ))
-    _ <- ensureIndex
-    _ <- putMapping(json)
-  } yield ()
-
+  // Returns true if the index was created.
+  // False if it already existed.
+  def initMapping(keys: Set[Key[Any]], req: Req): ES[Boolean] = for {
+    b <- ensureIndex(req)
+    _ <- if (b) for {
+      es <- getConfig
+      json = Json(
+        es.typeName := jObjectAssocList(List(
+          "_timestamp" -> Json("enabled" := true, "store" := true),
+          "properties" -> Properties(List(
+            Field("host", StringField),
+            Field("cluster", StringField)) ++
+            (keys map keyField)).asJson)
+        ))
+      _ <- putMapping(json, req)
+    } yield ()
+    else lift(Task.now(()))
+  } yield b
 
 
   def elasticString(req: Req): ES[String] =
@@ -175,9 +178,13 @@ case class Elastic(M: Monitoring) {
   } yield ()
 
   def updateMapping(ps: Properties): ES[Unit] = for {
+    // First make sure the index is inited.
+    // This is required since the index name changes periodically.
+    r  <- mappingURL.lift[Task]
+    _  <- runInitMap(r)
     es <- getConfig
     json = Mappings(List(Mapping(es.typeName, ps))).asJson
-    _  <- putMapping(json)
+    _  <- putMapping(json, r)
   } yield ()
 
   def keyField(k: Key[Any]): Field = {
@@ -200,16 +207,16 @@ case class Elastic(M: Monitoring) {
     }
   }
 
-  def ensureIndex: ES[Unit] = for {
-    url <- indexURL.lift[Task]
+  // Returns true if the index was created. False if it already existed.
+  def ensureIndex(url: Req): ES[Boolean] = for {
     s   <- elasticString(url.HEAD).mapK(_.attempt)
-    _   <- s.fold(
+    b   <- s.fold(
              e => e.getCause match {
-               case StatusCode(404) => createIndex
+               case StatusCode(404) => createIndex *> lift(Task.now(true))
                case _ => lift(Task.fail(e)) // SPLODE!
              },
-             _ => lift(Task.now(())))
-  } yield ()
+             _ => lift(Task.now(false)))
+  } yield b
 
   def createIndex: ES[Unit] = for {
     url <- indexURL.lift[Task]
@@ -234,11 +241,15 @@ case class Elastic(M: Monitoring) {
     def apply[A](t: Task[A]) = t.liftKleisli
   }
 
+  def runInitMap(r: Req): ES[Unit] =
+    M.keys.continuous.once.translate(lift).evalMap(initMapping(_, r)).run
+
   /**
    * Publishes to an ElasticSearch URL at `esURL`.
    */
   def publish(flaskName: String): ES[Unit] = for {
-      _   <- M.keys.continuous.once.translate(lift).evalMap(initMapping).run
+      r   <- mappingURL.lift[Task]
+      _   <- runInitMap(r)
       ref <- lift(IORef(Set[Key[Any]]()))
       -   <- (Monitoring.subscribe(M)(k =>
                 k.attributes.contains("host") ||
