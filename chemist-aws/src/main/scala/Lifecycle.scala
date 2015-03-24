@@ -24,6 +24,7 @@ object Lifecycle {
   import argonaut._, Argonaut._
   import journal.Logger
   import scala.collection.JavaConverters._
+  import metrics._
 
   private implicit val log = Logger[Lifecycle.type]
 
@@ -64,6 +65,9 @@ object Lifecycle {
     // terrible side-effect but we want to track the events
     // that chemist actually sees
     r.addEvent(e).run // YIKES!
+
+    // MOAR side-effects!
+    LifecycleEvents.increment
 
     def isFlask: Task[Boolean] =
       ASG.lookupByName(e.asgName)(asg).flatMap { a =>
@@ -145,7 +149,10 @@ object Lifecycle {
     ): Task[Unit] = {
     stream(queueName, resources)(r,sqs,asg,ec2,dsc).flatMap {
       case -\/(fail) => Process.halt
-      case \/-(win)  => s
+      case \/-(win)  => win match {
+        case Redistributed(_) => Reshardings.increment; s
+        case _ => s
+      }
     }.run
   }
 }

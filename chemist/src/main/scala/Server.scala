@@ -45,6 +45,9 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
   import JSON._
   import concurrent.duration._
   import chemist.ChemistK
+  import Server._
+  import metrics._
+  import chemist.ChemistK
 
   private def json[A : EncodeJson](a: ChemistK[A]) =
     a(platform).attemptRun.fold(
@@ -56,34 +59,34 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
 
   def intent = {
     case GET(Path("/")) =>
-      Redirect("/index.html")
+      GetRoot.time(Redirect("/index.html"))
 
     case GET(Path("/status")) =>
-      Ok ~> JsonResponse(Chemist.version)
+      GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
     case GET(Path("/distribution")) =>
-      json(chemist.distribution.map(_.toList))
+      GetDistribution.time(json(chemist.distribution.map(_.toList)))
 
     case GET(Path("/lifecycle/history")) =>
-      json(chemist.history.map(_.toList))
+      GetLifecycleHistory.time(json(chemist.history.map(_.toList)))
 
     case POST(Path("/distribute")) =>
-      NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)")
+      PostDistribute.time(NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)"))
 
     case POST(Path("/bootstrap")) =>
-      json(chemist.bootstrap)
+      PostBootstrap.time(json(chemist.bootstrap))
 
     case GET(Path(Seg("shards" :: Nil))) =>
-      json(chemist.shards)
+      GetShards.time(json(chemist.shards))
 
     case GET(Path(Seg("shards" :: id :: Nil))) =>
-      json(chemist.shard(id))
+      GetShardById.time(json(chemist.shard(id)))
 
     case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
-      json(chemist.exclude(id))
+      PostShardExclude.time(json(chemist.exclude(id)))
 
     case POST(Path(Seg("shards" :: id :: "include" :: Nil))) =>
-      json(chemist.include(id))
+      PostShardInclude.time(json(chemist.include(id)))
 
   }
 }
