@@ -79,7 +79,8 @@ case class Elastic(M: Monitoring) {
     Process1[Datapoint[A], ESGroup[A]] =
       await1[Datapoint[A]].flatMap { pt =>
         val name = pt.key.name
-        val host = pt.key.attributes.get("url")
+        val host = pt.key.attributes.get("source")
+        println(pt.key.attributes)
         val t = name.split("/").toList
         m.get(host) match {
           case Some(g) => g.get(t) match {
