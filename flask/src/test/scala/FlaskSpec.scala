@@ -63,8 +63,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   implicit val log: String => Unit = s => L(s)
 
-  val f = Flask.instrument(new Instruments(1.minute))
-  val flaskUrl = url(s"http://localhost:$funnelPort/mirror").setContentType("application/json", "UTF-8")
+  val flaskUrl = url(s"http://localhost:${options.funnelPort}/mirror").setContentType("application/json", "UTF-8")
 
   val payload = s"""
   [
@@ -82,10 +81,6 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   implicit val B = scalaz.std.anyVal.booleanInstance.conjunction
   implicit val s = scalaz.stream.DefaultScheduler
-
-  override def beforeAll() {
-    Thread.sleep(2000)
-  }
 
   val E = Endpoint.unsafeApply(publish &&& bind, Settings.tcp)
 

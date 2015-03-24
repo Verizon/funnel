@@ -70,10 +70,7 @@ class Flask(options: Options, val I: Instruments) {
       case _            => Process.fail(new RuntimeException("Unknown URI scheme submitted."))
     }
 
-  private def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
-    httpOrZmtp(alive)(uri) observe countDatapoints
-
-  def main(args: Array[String]): Unit = {
+  def run(args: Array[String]): Unit = {
 
     val logger = LoggerFactory.getLogger("flask")
 
