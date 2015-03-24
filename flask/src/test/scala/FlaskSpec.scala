@@ -99,6 +99,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   override def beforeAll() {
     app.run(Array())
     Http(flaskUrl << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)
+    ()
   }
 
   override def afterAll() {
@@ -117,5 +118,6 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     Ø.linkP(E)(alive)(socket =>
       proc.through(Ø.write(socket))).runFoldMap(identity).run
+      ()
   }
 }
