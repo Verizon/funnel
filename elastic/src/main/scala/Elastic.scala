@@ -58,11 +58,12 @@ object ElasticCfg {
 }
 
 case class Elastic(M: Monitoring) {
-  type Name = String
+  type SourceURL = String
+  type Window = String
   type Path = List[String]
 
   /** Data points grouped by mirror URL and key */
-  type ESGroup[A] = Map[Option[Name], Map[Path, Datapoint[A]]]
+  type ESGroup[A] = Map[(Option[Window], Option[SourceURL]), Map[Path, Datapoint[A]]]
 
   import Process._
   import scalaz.concurrent.Task
@@ -79,17 +80,21 @@ case class Elastic(M: Monitoring) {
     Process1[Datapoint[A], ESGroup[A]] =
       await1[Datapoint[A]].flatMap { pt =>
         val name = pt.key.name
-        val host = pt.key.attributes.get("source")
+        val source = pt.key.attributes.get("source")
         val t = name.split("/").toList
+        val w = t.headOption.filter(x =>
+          List("previous", "now", "sliding") contains x)
+        val host = (w, source)
+        val k = t.drop(if (w.isDefined) 1 else 0)
         m.get(host) match {
-          case Some(g) => g.get(t) match {
+          case Some(g) => g.get(k) match {
             case Some(_) =>
-              emit(m) ++ go(Map(host -> Map(t -> pt)))
+              emit(m) ++ go(Map(host -> Map(k -> pt)))
             case None =>
-              go(m + (host -> (g + (t -> pt))))
+              go(m + (host -> (g + (k -> pt))))
           }
           case None =>
-            go(m + (host -> Map(t -> pt)))
+            go(m + (host -> Map(k -> pt)))
         }
       }
     go(Map())
@@ -100,20 +105,21 @@ case class Elastic(M: Monitoring) {
   import http.JSON._
 
   /**
-   * Emits one JSON document per mirror URL, on the right,
+   * Emits one JSON document per mirror URL and window type, on the right,
    * first emitting the ES mapping properties for their keys, on the left.
-   * Once grouped by `elasticGroup`, this process emits one document per URL
-   * with all the key/value pairs that were seen for that mirror in the group.
+   * Once grouped by `elasticGroup`, this process emits one document per
+   * URL/window with all the key/value pairs that were seen for that mirror
+   * in the group for that period.
    */
   def elasticUngroup[A](flaskName: String): Process1[ESGroup[A], Properties \/ Json] =
     await1[ESGroup[A]].flatMap { g =>
       emit(left(Properties(g.values.flatMap(_.values.map(p =>
           keyField(p.key))).toList))) ++
       emitAll(g.toSeq.map { case (name, m) =>
-        ("host" := name.getOrElse(flaskName)) ->:
+        ("host" := name._2.getOrElse(flaskName)) ->:
         ("@timestamp" :=
           new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
-          m.toList.foldLeft(jEmptyObject) {
+          m.toList.foldLeft(("window" :=? name._1).map(_ ->: jEmptyObject) getOrElse jEmptyObject) {
             case (o, (ps, dp)) =>
               dp.key.attributes.get("bucket").map(x => ("cluster" := x) ->: jEmptyObject).
                 getOrElse(jEmptyObject) deepmerge
@@ -155,7 +161,8 @@ case class Elastic(M: Monitoring) {
             Field("cluster", StringField)) ++
             (keys map keyField)).asJson)
         ))
-      _ <- putMapping(json, req)
+      r <- mappingURL(req).lift[Task]
+      _ <- putMapping(json, r)
     } yield ()
     else lift(Task.now(()))
   } yield b
@@ -180,8 +187,9 @@ case class Elastic(M: Monitoring) {
   def updateMapping(ps: Properties): ES[Unit] = for {
     // First make sure the index is inited.
     // This is required since the index name changes periodically.
-    r  <- mappingURL.lift[Task]
-    _  <- runInitMap(r)
+    u  <- indexURL.lift[Task]
+    r  <- mappingURL(u).lift[Task]
+    _  <- runInitMap(u)
     es <- getConfig
     json = Mappings(List(Mapping(es.typeName, ps))).asJson
     _  <- putMapping(json, r)
@@ -212,14 +220,13 @@ case class Elastic(M: Monitoring) {
     s   <- elasticString(url.HEAD).mapK(_.attempt)
     b   <- s.fold(
              e => e.getCause match {
-               case StatusCode(404) => createIndex *> lift(Task.now(true))
+               case StatusCode(404) => createIndex(url) *> lift(Task.now(true))
                case _ => lift(Task.fail(e)) // SPLODE!
              },
              _ => lift(Task.now(false)))
   } yield b
 
-  def createIndex: ES[Unit] = for {
-    url <- indexURL.lift[Task]
+  def createIndex(url: Req): ES[Unit] = for {
     _   <- elastic(url.PUT, Json("settings" := Json("index.cache.query.enable" := true)))
   } yield ()
 
@@ -228,8 +235,8 @@ case class Elastic(M: Monitoring) {
     url(s"${es.url}/${es.indexName}-$date")
   }
 
-  def mappingURL: Reader[ElasticCfg, Req] = Reader { es =>
-    (indexURL(es) / "_mapping" / s"${es.typeName}").
+  def mappingURL(ixURL: Req): Reader[ElasticCfg, Req] = Reader { es =>
+    (ixURL / "_mapping" / s"${es.typeName}").
       setContentType("application/json", "UTF-8")
   }
 
@@ -248,15 +255,13 @@ case class Elastic(M: Monitoring) {
    * Publishes to an ElasticSearch URL at `esURL`.
    */
   def publish(flaskName: String): ES[Unit] = for {
-      r   <- mappingURL.lift[Task]
-      _   <- runInitMap(r)
+      u   <- indexURL.lift[Task]
+      _   <- runInitMap(u)
       ref <- lift(IORef(Set[Key[Any]]()))
-      -   <- (Monitoring.subscribe(M)(k =>
-                k.attributes.contains("host") ||
-                k.name.matches("previous/.*")).translate(lift) |>
+      -   <- (Monitoring.subscribe(M)(_ => true).translate(lift) |>
               elasticGroup |> elasticUngroup(flaskName)).evalMap(_.fold(
                 props => updateMapping(props),
-                json => esURL.lift[Task] >>= (r => elastic(r.POST, json))
+                json  => esURL.lift[Task] >>= (r => elastic(r.POST, json))
               )).run
     } yield ()
 }
