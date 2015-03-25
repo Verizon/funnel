@@ -1,0 +1,14 @@
+---
+- name: chemist | create image
+  hosts: all
+  gather_facts: false
+  user: ec2-user
+  roles:
+    - application
+  tasks:
+    - name: chemist | override configuration file
+      sudo: yes
+      template: >
+        src=templates/chemist.cfg.j2
+        dest=/usr/share/oncue/etc/chemist.cfg
+        owner=root group=root mode=0644

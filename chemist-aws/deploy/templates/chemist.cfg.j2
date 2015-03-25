@@ -1,0 +1,18 @@
+
+chemist {
+  network {
+    host = "127.0.0.1"
+    port = 9000
+  }
+
+  sns-topic-name = "ops-chemist"
+  sqs-queue-name = "ops-chemist"
+
+  resources-to-monitor = [ "stream/previous" ]
+}
+
+aws {
+  region = "us-east-1"
+  access-key = "$(AWS_ACCESS_KEY)"
+  secret-key = "$(AWS_SECRET_KEY)"
+}
