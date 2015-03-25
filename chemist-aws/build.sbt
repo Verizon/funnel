@@ -14,7 +14,11 @@ ScalaTest.settings
 
 Custom.compilation
 
+Coverage.settings
+
 name in Universal := "chemist-aws"
+
+fork in Test := true
 
 mainClass in Compile := Some("funnel.chemist.aws.Main")
 
