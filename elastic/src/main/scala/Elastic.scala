@@ -80,7 +80,7 @@ case class Elastic(M: Monitoring) {
     Process1[Datapoint[A], ESGroup[A]] =
       await1[Datapoint[A]].flatMap { pt =>
         val name = pt.key.name
-        val source = pt.key.attributes.get("source")
+        val source = pt.key.attributes.get(AttributeKeys.source)
         val t = name.split("/").toList
         val w = t.headOption.filter(x =>
           List("previous", "now", "sliding") contains x)
@@ -121,8 +121,9 @@ case class Elastic(M: Monitoring) {
           new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
           m.toList.foldLeft(("window" :=? name._1).map(_ ->: jEmptyObject) getOrElse jEmptyObject) {
             case (o, (ps, dp)) =>
-              dp.key.attributes.get("bucket").map(x => ("cluster" := x) ->: jEmptyObject).
-                getOrElse(jEmptyObject) deepmerge
+              dp.key.attributes.get(AttributeKeys.bucket).map(x =>
+                ("cluster" := x) ->: jEmptyObject
+              ).getOrElse(jEmptyObject) deepmerge
                   (o deepmerge ps.foldRight((dp.asJson -| "value").get)((a, b) =>
                     (a := b) ->: jEmptyObject))
           }

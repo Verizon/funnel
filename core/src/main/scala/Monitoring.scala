@@ -167,7 +167,7 @@ trait Monitoring {
 
           val received: Process[Task,Unit] = link(hook) {
             attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
-              source, Map("bucket" -> bucket, "source" -> localName))
+              source, Map(AttributeKeys.bucket -> bucket, AttributeKeys.source -> localName))
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
