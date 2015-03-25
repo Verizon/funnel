@@ -35,7 +35,7 @@ lazy val core = project
 
 lazy val elastic = project.dependsOn(core, http)
 
-lazy val flask = project.dependsOn(aws, riemann, elastic, zeromq % "test->test;compile->compile")
+lazy val flask = project.dependsOn(aws, riemann, elastic, zeromq)
 
 lazy val http = project.dependsOn(core)
 
