@@ -106,18 +106,20 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     app.S.stop()
   }
 
-  "mirrorDatapoints" should "be 5000" in {
-    app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete.sleepUntil(ready.discrete.once).once.runLast.map(_.get).runAsync { d =>
-      d.fold (
-        t =>
-        throw t,
-        v =>
-        v.toInt should be (5000)
-      )
-    }
+  if (Ø.isEnabled) {
+    "mirrorDatapoints" should "be 5000" in {
+      app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete.sleepUntil(ready.discrete.once).once.runLast.map(_.get).runAsync { d =>
+        d.fold (
+          t =>
+          throw t,
+          v =>
+          v.toInt should be (5000)
+        )
+      }
 
-    Ø.linkP(E)(alive)(socket =>
-      proc.through(Ø.write(socket))).runFoldMap(identity).run
+      Ø.linkP(E)(alive)(socket =>
+        proc.through(Ø.write(socket))).runFoldMap(identity).run
       ()
+    }
   }
 }
