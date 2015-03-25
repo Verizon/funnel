@@ -14,10 +14,4 @@ object metrics {
   val GetShardById = timer("http/get/shards/id", "time taken to get shard by ID")
   val PostShardExclude = timer("http/post/shards/id/exclude", "time taken to exclude shard by ID")
   val PostShardInclude = timer("http/post/shards/id/include", "time taken to include shard by ID")
-<<<<<<< HEAD
-=======
-
-  val LifecycleEvents = counter("lifecycle/events", 0, "number of lifecycle events within a given window")
-  val Reshardings = counter("lifecycle/resharding", 0, "number of times lifecycle events triggered resharding")
->>>>>>> parent of 6fae948... resolved revert conflict
 }
