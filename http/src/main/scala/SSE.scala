@@ -55,7 +55,7 @@ object SSE {
 
   /// parsing
 
-  case class ParseError(message: String) extends Exception(message)
+  case class ParseError(msg: String) extends Exception
 
   /**
    * Streaming parser for an SSE stream. Example, given:
