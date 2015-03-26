@@ -29,13 +29,22 @@ object Lifecycle {
   private implicit val log = Logger[Lifecycle.type]
 
   case class MessageParseException(override val getMessage: String) extends RuntimeException
-  case object LowPriorityScalingException extends RuntimeException {
-    override val getMessage: String = "The specified scaling event does not affect flask capactiy"
-  }
 
+  /**
+   * Attempt to parse incomming SQS messages into `AutoScalingEvent`. Yield a
+   * `MessageParseException` in the event the message is not decipherable.
+   */
   def parseMessage(msg: Message): Throwable \/ AutoScalingEvent =
     Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException(_))
 
+
+  /**
+   * This function essentially converts the polling of an SQS queue into a scalaz-stream
+   * process. Said process contains Strings being delivered on the SQS queue, which we
+   * then attempt to parse into an `AutoScalingEvent`. Assuming the message parses correctly
+   * we then pass the `AutoScalingEvent` to the `interpreter` function for further processing.
+   * In the event the message does not parse to an `AutoScalingEvent`,
+   */
   def stream(queueName: String, resources: Seq[String]
     )(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Process[Task, Throwable \/ Action] = {
@@ -55,8 +64,24 @@ object Lifecycle {
 
   //////////////////////////// I/O Actions ////////////////////////////
 
-  // im really not sure what to say about this monster...
-  // sorry reader.
+  /**
+   * This function is a bit of a monster and forms the crux of the chemist system
+   * when running on AWS. It's primary job is to recieve an AutoScalingEvent and
+   * then determine if that event pertains to a flask instance, or if it pertains
+   * to a normal service instance that needs to be monitored. The following cases
+   * are handled by this function:
+   *
+   * + New flask instance avalible:
+   *     Add this extra capacity to the known flask list
+   *
+   * + Flask instance terminated:
+   *     Remove this flask from the known instances and repartiion any work that
+   *     was assigned to this flask to another still-avalible flask.
+   *
+   * + New generic instance avalible:
+   *     Instruct one of the online flasks to start monitoring this new instance
+   *
+   */
   def interpreter(e: AutoScalingEvent, resources: Seq[String]
     )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Action] = {
@@ -129,10 +154,18 @@ object Lifecycle {
   def sink: Sink[Task,Action] =
     Process.emit {
       case Redistributed(seq) =>
-        Sharding.distribute(seq).map(_ => ())
+        for {
+          _ <- Sharding.distribute(seq)
+          _ <- Task.now(Reshardings.increment)
+        } yield ()
+
       case _ => Task.now( () )
     }
 
+  /**
+   * The purpose of this function is to turn the result from the interpreter
+   * into an effect that has some meaning within the system (i.e. resharding or not)
+   */
   def event(e: AutoScalingEvent, resources: Seq[String]
     )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Unit] = {
@@ -144,16 +177,28 @@ object Lifecycle {
     }
   }
 
+  /**
+   * The main method for the lifecycle process. Run the `stream` method and then handle
+   * failures that might occour on the process. This function is primarily used in the
+   * init method for chemist so that the SQS/SNS lifecycle is started from the edge of
+   * the world.
+   */
   def run(queueName: String, resources: Seq[String], s: Sink[Task, Action]
     )(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Unit] = {
-    stream(queueName, resources)(r,sqs,asg,ec2,dsc).flatMap {
-      case -\/(fail) => Process.halt
+    val process: Sink[Task, Action] = stream(queueName, resources)(r,sqs,asg,ec2,dsc).flatMap {
+      case -\/(fail) => {
+        log.error(s"Problem encountered when trying to processes SQS lifecycle message: $fail")
+        fail.printStackTrace
+        s
+      }
       case \/-(win)  => win match {
-        case Redistributed(_) => Reshardings.increment; s
+        case Redistributed(_) => s
         case _ => s
       }
-    }.run
+    }
+
+    process.run
   }
 }
 

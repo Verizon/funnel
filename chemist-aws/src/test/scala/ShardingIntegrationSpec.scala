@@ -8,7 +8,7 @@ import funnel.http.MonitoringServer
 import scalaz.==>>
 import concurrent.duration._
 
-class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfterAll with ChemistSpec {
+class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   import Sharding.{Distribution,Target}
 
   val W = 30.seconds
