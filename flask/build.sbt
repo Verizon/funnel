@@ -19,7 +19,6 @@ SbtMultiJvm.multiJvmSettings
 Custom.testing
 
 libraryDependencies ++= Seq(
-  "intelmedia.ws.common" %% "logging-s3" % "8.0.+",
   "oncue.svc.knobs"      %% "core"       % V.knobs
 )
 
