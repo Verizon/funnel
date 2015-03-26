@@ -10,7 +10,7 @@ import scalaz.stream.Process
 import scalaz.stream.async.signal
 import com.amazonaws.auth.BasicAWSCredentials
 import argonaut._, Argonaut._
-import org.slf4j.LoggerFactory
+import journal.Logger
 import funnel.elastic._
 import funnel.http.JSON._
 import funnel.zeromq._
@@ -55,7 +55,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       awsProxyPort, awsProxyProtocol, awsRegion, port), cfg))
   }.run
 
-  val logger = LoggerFactory.getLogger("flask")
+  val logger = Logger[this.type]
 
   implicit val logPool: Strategy = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
 
