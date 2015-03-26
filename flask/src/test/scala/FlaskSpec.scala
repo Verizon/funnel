@@ -55,6 +55,8 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       awsProxyPort, awsProxyProtocol, awsRegion, port), cfg))
   }.run
 
+  val logger = Logger[this.type]
+
   implicit val logPool: Strategy = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
 
   val L = Actor.actor((s: String) => logger.info(s))
