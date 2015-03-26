@@ -3,7 +3,7 @@ package flask
 
 import com.aphyr.riemann.client.RiemannClient
 import scala.concurrent.duration._
-import scalaz.concurrent.{ Actor, Strategy, Task }
+import scalaz.concurrent.Task
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.stream.{ io, Process, Sink }
@@ -73,12 +73,7 @@ class Flask(options: Options, val I: Instruments) {
   def run(args: Array[String]): Unit = {
 
     val logger = Logger[this.type]
-
-    implicit val logPool: Strategy = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
-
-    val L = Actor.actor((s: String) => logger.info(s))
-
-    implicit val log: String => Unit = s => L(s)
+    implicit val log = { s: String => logger.debug(s) }
 
     val Q = SNS.client(
       options.awsCredentials,
@@ -176,12 +171,7 @@ object Main {
   }
 
   val logger = Logger[this.type]
-
-  implicit val logPool: Strategy = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
-
-  val L = Actor.actor((s: String) => logger.info(s))
-
-  implicit val log: String => Unit = s => L(s)
+  implicit val log = { s: String => logger.debug(s) }
 
   val app = new Flask(options, I)
 
