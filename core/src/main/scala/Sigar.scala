@@ -5,9 +5,11 @@ import collection.JavaConversions._
 import scala.concurrent.duration._
 import scalaz.concurrent.Strategy
 import scalaz.stream._
+import journal.Logger
 
 /** Functions for adding various system metrics collected by SIGAR to a `Monitoring` instance. */
 class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
+  val log = Logger[this.type]
 
   type G = Gauge[Periodic[Stats], Double]
 
@@ -136,8 +138,7 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
   def instrument(
     implicit ES: ExecutorService = Monitoring.defaultPool,
              TS: ScheduledExecutorService = Monitoring.schedulingPool,
-             t: Duration = 30 seconds,
-             log: String => Unit): Unit = {
+             t: Duration = 30 seconds): Unit = {
 
     // Make the side effects happen.
     // Side effects FTL!
@@ -178,7 +179,7 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
           v.diskReads.set(u.getDiskReads)
         } catch {
           // Catch exceptions caused by file systems getting dismounted etc.
-          case e: Exception => log(e.toString)
+          case e: Exception => log.error(e.toString)
         }
       }
 
@@ -220,7 +221,9 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
 }
 
 object Sigar {
-  def apply(I: Instruments)(implicit log: String => Unit): Option[Sigar] = {
+  val log = Logger[this.type]
+
+  def apply(I: Instruments): Option[Sigar] = {
     try {
       val sigar = new org.hyperic.sigar.Sigar
       // internals of sigar seem to be lazy, so lets force a
@@ -231,15 +234,15 @@ object Sigar {
       Option(new Sigar(I, sigar))
     } catch {
       case e: LinkageError =>
-        log("Unable to load native Sigar library, it may not be installed?")
-        log(s"The following error was encountered: $e")
-        log("java.library.path is set to: " +
+        log.debug("Unable to load native Sigar library, it may not be installed?")
+        log.debug(s"The following error was encountered: $e")
+        log.debug("java.library.path is set to: " +
           System.getProperty("java.library.path"))
         None
     }
   }
 
-  def instrument(I: Instruments)(implicit log: String => Unit): Unit =
+  def instrument(I: Instruments): Unit =
     apply(I).foreach(_.instrument)
 
 }

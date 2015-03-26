@@ -135,7 +135,7 @@ trait Monitoring {
     parse: DatapointParser,
     myName: String = "Funnel Mirror",
     nodeRetries: Names => Event = _ => defaultRetries
-  )(implicit log: String => Unit): Task[Unit] = {
+  ): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
     val alive     = signal[Unit](S)
     val active    = signal[Set[URI]](S)
