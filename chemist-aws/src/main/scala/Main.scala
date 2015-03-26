@@ -14,10 +14,11 @@ object Main {
       } yield Config.readConfig(a ++ b)).run
     }
 
-    Server.start(chemist, aws).run
+    val monitoring = MonitoringServer.start(Monitoring.default, 5775)
 
-    // this should probally be called to release
-    // the underlying resources.
-    // dispatch.Http.shutdown()
+    Server.start(chemist, aws).onFinish(_ => Task.delay {
+      monitoring.stop()
+      dispatch.Http.shutdown()
+    }).run
   }
 }

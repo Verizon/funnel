@@ -28,13 +28,13 @@ class ServerSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   behavior of "chemist server"
 
-  // it should "respond to index.html" in {
-  //   println(fetch("/index.html"))
-  // }
-
-  it must "respond to the /lifecycle/history" in {
-    println(fetch("/lifecycle/history"))
+  it should "respond to index.html" in {
+    fetch("/index.html").length > 10
   }
+
+  // it must "respond to the /lifecycle/history" in {
+  //   println(fetch("/lifecycle/history"))
+  // }
 
 
 }
