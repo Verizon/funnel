@@ -3,8 +3,6 @@ import oncue.build._
 import com.typesafe.sbt.SbtNativePackager._
 import com.typesafe.sbt.packager.Keys._
 import spray.revolver.RevolverPlugin._
-import com.typesafe.sbt.SbtMultiJvm
-import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 
 OnCue.baseSettings
 
@@ -14,9 +12,7 @@ Revolver.settings
 
 ScalaTest.settings
 
-SbtMultiJvm.multiJvmSettings
-
-Custom.testing
+Coverage.settings
 
 libraryDependencies ++= Seq(
   "oncue.svc.knobs"      %% "core"       % V.knobs
@@ -24,7 +20,7 @@ libraryDependencies ++= Seq(
 
 name in Universal := "flask"
 
-(scalacOptions in MultiJvm) += "-language:postfixOps"
+fork in Test := true
 
 mappings in Universal ++= Seq(
   file("flask/src/main/resources/oncue/flask.cfg") -> "etc/flask.cfg"
