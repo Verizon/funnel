@@ -1,7 +1,6 @@
 package funnel
 package flask
 
-import org.slf4j.LoggerFactory
 import com.aphyr.riemann.client.RiemannClient
 import scala.concurrent.duration._
 import scalaz.concurrent.{ Actor, Strategy, Task }
@@ -13,6 +12,7 @@ import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.sns.{AmazonSNSClient,AmazonSNS}
 import com.amazonaws.regions.{Region, Regions}
+import journal.Logger
 import funnel.{Events,DatapointParser,Datapoint,Names,Sigar,Monitoring,Instruments}
 import funnel.riemann.Riemann
 import funnel.http.{MonitoringServer,SSE}
@@ -72,7 +72,7 @@ class Flask(options: Options, val I: Instruments) {
 
   def run(args: Array[String]): Unit = {
 
-    val logger = LoggerFactory.getLogger("flask")
+    val logger = Logger[this.type]
 
     implicit val logPool: Strategy = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
 
@@ -175,7 +175,7 @@ object Main {
     }
   }
 
-  val logger = LoggerFactory.getLogger("flask")
+  val logger = Logger[this.type]
 
   implicit val logPool: Strategy = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
 
