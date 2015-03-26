@@ -2,7 +2,7 @@ package funnel
 package flask
 
 import scala.concurrent.duration._
-import scalaz.concurrent.{ Actor, Strategy, Task }
+import scalaz.concurrent.Task
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
@@ -55,13 +55,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       awsProxyPort, awsProxyProtocol, awsRegion, port), cfg))
   }.run
 
-  val logger = Logger[this.type]
-
-  implicit val logPool: Strategy = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
-
-  val L = Actor.actor((s: String) => logger.info(s))
-
-  implicit val log: String => Unit = s => L(s)
+  val log = Logger[this.type]
 
   val flaskUrl = url(s"http://localhost:${options.funnelPort}/mirror").setContentType("application/json", "UTF-8")
 
