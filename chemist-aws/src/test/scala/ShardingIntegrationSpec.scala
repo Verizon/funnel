@@ -68,7 +68,7 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
   it should "sucsessfully be able to stream events from two local monitoring instances to a local flask" in {
     F1.processMirroringEvents(
       funnel.http.SSE.readEvents,
-      "intspec")(println).runAsync(println)
+      "intspec").runAsync(println)
 
     val x = for {
       a <- Sharding.locateAndAssignDistribution(T1,R)
