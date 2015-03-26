@@ -11,7 +11,7 @@ import scalaz.concurrent.Task
 import scalaz.std.string._
 import Sharding.{Distribution,Target}
 
-class LifecycleSpec extends FlatSpec with Matchers with ChemistSpec {
+class LifecycleSpec extends FlatSpec with Matchers {
   val ec2 = TestAmazonEC2(Fixtures.instances)
   val uuid = java.util.UUID.randomUUID.toString
   val sqs1 = TestAmazonSQS(Fixtures.asgEvent(Launch, name = uuid, instanceId = "i-flaskAAA"))
