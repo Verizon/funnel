@@ -2,6 +2,9 @@ package funnel
 package chemist
 package aws
 
+import scalaz.concurrent.Task
+import http.MonitoringServer
+
 object Main {
   def main(args: Array[String]): Unit = {
 

@@ -129,10 +129,18 @@ object Lifecycle {
   def sink: Sink[Task,Action] =
     Process.emit {
       case Redistributed(seq) =>
-        Sharding.distribute(seq).map(_ => ())
+        for {
+          _ <- Sharding.distribute(seq)
+          _ <- Task.now(Reshardings.increment)
+        } yield ()
+
       case _ => Task.now( () )
     }
 
+  /**
+   * The purpose of this function is to turn the result from the interpreter
+   * into an effect that has some meaning within the system (i.e. resharding or not)
+   */
   def event(e: AutoScalingEvent, resources: Seq[String]
     )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Unit] = {
@@ -147,13 +155,15 @@ object Lifecycle {
   def run(queueName: String, resources: Seq[String], s: Sink[Task, Action]
     )(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Unit] = {
-    stream(queueName, resources)(r,sqs,asg,ec2,dsc).flatMap {
+    val process = stream(queueName, resources)(r,sqs,asg,ec2,dsc).flatMap {
       case -\/(fail) => Process.halt
       case \/-(win)  => win match {
-        case Redistributed(_) => Reshardings.increment; s
+        case Redistributed(_) => s
         case _ => s
       }
-    }.run
+    }
+
+    process.run
   }
 }
 
