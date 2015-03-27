@@ -12,8 +12,6 @@ Revolver.settings
 
 ScalaTest.settings
 
-Coverage.settings
-
 libraryDependencies ++= Seq(
   "oncue.svc.knobs"      %% "core"       % V.knobs
 )
