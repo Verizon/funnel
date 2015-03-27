@@ -16,7 +16,7 @@ class ServerSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   val http = Http()
 
   private def fetch(path: String): String =
-    Await.result(http(url(s"http://127.0.0.1:8080$path") OK as.String), 5.seconds)
+    Await.result(http(url(s"http://127.0.0.1:64523$path") OK as.String), 5.seconds)
 
   override def beforeAll(): Unit = {
     Server.start(core,platform).runAsync(_ => ())
