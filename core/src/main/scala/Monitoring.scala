@@ -28,7 +28,7 @@ import internals._
 trait Monitoring {
   import Monitoring._
 
-  val log: Logger
+  def log: Logger
 
   /**
    * Create a new topic with the given name and units,
@@ -204,7 +204,7 @@ trait Monitoring {
         _ <- if (b) {
           update(k, pt.value)
         } else Task {
-               log.info(s"$msg new key: $k")
+               log.debug(s"$msg new key: $k")
                val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
                snk(pt.value)
              }
@@ -246,10 +246,10 @@ trait Monitoring {
                       f: Seq[O] => O2): Task[Key[O2]] = for {
     _ <- initialize(out)
     _ <- Task.fork(e(this).flatMap { _ =>
-      log.info("Monitoring.aggregate: gathering values")
+      log.debug("Monitoring.aggregate: gathering values")
       Process.eval { evalFamily(family).flatMap { vs =>
         val v = f(vs)
-        log.info(s"Monitoring.aggregate: aggregated $v from ${vs.size} matching keys")
+        log.debug(s"Monitoring.aggregate: aggregated $v from ${vs.size} matching keys")
         update(out, v)
       }}}.run)
   } yield out
@@ -273,14 +273,14 @@ trait Monitoring {
     val alive = signal[Unit](Strategy.Sequential); alive.set(()).run
     val pts = Monitoring.subscribe(this)(f).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
-        log.info(s"$msg no more data points for '$f', resetting...")
+        log.debug(s"$msg no more data points for '$f', resetting...")
         reset
       }}
     }
     e(this).zip(alive.continuous).map(_._1).either(pts)
            .scan(Vector(false,false))((acc,a) => acc.tail :+ a.isLeft)
            .filter { xs => xs forall (identity) }
-           .evalMap { _ => log.info(s"$msg no activity for '$f', resetting..."); reset }
+           .evalMap { _ => log.debug(s"$msg no activity for '$f', resetting..."); reset }
            .run.runAsync { _ => () }
   }
 
@@ -433,7 +433,7 @@ object Monitoring {
      scalaz.stream.merge.mergeN(M.distinctKeys.filter(p).map(k => points(k)))
    def points(k: Key[Any]): Process[Task, Datapoint[Any]] =
      M.get(k).discrete.map(Datapoint(k, _)).onComplete {
-       Process.eval_(Task.delay(M.log.info(s"unsubscribing: $k")))
+       Process.eval_(Task.delay(M.log.debug(s"unsubscribing: $k")))
      }
    interleaveAll(f)
   }

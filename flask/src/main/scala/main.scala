@@ -61,7 +61,7 @@ class Flask(options: Options, val I: Instruments) {
 
   private def runAsync(p: Task[Unit]): Unit = p.runAsync(_.fold(e => {
     e.printStackTrace()
-    log.error(s"[ERROR] $e - ${e.getMessage}")
+    log.error(s"Flask error in runAsync(): Exception $e - ${e.getMessage}")
     log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
   }, identity _))
 
