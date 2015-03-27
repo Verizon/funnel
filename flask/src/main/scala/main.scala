@@ -3,7 +3,7 @@ package flask
 
 import com.aphyr.riemann.client.RiemannClient
 import scala.concurrent.duration._
-import scalaz.concurrent.{ Actor, Strategy, Task }
+import scalaz.concurrent.Task
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.stream.{ io, Process, Sink }
@@ -30,6 +30,8 @@ class Flask(options: Options, val I: Instruments) {
   import Events.Event
   import scalaz.\/._
 
+  val log = Logger[this.type]
+
   val mirrorDatapoints = I.counter("mirror/datapoints")
 
   val S = MonitoringServer.start(I.monitoring, options.funnelPort)
@@ -42,7 +44,7 @@ class Flask(options: Options, val I: Instruments) {
     R.disconnect
   }
 
-  private def giveUp(names: Names, sns: AmazonSNS, log: String => Unit) = {
+  private def giveUp(names: Names, sns: AmazonSNS) = {
     val msg = s"${names.mine} gave up on ${names.kind} server ${names.theirs}"
     Process.eval(SNS.publish(options.snsErrorTopic, msg)(sns))
   }
@@ -57,10 +59,10 @@ class Flask(options: Options, val I: Instruments) {
     System.exit(1)
   }
 
-  private def runAsync(p: Task[Unit])(implicit log: String => Unit): Unit = p.runAsync(_.fold(e => {
+  private def runAsync(p: Task[Unit]): Unit = p.runAsync(_.fold(e => {
     e.printStackTrace()
-    log(s"[ERROR] $e - ${e.getMessage}")
-    log(e.getStackTrace.toList.mkString("\n","\t\n",""))
+    log.error(s"Flask error in runAsync(): Exception $e - ${e.getMessage}")
+    log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
   }, identity _))
 
   private def httpOrZmtp(alive: Signal[Boolean])(uri: URI): Process[Task,Datapoint[Any]] =
@@ -71,15 +73,6 @@ class Flask(options: Options, val I: Instruments) {
     }
 
   def run(args: Array[String]): Unit = {
-
-    val logger = Logger[this.type]
-
-    implicit val logPool: Strategy = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
-
-    val L = Actor.actor((s: String) => logger.info(s))
-
-    implicit val log: String => Unit = s => L(s)
-
     val Q = SNS.client(
       options.awsCredentials,
       options.awsProxyHost,
@@ -95,7 +88,7 @@ class Flask(options: Options, val I: Instruments) {
       httpOrZmtp(alive)(uri) observe countDatapoints
 
     def retries(names: Names): Event =
-      Monitoring.defaultRetries andThen (_ ++ giveUp(names, Q, log))
+      Monitoring.defaultRetries andThen (_ ++ giveUp(names, Q))
 
     val localhost = java.net.InetAddress.getLocalHost.toString
 
@@ -174,14 +167,6 @@ object Main {
       s.instrument
     }
   }
-
-  val logger = Logger[this.type]
-
-  implicit val logPool: Strategy = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
-
-  val L = Actor.actor((s: String) => logger.info(s))
-
-  implicit val log: String => Unit = s => L(s)
 
   val app = new Flask(options, I)
 

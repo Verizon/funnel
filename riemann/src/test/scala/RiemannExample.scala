@@ -36,7 +36,7 @@ object Main {
            }.run.runAsyncInterruptibly(println, stop)
 
     val t2 = Riemann.publish(Monitoring.default, 10f,
-        Events.every(10.seconds))(R, Riemann.collector(R))(println(_)).runAsyncInterruptibly(println, stop)
+        Events.every(10.seconds))(R, Riemann.collector(R)).runAsyncInterruptibly(println, stop)
 
     println
     println("Press [Enter] to quit...")

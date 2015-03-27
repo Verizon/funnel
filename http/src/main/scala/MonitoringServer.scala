@@ -54,7 +54,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
     server.setExecutor(Monitoring.serverPool)
     val _ = server.createContext("/", handleMetrics(M))
     server.start()
-    M.log("server started on port: " + port)
+    M.log.info("server started on port: " + port)
   }
 
   def stop(): Unit = server.stop(0)
@@ -203,7 +203,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
 
   protected def handleMetrics(M: Monitoring) = new HttpHandler {
     def handle(req: HttpExchange): Unit = try {
-      M.log("requested path: " + req.getRequestURI.getPath)
+      M.log.info("requested path: " + req.getRequestURI.getPath)
       val path = req.getRequestURI.getPath match {
         case "/" => Nil
         case p   => p.split("/").toList.tail
@@ -221,7 +221,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
       }
     }
     catch {
-      case e: Exception => M.log("fatal error: " + e)
+      case e: Exception => M.log.error("fatal error: " + e)
     }
     finally req.close
   }

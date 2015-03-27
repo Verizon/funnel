@@ -18,6 +18,7 @@ import scalaz.{\/, ~>, Monad}
 import Events.Event
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.signal
+import journal.Logger
 import internals._
 
 /**
@@ -27,7 +28,7 @@ import internals._
 trait Monitoring {
   import Monitoring._
 
-  def log(s: String): Unit
+  def log: Logger
 
   /**
    * Create a new topic with the given name and units,
@@ -135,7 +136,7 @@ trait Monitoring {
     parse: DatapointParser,
     myName: String = "Funnel Mirror",
     nodeRetries: Names => Event = _ => defaultRetries
-  )(implicit log: String => Unit): Task[Unit] = {
+  ): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
     val alive     = signal[Unit](S)
     val active    = signal[Set[URI]](S)
@@ -178,7 +179,7 @@ trait Monitoring {
           }
 
           Task.fork(receivedIdempotent.run).runAsync(_.fold(
-            err => log(err.getMessage), identity))
+            err => log.error(err.getMessage), identity))
         }
         case Discard(source) => Task.delay {
           Option(urlSignals.get(source)).foreach(_.close.runAsync(_ => ()))
@@ -203,7 +204,7 @@ trait Monitoring {
         _ <- if (b) {
           update(k, pt.value)
         } else Task {
-               log(s"$msg new key: $k")
+               log.debug(s"$msg new key: $k")
                val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
                snk(pt.value)
              }
@@ -222,7 +223,7 @@ trait Monitoring {
       parse: DatapointParser)(breaker: Event)(source: URI, attrs: Map[String, String] = Map())(
         implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
     val report = (e: Throwable) => {
-      log(s"attemptMirrorAll.ERROR: source: $source, error: $e")
+      log.error(s"attemptMirrorAll.ERROR: source: $source, error: $e")
       ()
     }
     Monitoring.attemptRepeatedly(report)(
@@ -245,10 +246,10 @@ trait Monitoring {
                       f: Seq[O] => O2): Task[Key[O2]] = for {
     _ <- initialize(out)
     _ <- Task.fork(e(this).flatMap { _ =>
-      log("Monitoring.aggregate: gathering values")
+      log.debug("Monitoring.aggregate: gathering values")
       Process.eval { evalFamily(family).flatMap { vs =>
         val v = f(vs)
-        log(s"Monitoring.aggregate: aggregated $v from ${vs.size} matching keys")
+        log.debug(s"Monitoring.aggregate: aggregated $v from ${vs.size} matching keys")
         update(out, v)
       }}}.run)
   } yield out
@@ -272,14 +273,14 @@ trait Monitoring {
     val alive = signal[Unit](Strategy.Sequential); alive.set(()).run
     val pts = Monitoring.subscribe(this)(f).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
-        log(s"$msg no more data points for '$f', resetting...")
+        log.debug(s"$msg no more data points for '$f', resetting...")
         reset
       }}
     }
     e(this).zip(alive.continuous).map(_._1).either(pts)
            .scan(Vector(false,false))((acc,a) => acc.tail :+ a.isLeft)
            .filter { xs => xs forall (identity) }
-           .evalMap { _ => log(s"$msg no activity for '$f', resetting..."); reset }
+           .evalMap { _ => log.debug(s"$msg no activity for '$f', resetting..."); reset }
            .run.runAsync { _ => () }
   }
 
@@ -392,8 +393,7 @@ object Monitoring {
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
     new Monitoring {
-      def log(s: String) =
-        logger(s)
+      val log = Logger[this.type]
 
       def keys = keys_
 
@@ -433,7 +433,7 @@ object Monitoring {
      scalaz.stream.merge.mergeN(M.distinctKeys.filter(p).map(k => points(k)))
    def points(k: Key[Any]): Process[Task, Datapoint[Any]] =
      M.get(k).discrete.map(Datapoint(k, _)).onComplete {
-       Process.eval_(Task.delay(M.log(s"unsubscribing: $k")))
+       Process.eval_(Task.delay(M.log.debug(s"unsubscribing: $k")))
      }
    interleaveAll(f)
   }
