@@ -180,8 +180,8 @@ case class Elastic(M: Monitoring) {
     es <- getConfig
     ta <- lower(elasticString(req << json.nospaces))
     _  <- lift(ta.attempt.map(_.fold(
-      e => {M.log(s"Unable to send document to elastic search due to '$e'.")
-            M.log(s"Configuration was $es. Document was: \n ${json.nospaces}")},
+      e => {M.log.error(s"Unable to send document to elastic search due to '$e'.")
+            M.log.error(s"Configuration was $es. Document was: \n ${json.nospaces}")},
       _ => ())))
   } yield ()
 
