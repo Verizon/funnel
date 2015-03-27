@@ -234,9 +234,9 @@ object Sigar {
       Option(new Sigar(I, sigar))
     } catch {
       case e: LinkageError =>
-        log.debug("Unable to load native Sigar library, it may not be installed?")
-        log.debug(s"The following error was encountered: $e")
-        log.debug("java.library.path is set to: " +
+        log.warn("Unable to load native Sigar library, it may not be installed?")
+        log.warn(s"The following error was encountered: $e")
+        log.warn("java.library.path is set to: " +
           System.getProperty("java.library.path"))
         None
     }

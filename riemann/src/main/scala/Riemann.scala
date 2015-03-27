@@ -100,7 +100,7 @@ object Riemann {
       case b: Boolean => e.state(b.toString)
       // will *never* be encountered at this point
       // case s: Stats =>
-      case x => log.debug("]]]]]]]]]]]]]]] "+x.getClass.getName); ???
+      case x => log.debug(s"unknown datapoint value class of type: ${x.getClass.getName}"); ???
     }
 
     // lifts the EventDSL into an REvent
