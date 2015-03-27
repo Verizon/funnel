@@ -151,11 +151,11 @@ object Lifecycle {
   // not sure if this is really needed but
   // looks like i can use this in a more generic way
   // to send previously unknown targets to flasks
-  def sink: Sink[Task,Action] =
+  def sink(http: dispatch.Http): Sink[Task,Action] =
     Process.emit {
       case Redistributed(seq) =>
         for {
-          _ <- Sharding.distribute(seq)
+          _ <- Sharding.distribute(seq)(http)
           _ <- Task.now(Reshardings.increment)
         } yield ()
 
@@ -167,11 +167,11 @@ object Lifecycle {
    * into an effect that has some meaning within the system (i.e. resharding or not)
    */
   def event(e: AutoScalingEvent, resources: Seq[String]
-    )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+    )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery, http: dispatch.Http
     ): Task[Unit] = {
     interpreter(e, resources)(r, asg, ec2, dsc).map {
       case Redistributed(seq) =>
-        Sharding.distribute(seq).map(_ => ())
+        Sharding.distribute(seq)(http).map(_ => ())
       case _ =>
         Task.now( () )
     }

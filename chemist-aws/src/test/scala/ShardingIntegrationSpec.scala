@@ -39,6 +39,10 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
     Target("test1",SafeURL("http://127.0.0.1:8081/stream/now"))
   )
 
+  val H = dispatch.Http.configure(
+    _.setAllowPoolingConnection(true)
+     .setConnectionTimeoutInMs(5000))
+
   override def beforeAll(){
     addInstruments(I3)
     addInstruments(I1)
@@ -53,7 +57,7 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
     MS1.stop()
     MS2.stop()
     FS1.stop()
-    dispatch.Http.shutdown()
+    H.shutdown()
   }
 
   private def addFlask(fid: String): Unit = {
@@ -72,7 +76,7 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
 
     val x = for {
       a <- Sharding.locateAndAssignDistribution(T1,R)
-      b <- Sharding.distribute(a)
+      b <- Sharding.distribute(a)(H)
     } yield b
 
     x.run
