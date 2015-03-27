@@ -48,7 +48,7 @@ class AwsChemist extends Chemist[Aws]{
     _  = log.debug("increased the known monitoring capactiy based on discovered flasks")
 
     // ask those flasks for their current work and yield a `Distribution`
-    d <- Sharding.gatherAssignedTargets(f).liftKleisli
+    d <- Sharding.gatherAssignedTargets(f)(cfg.http).liftKleisli
     _  = log.debug("read the existing state of assigned work from the remote instances")
 
     // update the distribution accordingly
@@ -57,7 +57,7 @@ class AwsChemist extends Chemist[Aws]{
 
     _ <- (for {
       h <- Sharding.locateAndAssignDistribution(t, cfg.repository)
-      g <- Sharding.distribute(h)
+      g <- Sharding.distribute(h)(cfg.http)
     } yield ()).liftKleisli
 
     _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
@@ -84,7 +84,7 @@ class AwsChemist extends Chemist[Aws]{
 
       // now the queues are setup with the right permissions,
       // start the lifecycle listener
-      _ <- Lifecycle.run(cfg.queue.topicName, cfg.resources, Lifecycle.sink
+      _ <- Lifecycle.run(cfg.queue.topicName, cfg.resources, Lifecycle.sink(cfg.http)
             )(cfg.repository, cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery).liftKleisli
       _  = log.debug("lifecycle process started")
 
@@ -96,6 +96,6 @@ class AwsChemist extends Chemist[Aws]{
     for {
       cfg <- config
       e  = AutoScalingEvent(id.toLowerCase, state)
-      _ <- Lifecycle.event(e, cfg.resources)(cfg.repository, cfg.asg, cfg.ec2, cfg.discovery).liftKleisli
+      _ <- Lifecycle.event(e, cfg.resources)(cfg.repository, cfg.asg, cfg.ec2, cfg.discovery, cfg.http).liftKleisli
     } yield ()
 }
