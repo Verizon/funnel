@@ -13,6 +13,12 @@ sealed trait Reportable[+A] {
 }
 
 object Reportable {
+  /**
+   * used to make sure scalacheck is generating all possiblilites, if
+    * you add a new one, please update this
+   */
+  def all: Seq[Reportable[Any]] = Seq(B,D,S,Stats)
+
   implicit case object B extends Reportable[Boolean] {
     def read(a: Any): Option[Boolean] =
       try Some(a.asInstanceOf[Boolean])

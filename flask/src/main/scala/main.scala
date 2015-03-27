@@ -21,6 +21,7 @@ import zeromq._
 import sockets._
 import scalaz.stream._
 import scalaz.\/
+import messages._
 import Telemetry._
 
 /**
@@ -35,8 +36,6 @@ object Main {
 
   lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)
 
-  type TelemetrySink = Sink[Task, Telemetry]
-
 
   private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
     server.stop()
@@ -46,14 +45,6 @@ object Main {
 
   private def giveUp(names: Names, telemetry: TelemetrySink): Process[Task,Unit] = {
     (Process.eval(Task.now(Error(names))) to telemetry)
-  }
-
-  val keyChanges: Process1[Set[Key[Any]] => Key[Any]] = {
-    def go(old: Option[Set[Key]], current: Set[Key]) = old match {
-      case None => emitSeq(current.toSeq)
-      case Some(old) => emitSeq(current - old)
-    } ++ receive1[Set[Key]] { next => go(Some(current), next) }
-    go(None)
   }
 
   private def riemannErrorAndQuit(rm: RiemannCfg, f: () => Unit): Unit = {
@@ -115,20 +106,11 @@ object Main {
 
     implicit val log: String => Unit = s => L(s)
 
-    def telemetryEndpoint(uri: URI): Throwable \/ Endpoint = Endpoint(publish &&& bind, uri)
-
-    def telemetrySocket(uri: URI): TelemetrySink =
-      telemetryEndpoint(uri).map { e: Endpoint =>
-        Ø.link(e)(signal) { socket =>
-          Ø.write(socket)
-        }
-      }.fold(e => { e.printStackTrace ; sys.error(e.getMessage) },
-             identity).mapOut(_ => ())
-
-    val Q = telemetrySocket(new URI("localhost", cfg.lookup[Int]("telemetryPort").getOrElse(5774)))
-
+    val Q = telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${cfg.lookup[Int]("telemetryPort").getOrElse(5774)}"), signal)
     val M = Monitoring.default
     val S = MonitoringServer.start(M, options.funnelPort)
+
+    (M.keys.discrete pipe keyChanges to Q).run.runAsync(_ => ())
 
     // Determine whether to generate system statistics for the local host
     for {

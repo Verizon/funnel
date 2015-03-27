@@ -1,0 +1,25 @@
+import oncue.build._
+
+OnCue.baseSettings
+
+ScalaCheck.settings
+
+libraryDependencies ++= Seq(
+  "org.typelevel"        %% "scodec-core" % "1.6.+",
+  "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test"
+)
+
+initialCommands in console := """
+import funnel._
+import funnel.zeromq._
+import funnel.messages._
+import scalaz.stream._
+import scalaz.concurrent._
+import Process._
+import java.net.URI
+import Telemetry._
+import sockets._
+
+val U1 = new java.net.URI("ipc:///tmp/console.socket")
+val S = async.signalOf(true)
+"""

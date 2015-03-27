@@ -32,7 +32,7 @@ lazy val core = project
 
 lazy val elastic = project.dependsOn(core, http)
 
-lazy val flask = project.dependsOn(aws, riemann, elastic, zeromq)
+lazy val flask = project.dependsOn(aws, riemann, elastic, zeromq, messages)
 
 lazy val http = project.dependsOn(core)
 
@@ -43,6 +43,8 @@ lazy val riemann = project.dependsOn(core)
 lazy val zeromq = project.dependsOn(http).configs(MultiJvm)
 
 lazy val `zeromq-java` = project.dependsOn(http).configs(MultiJvm)
+
+lazy val messages = project.dependsOn(core, zeromq)
 
 OnCue.baseSettings
 
