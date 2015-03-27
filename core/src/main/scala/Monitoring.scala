@@ -50,6 +50,11 @@ trait Monitoring {
    */
   def get[O](k: Key[O]): Signal[O]
 
+  /**
+   * Remove the given key and stop updating it.
+   */
+  def remove[O](k: Key[O]): Task[Unit]
+
   /** Convience function to publish a metric under a newly created key. */
   def publish[O:Reportable](name: String, units: Units[O])(e: Event)(
                             f: Metric[O]): Task[Key[O]] =
@@ -283,6 +288,28 @@ trait Monitoring {
            .run.runAsync { _ => () }
   }
 
+  /**
+   * Remove keys from this `Monitoring` instance for which no updates are seen
+   * between two triggerings of the event `e`.
+   */
+  def keySenescence(e: Event): Process[Task, Unit] = mergeN(distinctKeys.map { k =>
+    val alive = signal[Unit](Strategy.Sequential); alive.set(()).run
+    val pts = Monitoring.subscribe(this)(_ == k).onComplete {
+      Process.eval_ { alive.close flatMap { _ =>
+        log(s"TTL: no more data points for '${k.name}', removing...")
+        remove(k)
+      }}
+    }
+    e(this).zip(alive.continuous).map(_._1).either(pts)
+      .scan(Vector(false,false)) {
+        (acc, a) => acc.tail :+ a.isLeft
+      }.filter { _ forall (identity) }
+      .evalMap { _ =>
+        log(s"TTL: no activity for '${k.name}', removing...")
+        remove(k)
+      }
+  })
+
   /** Return the elapsed time since this instance was started. */
   def elapsed: Duration
 
@@ -411,6 +438,12 @@ object Monitoring {
       def get[O](k: Key[O]): Signal[O] =
         topics.get(k).map(_.current.asInstanceOf[Signal[O]])
                      .getOrElse(sys.error("key not found: " + k))
+
+      def remove[O](k: Key[O]): Task[Unit] = for {
+        _ <- keys_.compareAndSet(_.map(_ - k))
+        _ <- topics.get(k).traverse_(_.current.close)
+        _ <- Task.delay(topics -= k)
+      } yield ()
 
       def elapsed: Duration = Duration.fromNanos(System.nanoTime - t0)
     }

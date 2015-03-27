@@ -20,5 +20,6 @@ case class Options(
   awsProxyPort: Option[Int],
   awsProxyProtocol: Option[String],
   awsRegion: String,
-  funnelPort: Int = 5775
+  funnelPort: Int = 5775,
+  metricTTL: Option[Duration] = None
 )

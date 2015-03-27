@@ -101,6 +101,9 @@ class Flask(options: Options, val I: Instruments) {
 
     val flaskName = options.name.getOrElse(localhost)
 
+    // Implement key TTL
+    options.metricTTL.foreach(t => runAsync(I.monitoring.keySenescence(Events.every(t)).run))
+
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), flaskName, retries))
 
     options.elastic.foreach { elastic =>
@@ -158,8 +161,9 @@ object Main {
     val awsProxyProtocol = cfg.lookup[String]("aws.proxy-protocol")
     val awsRegion        = cfg.require[String]("aws.region")
     val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
+    val metricTTL        = cfg.lookup[Duration]("flask.metric-ttl")
     Task((Options(Option(name), elastic, riemann, snsErrorTopic, awsCredentials, awsProxyHost,
-      awsProxyPort, awsProxyProtocol, awsRegion, port), cfg))
+      awsProxyPort, awsProxyProtocol, awsRegion, port, metricTTL), cfg))
   }.run
 
   val I = new Instruments(1.minute)
