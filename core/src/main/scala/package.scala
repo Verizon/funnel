@@ -3,7 +3,6 @@ package funnel {
   import scala.concurrent.duration._
 
   package object instruments extends Instruments(1 minute) with DefaultKeys {
-    implicit val log: String => Unit = s => Monitoring.default.log(s)
 
     Clocks.instrument(this)
     JVM.instrument(this)

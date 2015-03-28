@@ -9,6 +9,8 @@ import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.regions.{Regions,Region}
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
+import dispatch.Http
+import concurrent.duration.Duration
 
 case class QueueConfig(
   queueName: String,
@@ -22,10 +24,14 @@ case class AwsConfig(
   sns: AmazonSNS,
   sqs: AmazonSQS,
   ec2: AmazonEC2,
-  asg: AmazonAutoScaling
+  asg: AmazonAutoScaling,
+  commandTimeout: Duration
 ) extends PlatformConfig {
   val discovery: Discovery = new Discovery(ec2, asg)
   val repository: Repository = new StatefulRepository(discovery)
+  val http: Http = Http.configure(
+    _.setAllowPoolingConnection(true)
+     .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
 }
 
 object Config {
@@ -35,6 +41,7 @@ object Config {
     val resources = cfg.require[List[String]]("chemist.resources-to-monitor")
     val aws       = cfg.subconfig("aws")
     val network   = cfg.subconfig("chemist.network")
+    val timeout   = cfg.require[Duration]("chemist.command-timeout")
     AwsConfig(
       resources,
       network   = readNetwork(network),
@@ -42,7 +49,8 @@ object Config {
       sns       = readSNS(aws),
       sqs       = readSQS(aws),
       ec2       = readEC2(aws),
-      asg       = readASG(aws)
+      asg       = readASG(aws),
+      timeout
     )
   }
 
