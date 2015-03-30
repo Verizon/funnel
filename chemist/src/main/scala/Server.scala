@@ -17,9 +17,7 @@ object JsonRequest {
 
 object JsonResponse {
   def apply[A: EncodeJson](a: A, params: PrettyParams = PrettyParams.nospace) =
-    JsonContent ~>
-      ResponseHeader("Content-Type", Set("application/json")) ~>
-      ResponseString(a.jencode.pretty(params))
+    JsonContent ~> ResponseString(a.jencode.pretty(params))
 }
 
 object Server {
@@ -45,7 +43,6 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
   import chemist.ChemistK
   import Server._
   import metrics._
-  import chemist.ChemistK
 
   private def json[A : EncodeJson](a: ChemistK[A]) =
     a(platform).attemptRun.fold(
