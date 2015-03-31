@@ -2,6 +2,8 @@ package funnel
 package messages
 
 import scalaz.concurrent._
+import scalaz.syntax.traverse._
+import scalaz.std.vector._
 import scalaz.stream.async._
 import scalaz.stream.{Process,Channel,io, Sink, wye}
 import scalaz.std.anyVal._
@@ -37,12 +39,9 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     val sets: Vector[Set[Key[Any]]] = testKeys.tails.toVector.reverse.map(_.toSet).filterNot(_.isEmpty)
 
-    sets.foreach { s =>
-      (for {
-        _ <- Task.delay(println("adding keys to signal: " + s))
-        _ <- keysIn.set(s)
-      } yield ()).run
-    }
+    sets.traverse_{ s => keysIn.set(s) }.run
+
+    Thread.sleep(2000)
 
     val pub: Task[Unit] = telemetryPublishSocket(U1, S, (keysInD pipe keyChanges))
 
@@ -56,7 +55,6 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
     Thread.sleep(2000)
 //    S.set(false).run
 
-    println("in: " + sets)
 
   }
 }
@@ -65,27 +63,27 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
 
   "sub socket" should "sub" in {
     val (keysout, errors, sub) = telemetrySubscribeSocket(U1, S)
-    val keysoutS = S.discrete.wye(keysout.discrete)(wye.interrupt)
+    val keysoutS = keysout.discrete
+
     sub.run.runAsync {
       case -\/(e) => e.printStackTrace
       case \/-(_) => println("sub runasync success")
     }
     
-    val out: Task[IndexedSeq[Set[Key[Any]]]] = Task.async { cb =>
-      keysoutS.runLog.runAsync(cb)
+    var keysOut: Set[Key[Any]] = Set.empty
+    val myAwesomeSink: Sink[Task,Set[Key[Any]]] = Process.constant { k =>
+      Task {
+        keysOut = k
+      }
     }
 
-    println("a")
+    (keysoutS to myAwesomeSink).run.runAsync(_ => ())
+
     Thread.sleep(10000)
-    println("b")
+    keysout.close.run
     S.set(false).run
-    println("c")
 
-    val keys = out.run
-    println("d")
-    println("out: " + keys)
-
-    keys should be (testKeys.tails.toVector.reverse.map(_.toSet).filterNot(_.isEmpty))
+    keysOut should be (testKeys.toSet)
   }
 
 }

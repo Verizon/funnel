@@ -101,9 +101,7 @@ object ZeroMQ {
    */
   def write[A](socket: Socket)(implicit T: Transportable[A]): Channel[Task, A, Boolean] =
     io.channel { a =>
-      println("TRANS: " + a)
       Task.delay {
-        println("asdfadsfsdfdsfdfsd: " + a)
         val t = T(a)
         socket.sendMore(t.header)
         socket.send(t.bytes, 0)
@@ -117,7 +115,6 @@ object ZeroMQ {
    */
   private[funnel] def writeTrans(socket: Socket): Channel[Task, Transported, Boolean] = {
     io.channel { t =>
-      println("TRANS: " + t)
       Task.delay {
         socket.sendMore(t.header)
         socket.send(t.bytes, 0)

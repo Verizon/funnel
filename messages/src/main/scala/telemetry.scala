@@ -25,7 +25,7 @@ final case class NewKey(key: Key[_]) extends Telemetry
 
 object Telemetry extends TelemetryCodecs {
 
-  implicit lazy val transportedTelemetry = Transportable[Telemetry] { t =>
+  implicit val transportedTelemetry = Transportable[Telemetry] { t =>
     t match {
       case e @ Error(_) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("error")), errorCodec.encodeValid(e).toByteArray)
       case NewKey(key) =>
@@ -50,7 +50,7 @@ object Telemetry extends TelemetryCodecs {
     val errors = unboundedQueue[Error]
     val endpoint = telemetrySubscribeEndpoint(uri)
     val p = Ø.link(endpoint)(signal) { socket =>
-      Ø.receive(socket).observe(io.stdOut.contramap[Transported](_.toString + " <- <in>")) to fromTransported(keys, errors)
+      Ø.receive(socket) to fromTransported(keys, errors)
     }
 
 /*    p.run.runAsync {
@@ -64,14 +64,14 @@ object Telemetry extends TelemetryCodecs {
   def fromTransported(keys: Signal[Set[Key[Any]]], errors: Queue[Error]): Sink[Task, Transported] = {
     val currentKeys = collection.mutable.Set.empty[Key[Any]]
     Process.constant { x =>
-      println("from transported: " + x)
       x match {
         case Transported(_, Versions.v1, _, Some(Topic("error")), bytes) =>
           errors.enqueueOne(errorCodec.decodeValidValue(BitVector(bytes)))
         case Transported(_, Versions.v1, _, Some(Topic("key")), bytes) =>
           Task(currentKeys += keyCodec.decodeValidValue(BitVector(bytes))).flatMap { k =>
-            println("i'm stuffing this into the signal: " + k.toSet)
-            keys.set(k.toSet)
+            println("i'm going to stuff this into the signal: " + keys)
+            keys.set(k.toSet).flatMap { _ =>             Task.delay(println("i've stuffed this into the signal: " + k.toSet)) }
+
           }
       }
     }
