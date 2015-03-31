@@ -25,7 +25,8 @@ case class AwsConfig(
   sqs: AmazonSQS,
   ec2: AmazonEC2,
   asg: AmazonAutoScaling,
-  commandTimeout: Duration
+  commandTimeout: Duration,
+  includeVpcTargets: Boolean
 ) extends PlatformConfig {
   val discovery: Discovery = new Discovery(ec2, asg)
   val repository: Repository = new StatefulRepository(discovery)
@@ -42,6 +43,7 @@ object Config {
     val aws       = cfg.subconfig("aws")
     val network   = cfg.subconfig("chemist.network")
     val timeout   = cfg.require[Duration]("chemist.command-timeout")
+    val usevpc    = cfg.lookup[Boolean]("chemist.include-vpc-targets").getOrElse(false)
     AwsConfig(
       resources,
       network   = readNetwork(network),
@@ -50,7 +52,8 @@ object Config {
       sqs       = readSQS(aws),
       ec2       = readEC2(aws),
       asg       = readASG(aws),
-      timeout
+      timeout,
+      usevpc
     )
   }
 

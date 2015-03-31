@@ -10,6 +10,20 @@ import scalaz.syntax.kleisli._
 import scalaz.concurrent.Task
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 
+object AwsChemist {
+  /**
+   * filter out all the flask instances; these are not targets.
+   * if the config says to include vpc targets, include them if the target is in a private network
+   * if the target is on a public network address, include it
+   * otherwise, wtf, how did we arrive here - dont monitor it.
+   */
+  def filterInstances(instances: Seq[Instance])(cfg: AwsConfig): Seq[Instance] =
+    instances.filterNot(cfg.discovery.isFlask).collect {
+      case b if (cfg.includeVpcTargets && b.location.isPrivateNetwork) => b
+      case b if (!b.location.isPrivateNetwork)                         => b
+    }
+}
+
 class AwsChemist extends Chemist[Aws]{
   import Sharding.Target
 
@@ -27,8 +41,7 @@ class AwsChemist extends Chemist[Aws]{
 
     // filter out all the instances that are in private networks
     // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
-    z  = l.filterNot(_.location.isPrivateNetwork)
-          .filterNot(cfg.discovery.isFlask)
+    z  = AwsChemist.filterInstances(l)(cfg)
     _  = log.info(s"located ${z.length} instances that appear to be monitorable")
 
     // convert the instance list into reachable targets
