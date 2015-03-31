@@ -53,11 +53,6 @@ object Telemetry extends TelemetryCodecs {
       Ø.receive(socket) to fromTransported(keys, errors)
     }
 
-/*    p.run.runAsync {
-      case -\/(x) => x.printStackTrace()
-      case _ => ()
-    }
- */
     (keys, errors.dequeue, p)
   }
 
@@ -95,7 +90,6 @@ object Telemetry extends TelemetryCodecs {
 
 trait TelemetryCodecs extends Codecs {
   implicit lazy val errorCodec = Codec.derive[Names].xmap[Error](Error(_), _.names)
-//  implicit lazy val telemetryCodec: _root_.scodec.Codec[Telemetry] = (errorCodec :+: Codec.derive[NewKey]).discriminatedBy(uint8).using(Sized(1,2)).as[Telemetry]
 
   implicit val reportableCodec: Codec[Reportable[Any]] = (codecs.provide(Reportable.B) :+: codecs.provide(Reportable.D) :+: codecs.provide(Reportable.S) :+: codecs.provide(Reportable.Stats)).discriminatedByIndex(uint8).as[Reportable[Any]]
 
