@@ -1,0 +1,20 @@
+package funnel
+package chemist
+
+import scalaz.concurrent.Task
+import scalaz.syntax.kleisli._
+
+class TestChemist extends Chemist[TestPlatform]{
+  import Sharding.Target
+
+  def bootstrap: ChemistK[Unit] =
+    for {
+      cfg <- config
+    } yield ()
+
+  def init: ChemistK[Unit] =
+    Task.now(()).liftKleisli
+
+  protected def alterShard(id: String,state: AutoScalingEventKind): ChemistK[Unit] = ???
+
+}

@@ -1,15 +1,18 @@
 package funnel
 package chemist
 
+import journal.Logger
 import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterAll}
 import funnel.Monitoring
 import funnel.http.MonitoringServer
 import scalaz.==>>
 import scalaz.std.string._
 
-class ShardingSpec extends FlatSpec with Matchers with ChemistSpec  {
+class ShardingSpec extends FlatSpec with Matchers {
 
   import Sharding.{Distribution,Target}
+
+  implicit lazy val log: Logger = Logger("chemist-spec")
 
   implicit def tuple2target(in: (String,String)): Target =
     Target(in._1, SafeURL(in._2))

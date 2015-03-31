@@ -179,9 +179,9 @@ object Sharding {
    * Given a computer set of locations -> targets, actually send them to the
    * relevant shard node API.
    */
-  def distribute(locations: Map[Location, Seq[Target]]): Task[List[String]] =
+  def distribute(locations: Map[Location, Seq[Target]])(http: dispatch.Http): Task[List[String]] =
     Task.gatherUnordered(locations.map { case (loc,targets) =>
-      send(loc,targets) }.toSeq)
+      send(loc,targets)(http) }.toSeq)
 
   /**
    * Given a collection of flask instances, find out what exactly they are already
@@ -189,10 +189,10 @@ object Sharding {
    *
    * This function should only really be used startup of chemist.
    */
-  def gatherAssignedTargets(instances: Seq[Instance]): Task[Distribution] =
+  def gatherAssignedTargets(instances: Seq[Instance])(http: dispatch.Http): Task[Distribution] =
     for {
       a <- Task.gatherUnordered(instances.map(
-            i => requestAssignedTargets(i.location).map(i.id -> _)))
+            i => requestAssignedTargets(i.location)(http).map(i.id -> _)))
     } yield a.foldLeft(Distribution.empty){ (a,b) =>
       a.alter(b._1, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
     }
@@ -203,7 +203,7 @@ object Sharding {
    * Call out to the specific location and grab the list of things the flask
    * is already mirroring.
    */
-  private def requestAssignedTargets(location: Location): Task[Set[Target]] = {
+  private def requestAssignedTargets(location: Location)(http: dispatch.Http): Task[Set[Target]] = {
     import argonaut._, Argonaut._, JSON._, HJSON._
     import dispatch._, Defaults._
 
@@ -212,7 +212,7 @@ object Sharding {
       b  = url(a.toString)
       _  = log.debug(s"requesting assigned targets from $a")
 
-      c <- fromScalaFuture(Http(b OK as.String))
+      c <- fromScalaFuture(http(b OK as.String))
     } yield {
       Parse.decodeOption[List[Bucket]](c
         ).toList.flatMap(identity
@@ -225,7 +225,7 @@ object Sharding {
   /**
    * Touch the network and do the I/O using Dispatch.
    */
-  private def send(to: Location, targets: Seq[Target]): Task[String] = {
+  private def send(to: Location, targets: Seq[Target])(http: dispatch.Http): Task[String] = {
     import dispatch._, Defaults._
     import argonaut._, Argonaut._
     import JSON.BucketsToJSON
@@ -239,7 +239,7 @@ object Sharding {
       a <- to.asURL(path = "mirror").fold(Task.fail(_), Task.now(_))
       b  = url(a.toString) << payload.toList.asJson.nospaces
       _  = log.debug(s"submitting to $a: $payload")
-      c <- fromScalaFuture(Http(b OK as.String))
+      c <- fromScalaFuture(http(b OK as.String))
     } yield c
   }
 

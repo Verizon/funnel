@@ -10,7 +10,7 @@ Bundle.settings
 
 Revolver.settings
 
-fork in test := true
+ScalaTest.settings
 
 libraryDependencies ++= Seq(
   "intelmedia.ws.common" %% "logging-s3"  % "8.0.+",
@@ -19,6 +19,8 @@ libraryDependencies ++= Seq(
 )
 
 name in Universal := "flask"
+
+fork in Test := true
 
 mappings in Universal ++= Seq(
   file("flask/src/main/resources/oncue/flask.cfg") -> "etc/flask.cfg"

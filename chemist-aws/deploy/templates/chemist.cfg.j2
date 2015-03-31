@@ -5,7 +5,9 @@ chemist {
     port = 9000
   }
 
-  command-timeout = 5 seconds
+  include-vpc-targets = true
+
+  command-timeout = 2 seconds
 
   sns-topic-name = "ops-chemist"
   sqs-queue-name = "ops-chemist"
@@ -14,7 +16,7 @@ chemist {
 }
 
 aws {
-  region = "$(AWS_DEFAULT_REGION)"
+  region = "us-east-1"
   access-key = "$(AWS_ACCESS_KEY)"
   secret-key = "$(AWS_SECRET_KEY)"
 }

@@ -1,5 +1,6 @@
 package funnel
 package chemist
+package aws
 
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model._

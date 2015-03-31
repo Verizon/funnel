@@ -11,8 +11,10 @@ import scalaz.stream.{async,Process}
 import scala.collection.JavaConverters._
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.signal
+import journal.Logger
 
 object Riemann {
+  val log = Logger[this.type]
 
   sealed trait Pusher
   final case class Hold(e: REvent) extends Pusher
@@ -22,14 +24,14 @@ object Riemann {
 
   private[riemann] def collector(
     R: RiemannClient
-  )(implicit log: String => Unit): Actor[Pusher] = {
+  ): Actor[Pusher] = {
     implicit val S = Strategy.Executor(Monitoring.serverPool)
     implicit val P = Monitoring.schedulingPool
     val a = Actor.actor[Pusher] {
       case Hold(e) => store = (e :: store)
       case Flush   => {
         R.sendEvents(store.asJava)
-        log(s"successfully sent batch of ${store.length}")
+        log.debug(s"successfully sent batch of ${store.length}")
         store = Nil
       }
     }
@@ -74,7 +76,7 @@ object Riemann {
     * C'est la vie!
     */
   private def toEvent(c: RiemannClient, ttl: Float)(pt: Datapoint[Any]
-    )(implicit log: String => Unit): REvent = {
+    ): REvent = {
     val name = pt.key.name
     val host = pt.key.attributes.get("url")
 
@@ -98,7 +100,7 @@ object Riemann {
       case b: Boolean => e.state(b.toString)
       // will *never* be encountered at this point
       // case s: Stats =>
-      case x => log("]]]]]]]]]]]]]]] "+x.getClass.getName); ???
+      case x => log.debug(s"unknown datapoint value class of type: ${x.getClass.getName}"); ???
     }
 
     // lifts the EventDSL into an REvent
@@ -121,7 +123,6 @@ object Riemann {
     ttlInSeconds: Float = 20f,
     retries: Event = Events.every(1 minutes)
   )(c: RiemannClient, a: Actor[Pusher]
-  )(implicit log: String => Unit
   ): Task[Unit] = {
     Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream
       ).zipWithIndex.evalMap { case (pt,i) =>
@@ -145,7 +146,7 @@ object Riemann {
     riemannName: String,
     riemannRetries: Names => Event = _ => Monitoring.defaultRetries)(
     myName: String = "Funnel Mirror"
-  )(implicit log: String => Unit): Task[Unit] = {
+  ): Task[Unit] = {
 
     val actor = collector(riemannClient)
 

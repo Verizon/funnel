@@ -1,5 +1,6 @@
 package funnel
 package chemist
+package aws
 
 import com.amazonaws.services.ec2.model.{Instance => EC2Instance}
 import com.amazonaws.services.ec2.model.{Placement,Tag}

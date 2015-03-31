@@ -1,16 +1,15 @@
 package funnel
 package flask
 
-import java.io.File
-import org.slf4j.LoggerFactory
 import com.aphyr.riemann.client.RiemannClient
 import scala.concurrent.duration._
-import scalaz.concurrent.{Task,Strategy,Actor}
-import scalaz.stream.Process
-import scalaz.stream.async.mutable.Signal
+import scalaz.concurrent.Task
 import scalaz.std.option._
 import scalaz.syntax.applicative._
+import scalaz.stream.{ io, Process, Sink }
+import scalaz.stream.async.mutable.Signal
 import knobs.{Config, Required, ClassPathResource, FileResource}
+import journal.Logger
 import funnel.{Events,DatapointParser,Datapoint,Names,Sigar,Monitoring,Instruments}
 import funnel.riemann.Riemann
 import funnel.http.{MonitoringServer,SSE}
@@ -30,9 +29,15 @@ import Telemetry._
   *
   * Or pass the location of the config file as a command line argument.
   */
-object Main {
+class Flask(options: Options, val I: Instruments) {
   import Events.Event
   import scalaz.\/._
+
+  val log = Logger[this.type]
+
+  val mirrorDatapoints = I.counter("mirror/datapoints")
+
+  val S = MonitoringServer.start(I.monitoring, options.funnelPort)
 
   lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)
 
@@ -45,7 +50,7 @@ object Main {
 
   private def riemannErrorAndQuit(rm: RiemannCfg, f: () => Unit): Unit = {
     val msg = s"# Riemann is not running at the specified location (${rm.host}:${rm.port}) #"
-    val padding = (for(_ <- 1 to msg.length) yield "#").mkString
+    val padding = "#" * msg.length
     Console.err.println(padding)
     Console.err.println(msg)
     Console.err.println(padding)
@@ -53,10 +58,10 @@ object Main {
     System.exit(1)
   }
 
-  private def runAsync(p: Task[Unit])(implicit log: String => Unit): Unit = p.runAsync(_.fold(e => {
+  private def runAsync(p: Task[Unit]): Unit = p.runAsync(_.fold(e => {
     e.printStackTrace()
-    log(s"[ERROR] $e - ${e.getMessage}")
-    log(e.getStackTrace.toList.mkString("\n","\t\n",""))
+    log.error(s"Flask error in runAsync(): Exception $e - ${e.getMessage}")
+    log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
   }, identity _))
 
   private def httpOrZmtp(alive: Signal[Boolean])(uri: URI): Process[Task,Datapoint[Any]] =
@@ -66,69 +71,32 @@ object Main {
       case _            => Process.fail(new RuntimeException("Unknown URI scheme submitted."))
     }
 
-  def main(args: Array[String]): Unit = {
+  def run(args: Array[String]): Unit = {
 
-    // merge the file config with the aws config
-    val config: Task[Config] = for {
-      a <- knobs.loadImmutable(List(Required(
-        FileResource(new File("/usr/share/oncue/etc/flask.cfg")) or
-        ClassPathResource("oncue/flask.cfg"))))
-      b <- knobs.aws.config
-    } yield a ++ b
-
-    val (options, cfg) = config.flatMap { cfg =>
-      val port        = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
-      val name        = cfg.lookup[String]("flask.name").getOrElse("flask")
-      val elasticURL  = cfg.lookup[String]("flask.elastic-search.url")
-      val elasticIx   = cfg.lookup[String]("flask.elastic-search.index-name")
-      val elasticTy   = cfg.lookup[String]("flask.elastic-search.type-name")
-      val elasticDf   =
-        cfg.lookup[String]("flask.elastic-search.partition-date-format").getOrElse("yyyy.MM.dd")
-      val elasticTimeout = cfg.lookup[Int]("flask.elastic-search.connection-timeout-in-ms").getOrElse(5000)
-      val riemannHost = cfg.lookup[String]("flask.riemann.host")
-      val riemannPort = cfg.lookup[Int]("flask.riemann.port")
-      val ttl         = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").map(_.minutes)
-      val riemann     = (riemannHost |@| riemannPort |@| ttl)(RiemannCfg)
-      val elastic     = (elasticURL |@| elasticIx |@| elasticTy)(
-        ElasticCfg(_, _, _, elasticDf, elasticTimeout))
-      Task((Options(elastic, riemann, port), cfg))
-    }.run
-
-    val logger = LoggerFactory.getLogger("flask")
-
-    implicit val logPool: Strategy = Strategy.Executor(java.util.concurrent.Executors.newFixedThreadPool(1))
-
-    val L = Actor.actor((s: String) => logger.info(s))
-
-    implicit val log: String => Unit = s => L(s)
-
+    def countDatapoints: Sink[Task, Datapoint[Any]] =
+      io.channel(_ => Task(mirrorDatapoints.increment))
 
     val Q = async.unboundedQueue[Telemetry]
-    val M = Monitoring.default
-    val S = MonitoringServer.start(M, options.funnelPort)
+    telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
+                           (I.monitoring.keys.discrete pipe keyChanges).wye(Q.dequeue)(wye.merge)).runAsync(_ => ())
 
-    telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${cfg.lookup[Int]("telemetryPort").getOrElse(5774)}"), signal, (M.keys.discrete pipe keyChanges).wye(Q.dequeue)(wye.merge)).runAsync(_ => ())
+    def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
+      httpOrZmtp(alive)(uri) observe countDatapoints
 
-    // Determine whether to generate system statistics for the local host
-    for {
-      b <- cfg.lookup[Boolean]("flask.collect-local-metrics") if b == true
-      t <- cfg.lookup[Int]("flask.local-metric-frequency")
-    }{
-      implicit val duration = t.seconds
-      Sigar(new Instruments(1.minute, M)).foreach { s =>
-        s.instrument
-      }
-    }
-    def retries(names: Names): Event = Monitoring.defaultRetries andThen (_ ++ Process.eval(Q.enqueueOne(Error(names))))
+    def retries(names: Names): Event =
+      Monitoring.defaultRetries andThen (_ ++ Process.eval(Q.enqueueOne(Error(names))))
 
     val localhost = java.net.InetAddress.getLocalHost.toString
 
-    val flaskName = cfg.lookup[String]("flask.name").getOrElse(localhost)
+    val flaskName = options.name.getOrElse(localhost)
 
-    runAsync(M.processMirroringEvents(httpOrZmtp(signal), flaskName, retries))
+    // Implement key TTL
+    options.metricTTL.foreach(t => runAsync(I.monitoring.keySenescence(Events.every(t)).run))
+
+    runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), flaskName, retries))
 
     options.elastic.foreach { elastic =>
-      runAsync(Elastic(M).publish(flaskName)(elastic))
+      runAsync(Elastic(I.monitoring).publish(flaskName)(elastic))
     }
 
     options.riemann.foreach { riemann =>
@@ -142,8 +110,60 @@ object Main {
       }
 
       runAsync(Riemann.publishToRiemann(
-        M, riemann.ttl.toSeconds.toFloat)(
+        I.monitoring, riemann.ttl.toSeconds.toFloat)(
         R, s"${riemann.host}:${riemann.port}", retries)(flaskName))
     }
   }
+}
+
+object Main {
+  import java.io.File
+  import knobs.{ ClassPathResource, Config, FileResource, Required }
+
+  val config: Task[Config] = for {
+    a <- knobs.loadImmutable(List(Required(
+      FileResource(new File("/usr/share/oncue/etc/flask.cfg")) or
+        ClassPathResource("oncue/flask.cfg"))))
+    b <- knobs.aws.config
+  } yield a ++ b
+
+  val (options, cfg) = config.flatMap { cfg =>
+    val name             = cfg.lookup[String]("flask.name").getOrElse("flask")
+    val elasticURL       = cfg.lookup[String]("flask.elastic-search.url")
+    val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
+    val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
+    val elasticDf        =
+      cfg.lookup[String]("flask.elastic-search.partition-date-format").getOrElse("yyyy.MM.dd")
+    val elasticTimeout   = cfg.lookup[Int]("flask.elastic-search.connection-timeout-in-ms").getOrElse(5000)
+    val esGroups         = cfg.lookup[List[String]]("flask.elastic-search.groups")
+    val riemannHost      = cfg.lookup[String]("flask.riemann.host")
+    val riemannPort      = cfg.lookup[Int]("flask.riemann.port")
+    val ttl              = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").map(_.minutes)
+    val riemann          = (riemannHost |@| riemannPort |@| ttl)(RiemannCfg)
+    val elastic          = (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
+      ElasticCfg(_, _, _, elasticDf, _, elasticTimeout))
+    val snsErrorTopic    = cfg.require[String]("flask.sns-error-topic")
+    val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
+    val metricTTL        = cfg.lookup[Duration]("flask.metric-ttl")
+    val telemetryPort        = cfg.lookup[Int]("telemetryPort").getOrElse(7391)
+
+    Task((Options(Option(name), elastic, riemann, snsErrorTopic, port, metricTTL, telemetryPort), cfg))
+  }.run
+
+  val I = new Instruments(1.minute)
+
+  // Determine whether to generate system statistics for the local host
+  for {
+    b <- cfg.lookup[Boolean]("flask.collect-local-metrics") if b == true
+    t <- cfg.lookup[Int]("flask.local-metric-frequency")
+  }{
+    implicit val duration = t.seconds
+    Sigar(I).foreach { s =>
+      s.instrument
+    }
+  }
+
+  val app = new Flask(options, I)
+
+  def main(args: Array[String]) = app.run(args)
 }

@@ -1,11 +1,12 @@
 package funnel
 package chemist
+package aws
 
 import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterAll}
 import funnel.Monitoring
 import funnel.http.MonitoringServer
 
-class DeployedSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
+class DiscoverySpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   // val S1 = MonitoringServer.start(Monitoring.default, 5775)
 

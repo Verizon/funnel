@@ -18,6 +18,7 @@ import scalaz.{\/, ~>, Monad}
 import Events.Event
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.signal
+import journal.Logger
 import internals._
 
 /**
@@ -27,7 +28,7 @@ import internals._
 trait Monitoring {
   import Monitoring._
 
-  def log(s: String): Unit
+  def log: Logger
 
   /**
    * Create a new topic with the given name and units,
@@ -49,6 +50,11 @@ trait Monitoring {
    * when new values are produced.
    */
   def get[O](k: Key[O]): Signal[O]
+
+  /**
+   * Remove the given key and stop updating it.
+   */
+  def remove[O](k: Key[O]): Task[Unit]
 
   /** Convience function to publish a metric under a newly created key. */
   def publish[O:Reportable](name: String, units: Units[O])(e: Event)(
@@ -135,7 +141,7 @@ trait Monitoring {
     parse: DatapointParser,
     myName: String = "Funnel Mirror",
     nodeRetries: Names => Event = _ => defaultRetries
-  )(implicit log: String => Unit): Task[Unit] = {
+  ): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
     val alive     = signal[Unit](S)
     val active    = signal[Set[URI]](S)
@@ -167,7 +173,7 @@ trait Monitoring {
 
           val received: Process[Task,Unit] = link(hook) {
             attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
-              source, Map("bucket" -> bucket, "source" -> localName))
+              source, Map(AttributeKeys.bucket -> bucket, AttributeKeys.source -> localName))
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
@@ -178,7 +184,7 @@ trait Monitoring {
           }
 
           Task.fork(receivedIdempotent.run).runAsync(_.fold(
-            err => log(err.getMessage), identity))
+            err => log.error(err.getMessage), identity))
         }
         case Discard(source) => Task.delay {
           Option(urlSignals.get(source)).foreach(_.close.runAsync(_ => ()))
@@ -203,7 +209,7 @@ trait Monitoring {
         _ <- if (b) {
           update(k, pt.value)
         } else Task {
-               log(s"$msg new key: $k")
+               log.debug(s"$msg new key: $k")
                val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
                snk(pt.value)
              }
@@ -222,7 +228,7 @@ trait Monitoring {
       parse: DatapointParser)(breaker: Event)(source: URI, attrs: Map[String, String] = Map())(
         implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
     val report = (e: Throwable) => {
-      log(s"attemptMirrorAll.ERROR: source: $source, error: $e")
+      log.error(s"attemptMirrorAll.ERROR: source: $source, error: $e")
       ()
     }
     Monitoring.attemptRepeatedly(report)(
@@ -245,10 +251,10 @@ trait Monitoring {
                       f: Seq[O] => O2): Task[Key[O2]] = for {
     _ <- initialize(out)
     _ <- Task.fork(e(this).flatMap { _ =>
-      log("Monitoring.aggregate: gathering values")
+      log.debug("Monitoring.aggregate: gathering values")
       Process.eval { evalFamily(family).flatMap { vs =>
         val v = f(vs)
-        log(s"Monitoring.aggregate: aggregated $v from ${vs.size} matching keys")
+        log.debug(s"Monitoring.aggregate: aggregated $v from ${vs.size} matching keys")
         update(out, v)
       }}}.run)
   } yield out
@@ -272,16 +278,38 @@ trait Monitoring {
     val alive = signal[Unit](Strategy.Sequential); alive.set(()).run
     val pts = Monitoring.subscribe(this)(f).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
-        log(s"$msg no more data points for '$f', resetting...")
+        log.debug(s"$msg no more data points for '$f', resetting...")
         reset
       }}
     }
     e(this).zip(alive.continuous).map(_._1).either(pts)
            .scan(Vector(false,false))((acc,a) => acc.tail :+ a.isLeft)
            .filter { xs => xs forall (identity) }
-           .evalMap { _ => log(s"$msg no activity for '$f', resetting..."); reset }
+           .evalMap { _ => log.debug(s"$msg no activity for '$f', resetting..."); reset }
            .run.runAsync { _ => () }
   }
+
+  /**
+   * Remove keys from this `Monitoring` instance for which no updates are seen
+   * between two triggerings of the event `e`.
+   */
+  def keySenescence(e: Event): Process[Task, Unit] = mergeN(distinctKeys.map { k =>
+    val alive = signal[Unit](Strategy.Sequential); alive.set(()).run
+    val pts = Monitoring.subscribe(this)(_ == k).onComplete {
+      Process.eval_ { alive.close flatMap { _ =>
+        log.debug(s"TTL: no more data points for '$k', removing...")
+        remove(k)
+      }}
+    }
+    e(this).zip(alive.continuous).map(_._1).either(pts)
+      .scan(Vector(false,false)) {
+        (acc, a) => acc.tail :+ a.isLeft
+      }.filter { _ forall (identity) }
+      .evalMap { _ =>
+        log.debug(s"TTL: no activity for '$k' removing...")
+        alive.close >> remove(k)
+      }
+  })
 
   /** Return the elapsed time since this instance was started. */
   def elapsed: Duration
@@ -392,8 +420,7 @@ object Monitoring {
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
     new Monitoring {
-      def log(s: String) =
-        logger(s)
+      val log = Logger[this.type]
 
       def keys = keys_
 
@@ -411,6 +438,12 @@ object Monitoring {
       def get[O](k: Key[O]): Signal[O] =
         topics.get(k).map(_.current.asInstanceOf[Signal[O]])
                      .getOrElse(sys.error("key not found: " + k))
+
+      def remove[O](k: Key[O]): Task[Unit] = for {
+        _ <- keys_.compareAndSet(_.map(_ - k))
+        _ <- topics.get(k).traverse_(_.current.close)
+        _ <- Task.delay(topics -= k)
+      } yield ()
 
       def elapsed: Duration = Duration.fromNanos(System.nanoTime - t0)
     }
@@ -433,7 +466,7 @@ object Monitoring {
      scalaz.stream.merge.mergeN(M.distinctKeys.filter(p).map(k => points(k)))
    def points(k: Key[Any]): Process[Task, Datapoint[Any]] =
      M.get(k).discrete.map(Datapoint(k, _)).onComplete {
-       Process.eval_(Task.delay(M.log(s"unsubscribing: $k")))
+       Process.eval_(Task.delay(M.log.debug(s"unsubscribing: $k")))
      }
    interleaveAll(f)
   }
