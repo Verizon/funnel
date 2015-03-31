@@ -24,12 +24,17 @@ trait TelemetryMultiTest {
     Key("key5", Reportable.D, Units.Count, "desc", Map("ke1" -> "ve1")),
     Key("key6", Reportable.S, Units.TrafficLight, "desc", Map("kf1" -> "vf1"))
   )
+
+  val errors = List(
+    Error(Names("kind1", "mine", "theirs")),
+    Error(Names("kind2", "mine", "theirs")),
+    Error(Names("kind3", "mine", "theirs")),
+    Error(Names("kind4", "mine", "theirs"))
+  )
 }
 
 
 class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
-
-
 
   "publish socket" should "publish" in {
     S.set(true).run
@@ -43,8 +48,9 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     Thread.sleep(2000)
 
-    val pub: Task[Unit] = telemetryPublishSocket(U1, S, (keysInD pipe keyChanges))
+    val errorsS = Process.emitAll(errors)
 
+    val pub: Task[Unit] = telemetryPublishSocket(U1, S, errorsS.wye(keysInD pipe keyChanges)(wye.merge))
     pub.runAsync {
       case -\/(e) => e.printStackTrace
       case \/-(_) => println("pub runasync success")
@@ -53,16 +59,13 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
     Thread.sleep(2000)
     keysIn.close.run
     Thread.sleep(2000)
-//    S.set(false).run
-
-
   }
 }
 
 class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
 
   "sub socket" should "sub" in {
-    val (keysout, errors, sub) = telemetrySubscribeSocket(U1, S)
+    val (keysout, errorsS, sub) = telemetrySubscribeSocket(U1, S)
     val keysoutS = keysout.discrete
 
     sub.run.runAsync {
@@ -77,13 +80,24 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
       }
     }
 
+    var errorsOut: List[Error] = Nil
+    val anotherAwesomeSink: Sink[Task,Error] = Process.constant { e =>
+      Task {
+        errorsOut = e :: errorsOut
+      }
+    }
+
+
+
     (keysoutS to myAwesomeSink).run.runAsync(_ => ())
+    (errorsS to anotherAwesomeSink).run.runAsync(_ => ())
 
     Thread.sleep(10000)
     keysout.close.run
     S.set(false).run
 
     keysOut should be (testKeys.toSet)
+    errorsOut.reverse should be (errors)
   }
 
 }

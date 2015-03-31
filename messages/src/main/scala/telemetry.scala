@@ -69,9 +69,7 @@ object Telemetry extends TelemetryCodecs {
           errors.enqueueOne(errorCodec.decodeValidValue(BitVector(bytes)))
         case Transported(_, Versions.v1, _, Some(Topic("key")), bytes) =>
           Task(currentKeys += keyCodec.decodeValidValue(BitVector(bytes))).flatMap { k =>
-            println("i'm going to stuff this into the signal: " + keys)
-            keys.set(k.toSet).flatMap { _ =>             Task.delay(println("i've stuffed this into the signal: " + k.toSet)) }
-
+            keys.set(k.toSet)
           }
       }
     }
