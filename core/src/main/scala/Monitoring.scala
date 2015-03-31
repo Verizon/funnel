@@ -297,7 +297,7 @@ trait Monitoring {
     val alive = signal[Unit](Strategy.Sequential); alive.set(()).run
     val pts = Monitoring.subscribe(this)(_ == k).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
-        log(s"TTL: no more data points for '$k', removing...")
+        log.debug(s"TTL: no more data points for '$k', removing...")
         remove(k)
       }}
     }
@@ -306,7 +306,7 @@ trait Monitoring {
         (acc, a) => acc.tail :+ a.isLeft
       }.filter { _ forall (identity) }
       .evalMap { _ =>
-        log(s"TTL: no activity for '$k' removing...")
+        log.debug(s"TTL: no activity for '$k' removing...")
         alive.close >> remove(k)
       }
   })

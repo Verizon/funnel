@@ -40,7 +40,8 @@ case class ElasticCfg(url: String,
                       indexName: String,
                       typeName: String,
                       dateFormat: String,
-                      http: dispatch.Http)
+                      http: dispatch.Http,
+                      groups: List[String])
 
 object ElasticCfg {
   def apply(
@@ -48,12 +49,13 @@ object ElasticCfg {
     indexName: String,
     typeName: String,
     dateFormat: String,
+    groups: List[String],
     connectionTimeoutMs: Int = 5000
   ): ElasticCfg = {
     val driver: Http = Http.configure(
       _.setAllowPoolingConnection(true)
        .setConnectionTimeoutInMs(connectionTimeoutMs))
-    ElasticCfg(url, indexName, typeName, dateFormat, driver)
+    ElasticCfg(url, indexName, typeName, dateFormat, driver, groups)
   }
 }
 
@@ -63,29 +65,26 @@ case class Elastic(M: Monitoring) {
   type Path = List[String]
 
   /** Data points grouped by mirror URL and key */
-  type ESGroup[A] = Map[(Option[Window], Option[SourceURL]), Map[Path, Datapoint[A]]]
+  type ESGroup[A] = Map[(String, Option[SourceURL]), Map[Path, Datapoint[A]]]
 
   import Process._
   import scalaz.concurrent.Task
   import scalaz.Tree
 
   /**
-   * Groups data points by key and mirror URL.
+   * Groups data points by key, mirror URL, and custom grouping from config.
    * Emits when it receives a key/mirror where the key is already in the group for the mirror.
    * That is, emits as few times as possible without duplicates
    * and without dropping any data.
    */
-  def elasticGroup[A]: Process1[Datapoint[A], ESGroup[A]] = {
-    def go(m: ESGroup[A]):
-    Process1[Datapoint[A], ESGroup[A]] =
+  def elasticGroup[A](groups: List[String]): Process1[Datapoint[A], ESGroup[A]] = {
+    def go(m: ESGroup[A]): Process1[Datapoint[A], ESGroup[A]] =
       await1[Datapoint[A]].flatMap { pt =>
-        val name = pt.key.name
+        val name   = pt.key.name
         val source = pt.key.attributes.get(AttributeKeys.source)
-        val t = name.split("/").toList
-        val w = t.headOption.filter(x =>
-          List("previous", "now", "sliding") contains x)
-        val host = (w, source)
-        val k = t.drop(if (w.isDefined) 1 else 0)
+        val group  = groups.find(name startsWith _) getOrElse ""
+        val k      = name.drop(group.length).split("/").toList.filterNot(_ == "")
+        val host   = (group, source)
         m.get(host) match {
           case Some(g) => g.get(k) match {
             case Some(_) =>
@@ -119,7 +118,7 @@ case class Elastic(M: Monitoring) {
         ("host" := name._2.getOrElse(flaskName)) ->:
         ("@timestamp" :=
           new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
-          m.toList.foldLeft(("window" :=? name._1).map(_ ->: jEmptyObject) getOrElse jEmptyObject) {
+          m.toList.foldLeft(("group" := name._1) ->: jEmptyObject) {
             case (o, (ps, dp)) =>
               dp.key.attributes.get(AttributeKeys.bucket).map(x =>
                 ("cluster" := x) ->: jEmptyObject
@@ -258,9 +257,10 @@ case class Elastic(M: Monitoring) {
   def publish(flaskName: String): ES[Unit] = for {
       u   <- indexURL.lift[Task]
       _   <- runInitMap(u)
+      cfg <- getConfig
       ref <- lift(IORef(Set[Key[Any]]()))
-      -   <- (Monitoring.subscribe(M)(_ => true).translate(lift) |>
-              elasticGroup |> elasticUngroup(flaskName)).evalMap(_.fold(
+      -   <- (Monitoring.subscribe(M)(k => cfg.groups.exists(g => k.startsWith(g))).translate(lift) |>
+              elasticGroup(cfg.groups) |> elasticUngroup(flaskName)).evalMap(_.fold(
                 props => updateMapping(props),
                 json  => esURL.lift[Task] >>= (r => elastic(r.POST, json))
               )).run

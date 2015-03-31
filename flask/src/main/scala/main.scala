@@ -139,12 +139,13 @@ object Main {
     val elasticDf        =
       cfg.lookup[String]("flask.elastic-search.partition-date-format").getOrElse("yyyy.MM.dd")
     val elasticTimeout   = cfg.lookup[Int]("flask.elastic-search.connection-timeout-in-ms").getOrElse(5000)
+    val esGroups         = cfg.lookup[List[String]]("flask.elastic-search.groups")
     val riemannHost      = cfg.lookup[String]("flask.riemann.host")
     val riemannPort      = cfg.lookup[Int]("flask.riemann.port")
     val ttl              = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").map(_.minutes)
     val riemann          = (riemannHost |@| riemannPort |@| ttl)(RiemannCfg)
-    val elastic          = (elasticURL |@| elasticIx |@| elasticTy)(
-      ElasticCfg(_, _, _, elasticDf, elasticTimeout))
+    val elastic          = (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
+      ElasticCfg(_, _, _, elasticDf, _, elasticTimeout))
     val snsErrorTopic    = cfg.require[String]("flask.sns-error-topic")
     val awsAccessKey     = cfg.require[String]("aws.access-key")
     val awsSecretKey     = cfg.require[String]("aws.secret-key")
