@@ -44,7 +44,7 @@ lazy val zeromq = project.dependsOn(http).configs(MultiJvm)
 
 lazy val `zeromq-java` = project.dependsOn(http).configs(MultiJvm)
 
-lazy val messages = project.dependsOn(core, zeromq)
+lazy val messages = project.dependsOn(core, zeromq).configs(MultiJvm)
 
 OnCue.baseSettings
 

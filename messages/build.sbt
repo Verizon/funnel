@@ -1,8 +1,16 @@
 import oncue.build._
+import com.typesafe.sbt.SbtMultiJvm
+import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 
 OnCue.baseSettings
 
 ScalaCheck.settings
+
+ScalaTest.settings
+
+SbtMultiJvm.multiJvmSettings
+
+Custom.testing
 
 libraryDependencies ++= Seq(
   "org.typelevel"        %% "scodec-core" % "1.6.+",

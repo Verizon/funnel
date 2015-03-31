@@ -12,7 +12,7 @@ import scalaz.stream._
 import scalaz.stream.async.mutable.{Signal,Queue}
 import scalaz.stream.async.{signalOf,unboundedQueue}
 import scalaz.concurrent.Task
-import scalaz.\/
+import scalaz.{-\/,\/,\/-}
 import java.net.URI
 
 sealed trait Telemetry
@@ -25,12 +25,12 @@ final case class NewKey(key: Key[_]) extends Telemetry
 
 object Telemetry extends TelemetryCodecs {
 
-  implicit val transportedTelemetry = Transportable[Telemetry] { t =>
-    println("hi tim: " + t)
+  implicit lazy val transportedTelemetry = Transportable[Telemetry] { t =>
     t match {
-      case e @ Error(_) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("error")), telemetryCodec.encodeValid(e).toByteArray)
-      case k @ NewKey(_) =>
-        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("key")), telemetryCodec.encodeValid(k).toByteArray)
+      case e @ Error(_) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("error")), errorCodec.encodeValid(e).toByteArray)
+      case NewKey(key) =>
+        val bytes = keyCodec.encodeValid(key).toByteArray
+        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("key")), bytes)
     }
   }
 
@@ -38,15 +38,14 @@ object Telemetry extends TelemetryCodecs {
 
   def telemetrySubscribeEndpoint(uri: URI): Endpoint = Endpoint.unsafeApply(subscribe &&& (connect ~ topics.all), uri)
 
-  def telemetryPublishSocket(uri: URI, signal: Signal[Boolean]): Channel[Task, Telemetry, Boolean] = {
+  def telemetryPublishSocket(uri: URI, signal: Signal[Boolean], telemetry: Process[Task,Telemetry]): Task[Unit] = {
     val e = telemetryPublishEndpoint(uri)
     Ø.link(e)(signal) { socket =>
-      println("SOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKETSOCKET")
-      Ø.write(socket)(transportedTelemetry)
-    }
+      telemetry  through Ø.write(socket)
+    }.run
   }
 
-  def telemetrySubscribeSocket(uri: URI, signal: Signal[Boolean]): (Signal[Set[Key[Any]]], Process[Task,Error]) = {
+  def telemetrySubscribeSocket(uri: URI, signal: Signal[Boolean]): (Signal[Set[Key[Any]]], Process[Task,Error], Process[Task,Unit]) = {
     val keys = signalOf(Set.empty[Key[Any]])
     val errors = unboundedQueue[Error]
     val endpoint = telemetrySubscribeEndpoint(uri)
@@ -54,8 +53,12 @@ object Telemetry extends TelemetryCodecs {
       Ø.receive(socket).observe(io.stdOut.contramap[Transported](_.toString + " <- <in>")) to fromTransported(keys, errors)
     }
 
-    p.run.runAsync{x => println("xxxxx: " + x) ; ()}
-    keys -> errors.dequeue
+/*    p.run.runAsync {
+      case -\/(x) => x.printStackTrace()
+      case _ => ()
+    }
+ */
+    (keys, errors.dequeue, p)
   }
 
   def fromTransported(keys: Signal[Set[Key[Any]]], errors: Queue[Error]): Sink[Task, Transported] = {
@@ -66,7 +69,10 @@ object Telemetry extends TelemetryCodecs {
         case Transported(_, Versions.v1, _, Some(Topic("error")), bytes) =>
           errors.enqueueOne(errorCodec.decodeValidValue(BitVector(bytes)))
         case Transported(_, Versions.v1, _, Some(Topic("key")), bytes) =>
-          Task(currentKeys += keyCodec.decodeValidValue(BitVector(bytes))).flatMap(k => keys.set(k.toSet))
+          Task(currentKeys += keyCodec.decodeValidValue(BitVector(bytes))).flatMap { k =>
+            println("i'm stuffing this into the signal: " + k.toSet)
+            keys.set(k.toSet)
+          }
       }
     }
   }
@@ -74,7 +80,6 @@ object Telemetry extends TelemetryCodecs {
   val keyChanges: Process1[Set[Key[Any]], NewKey] = {
     import Process._
     def go(old: Option[Set[Key[Any]]]): Process1[Set[Key[Any]], NewKey] = receive1 { current =>
-      println("got a new set of keys: " + current)
       val toEmit = old match {
         case None => current
         case Some(oldKeys) => (current -- oldKeys)
@@ -82,19 +87,17 @@ object Telemetry extends TelemetryCodecs {
       if(toEmit.isEmpty) {
         go(Some(current))
       } else {
-        println("to emit: " + toEmit)
         emitAll(toEmit.toSeq.map(NewKey.apply)) ++ go(Some(current))
       }
     }
     go(None)
   }
-
 }
 
 
 trait TelemetryCodecs extends Codecs {
-  implicit val errorCodec = Codec.derive[Names].xmap[Error](Error(_), _.names)
-  implicit val telemetryCodec: _root_.scodec.Codec[Telemetry] = (errorCodec :+: Codec.derive[NewKey]).discriminatedBy(uint8).using(Sized(1,2)).as[Telemetry]
+  implicit lazy val errorCodec = Codec.derive[Names].xmap[Error](Error(_), _.names)
+//  implicit lazy val telemetryCodec: _root_.scodec.Codec[Telemetry] = (errorCodec :+: Codec.derive[NewKey]).discriminatedBy(uint8).using(Sized(1,2)).as[Telemetry]
 
   implicit val reportableCodec: Codec[Reportable[Any]] = (codecs.provide(Reportable.B) :+: codecs.provide(Reportable.D) :+: codecs.provide(Reportable.S) :+: codecs.provide(Reportable.Stats)).discriminatedByIndex(uint8).as[Reportable[Any]]
 
@@ -139,4 +142,3 @@ trait TelemetryCodecs extends Codecs {
   lazy implicit val keyCodec: Codec[Key[Any]] = (utf8 :: reportableCodec :: unitsCodec :: utf8 :: map[String,String]).as[Key[Any]]
 
 }
-

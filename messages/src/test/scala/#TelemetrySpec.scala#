@@ -3,6 +3,7 @@ package messages
 
 import org.scalacheck._
 import org.scalacheck.Prop.forAll
+import Arbitrary._
 import shapeless.contrib.scalacheck._
 import scalaz.{-\/,\/,\/-}
 import Telemetry._

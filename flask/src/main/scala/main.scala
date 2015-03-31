@@ -43,10 +43,6 @@ object Main {
     R.disconnect
   }
 
-  private def giveUp(names: Names, telemetry: TelemetrySink): Process[Task,Unit] = {
-    (Process.eval(Task.now(Error(names))) to telemetry)
-  }
-
   private def riemannErrorAndQuit(rm: RiemannCfg, f: () => Unit): Unit = {
     val msg = s"# Riemann is not running at the specified location (${rm.host}:${rm.port}) #"
     val padding = (for(_ <- 1 to msg.length) yield "#").mkString
@@ -106,11 +102,12 @@ object Main {
 
     implicit val log: String => Unit = s => L(s)
 
-    val Q = telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${cfg.lookup[Int]("telemetryPort").getOrElse(5774)}"), signal)
+
+    val Q = async.unboundedQueue[Telemetry]
     val M = Monitoring.default
     val S = MonitoringServer.start(M, options.funnelPort)
 
-    (M.keys.discrete pipe keyChanges to Q).run.runAsync(_ => ())
+    telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${cfg.lookup[Int]("telemetryPort").getOrElse(5774)}"), signal, (M.keys.discrete pipe keyChanges).wye(Q.dequeue)(wye.merge)).runAsync(_ => ())
 
     // Determine whether to generate system statistics for the local host
     for {
@@ -122,9 +119,7 @@ object Main {
         s.instrument
       }
     }
-
-    def retries(names: Names): Event =
-      Monitoring.defaultRetries andThen (_ ++ giveUp(names, Q))
+    def retries(names: Names): Event = Monitoring.defaultRetries andThen (_ ++ Process.eval(Q.enqueueOne(Error(names))))
 
     val localhost = java.net.InetAddress.getLocalHost.toString
 
