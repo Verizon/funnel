@@ -13,7 +13,7 @@ Revolver.settings
 ScalaTest.settings
 
 libraryDependencies ++= Seq(
-  "intelmedia.ws.common" %% "logging-s3"  % "8.0.+",
+  "intelmedia.ws.common" %% "logging-s3"  % "9.1.+",
   "oncue.svc.knobs"      %% "core"        % V.knobs,
   "org.typelevel"        %% "scodec-core" % "1.6.+"
 )
