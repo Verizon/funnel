@@ -25,14 +25,14 @@ object Server {
 
   def start[U <: Platform](chemist: Chemist[U], platform: U): Task[Unit] =
     Task.reduceUnordered[Unit, Unit](Seq(
-      chemist.bootstrap(platform),
-      chemist.init(platform),
-      Task(unfiltered.netty.Server
+      Task.delay(unfiltered.netty.Server
         .http(platform.config.network.port, platform.config.network.host)
         .resources(getClass.getResource("/oncue/www/"), cacheSeconds = 3600)
         .handler(Server(chemist, platform))
         .run
-      )
+      ),
+      chemist.bootstrap(platform),
+      chemist.init(platform)
     ))
 }
 
