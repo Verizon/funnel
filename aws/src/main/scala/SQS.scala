@@ -139,11 +139,8 @@ object SQS {
         val msgs: List[Message] =
           client.receiveMessage(req).getMessages.asScala.toList
 
-        // println("sqs messages recieved count: " + msgs.length)
-        // println("sqs messages: " + msgs)
-
         msgs
-      }(pool)
+      }(pool).or(Task.now(List.empty[Message]))
     }
   }
 
@@ -161,7 +158,7 @@ object SQS {
         }
         ()
       } else ()
-    }
+    } or Task.now(())
 
     Process.eval(result)
   }

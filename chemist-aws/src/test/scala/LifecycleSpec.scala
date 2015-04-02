@@ -43,18 +43,29 @@ class LifecycleSpec extends FlatSpec with Matchers {
   }
 
   it should "produce a parse exception in the event the message on SQS cannot be parsed" in {
-    fromStream(sqs3, asg1).swap.toOption.get shouldBe a [Lifecycle.MessageParseException]
+    fromStream(sqs3, asg1).swap.toOption.get shouldBe a [MessageParseException]
   }
 
   behavior of "Lifecycle.interpreter"
+
+  import scalaz.syntax.traverse._
+  import scalaz.{Unapply,Traverse}
+  import scalaz.syntax.either._
+
+  def check(json: String): Task[Throwable \/ Action] =
+    Lifecycle.parseMessage(TestMessage(json)
+      ).traverseU(Lifecycle.interpreter(_, resources)(r, asg1, ec2, dsc))
+
+  it should "parse messages and produce the right action" in {
+    check(Fixtures.asgEvent(Launch, instanceId = "i-flaskAAA")).run should equal (NoOp.right)
+    check("INVALID-MESSAGE").map(_ => true).run should equal (true)
+  }
 
   // TODO: finish refactoring this.
   // it should "produce a Redistributed when given a flask launch task" in {
   //   Lifecycle.interpreter(AutoScalingEvent("i-xxx", Launch), Nil
   //     )(r, asg1, ec2, dsc).run should equal (true)
   // }
-
-
 
   // it should "Lifecycle.toSink should compute and update state given 'AddCapacity' command" in {
   //   effect(AddCapacity(k1), s)

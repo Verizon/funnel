@@ -12,18 +12,13 @@ Revolver.settings
 
 ScalaTest.settings
 
-libraryDependencies ++= Seq(
-  "intelmedia.ws.common" %% "logging-s3"  % "9.1.+",
-  "oncue.svc.knobs"      %% "core"        % V.knobs,
-  "org.typelevel"        %% "scodec-core" % "1.6.+"
+libraryDependencies ++= Seq (
+  "oncue.svc.knobs"      %% "core"       % V.knobs,
+  "intelmedia.ws.common" %% "logging-s3" % "10.+"
 )
 
 name in Universal := "flask"
 
 fork in Test := true
-
-mappings in Universal ++= Seq(
-  file("flask/src/main/resources/oncue/flask.cfg") -> "etc/flask.cfg"
-)
 
 mainClass in Revolver.reStart := Some("funnel.flask.Main")

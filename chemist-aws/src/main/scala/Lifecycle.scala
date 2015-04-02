@@ -27,8 +27,7 @@ object Lifecycle {
   import metrics._
 
   private implicit val log = Logger[Lifecycle.type]
-
-  case class MessageParseException(override val getMessage: String) extends RuntimeException
+  private val noop = \/-(NoOp)
 
   /**
    * Attempt to parse incomming SQS messages into `AutoScalingEvent`. Yield a
@@ -36,7 +35,6 @@ object Lifecycle {
    */
   def parseMessage(msg: Message): Throwable \/ AutoScalingEvent =
     Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException(_))
-
 
   /**
    * This function essentially converts the polling of an SQS queue into a scalaz-stream
@@ -48,6 +46,24 @@ object Lifecycle {
   def stream(queueName: String, resources: Seq[String]
     )(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Process[Task, Throwable \/ Action] = {
+      // adding this function to ensure that parse errors do not get
+      // lifted into errors that will later fail the stream, and that
+      // any errors in the interpreter are properly handled.
+      def go(m: Message): Task[Throwable \/ Action] =
+        parseMessage(m).traverseU(interpreter(_, resources)(r, asg, ec2, dsc)).handle {
+          case MessageParseException(err) =>
+            log.warn(s"Unexpected recoverable error when parsing lifecycle message: $err")
+            noop
+
+          case InstanceNotFoundException(id,kind) =>
+            log.warn(s"Unexpected recoverable error locating $kind id '$id' specified on lifecycle message.")
+            noop
+
+          case _ =>
+            log.warn(s"Failed to handle error state when recieving lifecycle event: ${m.getBody}")
+            noop
+        }
+
     for {
       a <- SQS.subscribe(queueName)(sqs)(Chemist.defaultPool, Chemist.schedulingPool)
       _ <- Process.eval(Task(log.debug(s"stream, number messages recieved: ${a.length}")))
@@ -55,7 +71,7 @@ object Lifecycle {
       b <- Process.emitAll(a)
       _ <- Process.eval(Task(log.debug(s"stream, raw message recieved: $b")))
 
-      c <- Process.eval(parseMessage(b).traverseU(interpreter(_, resources)(r, asg, ec2, dsc)))
+      c <- Process.eval(go(b))
       _ <- Process.eval(Task(log.debug(s"stream, computed action: $c")))
 
       _ <- SQS.deleteMessages(queueName, a)(sqs)
@@ -201,6 +217,3 @@ object Lifecycle {
     process.run
   }
 }
-
-
-

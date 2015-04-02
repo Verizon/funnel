@@ -8,9 +8,8 @@ ScalaCheck.settings
 fork in (run in Test) := true
 
 libraryDependencies ++= Seq(
-  "net.databinder.dispatch" %% "dispatch-core" % "0.11.2",
+  "net.databinder.dispatch" %% "dispatch-core" % V.dispatch,
   "oncue.svc.knobs"         %% "core"          % V.knobs
 )
 
 scalacOptions += "-language:postfixOps"
-
