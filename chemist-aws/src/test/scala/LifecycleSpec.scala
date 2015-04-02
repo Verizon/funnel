@@ -61,14 +61,11 @@ class LifecycleSpec extends FlatSpec with Matchers {
     check("INVALID-MESSAGE").map(_ => true).run should equal (true)
   }
 
-
   // TODO: finish refactoring this.
   // it should "produce a Redistributed when given a flask launch task" in {
   //   Lifecycle.interpreter(AutoScalingEvent("i-xxx", Launch), Nil
   //     )(r, asg1, ec2, dsc).run should equal (true)
   // }
-
-
 
   // it should "Lifecycle.toSink should compute and update state given 'AddCapacity' command" in {
   //   effect(AddCapacity(k1), s)
