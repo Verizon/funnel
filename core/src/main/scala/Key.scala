@@ -7,11 +7,11 @@ package funnel
  * a textual description, and a map of arbitrary attributes associated with this key
  * (such as its originating Funnel, grouping, or other ancillary metadata).
  */
-case class Key[+A] private[funnel](name: String,
-                                   typeOf: Reportable[A],
-                                   units: Units[A],
-                                   description: String,
-                                   attributes: Map[String, String]) {
+final case class Key[+A] private[funnel](name: String,
+                                         typeOf: Reportable[A],
+                                         units: Units[A],
+                                         description: String,
+                                         attributes: Map[String, String]) {
 
   /** Check if the name of the key ends with the given suffix */
   def endsWith(suffix: String): Boolean = name.endsWith(suffix)

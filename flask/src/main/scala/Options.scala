@@ -15,11 +15,7 @@ case class Options(
   elastic: Option[ElasticCfg] = None,
   riemann: Option[RiemannCfg] = None,
   snsErrorTopic: String,
-  awsCredentials: BasicAWSCredentials,
-  awsProxyHost: Option[String],
-  awsProxyPort: Option[Int],
-  awsProxyProtocol: Option[String],
-  awsRegion: String,
   funnelPort: Int = 5775,
-  metricTTL: Option[Duration] = None
+  metricTTL: Option[Duration] = None,
+  telemetryPort: Int = 7391
 )

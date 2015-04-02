@@ -44,16 +44,8 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val elastic          = (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
       ElasticCfg(_, _, _, elasticDf, _, elasticTimeout))
     val snsErrorTopic    = cfg.require[String]("flask.sns-error-topic")
-    val awsAccessKey     = cfg.require[String]("aws.access-key")
-    val awsSecretKey     = cfg.require[String]("aws.secret-key")
-    val awsCredentials   = new BasicAWSCredentials(awsAccessKey, awsSecretKey)
-    val awsProxyHost     = cfg.lookup[String]("aws.proxy-host")
-    val awsProxyPort     = cfg.lookup[Int]("aws.proxy-port")
-    val awsProxyProtocol = cfg.lookup[String]("aws.proxy-protocol")
-    val awsRegion        = cfg.require[String]("aws.region")
     val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
-    Task((Options(Option(name), elastic, riemann, snsErrorTopic, awsCredentials, awsProxyHost,
-      awsProxyPort, awsProxyProtocol, awsRegion, port), cfg))
+    Task((Options(Option(name), elastic, riemann, snsErrorTopic, port), cfg))
   }.run
 
   val log = Logger[this.type]
