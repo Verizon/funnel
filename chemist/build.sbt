@@ -12,9 +12,9 @@ Custom.compilation
 fork in test := true
 
 libraryDependencies ++= Seq(
-  "intelmedia.ws.common"    %% "logging-s3"              % "8.0.+",
+  "intelmedia.ws.common"    %% "logging-s3"              % "10.+",
   "oncue.svc.knobs"         %% "core"                    % V.knobs,
-  "net.databinder.dispatch" %% "dispatch-core"           % "0.11.2",
+  "net.databinder.dispatch" %% "dispatch-core"           % V.dispatch,
   "net.databinder"          %% "unfiltered-filter"       % V.unfiltered,
   "net.databinder"          %% "unfiltered-netty-server" % V.unfiltered
 )
