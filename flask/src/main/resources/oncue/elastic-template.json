@@ -1,0 +1,65 @@
+{
+  "template" : "funnel*",
+  "mappings": {
+    "metric": {
+      "dynamic_templates": [
+        { 
+          "funnel_stats": {
+            "path_match": "*.funnel_stats.*",
+            "mapping": { "type": "double" }
+          }
+        },
+        {
+          "funnel_double": {
+            "path_match": "*.funnel_double",
+            "mapping": { "type": "double" }
+          }
+        },
+        {
+          "funnel_integer": {
+            "path_match": "*.funnel_int",
+            "mapping": { "type": "integer" }
+          }
+        },
+        {
+          "funnel_long": {
+            "path_match": "*.funnel_long",
+            "mapping": { "type": "long" }
+          }
+        },
+        {
+          "funnel_boolean": {
+            "path_match": "*.funnel_bool",
+            "mapping": { "type": "boolean" }
+          }
+        },
+        {
+          "funnel_string": {
+            "path_match": "*.funnel_string",
+            "mapping": { "index": "not_analyzed",
+                         "type": "string",
+                         "date_detection": false }
+          }
+        }
+      ],
+      "properties": {
+        "@timestamp": {
+          "type": "date",
+          "format": "dateOptionalTime"
+        },
+        "host": {
+          "type": "string",
+          "index": "not_analyzed"
+        },
+        "cluster": {
+          "type": "string",
+          "index": "not_analyzed"
+        },
+        "group": {
+          "type": "string",
+          "index": "not_analyzed"
+        }
+      }
+    }
+  } 
+}
