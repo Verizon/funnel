@@ -10,11 +10,11 @@ case class Location(
   port: Int = 5775,
   datacenter: String,
   isPrivateNetwork: Boolean = false
-){
+){ self =>
   def asURL(port: Int = port, path: String = ""): Throwable \/ URL =
     dns match {
       case Some(h) if h.nonEmpty => \/-(new URL(s"http://$h:$port/$path"))
-      case _ => -\/(new RuntimeException(s"No hostname is specified for the specified location."))
+      case _ => -\/(InvalidLocationException(self))
     }
 }
 object Location {
