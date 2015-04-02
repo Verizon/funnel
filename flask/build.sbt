@@ -12,7 +12,10 @@ Revolver.settings
 
 ScalaTest.settings
 
-libraryDependencies += "oncue.svc.knobs" %% "core" % V.knobs
+libraryDependencies ++= Seq (
+  "oncue.svc.knobs"      %% "core"       % V.knobs,
+  "intelmedia.ws.common" %% "logging-s3" % "10.+"
+)
 
 name in Universal := "flask"
 

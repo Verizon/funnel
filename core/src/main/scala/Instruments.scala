@@ -26,7 +26,7 @@ class Instruments(val window: Duration,
     * takes a Key => Key and also sets the kind attribute
     */
   private def andKind[A](kind: String, keyMod: Key[A] => Key[A]): Key[A] => Key[A] =
-    keyMod compose (k => k.copy(attributes = k.attributes + ("kind" -> "counter")))
+    keyMod compose (k => k.copy(attributes = k.attributes + ("kind" -> kind)))
 
   /**
    * Return a `Counter` with the given starting count.

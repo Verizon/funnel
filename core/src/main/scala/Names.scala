@@ -1,4 +1,4 @@
 package funnel
 
-case class Names(kind: String, mine: String, theirs: String)
+final case class Names(kind: String, mine: String, theirs: String)
 
