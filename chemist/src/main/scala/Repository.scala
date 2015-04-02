@@ -39,8 +39,6 @@ import com.amazonaws.services.ec2.AmazonEC2
 import funnel.internals._
 import journal.Logger
 
-case class MissingInstanceException(override val getMessage: String) extends RuntimeException(getMessage)
-
 class StatefulRepository(discovery: Discovery) extends Repository {
   private val log = Logger[StatefulRepository]
 
@@ -80,7 +78,7 @@ class StatefulRepository(discovery: Discovery) extends Repository {
 
   def instance(id: InstanceID): Task[Instance] =
     I.get.lookup(id) match {
-      case None    => Task.fail(MissingInstanceException(s"No instance with the ID $id"))
+      case None    => Task.fail(InstanceNotFoundException(id))
       case Some(i) => Task.now(i)
     }
 
@@ -92,9 +90,9 @@ class StatefulRepository(discovery: Discovery) extends Repository {
   def mergeDistribution(d: Distribution): Task[Distribution] =
     Task(D.update(_.unionWith(d)(_ ++ _)))
 
-  def assignedTargets(flask: InstanceID): Task[Set[Sharding.Target]] =
-    D.get.lookup(flask) match {
-      case None => Task.fail(MissingInstanceException(s"No flask with the ID $flask"))
+  def assignedTargets(id: InstanceID): Task[Set[Sharding.Target]] =
+    D.get.lookup(id) match {
+      case None => Task.fail(InstanceNotFoundException(id, "Flask"))
       case Some(t) => Task.now(t)
     }
 

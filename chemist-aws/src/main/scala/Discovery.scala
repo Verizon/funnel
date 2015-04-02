@@ -42,7 +42,7 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
   def lookupOne(id: InstanceID): Task[Instance] = {
     lookupMany(Seq(id)).flatMap {
       _.filter(_.id == id).headOption match {
-        case None => Task.fail(new Exception("No instance found with that key."))
+        case None => Task.fail(InstanceNotFoundException(id))
         case Some(i) => Task.now(i)
       }
     }
