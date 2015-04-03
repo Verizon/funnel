@@ -6,10 +6,11 @@
     </encoder>
   </appender>
 
-  <logger name="org.apache.http" level="OFF" />
-  <logger name="com.amazonaws" level="OFF" />
-  <logger name="com.netty" level="OFF" />
-  <logger name="com.ning.http" level="OFF" />
+  <logger name="org.apache.http"         level="OFF" />
+  <logger name="com.amazonaws"           level="OFF" />
+  <logger name="com.netty"               level="OFF" />
+  <logger name="com.ning.http"           level="OFF" />
+  <logger name="funnel.chemist.Sharding" level="INFO" />
 
   <root level="DEBUG">
     <appender-ref ref="STDOUT" />
