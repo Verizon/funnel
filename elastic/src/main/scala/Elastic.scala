@@ -123,14 +123,12 @@ case class Elastic(M: Monitoring) {
           new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
           m.toList.foldLeft(("group" := name._1) ->: jEmptyObject) {
             case (o, (ps, dp)) =>
-              val tpe = keyField(dp.key).tpe match {
-                case ObjectField(_) => "funnel_stats"
-                case t => s"funnel_$t"
-              }
-              dp.key.attributes.get(AttributeKeys.bucket).map(x =>
+              val attrs = dp.key.attributes
+              val kind = attrs.get(AttributeKeys.kind)
+              attrs.get(AttributeKeys.bucket).map(x =>
                 ("cluster" := x) ->: jEmptyObject
               ).getOrElse(jEmptyObject) deepmerge
-                  (o deepmerge (ps ++ List(tpe)).foldRight(
+                  (o deepmerge (ps ++ kind).foldRight(
                     (dp.asJson -| "value").get)((a, b) =>
                       (a := b) ->: jEmptyObject))
           }
