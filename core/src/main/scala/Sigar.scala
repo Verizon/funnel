@@ -221,6 +221,7 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
 }
 
 object Sigar {
+  import org.hyperic.sigar.SigarException
   val log = Logger[this.type]
 
   def apply(I: Instruments): Option[Sigar] = {
@@ -233,7 +234,10 @@ object Sigar {
 
       Option(new Sigar(I, sigar))
     } catch {
-      case e: LinkageError =>
+      case e: SigarException =>
+        log.error(s"Unable to initilize Sigar: $e")
+        None
+      case e: LinkageError   =>
         log.warn("Unable to load native Sigar library, it may not be installed?")
         log.warn(s"The following error was encountered: $e")
         log.warn("java.library.path is set to: " +
