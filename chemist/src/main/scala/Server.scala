@@ -18,7 +18,6 @@ object JsonRequest {
 object JsonResponse {
   def apply[A: EncodeJson](a: A, params: PrettyParams = PrettyParams.nospace) =
     JsonContent ~>
-      ResponseHeader("Content-Type", Set("application/json")) ~>
       ResponseString(a.jencode.pretty(params))
 }
 
