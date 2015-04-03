@@ -84,15 +84,13 @@ case class Elastic(M: Monitoring) {
    */
   def elasticGroup[A](groups: List[String]): Process1[Option[Datapoint[A]], ESGroup[A]] = {
     def go(sawDatapoint: Boolean, m: ESGroup[A]): Process1[Option[Datapoint[A]], ESGroup[A]] =
-      await1[Option[Datapoint[A]]].flatMap { _ match {
+      await1[Option[Datapoint[A]]].flatMap {
         case Some(pt) =>
           val name = pt.key.name
           val source = pt.key.attributes.get(AttributeKeys.source)
-          val t = name.split("/").toList
-          val w = t.headOption.filter(x =>
-            List("previous", "now", "sliding") contains x)
-          val host = (w, source)
-          val k = t.drop(if (w.isDefined) 1 else 0)
+          val group = groups.find(name startsWith _) getOrElse ""
+          val k = name.drop(group.length).split("/").toList.filterNot(_ == "")
+          val host = (group, source)
           m.get(host) match {
             case Some(g) => g.get(k) match {
               case Some(_) =>
@@ -110,7 +108,6 @@ case class Elastic(M: Monitoring) {
             emit(m) ++ go(false, Map())		// Publish current Map
           }
       }
-    }
     go(false, Map())
   }
 
@@ -282,7 +279,7 @@ case class Elastic(M: Monitoring) {
       timeout = Process.awakeEvery(d)(DefaultStrategy, Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
       subscription = Monitoring.subscribe(M)(k => cfg.groups.exists(g => k.startsWith(g))).map(Option.apply)
       -   <- (timeout.wye(subscription)(wye.merge).translate(lift) |>
-              elasticGroup |> elasticUngroup(flaskName)).evalMap(_.fold(
+              elasticGroup(cfg.groups) |> elasticUngroup(flaskName)).evalMap(_.fold(
                 props => updateMapping(props),
                 json  => esURL.lift[Task] >>= (r => elastic(r.POST, json))
               )).run
