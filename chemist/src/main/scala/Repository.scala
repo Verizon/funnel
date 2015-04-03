@@ -62,19 +62,19 @@ class StatefulRepository(discovery: Discovery) extends Repository {
 
   def addEvent(e: AutoScalingEvent): Task[Unit] = {
     log.info(s"Adding auto-scalling event to the historical events: $e")
-    Task(Q.push(e))
+    Task.delay(Q.push(e))
   }
 
   def historicalEvents: Task[Seq[AutoScalingEvent]] =
-    Task(Q.toSeq)
+    Task.delay(Q.toSeq.toList)
 
   /////////////// instance operations ///////////////
 
   def addInstance(instance: Instance): Task[InstanceM] =
-    Task(I.update(_.insert(instance.id, instance)))
+    Task.delay(I.update(_.insert(instance.id, instance)))
 
   def removeInstance(id: InstanceID): Task[InstanceM] =
-    Task(I.update(_.delete(id)))
+    Task.delay(I.update(_.delete(id)))
 
   def instance(id: InstanceID): Task[Instance] =
     I.get.lookup(id) match {
@@ -88,7 +88,7 @@ class StatefulRepository(discovery: Discovery) extends Repository {
     Task.now(D.get)
 
   def mergeDistribution(d: Distribution): Task[Distribution] =
-    Task(D.update(_.unionWith(d)(_ ++ _)))
+    Task.delay(D.update(_.unionWith(d)(_ ++ _)))
 
   def assignedTargets(id: InstanceID): Task[Set[Sharding.Target]] =
     D.get.lookup(id) match {
@@ -114,7 +114,7 @@ class StatefulRepository(discovery: Discovery) extends Repository {
    */
   def increaseCapacity(instance: Instance): Task[(Distribution,InstanceM)] =
     for {
-      a <- Task(D.update(_.insert(instance.id, Set.empty)))
+      a <- Task.delay(D.update(_.insert(instance.id, Set.empty)))
       _  = log.debug(s"increaseCapacity, updating the distribution for ${instance.id}")
       b <- addInstance(instance)
       _  = log.debug(s"increaseCapacity, updated with ${instance.id}")
@@ -123,6 +123,6 @@ class StatefulRepository(discovery: Discovery) extends Repository {
   def decreaseCapacity(downed: InstanceID): Task[Distribution] =
     for {
       _ <- removeInstance(downed)
-      d <- Task(D.update(_.delete(downed)))
+      d <- Task.delay(D.update(_.delete(downed)))
     } yield d
 }

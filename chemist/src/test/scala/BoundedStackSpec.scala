@@ -33,4 +33,14 @@ class BoundedStackSpec extends FlatSpec with Matchers {
     B1.toSeq should equal ((2 to 11).reverse.toSeq)
   }
 
+  import scalaz.concurrent.Task
+  import scalaz._, Scalaz._
+
+  it should "work reasonably even with a lot of thrashing on the stack" in {
+    val B1 = new BoundedStack[Int](10)
+    (1 to 10001).toVector.traverse(i => Task(B1.push(i))).run
+    B1.peek should equal(Some(10001))
+    B1.toSeq.toList should equal ( (2 to 10001).toList.reverse.take(10) )
+  }
+
 }
