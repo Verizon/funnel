@@ -100,18 +100,27 @@ object ZeroMQ {
    * write any A for which we have a [[Transportable]] instance
    */
   def write[A](socket: Socket)(implicit T: Transportable[A]): Channel[Task, A, Boolean] =
-    writeTrans(socket).contramap[A](T.apply)
+    io.channel { a =>
+      Task.delay {
+        val t = T(a)
+        socket.sendMore(t.header)
+        socket.send(t.bytes, 0)
+      }
+    }
+
+//    writeTrans(socket).contramap[A](T.apply)
 
   /**
    * An internal method for writing a Transported message
    */
-  private[funnel] def writeTrans(socket: Socket): Channel[Task, Transported, Boolean] =
+  private[funnel] def writeTrans(socket: Socket): Channel[Task, Transported, Boolean] = {
     io.channel { t =>
       Task.delay {
         socket.sendMore(t.header)
         socket.send(t.bytes, 0)
       }
     }
+  }
 
 
   /////////////////////////////// INTERNALS ///////////////////////////////////

@@ -373,7 +373,7 @@ trait Monitoring {
 
 object Monitoring {
 
-  def defaultRetries = Events.takeEvery(30 seconds, 6)
+  def defaultRetries: Monitoring => Process[Task,Unit] = Events.takeEvery(30 seconds, 6)
 
   private def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {

@@ -8,10 +8,7 @@ import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.stream.{ io, Process, Sink }
 import scalaz.stream.async.mutable.Signal
-import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
-import com.amazonaws.auth.BasicAWSCredentials
-import com.amazonaws.services.sns.{AmazonSNSClient,AmazonSNS}
-import com.amazonaws.regions.{Region, Regions}
+import knobs.{Config, Required, ClassPathResource, FileResource}
 import journal.Logger
 import funnel.{Events,DatapointParser,Datapoint,Names,Sigar,Monitoring,Instruments}
 import funnel.riemann.Riemann
@@ -19,6 +16,12 @@ import funnel.http.{MonitoringServer,SSE}
 import funnel.elastic._
 import funnel.zeromq.Mirror
 import java.net.URI
+import zeromq._
+import sockets._
+import scalaz.stream._
+import scalaz.\/
+import messages._
+import Telemetry._
 
 /**
   * How to use: Modify oncue/flask.cfg on the classpath
@@ -38,15 +41,11 @@ class Flask(options: Options, val I: Instruments) {
 
   lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)
 
+
   private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
     server.stop()
     signal.set(false).flatMap(_ => signal.close).run
     R.disconnect
-  }
-
-  private def giveUp(names: Names, sns: AmazonSNS) = {
-    val msg = s"${names.mine} gave up on ${names.kind} server ${names.theirs}"
-    Process.eval(SNS.publish(options.snsErrorTopic, msg)(sns))
   }
 
   private def riemannErrorAndQuit(rm: RiemannCfg, f: () => Unit): Unit = {
@@ -73,22 +72,19 @@ class Flask(options: Options, val I: Instruments) {
     }
 
   def run(args: Array[String]): Unit = {
-    val Q = SNS.client(
-      options.awsCredentials,
-      options.awsProxyHost,
-      options.awsProxyPort,
-      options.awsProxyProtocol,
-      Region.getRegion(Regions.fromName(options.awsRegion))
-    )
 
     def countDatapoints: Sink[Task, Datapoint[Any]] =
       io.channel(_ => Task(mirrorDatapoints.increment))
+
+    val Q = async.unboundedQueue[Telemetry]
+    telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
+                           (I.monitoring.keys.discrete pipe keyChanges).wye(Q.dequeue)(wye.merge)).runAsync(_ => ())
 
     def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
       httpOrZmtp(alive)(uri) observe countDatapoints
 
     def retries(names: Names): Event =
-      Monitoring.defaultRetries andThen (_ ++ giveUp(names, Q))
+      Monitoring.defaultRetries andThen (_ ++ Process.eval(Q.enqueueOne(Error(names))))
 
     val localhost = java.net.InetAddress.getLocalHost.toString
 
@@ -149,17 +145,11 @@ object Main {
     val elastic          = (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
       ElasticCfg(_, _, _, elasticDf, esTemplate, esTemplateLoc, _, elasticTimeout))
     val snsErrorTopic    = cfg.require[String]("flask.sns-error-topic")
-    val awsAccessKey     = cfg.require[String]("aws.access-key")
-    val awsSecretKey     = cfg.require[String]("aws.secret-key")
-    val awsCredentials   = new BasicAWSCredentials(awsAccessKey, awsSecretKey)
-    val awsProxyHost     = cfg.lookup[String]("aws.proxy-host")
-    val awsProxyPort     = cfg.lookup[Int]("aws.proxy-port")
-    val awsProxyProtocol = cfg.lookup[String]("aws.proxy-protocol")
-    val awsRegion        = cfg.require[String]("aws.region")
     val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
     val metricTTL        = cfg.lookup[Duration]("flask.metric-ttl")
-    Task((Options(Option(name), elastic, riemann, snsErrorTopic, awsCredentials, awsProxyHost,
-      awsProxyPort, awsProxyProtocol, awsRegion, port, metricTTL), cfg))
+    val telemetryPort        = cfg.lookup[Int]("telemetryPort").getOrElse(7391)
+
+    Task((Options(Option(name), elastic, riemann, snsErrorTopic, port, metricTTL, telemetryPort), cfg))
   }.run
 
   val I = new Instruments(1.minute)

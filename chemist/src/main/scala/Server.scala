@@ -31,8 +31,14 @@ object Server {
         .handler(Server(chemist, platform))
         .run
       ),
-      chemist.bootstrap(platform),
-      chemist.init(platform)
+      chemist.bootstrap(platform).handle {
+        case e =>
+          log.warn(s"Unable to bootstrap the chemist service. Failed with error: $e")
+      },
+      chemist.init(platform).handle {
+        case e =>
+          log.warn(s"Unable to initilize the chemist service. Failed with error: $e")
+      }
     ))
 }
 

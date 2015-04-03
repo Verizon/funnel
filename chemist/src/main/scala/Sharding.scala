@@ -180,8 +180,11 @@ object Sharding {
    * relevant shard node API.
    */
   def distribute(locations: Map[Location, Seq[Target]])(http: dispatch.Http): Task[List[String]] =
-    Task.gatherUnordered(locations.map { case (loc,targets) =>
-      send(loc,targets)(http) }.toSeq)
+    Task.gatherUnordered(
+      locations.map { case (loc,targets) =>
+        send(loc,targets)(http)
+      }.toSeq
+    )
 
   /**
    * Given a collection of flask instances, find out what exactly they are already
@@ -190,12 +193,12 @@ object Sharding {
    * This function should only really be used startup of chemist.
    */
   def gatherAssignedTargets(instances: Seq[Instance])(http: dispatch.Http): Task[Distribution] =
-    for {
+    (for {
       a <- Task.gatherUnordered(instances.map(
             i => requestAssignedTargets(i.location)(http).map(i.id -> _)))
     } yield a.foldLeft(Distribution.empty){ (a,b) =>
       a.alter(b._1, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
-    }
+    }) or Task.now(Distribution.empty)
 
   import funnel.http.{Bucket,JSON => HJSON}
 

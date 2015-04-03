@@ -9,7 +9,7 @@ case class BoundedStack[A](maximumEntries: Int){
   import scala.collection.JavaConverters._
 
   private val list: Deque[A] = new ConcurrentLinkedDeque[A]
-  private val lock = new ReentrantLock
+  private val lock = new Object
 
   def push(item: A): Unit = {
     def add: Unit = {
@@ -17,9 +17,7 @@ case class BoundedStack[A](maximumEntries: Int){
       if (list.size > maximumEntries) list.removeLast()
     }
 
-    lock.lock()
-    try add
-    finally lock.unlock()
+    lock.synchronized(add)
   }
 
   def pop: Option[A] = Option(list.poll)
