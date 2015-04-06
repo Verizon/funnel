@@ -1,9 +1,7 @@
 package funnel
 package elastic
 
-import scala.concurrent.duration._
 import org.scalacheck.{Properties => P, _}
-import scalaz.stream._
 
 object ElasticTest extends P("elastic") {
   val genName = Gen.oneOf("k1", "k2")
