@@ -86,8 +86,6 @@ class Flask(options: Options, val I: Instruments) {
     def retries(names: Names): Event =
       Monitoring.defaultRetries andThen (_ ++ Process.eval(Q.enqueueOne(Error(names))))
 
-    val localhost = java.net.InetAddress.getLocalHost.toString
-
     val flaskName = options.name.getOrElse(s"flask-${oncue.svc.funnel.BuildInfo.version}")
 
     // Implement key TTL
