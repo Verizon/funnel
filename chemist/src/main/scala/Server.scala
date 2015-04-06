@@ -18,7 +18,8 @@ object JsonRequest {
 
 object JsonResponse {
   def apply[A: EncodeJson](a: A, params: PrettyParams = PrettyParams.nospace) =
-    JsonContent ~> ResponseString(a.jencode.pretty(params))
+    JsonContent ~>
+      ResponseString(a.jencode.pretty(params))
 }
 
 object Server {
