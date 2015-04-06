@@ -46,7 +46,7 @@ case class ElasticCfg(url: String,
                       templateLocation: Option[String],
                       http: dispatch.Http,
                       groups: List[String],
-  		      subscriptionTimeout: FiniteDuration
+            		      subscriptionTimeout: FiniteDuration
 )
 
 object ElasticCfg {
@@ -59,11 +59,11 @@ object ElasticCfg {
     templateLocation: Option[String],
     groups: List[String],
     subscriptionTimeout: FiniteDuration = 10.minutes,
-    connectionTimeoutMs: Int = 5000
+    connectionTimeoutMs: Duration = 5000.milliseconds
   ): ElasticCfg = {
     val driver: Http = Http.configure(
       _.setAllowPoolingConnection(true)
-       .setConnectionTimeoutInMs(connectionTimeoutMs))
+       .setConnectionTimeoutInMs(connectionTimeoutMs.toMillis.toInt))
     ElasticCfg(url, indexName, typeName, dateFormat,
                templateName, templateLocation, driver, groups, subscriptionTimeout)
   }
@@ -152,7 +152,6 @@ case class Elastic(M: Monitoring) {
   import scalaz.\/
   import scala.concurrent.{Future,ExecutionContext}
   import java.io.File
-  import knobs.{ ClassPathResource, Config, FileResource, Required }
 
   def fromScalaFuture[A](a: => Future[A])(implicit e: ExecutionContext): Task[A] =
     Task async { k =>
@@ -252,6 +251,7 @@ case class Elastic(M: Monitoring) {
       _   <- ensureTemplate
       cfg <- getConfig
       ref <- lift(IORef(Set[Key[Any]]()))
+
       d   <- duration.lift[Task]
       timeout = Process.awakeEvery(d)(Executor(Monitoring.serverPool), Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
       subscription = Monitoring.subscribe(M)(k => cfg.groups.exists(g => k.startsWith(g))).map(Option.apply)

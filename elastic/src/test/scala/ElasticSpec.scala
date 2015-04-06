@@ -16,7 +16,7 @@ class ElasticSpec extends FlatSpec with Matchers {
   import E._
 
   "elasticGroup" should "emit on timeout" in {
-    val cfg = ElasticCfg("localhost", "index", "type", "dateFormat", "template", None, List("k"), 5.seconds, 5000)
+    val cfg = ElasticCfg("localhost", "index", "type", "dateFormat", "template", None, List("k"), 5.seconds, 5.seconds)
     val dp1 = Datapoint[Any](Key("k1", Units.Count: Units[Double], "description", Map(AttributeKeys.source -> "h1")), 3.14)
     val dp2 = Datapoint[Any](Key("k2", Units.Count: Units[Double], "description", Map(AttributeKeys.source -> "h2")), 2.17)
     val dps: Process[Task, Option[Datapoint[Any]]] = (Process(dp1) ++ Process(dp2)).map(Option.apply)
