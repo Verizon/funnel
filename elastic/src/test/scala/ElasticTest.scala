@@ -40,6 +40,6 @@ object ElasticTest extends P("elastic") {
   property("elasticUngroup") = Prop.forAll(Gen.listOf(datapoint)) { dps =>
     val gs = elasticGroup(List("k"))(dps ++ dps)
     val ug = elasticUngroup("flask")(gs)
-    ug.forall(_.fold(!_.fields.isEmpty, _.isObject))
+    ug.forall(_.isObject)
   }
 }
