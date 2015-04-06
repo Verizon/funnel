@@ -25,9 +25,19 @@ flask {
     url = "http://imdev-ops-es.svc.oncue.com:9200"
 {% endif %}
     index-name = "funnel"
+
     type-name = "metric"
+
     partition-date-format = "yyyy.MM.dd"
+
     connection-timeout-in-ms = 3000
+
+    groups = [ "previous/jvm", "previous/system", "previous" ]
+
+    template {
+      name = "flask"
+      location = "/usr/share/oncue/etc/elastic-template.json"
+    }
   }
 }
 
