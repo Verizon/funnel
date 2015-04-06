@@ -8,4 +8,5 @@ package funnel
 object AttributeKeys {
   val bucket = "bucket"
   val source = "source"
+  val kind = "kind"
 }
