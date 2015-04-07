@@ -127,7 +127,7 @@ case class Elastic(M: Monitoring) {
    * URL/window with all the key/value pairs that were seen for that mirror
    * in the group for that period.
    */
-  def elasticUngroup[A](flaskName: String): Process1[ESGroup[A], Json] =
+  def elasticUngroup[A](flaskName: String, flaskBucket: String): Process1[ESGroup[A], Json] =
     await1[ESGroup[A]].flatMap { g =>
       emitAll(g.toSeq.map { case (name, m) =>
         ("host" := name._2.getOrElse(flaskName)) ->:
@@ -137,12 +137,10 @@ case class Elastic(M: Monitoring) {
             case (o, (ps, dp)) =>
               val attrs = dp.key.attributes
               val kind = attrs.get(AttributeKeys.kind)
-              attrs.get(AttributeKeys.bucket).map(x =>
-                ("cluster" := x) ->: jEmptyObject
-              ).getOrElse(jEmptyObject) deepmerge
-                  (o deepmerge (ps ++ kind).foldRight(
-                    (dp.asJson -| "value").get)((a, b) =>
-                      (a := b) ->: jEmptyObject))
+              val clust = ("cluster" :=
+                attrs.get(AttributeKeys.bucket).getOrElse(flaskBucket)) ->: jEmptyObject
+              clust deepmerge (o deepmerge (ps ++ kind).foldRight((dp.asJson -| "value").get)(
+                (a, b) => (a := b) ->: jEmptyObject))
           }
       })
     }.repeat
@@ -247,16 +245,15 @@ case class Elastic(M: Monitoring) {
   /**
    * Publishes to an ElasticSearch URL at `esURL`.
    */
-  def publish(flaskName: String): ES[Unit] = for {
+  def publish(flaskName: String, flaskBucket: String): ES[Unit] = for {
       _   <- ensureTemplate
       cfg <- getConfig
       ref <- lift(IORef(Set[Key[Any]]()))
-
       d   <- duration.lift[Task]
       timeout = Process.awakeEvery(d)(Executor(Monitoring.serverPool), Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
       subscription = Monitoring.subscribe(M)(k => cfg.groups.exists(g => k.startsWith(g))).map(Option.apply)
       -   <- (timeout.wye(subscription)(wye.merge).translate(lift) |>
-              elasticGroup(cfg.groups) |> elasticUngroup(flaskName)).evalMap(
+              elasticGroup(cfg.groups) |> elasticUngroup(flaskName, flaskBucket)).evalMap(
                 json  => esURL.lift[Task] >>= (r => elasticJson(r.POST, json))
               ).run
     } yield ()
