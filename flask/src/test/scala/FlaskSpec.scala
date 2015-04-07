@@ -75,7 +75,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     Transported(Schemes.unknown, Versions.v1, None, None, ba)
   }
 
-  val seq: Seq[Array[Byte]] = for(i <- 0 until 5000) yield Datapoint(Key("now/life", Units.Count: Units[Double], "description", Map("url" -> "http://localhost")), 42.0).asJson.spaces2.getBytes
+  val seq: Seq[Array[Byte]] = for(i <- 0 until 5000) yield Datapoint(Key[Double]("now/life", Units.Count: Units, "description", Map("url" -> "http://localhost")), 42.0).asJson.spaces2.getBytes
   val k: Seq[Boolean] = seq.map(_ => true) ++ Seq(false)
 
   val proc: Process[Task, Array[Byte]] = Process.emitAll(seq) fby Process.eval_(ready.set(true))

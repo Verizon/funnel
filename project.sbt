@@ -21,6 +21,8 @@ lazy val funnel = project.in(file(".")).aggregate(
   chemist,
   `chemist-aws`)
 
+parallelExecution in Test := true
+
 lazy val agent = project.dependsOn(zeromq % "test->test;compile->compile", http, nginx).configs(MultiJvm)
 
 lazy val `agent-windows` = project.dependsOn(`zeromq-java`, http, nginx).configs(MultiJvm)

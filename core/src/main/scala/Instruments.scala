@@ -43,7 +43,7 @@ class Instruments(val window: Duration,
       val count = B.resetEvery(window)(B.counter(init))
       val previousCount = B.emitEvery(window)(count)
       val slidingCount = B.sliding(window)(identity[Double])(Group.doubleGroup)
-      val u: Units[Double] = Units.Count
+      val u: Units/*[Double]*/ = Units.Count
       val (nowK, incrNow) =
         monitoring.topic[Long,Double](s"now/$label", u, nowL(description), kinded)(count)
       val (prevK, incrPrev) =
@@ -125,7 +125,7 @@ class Instruments(val window: Duration,
    * window of values as well, see `numericGauge`.
    */
   def gauge[A:Reportable](label: String, init: A,
-                          units: Units[A] = Units.None,
+                          units: Units/*[A]*/ = Units.None,
                           description: String = "",
                           keyMod: Key[A] => Key[A] = {(k:Key[A]) => k}): Gauge[Continuous[A],A] = {
     val kinded = andKind("gauge",keyMod)
@@ -151,7 +151,7 @@ class Instruments(val window: Duration,
    * See [[funnel.Periodic]].
    */
   def numericGauge(label: String, init: Double,
-                   units: Units[Stats] = Units.None,
+                   units: Units/*[Stats]*/ = Units.None,
                    description: String = "",
                    keyMod: Key[Stats] => Key[Stats] = identity): Gauge[Periodic[Stats],Double] = {
     val kinded = andKind("numeric", keyMod)
@@ -187,7 +187,7 @@ class Instruments(val window: Duration,
       val timer = B.resetEvery(window)(B.stats)
       val previousTimer = B.emitEvery(window)(timer)
       val slidingTimer = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
-      val u: Units[Stats] = Units.Duration(TimeUnit.MILLISECONDS)
+      val u: Units/*[Stats]*/ = Units.Duration(TimeUnit.MILLISECONDS)
       val (nowK, nowSnk) =
         monitoring.topic[Double, Stats](s"now/$label", u, nowL(description), kinded)(timer)
       val (prevK, prevSnk) =

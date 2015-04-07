@@ -9,7 +9,7 @@ package funnel
  */
 final case class Key[+A] private[funnel](name: String,
                                          typeOf: Reportable[A],
-                                         units: Units[A],
+                                         units: Units/*[A]*/,
                                          description: String,
                                          attributes: Map[String, String]) {
 
@@ -47,7 +47,7 @@ final case class Key[+A] private[funnel](name: String,
   def modifyName(f: String => String): Key[A] = rename(f(name))
 
   /** Cast the key to a different type */
-  def cast[B](R: Reportable[B], U: Units[B]): Option[Key[B]] =
+  def cast[B](R: Reportable[B], U: Units/*[B]*/): Option[Key[B]] =
     if (R == typeOf && units == U) Some(this.asInstanceOf[Key[B]])
     else None
 
@@ -66,7 +66,7 @@ object Key {
     override def toString = "Key.EndsWith("+suffix+")"
   }
 
-  def apply[A](name: String, units: Units[A], desc: String = "", attribs: Map[String, String] = Map())(
+  def apply[A](name: String, units: Units/*[A]*/, desc: String = "", attribs: Map[String, String] = Map())(
     implicit R: Reportable[A]): Key[A] = Key(name, R, units, desc, attribs)
 
   implicit def keyToMetric[A](k: Key[A]): Metric[A] = Metric.key(k)

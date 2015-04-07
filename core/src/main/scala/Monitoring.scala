@@ -35,7 +35,7 @@ trait Monitoring {
    * using a stream transducer to
    */
   def topic[I, O:Reportable](
-      name: String, units: Units[O], description: String, keyMod: Key[O] => Key[O])(
+      name: String, units: Units/*[O]*/, description: String, keyMod: Key[O] => Key[O])(
       buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
     val k = keyMod(Key[O](name, units, description))
     (k, topic(k)(buf))
@@ -57,7 +57,7 @@ trait Monitoring {
   def remove[O](k: Key[O]): Task[Unit]
 
   /** Convience function to publish a metric under a newly created key. */
-  def publish[O:Reportable](name: String, units: Units[O])(e: Event)(
+  def publish[O:Reportable](name: String, units: Units/*[O]*/)(e: Event)(
                             f: Metric[O]): Task[Key[O]] =
     publish(Key(name, units))(e)(f)
 
@@ -353,7 +353,7 @@ trait Monitoring {
 
   /** Create a new topic with the given name and discard the key. */
   def topic_[I, O:Reportable](
-    name: String, units: Units[O], description: String,
+    name: String, units: Units/*[O]*/, description: String,
     buf: Process1[(I,Duration),O]): I => Unit = topic(name, units, description, identity[Key[O]])(buf)._2
 
   def filterKeys(f: Key[Any] => Boolean): Process[Task, List[Key[Any]]] =

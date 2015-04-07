@@ -12,7 +12,7 @@
   <logger name="com.ning.http"           level="OFF" />
   <logger name="funnel.chemist.Sharding" level="INFO" />
 
-  <root level="DEBUG">
+  <root level="INFO">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>
