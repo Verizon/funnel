@@ -37,7 +37,7 @@ object ElasticTest extends P("elastic") {
 
   property("elasticUngroup") = Prop.forAll(Gen.listOf(datapoint)) { dps =>
     val gs = elasticGroup(List("k"))(dps ++ dps)
-    val ug = elasticUngroup("flask")(gs)
+    val ug = elasticUngroup("flask", "flask")(gs)
     ug.forall(_.isObject)
   }
 }

@@ -29,7 +29,8 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   } yield a ++ b
 
   val (options, cfg) = config.flatMap { cfg =>
-    val name             = cfg.lookup[String]("flask.name").getOrElse("flask")
+    val name             = cfg.lookup[String]("flask.name")
+    val bucket           = cfg.lookup[String]("flask.bucket")
     val elasticURL       = cfg.lookup[String]("flask.elastic-search.url")
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
@@ -45,7 +46,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       ElasticCfg(_, _, _, elasticDf, "foo", None, _))
     val snsErrorTopic    = cfg.require[String]("flask.sns-error-topic")
     val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
-    Task((Options(Option(name), elastic, riemann, snsErrorTopic, port), cfg))
+    Task((Options(name, bucket, elastic, riemann, snsErrorTopic, port), cfg))
   }.run
 
   val log = Logger[this.type]
