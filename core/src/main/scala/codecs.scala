@@ -194,7 +194,7 @@ trait KeyCodecs extends Codecs { self =>
 
   implicit val timeUnitCodec: Codec[TimeUnit] = codecs.uint8.xmap(intToTU, tuToInt)
 
-  implicit def unitsCodec: Codec[Units/*[Any]*/] = {
+  implicit def unitsCodec: Codec[Units] = {
     import Units._
     (Codec.derive[Duration] :+:
        Codec.derive[Bytes] :+:
@@ -203,6 +203,6 @@ trait KeyCodecs extends Codecs { self =>
        codecs.provide(TrafficLight) :+:
        codecs.provide(Healthy) :+:
        codecs.provide(Load) :+:
-       codecs.provide(None)).discriminatedByIndex(uint8).as[Units/*[Any]*/]
+       codecs.provide(None)).discriminatedByIndex(uint8).as[Units]
   }
 }

@@ -91,7 +91,7 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
     (keysoutS to myAwesomeSink).run.runAsync(_ => ())
     (errorsS to anotherAwesomeSink).run.runAsync(_ => ())
 
-    Thread.sleep(100)
+    Thread.sleep(1000)
     keysout.close.run
     S.set(false).run
 

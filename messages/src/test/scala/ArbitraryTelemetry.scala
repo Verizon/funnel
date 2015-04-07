@@ -34,7 +34,7 @@ trait ArbitraryTelemetry {
     Gen.oneOf(Zero, Kilo, Mega, Giga)
   }
 
-  val unitsGen : Gen[Units[Any]] = {
+  val unitsGen : Gen[Units] = {
     import Units._
     Gen.oneOf(
       durationGen,
@@ -57,5 +57,46 @@ trait ArbitraryTelemetry {
   } yield Key(name, typeOf, units, description, attributes)
 
   implicit val arbKey: Arbitrary[Key[Any]] = Arbitrary(keyGen)
+
+
+  val statsGen: Gen[Stats] =
+    for {
+      last <- arbitrary[Option[Double]]
+      mean <- arbitrary[Double]
+      count <- arbitrary[Int] suchThat (_ != 0)
+      variance <- arbitrary[Double]
+      skewness <- arbitrary[Double]
+      kurtosis <- arbitrary[Double]
+    } yield {
+      val m0 = count.toLong
+      val m1 = mean
+      val m2 = variance * count
+      val m3 = skewness / math.sqrt(count) * math.pow(m2, 1.5)
+      val m4 = (kurtosis + 3)/count * math.pow(m2, 2)
+      new funnel.Stats(com.twitter.algebird.Moments(m0, m1, m2, m3, m4), last)
+    }
+
+  val datapointGen: Gen[Datapoint[Any]] =
+    keyGen flatMap { k =>
+      k.typeOf match {
+        case Reportable.B =>
+          arbitrary[Boolean] flatMap { v =>
+            Datapoint(k, v)
+          }
+        case Reportable.D =>
+          arbitrary[Double] flatMap { v =>
+            Datapoint(k, v)
+          }
+        case Reportable.S =>
+          arbitrary[String] flatMap { v =>
+            Datapoint(k, v)
+          }
+        case Reportable.Stats =>
+          arbitrary[Boolean] flatMap { v =>
+            Datapoint(k, v)
+          }
+      }
+    }
+
 
 }

@@ -2,7 +2,7 @@ package funnel
 
 import java.util.concurrent.TimeUnit
 
-sealed trait Units//[+A]
+sealed trait Units
 
 object Units {
 
@@ -16,7 +16,7 @@ object Units {
   case class Duration(granularity: TimeUnit) extends Units { //[Double with funnel.Stats] {
     override def toString = capitalize(granularity.toString)
   }
-  case class Bytes(base: Base) extends Units { //[Double with funnel.Stats] {
+  case class Bytes(base: Base) extends Units {
     import Base._
     override def toString = base match {
       case Zero => "Bytes"
@@ -25,13 +25,13 @@ object Units {
       case Giga => "Gigabytes"
     }
   }
-  case object Count extends Units//[Double with funnel.Stats]
-  case object Ratio extends Units//[Double with funnel.Stats]
-  case object TrafficLight extends Units//[String] // "red", "yellow", "green"
-  case object Healthy extends Units//[Boolean]
-  case object Load extends Units//[String] // "idle", "busy", "overloaded"
+  case object Count extends Units
+  case object Ratio extends Units
+  case object TrafficLight extends Units
+  case object Healthy extends Units
+  case object Load extends Units
 
-  case object None extends Units//[Nothing]
+  case object None extends Units
 
   val Milliseconds = Duration(TimeUnit.MILLISECONDS)
   val Seconds = Duration(TimeUnit.SECONDS)
@@ -54,7 +54,7 @@ object Units {
    * because the node being contacted is down). See `Monitoring.mirror`
    * and `Monitoring.mirrorAll` for how this is used.
    */
-  def default[O](t: Reportable[O], u: Units/*[O]*/): Option[O] = (t, u) match {
+  def default[O](t: Reportable[O], u: Units): Option[O] = (t, u) match {
     case (Reportable.B, Healthy) => Some(false)
     case (Reportable.S, TrafficLight) => Some(funnel.TrafficLight.Red)
     case _ => scala.None

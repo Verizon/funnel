@@ -26,7 +26,7 @@ object Telemetry extends TelemetryCodecs {
     t match {
       case e @ Error(_) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("error")), errorCodec.encodeValid(e).toByteArray)
       case NewKey(key) =>
-        val bytes = null // STUkeyCodec.encodeValid(key).toByteArray
+        val bytes = keyEncode.encodeValid(key).toByteArray
         Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("key")), bytes)
     }
   }
@@ -60,7 +60,7 @@ object Telemetry extends TelemetryCodecs {
         case Transported(_, Versions.v1, _, Some(Topic("error")), bytes) =>
           errors.enqueueOne(errorCodec.decodeValidValue(BitVector(bytes)))
         case Transported(_, Versions.v1, _, Some(Topic("key")), bytes) =>
-          Task(currentKeys /* STU += keyCodec.decodeValidValue(BitVector(bytes))*/).flatMap { k =>
+          Task(currentKeys += keyDecode.decodeValidValue(BitVector(bytes))).flatMap { k =>
             keys.set(k.toSet)
           }
       }

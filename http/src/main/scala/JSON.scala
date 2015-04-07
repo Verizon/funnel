@@ -62,9 +62,9 @@ object JSON {
     if (s.isEmpty) s
     else s(0) + s.drop(1).toLowerCase
 
-  implicit def EncodeUnits/*[A]*/: EncodeJson[Units/*[A]*/] = {
+  implicit def EncodeUnits: EncodeJson[Units] = {
     import Units._; import Units.Base._
-    jencode1[Units/*[A]*/, String] {
+    jencode1[Units, String] {
       case Bytes(Zero)  => "Bytes"
       case Bytes(Kilo)  => "Kilobytes"
       case Bytes(Mega)  => "Megabytes"
@@ -79,7 +79,7 @@ object JSON {
     }
   }
 
-  implicit def DecodeUnits: DecodeJson[Units/*[Any]*/] = DecodeJson { c =>
+  implicit def DecodeUnits: DecodeJson[Units] = DecodeJson { c =>
     import Units._; import Units.Base._
     c.as[String] flatMap {
       case "Bytes" => D.ok { Bytes(Zero) }
@@ -109,7 +109,7 @@ object JSON {
   implicit def DecodeKey: DecodeJson[Key[Any]] = DecodeJson { c => for {
     name   <- (c --\ "name").as[String]
     typeOf <- (c --\ "type").as[Reportable[Any]]
-    u      <- (c --\ "units").as[Units/*[Any]*/]
+    u      <- (c --\ "units").as[Units]
     desc   <- (c --\ "description").as[String].option
     attrs  <- c.as[Map[String, String]].map(_ - "name" - "type" - "units" - "description")
   } yield Key(name, typeOf, u, desc getOrElse "", attrs) }

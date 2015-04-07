@@ -12,6 +12,9 @@ SbtMultiJvm.multiJvmSettings
 
 Custom.testing
 
+libraryDependencies += "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test"
+
+
 initialCommands in console := """
 import funnel._
 import funnel.zeromq._

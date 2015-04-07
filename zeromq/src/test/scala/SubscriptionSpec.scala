@@ -88,7 +88,7 @@ class SubscriptionSpec extends FlatSpec
   }
 
   val previous = Transported(Schemes.fsm, Versions.v1, Some(Windows.previous), None, "".getBytes).header.getBytes("ASCII")
-  val nowCounter = Transported(Schemes.fsm, Versions.v1, Some(Windows.now), Some(Topic("counter")), "".getBytes).header.getBytes("ASCII")
+  val nowCounter = Transported(Schemes.fsm, Versions.v1, Some(Windows.now), Some(Topic("numeric")), "".getBytes).header.getBytes("ASCII")
 
   private def countKeys(m: Monitoring): Int =
     m.keys.compareAndSet(identity).run.get.size
@@ -102,8 +102,7 @@ class SubscriptionSpec extends FlatSpec
       c1 should be > cn
       c2 should be > cp
 
-      println(s"n: $cn, p: $cp, c1: $c1, c2: $c2")
-      println(s"${M1.keys.get.run}")
+//      println(s"n: $cn, p: $cp, c1: $c1, c2: $c2")
 
       cn should be > 0
       cp should be > 0
