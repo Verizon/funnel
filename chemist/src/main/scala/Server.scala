@@ -6,6 +6,7 @@ import unfiltered.response._
 import unfiltered.netty._
 import argonaut._, Argonaut._
 import scalaz.concurrent.Task
+import scalaz.{\/,-\/,\/-}
 import journal.Logger
 
 object JsonRequest {
@@ -17,29 +18,32 @@ object JsonRequest {
 
 object JsonResponse {
   def apply[A: EncodeJson](a: A, params: PrettyParams = PrettyParams.nospace) =
-    JsonContent ~> ResponseString(a.jencode.pretty(params))
+    JsonContent ~>
+      ResponseString(a.jencode.pretty(params))
 }
 
 object Server {
   private val log = Logger[Server.type]
 
-  def start[U <: Platform](chemist: Chemist[U], platform: U): Task[Unit] =
-    Task.reduceUnordered[Unit, Unit](Seq(
-      Task(unfiltered.netty.Server
-        .http(platform.config.network.port, platform.config.network.host)
-        .resources(getClass.getResource("/oncue/www/"), cacheSeconds = 3600)
-        .handler(Server(chemist, platform))
-        .run
-      ),
-      chemist.bootstrap(platform).handle {
-        case e =>
-          log.warn(s"Unable to bootstrap the chemist service. Failed with error: $e")
-      },
-      chemist.init(platform).handle {
-        case e =>
-          log.warn(s"Unable to initilize the chemist service. Failed with error: $e")
-      }
-    ))
+  // there seems to be a bug in Task that makes doing what we previously had here
+  // not possible. The server gets into a hang/deadlock situation.
+  def unsafeStart[U <: Platform](chemist: Chemist[U], platform: U): Unit = {
+    chemist.bootstrap(platform).runAsync {
+      case -\/(err) => log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
+      case \/-(_)   => log.info("Sucsessfully bootstrap chemist at startup.")
+    }
+
+    chemist.init(platform).runAsync {
+      case -\/(err) => log.error(s"Unable to initilize the chemist service. Failed with error: $err")
+      case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
+    }
+
+    unfiltered.netty.Server
+      .http(platform.config.network.port, platform.config.network.host)
+      .resources(getClass.getResource("/oncue/www/"), cacheSeconds = 3600)
+      .handler(Server(chemist, platform))
+      .run
+  }
 }
 
 @io.netty.channel.ChannelHandler.Sharable

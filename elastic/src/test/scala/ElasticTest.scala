@@ -2,8 +2,6 @@ package funnel
 package elastic
 
 import org.scalacheck.{Properties => P, _}
-import scalaz._
-import Scalaz._
 
 object ElasticTest extends P("elastic") {
   val genName = Gen.oneOf("k1", "k2")
@@ -18,7 +16,7 @@ object ElasticTest extends P("elastic") {
   val datapoint = for {
     k <- genKey
     d <- Gen.posNum[Double]
-  } yield Datapoint(k, d)
+  } yield Option(Datapoint(k, d))
 
   val E = Elastic(Monitoring.default)
 
@@ -33,13 +31,13 @@ object ElasticTest extends P("elastic") {
 
   // Emits as few times as possible
   property("elasticGroupBottom") = Prop.forAll(Gen.listOf(datapoint)) { dps =>
-    val noDups = dps.groupBy(_.key).mapValues(_.head).values
+    val noDups = dps.groupBy(_.get.key).mapValues(_.head).values
     elasticGroup(List("k"))(noDups ++ noDups).size == 1 || dps.size == 0
   }
 
   property("elasticUngroup") = Prop.forAll(Gen.listOf(datapoint)) { dps =>
     val gs = elasticGroup(List("k"))(dps ++ dps)
     val ug = elasticUngroup("flask")(gs)
-    ug.forall(_.fold(!_.fields.isEmpty, _.isObject))
+    ug.forall(_.isObject)
   }
 }

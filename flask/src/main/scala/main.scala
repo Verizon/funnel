@@ -86,9 +86,7 @@ class Flask(options: Options, val I: Instruments) {
     def retries(names: Names): Event =
       Monitoring.defaultRetries andThen (_ ++ Process.eval(Q.enqueueOne(Error(names))))
 
-    val localhost = java.net.InetAddress.getLocalHost.toString
-
-    val flaskName = options.name.getOrElse(localhost)
+    val flaskName = options.name.getOrElse(s"flask-${oncue.svc.funnel.BuildInfo.version}")
 
     // Implement key TTL
     options.metricTTL.foreach(t => runAsync(I.monitoring.keySenescence(Events.every(t)).run))
@@ -134,14 +132,17 @@ object Main {
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
     val elasticDf        =
       cfg.lookup[String]("flask.elastic-search.partition-date-format").getOrElse("yyyy.MM.dd")
-    val elasticTimeout   = cfg.lookup[Int]("flask.elastic-search.connection-timeout-in-ms").getOrElse(5000)
+    val elasticTimeout   = cfg.lookup[Duration]("flask.elastic-search.connection-timeout").getOrElse(5.seconds)
     val esGroups         = cfg.lookup[List[String]]("flask.elastic-search.groups")
+    val esTemplate       = cfg.lookup[String]("flask.elastic-search.template.name").getOrElse("flask")
+    val esTemplateLoc    = cfg.lookup[String]("flask.elastic-search.template.location")
+    val esPublishTimeout = cfg.lookup[Duration]("flask.elastic-search.minimum-publish-frequency").getOrElse(10.minutes)
     val riemannHost      = cfg.lookup[String]("flask.riemann.host")
     val riemannPort      = cfg.lookup[Int]("flask.riemann.port")
     val ttl              = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").map(_.minutes)
     val riemann          = (riemannHost |@| riemannPort |@| ttl)(RiemannCfg)
     val elastic          = (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
-      ElasticCfg(_, _, _, elasticDf, _, elasticTimeout))
+      ElasticCfg(_, _, _, elasticDf, esTemplate, esTemplateLoc, _, esPublishTimeout.toNanos.nanos, elasticTimeout))
     val snsErrorTopic    = cfg.require[String]("flask.sns-error-topic")
     val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
     val metricTTL        = cfg.lookup[Duration]("flask.metric-ttl")

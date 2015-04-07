@@ -2,7 +2,7 @@ package funnel
 package chemist
 
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
-import scala.concurrent.Await
+import scala.concurrent.{Future,Await}
 import scala.concurrent.duration._
 import dispatch._, Defaults._
 
@@ -19,7 +19,7 @@ class ServerSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     Await.result(http(url(s"http://127.0.0.1:64523$path") OK as.String), 5.seconds)
 
   override def beforeAll(): Unit = {
-    Server.start(core,platform).runAsync(_ => ())
+    Future(Server.unsafeStart(core,platform))
     Thread.sleep(1.seconds.toMillis)
   }
 
@@ -31,10 +31,4 @@ class ServerSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "respond to index.html" in {
     fetch("/index.html").length > 10
   }
-
-  // it must "respond to the /lifecycle/history" in {
-  //   println(fetch("/lifecycle/history"))
-  // }
-
-
 }

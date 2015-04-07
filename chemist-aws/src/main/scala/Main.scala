@@ -19,9 +19,12 @@ object Main {
 
     val monitoring = MonitoringServer.start(Monitoring.default, 5775)
 
-    Server.start(chemist, aws).onFinish(_ => Task.delay {
-      monitoring.stop()
-      dispatch.Http.shutdown()
-    }).run
+    // this is the edge of the world and will just block until its stopped
+    Server.unsafeStart(chemist, aws)
+
+    // if we reach these then the server process has stopped and we need
+    // to cleanup the associated resources.
+    monitoring.stop()
+    dispatch.Http.shutdown()
   }
 }
