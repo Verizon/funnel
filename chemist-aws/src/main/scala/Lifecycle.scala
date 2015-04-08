@@ -185,7 +185,7 @@ object Lifecycle {
   def event(e: AutoScalingEvent, resources: Seq[String]
     )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery, http: dispatch.Http
     ): Task[Unit] = {
-    interpreter(e, resources)(r, asg, ec2, dsc).map {
+    interpreter(e, resources)(r, asg, ec2, dsc).flatMap {
       case Redistributed(seq) =>
         Sharding.distribute(seq)(http).map(_ => ())
       case _ =>
