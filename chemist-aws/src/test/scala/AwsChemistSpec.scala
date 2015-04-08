@@ -32,8 +32,6 @@ class ChemistAwsSpec extends FlatSpec with Matchers {
            instance(true, "qux") :: Nil
 
   "findInstances" should "not include flasks and honour the private network config" in {
-    println(f1)
-
     AwsChemist.filterInstances(f1)(c1).length should equal (3)
     AwsChemist.filterInstances(f1)(c2).length should equal (2)
   }
