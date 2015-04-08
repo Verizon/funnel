@@ -6,9 +6,9 @@
     </encoder>
   </appender>
 
-  <logger name="funnel" level="INFO" />
+  <logger name="funnel" level="OFF" />
 
-  <root level="INFO">
+  <root level="ERROR">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>
