@@ -1,4 +1,5 @@
 package funnel
+package aws
 
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
 import com.amazonaws.services.sns.{AmazonSNS,AmazonSNSClient}
@@ -6,7 +7,6 @@ import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.services.sns.model.{CreateTopicRequest, PublishRequest}
 import com.amazonaws.auth.BasicAWSCredentials
 import scalaz.concurrent.Task
-import aws.ARN
 
 object SNS {
 

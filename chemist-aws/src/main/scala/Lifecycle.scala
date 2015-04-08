@@ -10,6 +10,7 @@ import com.amazonaws.services.sqs.model.Message
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
+import funnel.aws._
 
 /**
  * The purpose of this object is to manage all the "lifecycle" events
@@ -185,7 +186,7 @@ object Lifecycle {
   def event(e: AutoScalingEvent, resources: Seq[String]
     )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery, http: dispatch.Http
     ): Task[Unit] = {
-    interpreter(e, resources)(r, asg, ec2, dsc).map {
+    interpreter(e, resources)(r, asg, ec2, dsc).flatMap {
       case Redistributed(seq) =>
         Sharding.distribute(seq)(http).map(_ => ())
       case _ =>

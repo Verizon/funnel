@@ -86,7 +86,9 @@ class Flask(options: Options, val I: Instruments) {
     def retries(names: Names): Event =
       Monitoring.defaultRetries andThen (_ ++ Process.eval(Q.enqueueOne(Error(names))))
 
-    val flaskName = options.name.getOrElse(s"flask-${oncue.svc.funnel.BuildInfo.version}")
+    import java.net.InetAddress
+    val flaskName = options.name.getOrElse(InetAddress.getLocalHost.getHostName)
+    val flaskBucket = options.bucket.getOrElse(s"flask-${oncue.svc.funnel.BuildInfo.version}")
 
     // Implement key TTL
     options.metricTTL.foreach(t => runAsync(I.monitoring.keySenescence(Events.every(t)).run))
@@ -94,7 +96,7 @@ class Flask(options: Options, val I: Instruments) {
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), flaskName, retries))
 
     options.elastic.foreach { elastic =>
-      runAsync(Elastic(I.monitoring).publish(flaskName)(elastic))
+      runAsync(Elastic(I.monitoring).publish(flaskName, flaskBucket)(elastic))
     }
 
     options.riemann.foreach { riemann =>
@@ -126,7 +128,8 @@ object Main {
   } yield a ++ b
 
   val (options, cfg) = config.flatMap { cfg =>
-    val name             = cfg.lookup[String]("flask.name").getOrElse("flask")
+    val name             = cfg.lookup[String]("flask.name")
+    val bucket           = cfg.lookup[String]("flask.bucket")
     val elasticURL       = cfg.lookup[String]("flask.elastic-search.url")
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
@@ -148,7 +151,7 @@ object Main {
     val metricTTL        = cfg.lookup[Duration]("flask.metric-ttl")
     val telemetryPort        = cfg.lookup[Int]("telemetryPort").getOrElse(7391)
 
-    Task((Options(Option(name), elastic, riemann, snsErrorTopic, port, metricTTL, telemetryPort), cfg))
+    Task((Options(name, bucket, elastic, riemann, snsErrorTopic, port, metricTTL, telemetryPort), cfg))
   }.run
 
   val I = new Instruments(1.minute)

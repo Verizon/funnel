@@ -1,4 +1,5 @@
 package funnel
+package aws
 
 import com.amazonaws.services.sqs.{AmazonSQS,AmazonSQSClient}
 import com.amazonaws.services.sqs.model.{
@@ -16,7 +17,6 @@ import scalaz.concurrent.{Strategy,Task}
 import scala.collection.JavaConverters._
 import concurrent.duration._
 import java.util.concurrent.{ExecutorService,ScheduledExecutorService}
-import aws.ARN
 
 object SQS {
   // hard-coded for now as these are so slow moving.
