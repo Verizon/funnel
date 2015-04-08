@@ -60,8 +60,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
   def stop(): Unit = server.stop(0)
 
   protected def handleIndex(req: HttpExchange): Unit = {
-    req.sendResponseHeaders(200, helpHTML.length)
-    req.getResponseBody.write(helpHTML.getBytes)
+    flush(200, helpHTML.getBytes, req)
   }
 
   protected def handleStream(M: Monitoring, prefix: String, req: HttpExchange): Unit = {
@@ -80,10 +79,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
     val ks = M.keys.continuous.once.runLastOr(Set.empty).run.filter(x =>
       x.startsWith(prefix) && query(x))
     val respBytes = JSON.prettyEncode(ks).getBytes
-    req.getResponseHeaders.set("Content-Type", "application/json")
-    req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
-    req.sendResponseHeaders(200, respBytes.length)
-    req.getResponseBody.write(respBytes)
+    flush(200, respBytes, req)
   }
 
   protected def handleKeysStream(M: Monitoring, req: HttpExchange): Unit = {
@@ -101,10 +97,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
       JSON.prettyEncode(m.filterKeys(k =>
         k.startsWith(label) &&
         keyQuery(req.getRequestURI)(k)).values.toList).getBytes
-    req.getResponseHeaders.set("Content-Type", "application/json")
-    req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
-    req.sendResponseHeaders(200, respBytes.length)
-    req.getResponseBody.write(respBytes)
+    flush(200, respBytes, req)
   }
 
   protected def handleAddMirroringURLs(M: Monitoring, req: HttpExchange): Unit = {
@@ -153,11 +146,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
     import JSON._; import argonaut._, Argonaut._;
 
     M.audit.attemptRun.fold(
-      err => {
-        val respBytes = err.getMessage.toString.getBytes("UTF-8")
-        req.sendResponseHeaders(500, respBytes.length)
-        req.getResponseBody.write(respBytes)
-      },
+      err => flush(500, err.getMessage.toString.getBytes("UTF-8"), req),
       list => flush(200,
         list.map(t => Audit(t._1, t._2)).asJson.nospaces.getBytes, req)
     )
@@ -176,6 +165,8 @@ class MonitoringServer(M: Monitoring, port: Int) {
     flush(status, body.getBytes, req)
 
   private def flush(status: Int, body: Array[Byte], req: HttpExchange): Unit = {
+    req.getResponseHeaders.set("Content-Type", "application/json")
+    req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
     req.sendResponseHeaders(status,body.length)
     req.getResponseBody.write(body)
   }
