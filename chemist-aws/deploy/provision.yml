@@ -28,3 +28,7 @@
       with_items:
       - { path: '/etc/nginx/conf.d/internal.conf' }
       - { path: '/etc/nginx/conf.d/monitoring.conf' }
+
+    - name: chemist | restart chemist service
+      sudo: yes
+      service: name=nginx state=restarted
