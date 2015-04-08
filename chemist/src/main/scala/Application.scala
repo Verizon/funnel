@@ -11,8 +11,8 @@ package chemist
 case class Application(
   name: String,
   version: String,
-  qualifier: String
+  qualifier: Option[String]
 ){
   override def toString: String =
-    s"$name-v$version-$qualifier"
+    s"$name-v$version${qualifier.map("-"+_).getOrElse("")}"
 }
