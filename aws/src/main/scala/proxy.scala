@@ -1,4 +1,5 @@
 package funnel
+package aws
 
 import com.amazonaws.{ClientConfiguration,Protocol}
 

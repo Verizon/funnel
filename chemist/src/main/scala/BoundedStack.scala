@@ -14,7 +14,7 @@ case class BoundedStack[A](maximumEntries: Int){
   def push(item: A): Unit = {
     def add: Unit = {
       list.push(item)
-      if (list.size > maximumEntries) list.removeLast()
+      if (list.size > maximumEntries) { val _ = list.removeLast() }
     }
 
     lock.synchronized(add)

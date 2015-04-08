@@ -11,6 +11,7 @@ import com.amazonaws.regions.{Regions,Region}
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import dispatch.Http
 import concurrent.duration.Duration
+import funnel.aws._
 
 case class QueueConfig(
   queueName: String,
