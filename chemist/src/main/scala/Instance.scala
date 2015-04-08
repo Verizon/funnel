@@ -10,17 +10,14 @@ case class Instance(
   firewalls: Seq[String], // essentially security groups
   tags: Map[String,String] = Map.empty
 ){
-  private def fromAppNameAndRevision: Option[Application] =
+  def application: Option[Application] = {
     for {
-      a <- tags.get("AppName")
-      b <- tags.get("revision")
-    } yield Application(a,b)
-
-  private def fromLegacyStackName: Option[Application] =
-    tags.get("aws:cloudformation:stack-name").map(Application(_, "unknown"))
-
-  def application: Option[Application] =
-    fromAppNameAndRevision orElse fromLegacyStackName
+      a <- tags.get("aws:cloudformation:stack-name").flatMap(_.split('-').lastOption
+             ).orElse(Option(java.util.UUID.randomUUID.toString))
+      b <- tags.get("type")
+      c <- tags.get("revision")
+    } yield Application(b,c,a)
+  }
 
   def asURL: Throwable \/ URL = location.asURL()
 }

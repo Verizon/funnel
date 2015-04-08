@@ -23,7 +23,7 @@ class ChemistAwsSpec extends FlatSpec with Matchers {
 
   def instance(isPrivate: Boolean, name: String): Instance = {
     val l = Location(None, "127.0.0.1", 45698, "dc", isPrivateNetwork = isPrivate)
-    Instance(id = "x", location = l, firewalls = Nil, tags = Map("AppName" -> name, "revision" -> "1.2.3"))
+    Instance(id = "x", location = l, firewalls = Nil, tags = Map("type" -> name, "revision" -> "1.2.3"))
   }
 
   val f1 = instance(true, "flask") ::
@@ -32,6 +32,8 @@ class ChemistAwsSpec extends FlatSpec with Matchers {
            instance(true, "qux") :: Nil
 
   "findInstances" should "not include flasks and honour the private network config" in {
+    println(f1)
+
     AwsChemist.filterInstances(f1)(c1).length should equal (3)
     AwsChemist.filterInstances(f1)(c2).length should equal (2)
   }
