@@ -22,7 +22,7 @@ final case class NewKey(key: Key[_]) extends Telemetry
 
 object Telemetry extends TelemetryCodecs {
 
-  implicit val TeansportedTelemetry = Transportable[Telemetry] { t =>
+  implicit val transportedTelemetry = Transportable[Telemetry] { t =>
     t match {
       case e @ Error(_) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("error")), errorCodec.encodeValid(e).toByteArray)
       case NewKey(key) =>
