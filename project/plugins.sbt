@@ -2,6 +2,7 @@ resolvers += Resolver.url(
   "tpolecat-sbt-plugin-releases",
     url("http://dl.bintray.com/content/tpolecat/sbt-plugin-releases"))(
         Resolver.ivyStylePatterns)
+
 credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 
 resolvers += "im.nexus" at "http://nexus.svc.oncue.com/nexus/content/groups/intel_media_maven/"
