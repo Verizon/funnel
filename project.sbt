@@ -14,6 +14,7 @@ lazy val funnel = project.in(file(".")).aggregate(
   elastic,
   nginx,
   riemann,
+  messages,
   zeromq,
   agent,
   `zeromq-java`,

@@ -11,8 +11,8 @@ import zeromq._
 object TelemetrySpec extends Properties("Telemetry codecs") with ArbitraryTelemetry {
 
   property("scodec key roundtrip") = forAll {(k: Key[Any]) ⇒
-    keyCodec.encode(k).fold(_ => false,
-                            bits => keyCodec.decodeValidValue(bits) == k)
+    keyEncode.encode(k).fold(_ => false,
+                             bits => keyDecode.decodeValidValue(bits) == k)
   }
 
 

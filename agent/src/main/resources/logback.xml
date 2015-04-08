@@ -12,7 +12,7 @@
   <logger name="com.ning.http" level="WARN" />
   <logger name="funnel.zeromq" level="WARN" />
 
-  <root level="DEBUG">
+  <root level="INFO">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>
