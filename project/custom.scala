@@ -5,6 +5,7 @@ import com.typesafe.sbt.SbtMultiJvm
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 
 object Custom {
+
   val compilation = Seq(
     scalacOptions := Compilation.flags.filterNot(_ == "-Xlint"))
 
