@@ -113,7 +113,7 @@ object MonitoringSpec extends Properties("monitoring") {
     }
     true
   }
-/*
+
   /*
    * Check that subscribing and filtering is the same as
    * filtering and subscribing.
@@ -142,7 +142,7 @@ object MonitoringSpec extends Properties("monitoring") {
     val d = (xs.length - ys.length).abs
     d <= 2 // Each of xs and ys could gain or lose one tick, for a total of 2
   }
- */
+
 
   /* Check that `distinct` combinator works. */
   property("distinct") = forAll(Gen.nonEmptyListOf(Gen.choose(-10L,10L))) { xs =>

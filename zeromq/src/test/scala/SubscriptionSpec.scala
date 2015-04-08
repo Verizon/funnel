@@ -52,7 +52,6 @@ class SubscriptionSpec extends FlatSpec
         println(s"Error was: $err")
 
       case \/-(win) =>
-        println(s"Streaming monitoring datapoints to the socket at ${E1.location.uri}")
     })
 
     Ø.link(E2)(S)(socket =>
@@ -65,7 +64,6 @@ class SubscriptionSpec extends FlatSpec
         println(s"Error was: $err")
 
       case \/-(win) =>
-        println(s"Streaming monitoring datapoints to the socket at ${E2.location.uri}")
     })
 
     Thread.sleep(2.seconds.toMillis)
