@@ -1,4 +1,5 @@
 package funnel
+package aws
 
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.auth.{AWSCredentials,BasicAWSCredentials}
