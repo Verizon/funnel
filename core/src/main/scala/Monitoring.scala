@@ -420,7 +420,7 @@ object Monitoring {
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
     new Monitoring {
-      val log = Logger[this.type]
+      val log = Logger[Monitoring]
 
       def keys = keys_
 
