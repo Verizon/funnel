@@ -1,0 +1,5 @@
+name: indoctrinate documentation
+markdown: redcarpet
+highlighter: pygments
+baseurl: /indoctrinate/
+apidocs: /indoctrinate/api/

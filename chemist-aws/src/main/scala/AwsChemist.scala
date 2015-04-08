@@ -9,6 +9,7 @@ import scalaz.{\/,-\/,\/-,Kleisli}
 import scalaz.syntax.kleisli._
 import scalaz.concurrent.Task
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
+import funnel.aws._
 
 object AwsChemist {
   /**

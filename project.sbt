@@ -2,6 +2,7 @@
 import oncue.build._
 
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
+//import sbtunidoc.Plugin.UnidocKeys._
 
 organization in Global  := "oncue.svc.funnel"
 
@@ -33,11 +34,17 @@ lazy val `chemist-aws` = project.dependsOn(chemist % "test->test;compile->compil
 
 lazy val core = project
 
+lazy val docs = project
+//  .settings(unidocProjectFilter in (ScalaUnidoc, unidoc) := inProjects(core))
+  .dependsOn(core)
+
 lazy val elastic = project.dependsOn(core, http)
 
-lazy val flask = project.dependsOn(aws, riemann, elastic, messages, zeromq % "test->test;compile->compile")
+lazy val flask = project.dependsOn(aws % "test->test;compile->compile", riemann, elastic, messages, zeromq % "test->test;compile->compile")
 
 lazy val http = project.dependsOn(core)
+
+lazy val messages = project.dependsOn(core, zeromq).configs(MultiJvm)
 
 lazy val nginx = project.dependsOn(core)
 
@@ -46,8 +53,6 @@ lazy val riemann = project.dependsOn(core)
 lazy val zeromq = project.dependsOn(http).configs(MultiJvm)
 
 lazy val `zeromq-java` = project.dependsOn(http).configs(MultiJvm)
-
-lazy val messages = project.dependsOn(core, zeromq).configs(MultiJvm)
 
 OnCue.baseSettings
 
