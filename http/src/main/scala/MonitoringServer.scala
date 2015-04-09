@@ -337,6 +337,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
     |          <p><a href="/mirror">POST /now</a>: Dynamically mirror metrics from other funnel(s).</p>
     |          <p><a href="/halt">POST /halt</a>: Stop mirroring metrics from the given funnel URLs.</p>
     |          <p><a href="/audit">GET /audit</a>: Display an aggregated view of all keys in this server broken down by previx.</p>
+    |          <p><a href="/audit">GET /audit/:attribute</a>: Display an aggregated view of all keys in this server broken down by attribute key.</p>
     |          <p><a href="/mirror/sources">GET /mirror/sources</a>: If mirroring from other nodes, display the sources of those keys.</p>
     |        </div>
     |      </div>
