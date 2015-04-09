@@ -142,10 +142,10 @@ class MonitoringServer(M: Monitoring, port: Int) {
     }.asJson.nospaces.getBytes, req)
   }
 
-  private def handleAudit(M: Monitoring, req: HttpExchange): Unit = {
+  private def handleAudit(M: Monitoring, filter: Option[String], req: HttpExchange): Unit = {
     import JSON._; import argonaut._, Argonaut._;
-
-    M.audit.attemptRun.fold(
+    val result: Task[List[(String,Int)]] = filter.fold(M.auditByPrefix)(M.auditByAttribute)
+    result.attemptRun.fold(
       err => flush(500, err.getMessage.toString.getBytes("UTF-8"), req),
       list => flush(200,
         list.map(t => Audit(t._1, t._2)).asJson.nospaces.getBytes, req)
@@ -201,7 +201,8 @@ class MonitoringServer(M: Monitoring, port: Int) {
       }
       path match {
         case Nil                          => handleIndex(req)
-        case "audit"  :: Nil              => handleAudit(M, req)
+        case "audit"  :: Nil              => handleAudit(M, None, req)
+        case "audit"  :: attr :: Nil      => handleAudit(M, Option(attr), req)
         case "halt"   :: Nil              => handleHaltMirroringURLs(M, req)
         case "mirror" :: Nil              => handleAddMirroringURLs(M, req)
         case "mirror" :: "sources" :: Nil => handleListMirroringURLs(M, req)
@@ -336,6 +337,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
     |          <p><a href="/mirror">POST /now</a>: Dynamically mirror metrics from other funnel(s).</p>
     |          <p><a href="/halt">POST /halt</a>: Stop mirroring metrics from the given funnel URLs.</p>
     |          <p><a href="/audit">GET /audit</a>: Display an aggregated view of all keys in this server broken down by previx.</p>
+    |          <p><a href="/audit">GET /audit/:attribute</a>: Display an aggregated view of all keys in this server broken down by attribute key.</p>
     |          <p><a href="/mirror/sources">GET /mirror/sources</a>: If mirroring from other nodes, display the sources of those keys.</p>
     |        </div>
     |      </div>
