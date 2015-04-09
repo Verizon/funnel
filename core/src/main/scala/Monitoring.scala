@@ -321,16 +321,24 @@ trait Monitoring {
   /** The time-varying set of keys. */
   def keys: Signal[Set[Key[Any]]]
 
-  /** get a count of all metric keys in the system broken down by their cluster attribute **/
-  def audit: Task[List[(String, Int)]] =
+  /** given some predicate, attempt to see how many keys matching that predicate exist */
+  def audit(p: Key[Any] => Option[String]): Task[List[(String, Int)]] =
     keys.compareAndSet(identity).map { k =>
-      val ks = k.toList.flatten
-      val clusters: List[String] = ks.flatMap(_.attributes.get("cluster")).distinct
+      val ks: List[Key[Any]] = k.toList.flatten
+      val clusters: List[String] = ks.flatMap(p(_).toSeq).distinct
       clusters.foldLeft(List.empty[(String, Int)]){ (a,step) =>
         val items = ks.filter(_.startsWith(step))
         (step, items.length) :: a
       }
     }
+
+  /** get a count of all metric keys in the system broken down by their logical prefix **/
+  def auditByPrefix: Task[List[(String,Int)]] =
+    audit(_.name.split('/').headOption)
+
+  /** get a count of all metric keys in the system broken down by a specified attribute **/
+  def auditByAttribute(attribute: String): Task[List[(String,Int)]] =
+    audit(_.attributes.get(attribute))
 
   /** Returns `true` if the given key currently exists. */
   def exists[O](k: Key[O]): Task[Boolean] =
