@@ -16,7 +16,7 @@
     - name: chemist | add custom nginx configuration
       sudo: yes
       template: >
-        src=templates/chemist.cfg.j2
+        src=templates/chemist.conf.j2
         dest=/etc/nginx/conf.d/chemist.conf
         owner=root group=root mode=0644
 
