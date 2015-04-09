@@ -321,13 +321,12 @@ trait Monitoring {
   /** The time-varying set of keys. */
   def keys: Signal[Set[Key[Any]]]
 
-  /** get a count of all metric keys in the system broken down by their logical prefix **/
+  /** get a count of all metric keys in the system broken down by their cluster attribute **/
   def audit: Task[List[(String, Int)]] =
     keys.compareAndSet(identity).map { k =>
       val ks = k.toList.flatten
-      val prefixes: List[String] = ks.flatMap(_.name.split('/').headOption).distinct
-
-      prefixes.foldLeft(List.empty[(String, Int)]){ (a,step) =>
+      val clusters: List[String] = ks.flatMap(_.attributes.get("cluster")).distinct
+      clusters.foldLeft(List.empty[(String, Int)]){ (a,step) =>
         val items = ks.filter(_.startsWith(step))
         (step, items.length) :: a
       }
