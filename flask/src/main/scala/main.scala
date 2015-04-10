@@ -97,13 +97,13 @@ class Flask(options: Options, val I: Instruments) {
     log.info("Booting the mirroring process...")
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), flaskName, retries))
 
-    log.info("Booting the elastic search sink...")
     options.elastic.foreach { elastic =>
+      log.info("Booting the elastic search sink...")
       runAsync(Elastic(I.monitoring).publish(flaskName, flaskBucket)(elastic))
     }
 
-    log.info("Booting the riemann sink...")
     options.riemann.foreach { riemann =>
+      log.info("Booting the riemann sink...")
       val R = RiemannClient.tcp(riemann.host, riemann.port)
       try {
         R.connect() // urgh. Give me stregth!
