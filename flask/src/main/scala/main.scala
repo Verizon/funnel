@@ -90,15 +90,19 @@ class Flask(options: Options, val I: Instruments) {
     val flaskName = options.name.getOrElse(InetAddress.getLocalHost.getHostName)
     val flaskBucket = options.bucket.getOrElse(s"flask-${oncue.svc.funnel.BuildInfo.version}")
 
-    // Implement key TTL
+
+    log.info("Booting the key senescence...")
     options.metricTTL.foreach(t => runAsync(I.monitoring.keySenescence(Events.every(t)).run))
 
+    log.info("Booting the mirroring process...")
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), flaskName, retries))
 
+    log.info("Booting the elastic search sink...")
     options.elastic.foreach { elastic =>
       runAsync(Elastic(I.monitoring).publish(flaskName, flaskBucket)(elastic))
     }
 
+    log.info("Booting the riemann sink...")
     options.riemann.foreach { riemann =>
       val R = RiemannClient.tcp(riemann.host, riemann.port)
       try {
