@@ -5,6 +5,7 @@ import scalaz.\/
 import java.net.{URI,URL}
 import scala.io.Source
 import scalaz.stream.Process
+import scalaz.stream.time._
 import scalaz.concurrent.{Task,Strategy}
 import scala.concurrent.duration._
 
@@ -46,7 +47,7 @@ object Import {
   }
 
   def periodicly(from: URI)(frequency: Duration = 10.seconds, log: journal.Logger): Process[Task,Unit] =
-    Process.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool
+    awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool
       ).evalMap(_ => statistics(from).handleWith {
         case e: java.io.FileNotFoundException =>
           log.error(s"An error occoured with the nginx import from $from")

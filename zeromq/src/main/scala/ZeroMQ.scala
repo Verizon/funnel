@@ -3,7 +3,7 @@ package zeromq
 
 import org.zeromq.ZMQ, ZMQ.Context, ZMQ.Socket
 import scalaz.concurrent.Task
-import scalaz.stream.{Process,Channel,io}
+import scalaz.stream.{Process,Channel,channel}
 import scalaz.stream.async.mutable.Signal
 import journal.Logger
 import java.net.URI
@@ -100,7 +100,7 @@ object ZeroMQ {
    * write any A for which we have a [[Transportable]] instance
    */
   def write[A](socket: Socket)(implicit T: Transportable[A]): Channel[Task, A, Boolean] =
-    io.channel { a =>
+    channel.lift { a =>
       Task.delay {
         val t = T(a)
         socket.sendMore(t.header)
@@ -114,7 +114,7 @@ object ZeroMQ {
    * An internal method for writing a Transported message
    */
   private[funnel] def writeTrans(socket: Socket): Channel[Task, Transported, Boolean] = {
-    io.channel { t =>
+    channel.lift { t =>
       Task.delay {
         socket.sendMore(t.header)
         socket.send(t.bytes, 0)

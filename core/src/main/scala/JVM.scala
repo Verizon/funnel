@@ -7,6 +7,7 @@ import collection.JavaConversions._
 import scala.concurrent.duration._
 import scalaz.concurrent.Strategy
 import scalaz.stream._
+import scalaz.stream.time._
 
 /** Functions for adding various JVM metrics to a `Monitoring` instance. */
 object JVM {
@@ -29,7 +30,7 @@ object JVM {
       val name = gc.getName.replace(' ', '-')
       val numCollections = numericGauge(s"jvm/gc/$name", 0, Units.Count)
       val collectionTime = numericGauge(s"jvm/gc/$name/time", 0, Units.Milliseconds)
-      Process.awakeEvery(t)(ST,TS).map { _ =>
+      awakeEvery(t)(ST,TS).map { _ =>
         numCollections.set(gc.getCollectionCount.toDouble)
         collectionTime.set(gc.getCollectionTime.toDouble)
       }.run.runAsync(_ => ())
@@ -69,7 +70,7 @@ object JVM {
     val nonheapCommitted = MB("jvm/memory/nonheap/committed",
                               "The amount of nonheap memory that is committed for the JVM to use.")
 
-    Process.awakeEvery(t)(ST,TS).map { _ =>
+    awakeEvery(t)(ST,TS).map { _ =>
       import mxBean.{getHeapMemoryUsage => heap, getNonHeapMemoryUsage => nonheap}
       totalInit.set(heap.getInit + nonheap.getInit)
       totalUsed.set(heap.getUsed + nonheap.getUsed)

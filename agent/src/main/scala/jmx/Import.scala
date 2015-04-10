@@ -5,6 +5,7 @@ package jmx
 import cjmx.util.jmx.{Attach, MBeanQuery, RichMBeanServerConnection, JMXConnection, JMX}
 import journal.Logger
 import scalaz.stream.{Process,Channel,io}
+import scalaz.stream.time._
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.std.option._
 import scalaz.syntax.std.option._
@@ -39,7 +40,7 @@ object Import {
   )(cache: ConnectorCache, inst: Instruments
   )(frequency: Duration = 10.seconds
   ): Process[Task,Unit] =
-    Process.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool)
+    awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool)
       .evalMap(_ => now(location, queries, exclusions, cluster)(cache, inst))
 
   /**

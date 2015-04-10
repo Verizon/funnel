@@ -74,7 +74,7 @@ class Flask(options: Options, val I: Instruments) {
   def run(args: Array[String]): Unit = {
 
     def countDatapoints: Sink[Task, Datapoint[Any]] =
-      io.channel(_ => Task(mirrorDatapoints.increment))
+      channel.lift(_ => Task(mirrorDatapoints.increment))
 
     val Q = async.unboundedQueue[Telemetry]
     telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
