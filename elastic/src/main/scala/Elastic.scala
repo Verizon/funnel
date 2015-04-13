@@ -234,7 +234,7 @@ case class Elastic(M: Monitoring) {
     template <- Task.delay(
       cfg.templateLocation.map(scala.io.Source.fromFile) getOrElse
         scala.io.Source.fromInputStream(
-          getClass.getResourceAsStream("oncue/elastic-template.json"))).liftKleisli
+          getClass.getResourceAsStream("/oncue/elastic-template.json"))).liftKleisli
     json <- Task.delay(template.mkString).liftKleisli
     turl = url(s"${cfg.url}") / "_template" / cfg.templateName
     _ <- ensureExists(turl, elastic(turl.PUT, json))
