@@ -60,7 +60,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
   def stop(): Unit = server.stop(0)
 
   protected def handleIndex(req: HttpExchange): Unit = {
-    flush(200, helpHTML.getBytes, req)
+    flush(200, helpHTML.getBytes, req, "text/html")
   }
 
   protected def handleStream(M: Monitoring, prefix: String, req: HttpExchange): Unit = {
@@ -164,8 +164,8 @@ class MonitoringServer(M: Monitoring, port: Int) {
   private def flush(status: Int, body: String, req: HttpExchange): Unit =
     flush(status, body.getBytes, req)
 
-  private def flush(status: Int, body: Array[Byte], req: HttpExchange): Unit = {
-    req.getResponseHeaders.set("Content-Type", "application/json")
+  private def flush(status: Int, body: Array[Byte], req: HttpExchange, contentType: String = "application/json"): Unit = {
+    req.getResponseHeaders.set("Content-Type", contentType)
     req.getResponseHeaders.set("Access-Control-Allow-Origin", "*")
     req.sendResponseHeaders(status,body.length)
     req.getResponseBody.write(body)
