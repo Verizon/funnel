@@ -327,7 +327,7 @@ trait Monitoring {
       val ks: List[Key[Any]] = k.toList.flatten
       val clusters: List[String] = ks.flatMap(p(_).toSeq).distinct
       clusters.foldLeft(List.empty[(String, Int)]){ (a,step) =>
-        val items = ks.filter(_.startsWith(step)) //|| _.has()
+        val items = ks.filter(p(_).isDefined)
         (step, items.length) :: a
       }
     }
