@@ -12,7 +12,7 @@ case class RiemannCfg(
 
 case class Options(
   name: Option[String],
-  bucket: Option[String],
+  cluster: Option[String],
   elastic: Option[ElasticCfg] = None,
   riemann: Option[RiemannCfg] = None,
   snsErrorTopic: String,
