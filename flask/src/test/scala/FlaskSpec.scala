@@ -30,7 +30,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   val (options, cfg) = config.flatMap { cfg =>
     val name             = cfg.lookup[String]("flask.name")
-    val bucket           = cfg.lookup[String]("flask.bucket")
+    val cluster           = cfg.lookup[String]("flask.cluster")
     val elasticURL       = cfg.lookup[String]("flask.elastic-search.url")
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
@@ -46,7 +46,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       ElasticCfg(_, _, _, elasticDf, "foo", None, _))
     val snsErrorTopic    = cfg.require[String]("flask.sns-error-topic")
     val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
-    Task((Options(name, bucket, elastic, riemann, snsErrorTopic, port), cfg))
+    Task((Options(name, cluster, elastic, riemann, snsErrorTopic, port), cfg))
   }.run
 
   val log = Logger[this.type]
@@ -56,7 +56,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   val payload = s"""
   [
     {
-      "bucket": "datapoints-1.0-us-east",
+      "cluster": "datapoints-1.0-us-east",
       "urls": [
         "${Settings.tcp}"
       ]

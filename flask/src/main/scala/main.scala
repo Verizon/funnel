@@ -88,18 +88,22 @@ class Flask(options: Options, val I: Instruments) {
 
     import java.net.InetAddress
     val flaskName = options.name.getOrElse(InetAddress.getLocalHost.getHostName)
-    val flaskBucket = options.bucket.getOrElse(s"flask-${oncue.svc.funnel.BuildInfo.version}")
+    val flaskCluster = options.cluster.getOrElse(s"flask-${oncue.svc.funnel.BuildInfo.version}")
 
-    // Implement key TTL
+
+    log.info("Booting the key senescence...")
     options.metricTTL.foreach(t => runAsync(I.monitoring.keySenescence(Events.every(t)).run))
 
+    log.info("Booting the mirroring process...")
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), flaskName, retries))
 
     options.elastic.foreach { elastic =>
-      runAsync(Elastic(I.monitoring).publish(flaskName, flaskBucket)(elastic))
+      log.info("Booting the elastic search sink...")
+      runAsync(Elastic(I.monitoring).publish(flaskName, flaskCluster)(elastic))
     }
 
     options.riemann.foreach { riemann =>
+      log.info("Booting the riemann sink...")
       val R = RiemannClient.tcp(riemann.host, riemann.port)
       try {
         R.connect() // urgh. Give me stregth!
@@ -129,7 +133,7 @@ object Main {
 
   val (options, cfg) = config.flatMap { cfg =>
     val name             = cfg.lookup[String]("flask.name")
-    val bucket           = cfg.lookup[String]("flask.bucket")
+    val cluster           = cfg.lookup[String]("flask.cluster")
     val elasticURL       = cfg.lookup[String]("flask.elastic-search.url")
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
@@ -151,7 +155,7 @@ object Main {
     val metricTTL        = cfg.lookup[Duration]("flask.metric-ttl")
     val telemetryPort        = cfg.lookup[Int]("telemetryPort").getOrElse(7391)
 
-    Task((Options(name, bucket, elastic, riemann, snsErrorTopic, port, metricTTL, telemetryPort), cfg))
+    Task((Options(name, cluster, elastic, riemann, snsErrorTopic, port, metricTTL, telemetryPort), cfg))
   }.run
 
   val I = new Instruments(1.minute)

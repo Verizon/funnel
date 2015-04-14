@@ -131,7 +131,7 @@ case class Elastic(M: Monitoring) {
    * URL/window with all the key/value pairs that were seen for that mirror
    * in the group for that period.
    */
-  def elasticUngroup[A](flaskName: String, flaskBucket: String): Process1[ESGroup[A], Json] =
+  def elasticUngroup[A](flaskName: String, flaskCluster: String): Process1[ESGroup[A], Json] =
     await1[ESGroup[A]].flatMap { g =>
       emitAll(g.toSeq.map { case (name, m) =>
         ("host" := name._2.getOrElse(flaskName)) ->:
@@ -142,7 +142,7 @@ case class Elastic(M: Monitoring) {
               val attrs = dp.key.attributes
               val kind = attrs.get(AttributeKeys.kind)
               val clust = ("cluster" :=
-                attrs.get(AttributeKeys.bucket).getOrElse(flaskBucket)) ->: jEmptyObject
+                attrs.get(AttributeKeys.cluster).getOrElse(flaskCluster)) ->: jEmptyObject
               clust deepmerge (o deepmerge (ps ++ kind).foldRight((dp.asJson -| "value").get)(
                 (a, b) => (a := b) ->: jEmptyObject))
           }
@@ -238,7 +238,7 @@ case class Elastic(M: Monitoring) {
     template <- Task.delay(
       cfg.templateLocation.map(scala.io.Source.fromFile) getOrElse
         scala.io.Source.fromInputStream(
-          getClass.getResourceAsStream("oncue/elastic-template.json"))).liftKleisli
+          getClass.getResourceAsStream("/oncue/elastic-template.json"))).liftKleisli
     json <- Task.delay(template.mkString).liftKleisli
     turl = url(s"${cfg.url}") / "_template" / cfg.templateName
     _ <- ensureExists(turl, elastic(turl.PUT, json))
@@ -268,7 +268,7 @@ case class Elastic(M: Monitoring) {
   /**
    * Publishes to an ElasticSearch URL at `esURL`.
    */
-  def publish(flaskName: String, flaskBucket: String): ES[Unit] = {
+  def publish(flaskName: String, flaskCluster: String): ES[Unit] = for {
     def doPublish(de: Process[Task, Json], cfg: ElasticCfg): Process[Task, Unit] =
       de to (constant((json: Json) => for {
         r <- Task.delay(esURL(cfg))
@@ -288,7 +288,7 @@ case class Elastic(M: Monitoring) {
       // Reads from the monitoring instance and posts to the publishing queue
       read = timeout.wye(subscription)(wye.merge) |>
                elasticGroup(cfg.groups) |>
-               elasticUngroup(flaskName, flaskBucket) to
+               elasticUngroup(flaskName, flaskCluster) to
                buffer.enqueue
       // Reads from the publishing queue and writes to ElasticSearch
       write  = doPublish(buffer.dequeue, cfg)

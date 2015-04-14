@@ -4,7 +4,7 @@ package chemist
 import scalaz.==>>
 import scalaz.std.string._
 import scalaz.concurrent.Task
-import funnel.BucketName
+import funnel.ClusterName
 import journal.Logger
 
 object Sharding {
@@ -16,7 +16,7 @@ object Sharding {
     def empty: Distribution = ==>>()
   }
 
-  case class Target(bucket: BucketName, url: SafeURL)
+  case class Target(cluster: ClusterName, url: SafeURL)
 
   object Target {
     val defaultResources = Seq("stream/previous")
@@ -51,9 +51,9 @@ object Sharding {
    * dump out the current snapshot of how chemist believes work
    * has been assigned to flasks.
    */
-  def snapshot(d: Distribution): Map[Flask, Map[BucketName, List[SafeURL]]] =
+  def snapshot(d: Distribution): Map[Flask, Map[ClusterName, List[SafeURL]]] =
     d.toList.map { case (i,s) =>
-      i -> s.groupBy(_.bucket).mapValues(_.toList.map(_.url))
+      i -> s.groupBy(_.cluster).mapValues(_.toList.map(_.url))
     }.toMap
 
   /**
@@ -200,7 +200,7 @@ object Sharding {
       a.alter(b._1, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
     }) or Task.now(Distribution.empty)
 
-  import funnel.http.{Bucket,JSON => HJSON}
+  import funnel.http.{Cluster,JSON => HJSON}
 
   /**
    * Call out to the specific location and grab the list of things the flask
@@ -217,7 +217,7 @@ object Sharding {
 
       c <- fromScalaFuture(http(b OK as.String))
     } yield {
-      Parse.decodeOption[List[Bucket]](c
+      Parse.decodeOption[List[Cluster]](c
         ).toList.flatMap(identity
         ).foldLeft(Set.empty[Target]){ (a,b) =>
           b.urls.map(s => Target(b.label, SafeURL(s))).toSet
@@ -231,12 +231,12 @@ object Sharding {
   private def send(to: Location, targets: Seq[Target])(http: dispatch.Http): Task[String] = {
     import dispatch._, Defaults._
     import argonaut._, Argonaut._
-    import JSON.BucketsToJSON
+    import JSON.ClustersToJSON
 
     // FIXME: "safe" because we know we're passing in the default localhost
     // val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
-    val payload: Map[BucketName, List[SafeURL]] =
-      targets.groupBy(_.bucket).mapValues(_.map(_.url).toList)
+    val payload: Map[ClusterName, List[SafeURL]] =
+      targets.groupBy(_.cluster).mapValues(_.map(_.url).toList)
 
     for {
       a <- to.asURL(path = "mirror").fold(Task.fail(_), Task.now(_))

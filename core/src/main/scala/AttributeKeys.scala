@@ -6,7 +6,7 @@ package funnel
  * place so that every place that refers to them agrees.
  */
 object AttributeKeys {
-  val bucket = "bucket"
+  val cluster = "cluster"
   val source = "source"
   val kind = "kind"
 }
