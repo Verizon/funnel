@@ -15,5 +15,5 @@ import scalaz.stream.Process
 
 package object funnel {
   type DatapointParser = java.net.URI => Process[Task,Datapoint[Any]]
-  type BucketName      = String
+  type ClusterName      = String
 }

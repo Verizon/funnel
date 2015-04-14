@@ -104,7 +104,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
     import JSON._; import argonaut.Parse;
 
     post(req){ json =>
-      Parse.decodeEither[List[Bucket]](json).fold(
+      Parse.decodeEither[List[Cluster]](json).fold(
         error => flush(400, error.toString, req),
         blist => {
           val cs: List[Command] = blist.flatMap(b => b.urls.map(u => Mirror(new URI(u), b.label)))
@@ -138,7 +138,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
   private def handleListMirroringURLs(M: Monitoring, req: HttpExchange): Unit = {
     import JSON._; import argonaut._, Argonaut._;
     flush(200, M.mirroringUrls.map {
-      case (a,b) => Bucket(a,b)
+      case (a,b) => Cluster(a,b)
     }.asJson.nospaces.getBytes, req)
   }
 

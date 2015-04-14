@@ -17,7 +17,7 @@ object JSON {
    *   "shard": "instance-f1",
    *   "targets": [
    *     {
-   *       "bucket": "testing",
+   *       "cluster": "testing",
    *       "urls": [
    *         "http://...:5775/stream/sliding",
    *         "http://...:5775/stream/sliding"
@@ -58,7 +58,7 @@ object JSON {
   /**
    *[
    *  {
-   *    "bucket": "imqa-maestro-1-0-261-QmUo7Js",
+   *    "cluster": "imqa-maestro-1-0-261-QmUo7Js",
    *    "urls": [
    *      "http://ec2-23-20-119-134.compute-1.amazonaws.com:5775/stream/sliding",
    *      "http://ec2-23-20-119-134.compute-1.amazonaws.com:5775/stream/uptime",
@@ -68,9 +68,9 @@ object JSON {
    *  }
    *]
    */
-  implicit val BucketsToJSON: EncodeJson[(String, List[SafeURL])] =
+  implicit val ClustersToJSON: EncodeJson[(String, List[SafeURL])] =
     EncodeJson((t: (String, List[SafeURL])) =>
-      ("bucket" := t._1) ->:
+      ("cluster" := t._1) ->:
       ("urls"   := t._2.map(_.underlying) ) ->: jEmptyObject
     )
 

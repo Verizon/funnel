@@ -120,15 +120,15 @@ trait Monitoring {
 
   private val urlSignals = new ConcurrentHashMap[URI, Signal[Unit]]
 
-  private val bucketUrls = new Ref[BucketName ==>> Set[URI]](==>>())
+  private val clusterUrls = new Ref[ClusterName ==>> Set[URI]](==>>())
 
   /**
    * Fetch a list of all the URLs that are currently being mirrored.
    * If nothing is currently being mirrored (as is the case for all funnels)
    * then this method yields an empty `Set[URL]`.
    */
-  def mirroringUrls: List[(BucketName, List[String])] = {
-    bucketUrls.get.toList.map { case (k,s) =>
+  def mirroringUrls: List[(ClusterName, List[String])] = {
+    clusterUrls.get.toList.map { case (k,s) =>
       k -> s.toList.map(_.toString)
     }
   }
@@ -148,19 +148,19 @@ trait Monitoring {
 
     /**
      * Update the running state of the world by updating the URLs we know about
-     * to mirror, and the bucket -> url mapping.
+     * to mirror, and the cluster -> url mapping.
      */
-    def modifyActive(b: BucketName, f: Set[URI] => Set[URI]): Task[Unit] =
+    def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] =
       for {
         _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))) )
-        _ <- Task( bucketUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))) )
+        _ <- Task( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))) )
       } yield ()
 
     for {
       _ <- active.set(Set.empty)
       _ <- alive.set(())
       _ <- mirroringCommands.evalMap {
-        case Mirror(source, bucket) => Task.delay {
+        case Mirror(source, cluster) => Task.delay {
           val S = Strategy.Executor(Monitoring.serverPool)
           val hook = signal[Unit](S)
           hook.set(()).runAsync(_ => ())
@@ -173,14 +173,14 @@ trait Monitoring {
 
           val received: Process[Task,Unit] = link(hook) {
             attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
-              source, Map(AttributeKeys.bucket -> bucket, AttributeKeys.source -> localName))
+              source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> localName))
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
             if (urls.contains(source)) Process.halt // skip it, alread running
-            else Process.eval_(modifyActive(bucket, _ + source)) ++ // add to active at start
+            else Process.eval_(modifyActive(cluster, _ + source)) ++ // add to active at start
               // and remove it when done
-              received.onComplete(Process.eval_(modifyActive(bucket, _ - source)))
+              received.onComplete(Process.eval_(modifyActive(cluster, _ - source)))
           }
 
           Task.fork(receivedIdempotent.run).runAsync(_.fold(
@@ -327,7 +327,7 @@ trait Monitoring {
       val ks: List[Key[Any]] = k.toList.flatten
       val clusters: List[String] = ks.flatMap(p(_).toSeq).distinct
       clusters.foldLeft(List.empty[(String, Int)]){ (a,step) =>
-        val items = ks.filter(_.startsWith(step))
+        val items = ks.filter(_.startsWith(step)) //|| _.has()
         (step, items.length) :: a
       }
     }
