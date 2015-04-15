@@ -268,7 +268,7 @@ case class Elastic(M: Monitoring) {
   /**
    * Publishes to an ElasticSearch URL at `esURL`.
    */
-  def publish(flaskName: String, flaskCluster: String): ES[Unit] = for {
+  def publish(flaskName: String, flaskCluster: String): ES[Unit] = {
     def doPublish(de: Process[Task, Json], cfg: ElasticCfg): Process[Task, Unit] =
       de to (constant((json: Json) => for {
         r <- Task.delay(esURL(cfg))
