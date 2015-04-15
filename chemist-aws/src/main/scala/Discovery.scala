@@ -129,8 +129,7 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
    * ready to start sending metrics if we connect to its `/stream` function.
    */
   private def validate(instance: Instance): Task[Instance] = {
-    if(instance.location.isPrivateNetwork) Task.now(instance)
-    else for {
+    for {
       a <- Task(instance.asURL.flatMap(fetch))(Chemist.defaultPool)
       b <- a.fold(e => Task.fail(e), o => Task.now(o))
     } yield instance

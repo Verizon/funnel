@@ -161,6 +161,7 @@ trait Monitoring {
       _ <- alive.set(())
       _ <- mirroringCommands.evalMap {
         case Mirror(source, cluster) => Task.delay {
+          log.info(s"Attempting to monitor '$cluster' located at '$source'")
           val S = Strategy.Executor(Monitoring.serverPool)
           val hook = signalOf[Unit](())(S)
 
