@@ -17,7 +17,7 @@ import scalaz.stream._
   * ````
   * [
   *   {
-  *     "bucket": "accounts",
+  *     "cluster": "accounts",
   *     "urls": [
   *       "http://sdfsd.com/sdf",
   *       "http://improd.dfs/sdfsd"
@@ -26,7 +26,7 @@ import scalaz.stream._
   * ]
   * ````
   **/
-case class Bucket(label: String, urls: List[String])
+case class Cluster(label: String, urls: List[String])
 
 /** JSON encoders and decoders for types in the this library. */
 object JSON {
@@ -38,8 +38,8 @@ object JSON {
   def encode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).nospaces
   def prettyEncode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).spaces2
 
-  implicit val BucketCodecJson: CodecJson[Bucket] =
-    casecodec2(Bucket.apply, Bucket.unapply)("bucket", "urls")
+  implicit val ClusterCodecJson: CodecJson[Cluster] =
+    casecodec2(Cluster.apply, Cluster.unapply)("cluster", "urls")
 
   implicit val DoubleEncodeJson =
     jencode1[Double,Option[Double]] {
@@ -62,9 +62,9 @@ object JSON {
     if (s.isEmpty) s
     else s(0) + s.drop(1).toLowerCase
 
-  implicit def EncodeUnits[A]: EncodeJson[Units[A]] = {
+  implicit def EncodeUnits: EncodeJson[Units] = {
     import Units._; import Units.Base._
-    jencode1[Units[A], String] {
+    jencode1[Units, String] {
       case Bytes(Zero)  => "Bytes"
       case Bytes(Kilo)  => "Kilobytes"
       case Bytes(Mega)  => "Megabytes"
@@ -79,7 +79,7 @@ object JSON {
     }
   }
 
-  implicit def DecodeUnits: DecodeJson[Units[Any]] = DecodeJson { c =>
+  implicit def DecodeUnits: DecodeJson[Units] = DecodeJson { c =>
     import Units._; import Units.Base._
     c.as[String] flatMap {
       case "Bytes" => D.ok { Bytes(Zero) }
@@ -109,7 +109,7 @@ object JSON {
   implicit def DecodeKey: DecodeJson[Key[Any]] = DecodeJson { c => for {
     name   <- (c --\ "name").as[String]
     typeOf <- (c --\ "type").as[Reportable[Any]]
-    u      <- (c --\ "units").as[Units[Any]]
+    u      <- (c --\ "units").as[Units]
     desc   <- (c --\ "description").as[String].option
     attrs  <- c.as[Map[String, String]].map(_ - "name" - "type" - "units" - "description")
   } yield Key(name, typeOf, u, desc getOrElse "", attrs) }

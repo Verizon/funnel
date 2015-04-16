@@ -6,9 +6,9 @@
     </encoder>
   </appender>
 
-  <logger name="intelmedia.ws.s2s" level="DEBUG" />
+  <logger name="funnel" level="OFF" />
 
-  <root level="DEBUG">
+  <root level="ERROR">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>

@@ -12,9 +12,20 @@
         src=templates/flask.cfg.j2
         dest=/usr/share/oncue/etc/flask.cfg
         owner=root group=root mode=0644
+
     - name: flask | copy elastic-template.json into place
       sudo: yes
       copy: >
         src=files/elastic-template.json
         dest=/usr/share/oncue/etc/elastic-template.json
         owner=root group=root mode=0644
+
+    - name: flask | install jq during development
+      sudo: yes
+      yum: name=jq state=latest
+      when: application_environment == "imdev"
+
+    - name: flask | install httpie during development
+      sudo: yes
+      pip: name=httpie
+      when: application_environment == "imdev"

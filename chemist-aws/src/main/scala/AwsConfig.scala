@@ -12,6 +12,7 @@ import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import dispatch.Http
 import concurrent.duration.Duration
 import scalaz.stream.async.mutable.Signal
+import funnel.aws._
 
 case class QueueConfig(
   queueName: String,

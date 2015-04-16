@@ -15,6 +15,7 @@ import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
 import journal.Logger
+import funnel.aws._
 
 /**
  * This module contains functions for describing the deployed world as the caller
@@ -141,9 +142,8 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
    * ready to start sending metrics if we connect to its `/stream` function.
    */
   private def validate(instance: Instance): Task[Instance] = {
-    if(instance.location.isPrivateNetwork) Task.now(instance)
-    else for {
-      a <- Task(fetch(instance.asURI))(Chemist.defaultPool)
+    for {
+      a <- Task(instance.asURI.asURL.flatMap(fetch))(Chemist.defaultPool)
       b <- a.fold(e => Task.fail(e), o => Task.now(o))
     } yield instance
   }

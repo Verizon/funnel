@@ -34,7 +34,7 @@ trait Monitoring {
    * using a stream transducer to
    */
   def topic[I, O:Reportable](
-      name: String, units: Units[O], description: String, keyMod: Key[O] => Key[O])(
+      name: String, units: Units, description: String, keyMod: Key[O] => Key[O])(
       buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
     val k = keyMod(Key[O](name, units, description))
     (k, topic(k)(buf))
@@ -56,7 +56,7 @@ trait Monitoring {
   def remove[O](k: Key[O]): Task[Unit]
 
   /** Convience function to publish a metric under a newly created key. */
-  def publish[O:Reportable](name: String, units: Units[O])(e: Event)(
+  def publish[O:Reportable](name: String, units: Units)(e: Event)(
                             f: Metric[O]): Task[Key[O]] =
     publish(Key(name, units))(e)(f)
 
@@ -119,15 +119,15 @@ trait Monitoring {
 
   private val urlSignals = new ConcurrentHashMap[URI, Signal[Unit]]
 
-  private val bucketUrls = new Ref[BucketName ==>> Set[URI]](==>>())
+  private val clusterUrls = new Ref[ClusterName ==>> Set[URI]](==>>())
 
   /**
    * Fetch a list of all the URLs that are currently being mirrored.
    * If nothing is currently being mirrored (as is the case for all funnels)
    * then this method yields an empty `Set[URL]`.
    */
-  def mirroringUrls: List[(BucketName, List[String])] = {
-    bucketUrls.get.toList.map { case (k,s) =>
+  def mirroringUrls: List[(ClusterName, List[String])] = {
+    clusterUrls.get.toList.map { case (k,s) =>
       k -> s.toList.map(_.toString)
     }
   }
@@ -147,19 +147,20 @@ trait Monitoring {
 
     /**
      * Update the running state of the world by updating the URLs we know about
-     * to mirror, and the bucket -> url mapping.
+     * to mirror, and the cluster -> url mapping.
      */
-    def modifyActive(b: BucketName, f: Set[URI] => Set[URI]): Task[Unit] =
+    def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] =
       for {
         _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))) )
-        _ <- Task( bucketUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))) )
+        _ <- Task( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))) )
       } yield ()
 
     for {
       _ <- active.set(Set.empty)
       _ <- alive.set(())
       _ <- mirroringCommands.evalMap {
-        case Mirror(source, bucket) => Task.delay {
+        case Mirror(source, cluster) => Task.delay {
+          log.info(s"Attempting to monitor '$cluster' located at '$source'")
           val S = Strategy.Executor(Monitoring.serverPool)
           val hook = signal[Unit](S)
           hook.set(()).runAsync(_ => ())
@@ -172,14 +173,14 @@ trait Monitoring {
 
           val received: Process[Task,Unit] = link(hook) {
             attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
-              source, Map(AttributeKeys.bucket -> bucket, AttributeKeys.source -> localName))
+              source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> localName))
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
             if (urls.contains(source)) Process.halt // skip it, alread running
-            else Process.eval_(modifyActive(bucket, _ + source)) ++ // add to active at start
+            else Process.eval_(modifyActive(cluster, _ + source)) ++ // add to active at start
               // and remove it when done
-              received.onComplete(Process.eval_(modifyActive(bucket, _ - source)))
+              received.onComplete(Process.eval_(modifyActive(cluster, _ - source)))
           }
 
           Task.fork(receivedIdempotent.run).runAsync(_.fold(
@@ -320,17 +321,24 @@ trait Monitoring {
   /** The time-varying set of keys. */
   def keys: Signal[Set[Key[Any]]]
 
-  /** get a count of all metric keys in the system broken down by their logical prefix **/
-  def audit: Task[List[(String, Int)]] =
+  /** given some predicate, attempt to see how many keys matching that predicate exist */
+  def audit(p: Key[Any] => Option[String]): Task[List[(String, Int)]] =
     keys.compareAndSet(identity).map { k =>
-      val ks = k.toList.flatten
-      val prefixes: List[String] = ks.flatMap(_.name.split('/').headOption).distinct
-
-      prefixes.foldLeft(List.empty[(String, Int)]){ (a,step) =>
-        val items = ks.filter(_.startsWith(step))
+      val ks: List[Key[Any]] = k.toList.flatten
+      val clusters: List[String] = ks.flatMap(p(_).toSeq).distinct
+      clusters.foldLeft(List.empty[(String, Int)]){ (a,step) =>
+        val items = ks.filter(p(_).isDefined)
         (step, items.length) :: a
       }
     }
+
+  /** get a count of all metric keys in the system broken down by their logical prefix **/
+  def auditByPrefix: Task[List[(String,Int)]] =
+    audit(_.name.split('/').headOption)
+
+  /** get a count of all metric keys in the system broken down by a specified attribute **/
+  def auditByAttribute(attribute: String): Task[List[(String,Int)]] =
+    audit(_.attributes.get(attribute))
 
   /** Returns `true` if the given key currently exists. */
   def exists[O](k: Key[O]): Task[Boolean] =
@@ -352,7 +360,7 @@ trait Monitoring {
 
   /** Create a new topic with the given name and discard the key. */
   def topic_[I, O:Reportable](
-    name: String, units: Units[O], description: String,
+    name: String, units: Units, description: String,
     buf: Process1[(I,Duration),O]): I => Unit = topic(name, units, description, identity[Key[O]])(buf)._2
 
   def filterKeys(f: Key[Any] => Boolean): Process[Task, List[Key[Any]]] =

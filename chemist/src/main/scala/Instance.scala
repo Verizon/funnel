@@ -11,17 +11,18 @@ case class Instance(
   firewalls: Seq[String], // essentially security groups
   tags: Map[String,String] = Map.empty
 ){
-  private def fromAppNameAndRevision: Option[Application] =
+  def application: Option[Application] = {
+    println(tags)
+
     for {
-      a <- tags.get("AppName")
-      b <- tags.get("revision")
-    } yield Application(a,b)
-
-  private def fromLegacyStackName: Option[Application] =
-    tags.get("aws:cloudformation:stack-name").map(Application(_, "unknown"))
-
-  def application: Option[Application] =
-    fromAppNameAndRevision orElse fromLegacyStackName
+      b <- tags.get("type").orElse(tags.get("Name"))
+      c <- tags.get("revision").orElse(Some("unknown"))
+    } yield Application(
+      name = b,
+      version = c,
+      qualifier = tags.get("aws:cloudformation:stack-name")
+        .flatMap(_.split('-').lastOption.find(_.length > 3)))
+  }
 
   def asURL: URI = location.asURI()
 }

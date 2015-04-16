@@ -46,19 +46,18 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     sets.traverse_{ s => keysIn.set(s) }.run
 
-    Thread.sleep(2000)
+    Thread.sleep(100)
 
     val errorsS = Process.emitAll(errors)
 
     val pub: Task[Unit] = telemetryPublishSocket(U1, S, errorsS.wye(keysInD pipe keyChanges)(wye.merge))
     pub.runAsync {
       case -\/(e) => e.printStackTrace
-      case \/-(_) => println("pub runasync success")
+      case \/-(_) => 
     }
 
-    Thread.sleep(2000)
+    Thread.sleep(100)
     keysIn.close.run
-    Thread.sleep(2000)
   }
 }
 
@@ -70,7 +69,7 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     sub.run.runAsync {
       case -\/(e) => e.printStackTrace
-      case \/-(_) => println("sub runasync success")
+      case \/-(_) => 
     }
 
     var keysOut: Set[Key[Any]] = Set.empty
@@ -90,7 +89,7 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
     (keysoutS to myAwesomeSink).run.runAsync(_ => ())
     (errorsS to anotherAwesomeSink).run.runAsync(_ => ())
 
-    Thread.sleep(10000)
+    Thread.sleep(1000)
     keysout.close.run
     S.set(false).run
 

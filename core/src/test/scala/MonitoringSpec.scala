@@ -29,7 +29,6 @@ object MonitoringSpec extends Properties("monitoring") {
 
   // +/- 200 trillion
   implicit val arbLong: Arbitrary[Long] = Arbitrary(Gen.choose(-200000000000000L, 200000000000000L))
-
   /*
    * Check that `roundDuration` works as expected for
    * some hardcoded examples.
@@ -143,6 +142,7 @@ object MonitoringSpec extends Properties("monitoring") {
     val d = (xs.length - ys.length).abs
     d <= 2 // Each of xs and ys could gain or lose one tick, for a total of 2
   }
+
 
   /* Check that `distinct` combinator works. */
   property("distinct") = forAll(Gen.nonEmptyListOf(Gen.choose(-10L,10L))) { xs =>
