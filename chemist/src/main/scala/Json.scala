@@ -46,7 +46,7 @@ object JSON {
   implicit val InstanceToJson: EncodeJson[Instance] =
     EncodeJson((i: Instance) =>
       ("id"         := i.id) ->:
-      ("host"       := i.location.dns) ->:
+      ("host"       := i.location.host) ->:
       ("version"    := i.application.map(_.version)) ->:
       ("datacenter" := i.location.datacenter) ->:
       ("firewalls"  := i.firewalls.toList) ->:

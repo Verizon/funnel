@@ -1,22 +1,38 @@
 package funnel
 package chemist
 
-import scalaz.==>>
+import scalaz.{==>>,Order}
 import scalaz.std.string._
+import scalaz.std.tuple._
 import scalaz.concurrent.Task
 import funnel.BucketName
 import journal.Logger
 
 object Sharding {
 
+  case class Distribution(
+    byFlask: Flask ==>> Set[Target],
+    byTarget: Target ==>> Set[Flask]
+  ) {
+    def addFlask(f: Flask): Distribution =
+      this.copy(byFlask = byFlask.insert(f, Set.empty))
+
+
+    def deleteFlask(f: Flask): Distribution =
+      Distribution(byFlask.delete(f),
+                   byTarget.map(_ - f))
+
+  }
+
   type Flask = InstanceID
-  type Distribution = Flask ==>> Set[Target]
 
   object Distribution {
-    def empty: Distribution = ==>>()
+    def empty: Distribution = Distribution(==>>.empty, ==>>.empty)
   }
 
   case class Target(bucket: BucketName, url: SafeURL)
+
+  implicit val orderTarget: Order[Target] = Order[(String,String)].contramap(t => (t.bucket, t.url.underlying))
 
   object Target {
     val defaultResources = Seq("stream/previous")
@@ -24,7 +40,7 @@ object Sharding {
     def fromInstance(resources: Seq[String] = defaultResources)(i: Instance): Set[Target] =
       (for {
         a <- i.application
-        b <- i.asURL.toOption
+        b = i.asURL
       } yield resources.map(r => Target(a.toString, SafeURL(b+r))).toSet
       ).getOrElse(Set.empty[Target])
   }
@@ -45,14 +61,14 @@ object Sharding {
    * work first.
    */
   def sorted(d: Distribution): Map[Flask, Set[Target]] =
-    d.toList.sortBy(_._2.size).toMap
+    d.byFlask.toList.sortBy(_._2.size).toMap
 
   /**
    * dump out the current snapshot of how chemist believes work
    * has been assigned to flasks.
    */
   def snapshot(d: Distribution): Map[Flask, Map[BucketName, List[SafeURL]]] =
-    d.toList.map { case (i,s) =>
+    d.byFlask.toList.map { case (i,s) =>
       i -> s.groupBy(_.bucket).mapValues(_.toList.map(_.url))
     }.toMap
 
@@ -61,10 +77,7 @@ object Sharding {
    * distributed world of urls.
    */
   def targets(d: Distribution): Set[Target] =
-    d.values match {
-      case Nil   => Set.empty[Target]
-      case other => other.reduceLeft(_ ++ _)
-    }
+    d.byTarget.keySet
 
   /**
    * provide the new distribution based on the result of calculating
@@ -210,13 +223,10 @@ object Sharding {
     import argonaut._, Argonaut._, JSON._, HJSON._
     import dispatch._, Defaults._
 
-    for {
-      a <- location.asURL(path = "mirror/sources").fold(Task.fail(_), Task.now(_))
-      b  = url(a.toString)
-      _  = log.debug(s"requesting assigned targets from $a")
-
-      c <- fromScalaFuture(http(b OK as.String))
-    } yield {
+    val uri = location.asURI(path = "mirror/sources")
+    val req = url(uri.toString)
+    log.debug(s"requesting assigned targets from $uri")
+    fromScalaFuture(http(req OK as.String)) map { c =>
       Parse.decodeOption[List[Bucket]](c
         ).toList.flatMap(identity
         ).foldLeft(Set.empty[Target]){ (a,b) =>
@@ -238,12 +248,10 @@ object Sharding {
     val payload: Map[BucketName, List[SafeURL]] =
       targets.groupBy(_.bucket).mapValues(_.map(_.url).toList)
 
-    for {
-      a <- to.asURL(path = "mirror").fold(Task.fail(_), Task.now(_))
-      b  = url(a.toString) << payload.toList.asJson.nospaces
-      _  = log.debug(s"submitting to $a: $payload")
-      c <- fromScalaFuture(http(b OK as.String))
-    } yield c
+    val uri = to.asURI(path = "mirror")
+    val req = url(uri.toString) << payload.toList.asJson.nospaces
+    log.debug(s"submitting to $uri: $payload")
+    fromScalaFuture(http(req OK as.String))
   }
 
 }

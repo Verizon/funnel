@@ -5,10 +5,19 @@ import scalaz.concurrent.Task
 import Sharding.Distribution
 import scalaz.==>>
 import scalaz.std.string._
+import scalaz.syntax.applicative._
+import scalaz.stream.{Sink, Process, async}
+import async.mutable.Signal
+import java.net.URI
+import messages.Error
+import messages.Telemetry._
+
 
 trait Repository {
 
-  type InstanceM   = InstanceID ==>> Instance
+  type Cluster   = String
+  type InstanceM = InstanceID ==>> Instance
+  type KeyM      = Cluster    ==>> Set[Key[Any]]
 
   /////////////// audit operations //////////////////
 
@@ -39,7 +48,7 @@ import com.amazonaws.services.ec2.AmazonEC2
 import funnel.internals._
 import journal.Logger
 
-class StatefulRepository(discovery: Discovery) extends Repository {
+class StatefulRepository(discovery: Discovery, signal: Signal[Boolean]) extends Repository {
   private val log = Logger[StatefulRepository]
 
   /**
@@ -58,20 +67,60 @@ class StatefulRepository(discovery: Discovery) extends Repository {
    */
   private val Q = new BoundedStack[AutoScalingEvent](100)
 
+  /**
+   * stores the set of all the keys we have ever seen
+   */
+  private val K = new Ref[Set[Key[Any]]](Set.empty)
+
+  /**
+   * remember what the last set of keys looked like from this flask we
+   * need this to diff with the next set so that we know if we are
+   * adding or removing keys
+   */
+  private val LK = new Ref[InstanceId ==>> Set[Key[Any]]](==>>.empty)
+
+  /**
+   * stores the list of errors we have gotten from flasks, most recent
+   * first.
+   */
+  private val E = new BoundedStack[Error](100)
+
   /////////////// audit operations //////////////////
 
   def addEvent(e: AutoScalingEvent): Task[Unit] = {
     log.info(s"Adding auto-scalling event to the historical events: $e")
-    Task.delay(Q.push(e))
+    Q.push(e)
   }
 
   def historicalEvents: Task[Seq[AutoScalingEvent]] =
     Task.delay(Q.toSeq.toList)
 
+  private val keySink: Sink[Task,(InstanceId, Set[Key[Any]])] =
+    Process.constant {
+      case (id, keys) =>
+        val old: Set[Key[Any]] = LK.get(_.lookup(id)) getOrElse Set.empty
+        val removed = old - keys
+        val added = keys - old
+
+        // for the removed keys, we have to see if they are being handled by some other flask, otherwise, remove them
+        removed foreach { k =>
+          cluster = k.
+        }
+
+    }
+
+    Task.delay(K.update(keys ++ _)))
+
+  private val errorSink: Sink[Task,Error] = Process.constant(E.push(_))
+
   /////////////// instance operations ///////////////
 
   def addInstance(instance: Instance): Task[InstanceM] =
-    Task.delay(I.update(_.insert(instance.id, instance)))
+    Task.delay(I.update(_.insert(instance.id, instance))) <* Task.delay {
+      val (keysout, errorsS, sub) = telemetrySubscribeSocket(instance.telemetryLocation.asURI(), signal)
+      (keysout.discrete to keySink).run.runAsync(_ => ()) // STU do something with the errors
+      (errorsS to errorSink).run.runAsync(_ => ()) // STU do something with the errors
+    }
 
   def removeInstance(id: InstanceID): Task[InstanceM] =
     Task.delay(I.update(_.delete(id)))
@@ -88,10 +137,12 @@ class StatefulRepository(discovery: Discovery) extends Repository {
     Task.now(D.get)
 
   def mergeDistribution(d: Distribution): Task[Distribution] =
-    Task.delay(D.update(_.unionWith(d)(_ ++ _)))
+    Task.delay(D.update(old =>
+                 Distribution(old.byFlask.unionWith(d.byFlask)(_ ++ _),
+                              old.byTarget.unionWith(d.byTarget)(_ ++ _))))
 
   def assignedTargets(id: InstanceID): Task[Set[Sharding.Target]] =
-    D.get.lookup(id) match {
+    D.get.byFlask.lookup(id) match {
       case None => Task.fail(InstanceNotFoundException(id, "Flask"))
       case Some(t) => Task.now(t)
     }
@@ -114,7 +165,7 @@ class StatefulRepository(discovery: Discovery) extends Repository {
    */
   def increaseCapacity(instance: Instance): Task[(Distribution,InstanceM)] =
     for {
-      a <- Task.delay(D.update(_.insert(instance.id, Set.empty)))
+      a <- Task.delay(D.update(_.addFlask(instance.id)))
       _  = log.debug(s"increaseCapacity, updating the distribution for ${instance.id}")
       b <- addInstance(instance)
       _  = log.debug(s"increaseCapacity, updated with ${instance.id}")
@@ -123,6 +174,6 @@ class StatefulRepository(discovery: Discovery) extends Repository {
   def decreaseCapacity(downed: InstanceID): Task[Distribution] =
     for {
       _ <- removeInstance(downed)
-      d <- Task.delay(D.update(_.delete(downed)))
+      d <- Task.delay(D.update(_.deleteFlask(downed)))
     } yield d
 }

@@ -55,7 +55,7 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
       case -\/(e) => e.printStackTrace
       case \/-(_) => println("pub runasync success")
     }
-    
+
     Thread.sleep(2000)
     keysIn.close.run
     Thread.sleep(2000)
@@ -72,7 +72,7 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
       case -\/(e) => e.printStackTrace
       case \/-(_) => println("sub runasync success")
     }
-    
+
     var keysOut: Set[Key[Any]] = Set.empty
     val myAwesomeSink: Sink[Task,Set[Key[Any]]] = Process.constant { k =>
       Task {
@@ -86,8 +86,6 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
         errorsOut = e :: errorsOut
       }
     }
-
-
 
     (keysoutS to myAwesomeSink).run.runAsync(_ => ())
     (errorsS to anotherAwesomeSink).run.runAsync(_ => ())

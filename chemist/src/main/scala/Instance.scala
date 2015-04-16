@@ -1,12 +1,13 @@
 package funnel
 package chemist
 
-import java.net.URL
+import java.net.URI
 import scalaz.{\/,\/-,-\/}
 
 case class Instance(
   id: String,
   location: Location = Location.localhost,
+  telemetryLocation: Location = Location.telemetryLocalhost,
   firewalls: Seq[String], // essentially security groups
   tags: Map[String,String] = Map.empty
 ){
@@ -22,5 +23,5 @@ case class Instance(
   def application: Option[Application] =
     fromAppNameAndRevision orElse fromLegacyStackName
 
-  def asURL: Throwable \/ URL = location.asURL()
+  def asURL: URI = location.asURI()
 }

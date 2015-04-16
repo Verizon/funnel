@@ -6,7 +6,11 @@ import java.net.URL
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
+import scalaz.\/
+import scalaz.std.vector._
 import scalaz.stream.Process
+import scalaz.syntax.monadPlus._
+import scalaz.syntax.std.option._
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
@@ -57,8 +61,10 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
       a <- EC2.reservations(ids)(ec2)
       _  = log.debug(s"Deployed.lookupMany, a = ${a.length}")
       b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
+      (fails,successes) = b.toVector.separate
       _  = log.debug(s"Deployed.lookupMany b = ${b.length}")
-    } yield b
+      _  = fails.foreach(x => log.error(x))
+    } yield successes
 
 
   ///////////////////////////// filters /////////////////////////////
@@ -93,22 +99,29 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
       r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))
     } yield r
 
-  private def fromAWSInstance(in: AWSInstance): Instance = {
+  private def fromAWSInstance(in: AWSInstance): String \/ Instance = {
     val sgs: List[String] = in.getSecurityGroups.asScala.toList.map(_.getGroupName)
     val extdns: Option[String] =
       if(in.getPublicDnsName.nonEmpty) Option(in.getPublicDnsName) else None
     val intdns = Option(in.getPrivateDnsName)
 
-    Instance(
-      id = in.getInstanceId,
-      location = Location(
-        dns = extdns orElse intdns,
-        datacenter = in.getPlacement.getAvailabilityZone,
-        isPrivateNetwork = (extdns.isEmpty && intdns.nonEmpty)
-      ),
-      firewalls = sgs,
-      tags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
-    )
+    val host = (extdns orElse intdns) \/> s"instance had no ip: ${in.getInstanceId}"
+    host map { h =>
+      val loc = Location(
+          host = h,
+          port = 5775,
+          datacenter = in.getPlacement.getAvailabilityZone,
+          isPrivateNetwork = (extdns.isEmpty && intdns.nonEmpty)
+      )
+      val tloc = loc.copy(port=5776)
+      Instance(
+        id = in.getInstanceId,
+        location = loc,
+        telemetryLocation = tloc,
+        firewalls = sgs,
+        tags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
+      )
+    }
   }
 
   import scala.io.Source
@@ -130,7 +143,7 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
   private def validate(instance: Instance): Task[Instance] = {
     if(instance.location.isPrivateNetwork) Task.now(instance)
     else for {
-      a <- Task(instance.asURL.flatMap(fetch))(Chemist.defaultPool)
+      a <- Task(fetch(instance.asURI))(Chemist.defaultPool)
       b <- a.fold(e => Task.fail(e), o => Task.now(o))
     } yield instance
   }

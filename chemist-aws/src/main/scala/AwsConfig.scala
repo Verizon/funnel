@@ -11,6 +11,7 @@ import com.amazonaws.regions.{Regions,Region}
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import dispatch.Http
 import concurrent.duration.Duration
+import scalaz.stream.async.mutable.Signal
 
 case class QueueConfig(
   queueName: String,
@@ -26,17 +27,18 @@ case class AwsConfig(
   ec2: AmazonEC2,
   asg: AmazonAutoScaling,
   commandTimeout: Duration,
-  includeVpcTargets: Boolean
+  includeVpcTargets: Boolean,
+  signal: Signal[Boolean]
 ) extends PlatformConfig {
   val discovery: Discovery = new Discovery(ec2, asg)
-  val repository: Repository = new StatefulRepository(discovery)
+  val repository: Repository = new StatefulRepository(discovery, signal)
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
 }
 
 object Config {
-  def readConfig(cfg: Config): AwsConfig = {
+  def readConfig(cfg: Config, signal: Signal[Boolean]): AwsConfig = {
     val topic     = cfg.require[String]("chemist.sns-topic-name")
     val queue     = cfg.require[String]("chemist.sqs-queue-name")
     val resources = cfg.require[List[String]]("chemist.resources-to-monitor")
@@ -53,7 +55,8 @@ object Config {
       ec2       = readEC2(aws),
       asg       = readASG(aws),
       timeout,
-      usevpc
+      usevpc,
+      signal
     )
   }
 

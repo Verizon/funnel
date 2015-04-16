@@ -4,6 +4,7 @@ package chemist
 import java.util.Deque
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.locks.ReentrantLock
+import scalaz.concurrent.Task
 
 case class BoundedStack[A](maximumEntries: Int){
   import scala.collection.JavaConverters._
@@ -11,13 +12,13 @@ case class BoundedStack[A](maximumEntries: Int){
   private val list: Deque[A] = new ConcurrentLinkedDeque[A]
   private val lock = new Object
 
-  def push(item: A): Unit = {
+  def push(item: A): Task[Unit] = {
     def add: Unit = {
       list.push(item)
       if (list.size > maximumEntries) list.removeLast()
     }
 
-    lock.synchronized(add)
+    Task.delay(lock.synchronized(add))
   }
 
   def pop: Option[A] = Option(list.poll)

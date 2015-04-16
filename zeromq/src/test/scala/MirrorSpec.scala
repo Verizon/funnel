@@ -7,7 +7,6 @@ import scalaz.stream.{Channel,Process,io}
 import scalaz.stream.async.signalOf
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
 import sockets._
-import java.util.concurrent.atomic.AtomicLong
 import scala.concurrent.duration._
 
 class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {

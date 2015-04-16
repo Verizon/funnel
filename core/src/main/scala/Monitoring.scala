@@ -1,7 +1,6 @@
 package funnel
 
 import java.net.URI
-import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory, ConcurrentHashMap}
 import scala.concurrent.duration._
 import scala.language.higherKinds

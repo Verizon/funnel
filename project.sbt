@@ -27,7 +27,7 @@ lazy val `agent-windows` = project.dependsOn(`zeromq-java`, http, nginx).configs
 
 lazy val aws = project
 
-lazy val chemist = project.dependsOn(core, http)
+lazy val chemist = project.dependsOn(core, http, messages)
 
 lazy val `chemist-aws` = project.dependsOn(chemist % "test->test;compile->compile", aws)
 
