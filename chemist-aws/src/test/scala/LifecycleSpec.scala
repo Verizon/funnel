@@ -8,6 +8,8 @@ import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import scalaz.{\/,\/-,-\/,==>>}
 import scalaz.stream.{Process,Sink}
 import scalaz.concurrent.Task
+import scalaz.stream.async.signalOf
+import scalaz.stream.async.mutable.Signal
 import scalaz.std.string._
 import Sharding.{Distribution,Target}
 
@@ -28,8 +30,11 @@ class LifecycleSpec extends FlatSpec with Matchers {
   val k1 = "i-dx947af7"
   val k2 = "i-15807647"
 
+
+  val signal: Signal[Boolean] = signalOf(true)
+
   private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): Throwable \/ Action =
-    Lifecycle.stream("name-of-queue", "stream/previous" :: Nil)(r, sqs, asg, ec2, dsc
+    Lifecycle.stream("name-of-queue", "stream/previous" :: Nil, signal)(r, sqs, asg, ec2, dsc
       ).until(Process.emit(false)).runLast.run.get // never do this anywhere but tests
 
   behavior of "Lifecycle.stream"
@@ -54,7 +59,7 @@ class LifecycleSpec extends FlatSpec with Matchers {
 
   def check(json: String): Task[Throwable \/ Action] =
     Lifecycle.parseMessage(TestMessage(json)
-      ).traverseU(Lifecycle.interpreter(_, resources)(r, asg1, ec2, dsc))
+      ).traverseU(Lifecycle.interpreter(_, resources, signal)(r, asg1, ec2, dsc))
 
   it should "parse messages and produce the right action" in {
     check(Fixtures.asgEvent(Launch, instanceId = "i-flaskAAA")).run should equal (NoOp.right)

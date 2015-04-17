@@ -2,7 +2,7 @@ package funnel
 package chemist
 package aws
 
-import java.net.URL
+import java.net.{URI,URL}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
@@ -114,7 +114,7 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
           datacenter = in.getPlacement.getAvailabilityZone,
           isPrivateNetwork = (extdns.isEmpty && intdns.nonEmpty)
       )
-      val tloc = loc.copy(port=5776)
+      val tloc = loc.copy(port=5776, protocol="tcp")
       Instance(
         id = in.getInstanceId,
         location = loc,
@@ -143,7 +143,7 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
    */
   private def validate(instance: Instance): Task[Instance] = {
     for {
-      a <- Task(instance.asURI.asURL.flatMap(fetch))(Chemist.defaultPool)
+      a <- Task(fetch(instance.asURI.toURL))(Chemist.defaultPool)
       b <- a.fold(e => Task.fail(e), o => Task.now(o))
     } yield instance
   }

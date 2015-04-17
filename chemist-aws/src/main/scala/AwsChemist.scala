@@ -8,6 +8,8 @@ import journal.Logger
 import scalaz.{\/,-\/,\/-,Kleisli}
 import scalaz.syntax.kleisli._
 import scalaz.concurrent.Task
+import scalaz.stream.async.signalOf
+import scalaz.stream.async.mutable.Signal
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 import funnel.aws._
 
@@ -29,6 +31,11 @@ class AwsChemist extends Chemist[Aws]{
   import Sharding.Target
 
   val log = Logger[this.type]
+
+  /**
+   * used to stop our sockets listening to telemetry on all the flasks
+   */
+  private val signal: Signal[Boolean] = signalOf(true)
 
   /**
    * Force chemist to re-read the world from AWS. Useful if for some reason
@@ -98,7 +105,7 @@ class AwsChemist extends Chemist[Aws]{
 
       // now the queues are setup with the right permissions,
       // start the lifecycle listener
-      _ <- Lifecycle.run(cfg.queue.topicName, cfg.resources, Lifecycle.sink(cfg.http)
+      _ <- Lifecycle.run(cfg.queue.topicName, cfg.resources, Lifecycle.sink(cfg.http), signalOf(true)
             )(cfg.repository, cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery).liftKleisli
       _  = log.debug("lifecycle process started")
 
@@ -110,6 +117,6 @@ class AwsChemist extends Chemist[Aws]{
     for {
       cfg <- config
       e  = AutoScalingEvent(id.toLowerCase, state)
-      _ <- Lifecycle.event(e, cfg.resources)(cfg.repository, cfg.asg, cfg.ec2, cfg.discovery, cfg.http).liftKleisli
+      _ <- Lifecycle.event(e, cfg.resources, signal)(cfg.repository, cfg.asg, cfg.ec2, cfg.discovery, cfg.http).liftKleisli
     } yield ()
 }

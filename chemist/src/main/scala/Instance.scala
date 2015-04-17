@@ -24,5 +24,5 @@ case class Instance(
         .flatMap(_.split('-').lastOption.find(_.length > 3)))
   }
 
-  def asURL: URI = location.asURI()
+  def asURI: URI = location.asURI()
 }

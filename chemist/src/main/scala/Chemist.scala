@@ -9,6 +9,7 @@ import scalaz.{\/,-\/,\/-,Kleisli}
 import scalaz.syntax.kleisli._
 import scalaz.concurrent.Task
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
+import messages.Error
 
 trait Chemist[A <: Platform]{
   import Sharding.Target
@@ -71,6 +72,12 @@ trait Chemist[A <: Platform]{
    */
   def history: ChemistK[Seq[AutoScalingEvent]] =
     config.flatMapK(_.repository.historicalEvents)
+
+  /**
+   * List out the last 100 Errors that this chemist has seen.
+   */
+  def errors: ChemistK[Seq[Error]] =
+    config.flatMapK(_.repository.errors)
 
   /**
    * Force chemist to re-read the world. Useful if for some reason

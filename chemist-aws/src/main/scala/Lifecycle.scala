@@ -6,11 +6,13 @@ import scalaz.{\/,-\/,\/-}
 import scalaz.syntax.traverse._
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Sink}
+import scalaz.stream.async.mutable.Signal
 import com.amazonaws.services.sqs.model.Message
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import funnel.aws._
+import messages.Telemetry._
 
 /**
  * The purpose of this object is to manage all the "lifecycle" events
@@ -44,14 +46,14 @@ object Lifecycle {
    * we then pass the `AutoScalingEvent` to the `interpreter` function for further processing.
    * In the event the message does not parse to an `AutoScalingEvent`,
    */
-  def stream(queueName: String, resources: Seq[String]
+  def stream(queueName: String, resources: Seq[String], signal: Signal[Boolean]
     )(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Process[Task, Throwable \/ Action] = {
       // adding this function to ensure that parse errors do not get
       // lifted into errors that will later fail the stream, and that
       // any errors in the interpreter are properly handled.
       def go(m: Message): Task[Throwable \/ Action] =
-        parseMessage(m).traverseU(interpreter(_, resources)(r, asg, ec2, dsc)).handle {
+        parseMessage(m).traverseU(interpreter(_, resources, signal)(r, asg, ec2, dsc)).handle {
           case MessageParseException(err) =>
             log.warn(s"Unexpected recoverable error when parsing lifecycle message: $err")
             noop
@@ -99,7 +101,7 @@ object Lifecycle {
    *     Instruct one of the online flasks to start monitoring this new instance
    *
    */
-  def interpreter(e: AutoScalingEvent, resources: Seq[String]
+  def interpreter(e: AutoScalingEvent, resources: Seq[String], signal: Signal[Boolean]
     )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Action] = {
     log.debug(s"interpreting event: $e")
@@ -137,6 +139,9 @@ object Lifecycle {
               _ <- r.addInstance(i)
               _  = log.debug(s"Adding service instance '$id' to known entries")
 
+              _ = monitorTelemetry(r,i,signal)
+              _  = log.debug(s"monitoring telemetry on instance '$id'")
+
               t  = Sharding.Target.fromInstance(resources)(i)
               m <- Sharding.locateAndAssignDistribution(t, r)
               _  = log.debug("Computed and set a new distribution for the addition of host...")
@@ -165,6 +170,14 @@ object Lifecycle {
     }
   }
 
+  def monitorTelemetry(r: Repository, instance: Instance, signal: Signal[Boolean]): Unit = {
+    val (keysout, errorsS, sub) = telemetrySubscribeSocket(instance.telemetryLocation.asURI(), signal)
+
+    (keysout.discrete.map(instance.id -> _) to r.keySink).run.runAsync(_ => ()) // STU do something with the errors
+
+    (errorsS to r.errorSink).run.runAsync(_ => ()) // STU do something with the errors
+  }
+
   // not sure if this is really needed but
   // looks like i can use this in a more generic way
   // to send previously unknown targets to flasks
@@ -183,10 +196,10 @@ object Lifecycle {
    * The purpose of this function is to turn the result from the interpreter
    * into an effect that has some meaning within the system (i.e. resharding or not)
    */
-  def event(e: AutoScalingEvent, resources: Seq[String]
+  def event(e: AutoScalingEvent, resources: Seq[String], signal: Signal[Boolean]
     )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery, http: dispatch.Http
     ): Task[Unit] = {
-    interpreter(e, resources)(r, asg, ec2, dsc).flatMap {
+    interpreter(e, resources, signal)(r, asg, ec2, dsc).flatMap {
       case Redistributed(seq) =>
         Sharding.distribute(seq)(http).map(_ => ())
       case _ =>
@@ -200,10 +213,10 @@ object Lifecycle {
    * init method for chemist so that the SQS/SNS lifecycle is started from the edge of
    * the world.
    */
-  def run(queueName: String, resources: Seq[String], s: Sink[Task, Action]
+  def run(queueName: String, resources: Seq[String], s: Sink[Task, Action], signal: Signal[Boolean]
     )(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Unit] = {
-    val process: Sink[Task, Action] = stream(queueName, resources)(r,sqs,asg,ec2,dsc).flatMap {
+    val process: Sink[Task, Action] = stream(queueName, resources, signal)(r,sqs,asg,ec2,dsc).flatMap {
       case -\/(fail) => {
         log.error(s"Problem encountered when trying to processes SQS lifecycle message: $fail")
         fail.printStackTrace
@@ -215,6 +228,8 @@ object Lifecycle {
       }
     }
 
-    process.run
+    process.run.onFinish { _ =>
+      signal.set(false)
+    }
   }
 }

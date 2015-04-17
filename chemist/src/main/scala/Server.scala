@@ -69,6 +69,9 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
     case GET(Path("/status")) =>
       GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
+    case GET(Path("/errors")) =>
+      GetStatus.time(Ok ~> JsonResponse(Chemist.version))
+
     case GET(Path("/distribution")) =>
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
 

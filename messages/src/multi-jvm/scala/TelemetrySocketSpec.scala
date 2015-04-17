@@ -56,8 +56,9 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
       case \/-(_) => 
     }
 
-    Thread.sleep(100)
+    Thread.sleep(200)
     keysIn.close.run
+    Thread.sleep(200)
   }
 }
 

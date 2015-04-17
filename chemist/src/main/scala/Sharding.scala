@@ -6,33 +6,22 @@ import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.concurrent.Task
 import funnel.ClusterName
+import scalaz.syntax.apply._
+
 import journal.Logger
 
 object Sharding {
 
-  case class Distribution(
-    byFlask: Flask ==>> Set[Target],
-    byTarget: Target ==>> Set[Flask]
-  ) {
-    def addFlask(f: Flask): Distribution =
-      this.copy(byFlask = byFlask.insert(f, Set.empty))
-
-
-    def deleteFlask(f: Flask): Distribution =
-      Distribution(byFlask.delete(f),
-                   byTarget.map(_ - f))
-
-  }
-
   type Flask = InstanceID
+  type Distribution = Flask ==>> Set[Target]
 
   object Distribution {
-    def empty: Distribution = Distribution(==>>.empty, ==>>.empty)
+    def empty: Distribution = ==>>()
   }
 
   case class Target(cluster: ClusterName, url: SafeURL)
 
-  implicit val orderTarget: Order[Target] = Order[(String,String)].contramap(t => (t.bucket, t.url.underlying))
+  implicit val orderTarget: Order[Target] = Order[(String,String)].contramap(t => (t.cluster, t.url.underlying))
 
   object Target {
     val defaultResources = Seq("stream/previous")
@@ -40,7 +29,7 @@ object Sharding {
     def fromInstance(resources: Seq[String] = defaultResources)(i: Instance): Set[Target] =
       (for {
         a <- i.application
-        b = i.asURL
+        b = i.asURI
       } yield resources.map(r => Target(a.toString, SafeURL(b+r))).toSet
       ).getOrElse(Set.empty[Target])
   }
@@ -61,7 +50,7 @@ object Sharding {
    * work first.
    */
   def sorted(d: Distribution): Map[Flask, Set[Target]] =
-    d.byFlask.toList.sortBy(_._2.size).toMap
+    d.toList.sortBy(_._2.size).toMap
 
   /**
    * dump out the current snapshot of how chemist believes work
@@ -77,7 +66,10 @@ object Sharding {
    * distributed world of urls.
    */
   def targets(d: Distribution): Set[Target] =
-    d.byTarget.keySet
+    d.values match {
+      case Nil   => Set.empty[Target]
+      case other => other.reduceLeft(_ ++ _)
+    }
 
   /**
    * provide the new distribution based on the result of calculating
@@ -223,15 +215,16 @@ object Sharding {
     import argonaut._, Argonaut._, JSON._, HJSON._
     import dispatch._, Defaults._
 
-    val uri = location.asURI(path = "mirror/sources")
-    val req = url(uri.toString)
-    log.debug(s"requesting assigned targets from $uri")
-    fromScalaFuture(http(req OK as.String)) map { c =>
-      Parse.decodeOption[List[Cluster]](c
+    val a = location.asURI(path = "mirror/sources")
+    val req = Task.delay(url(a.toString)) <* Task.delay(log.debug(s"requesting assigned targets from $a"))
+    req flatMap { b =>
+      fromScalaFuture(http(b OK as.String)).map { c =>
+        Parse.decodeOption[List[Cluster]](c
         ).toList.flatMap(identity
         ).foldLeft(Set.empty[Target]){ (a,b) =>
           b.urls.map(s => Target(b.label, SafeURL(s))).toSet
         }
+      }
     }
   }
 
@@ -249,11 +242,7 @@ object Sharding {
       targets.groupBy(_.cluster).mapValues(_.map(_.url).toList)
 
     val uri = to.asURI(path = "mirror")
-    val req = url(uri.toString) << payload.toList.asJson.nospaces
-    log.debug(s"submitting to $uri: $payload")
-    fromScalaFuture(http(req OK as.String))
+    val req = Task.delay(url(uri.toString) << payload.toList.asJson.nospaces) <* Task.delay(log.debug(s"submitting to $uri: $payload"))
+    req.flatMap(r => fromScalaFuture(http(r OK as.String)))
   }
-
 }
-
-
