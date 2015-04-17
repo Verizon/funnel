@@ -216,7 +216,9 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
       TCP.activeOpens.set(tcp.getActiveOpens)
       TCP.attemptFails.set(tcp.getAttemptFails)
 
-    }.run.runAsync(_ => ())
+    }.run.attempt.runAsync(_.fold(
+      x => log.info("Sigar monitoring terminated normally with $x"),
+      x => log.error("Sigar monitoring terminated abnormally with $x")))
   }
 }
 
