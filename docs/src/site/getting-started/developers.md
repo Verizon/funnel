@@ -8,9 +8,10 @@ section: "getting-started"
 
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
-````
+```
 libraryDependencies += "funnel" %% "http" % "x.y.z"
-````
+```
+
 (check for the latest release by [looking on the nexus](http://nexus.svc.oncue.com/nexus/content/repositories/releases/oncue/svc/funnel/http_2.10/))
 
 Current transitive dependencies this will introduce on your classpath:
@@ -25,7 +26,7 @@ You will likely never touch these dependencies directly, but its important to be
 
 With the dependency setup complete, you can now start instrumenting your code. The first thing you need to do is create a `metrics.scala` file, which should look something like this:
 
-````
+```
 package oncue.svc
 package myproject
 
@@ -40,7 +41,7 @@ object metrics {
     "the number of foos that have been seen")
   // more metrics here
 }
-````
+```
 
 The goal of this `metrics` object is to define your metrics up front, and force yourself to think about the metric requirements that your application has. All of your application metrics should be defined in the `metrics` object, and imported where they are needed by specific APIs.
 
@@ -51,7 +52,7 @@ The goal of this `metrics` object is to define your metrics up front, and force 
 
 At first blush, clearly having a single namespace for the entire world of application metrics could become unwieldy, so it is recommended to organise your metrics with nested objects, based on logical application layering. Here's a more complete example from the SU service that illustrates this pattern:
 
-````
+```
 package oncue.svc.su
 
 import funnel.instruments._
@@ -111,16 +112,20 @@ object metrics {
   }
 }
 
-````
+```
 
 The 1.0.x series of `funnel-core` has four supported metric types: `Counter`, `Timer`, `Gauge` and `TrafficLight`.
 
 
 #### Counters
 
-These simply increment an integer value specified by a label that you supply. Typical examples are number of sales, number of children etc.
+A counter simply increments an integer value specified by a label that you supply. A counter is appropriate for metrics that represent a tally, or the number of occurrences of something during a particular period. Typical examples are the number of sales, the number of errors, or messages received.
 
-````
+You should **not** use a counter for a magnitude or amount that represents the current value of something, such as the number of concurrent connections, the number of ongoing transactions, or the number of messages in a queue. In that case, use a _gauge_ instead (see below).
+
+For example, to create a counter for the number of cache hits:
+
+```
 package oncue.svc
 package yourproject
 
@@ -130,12 +135,11 @@ object metrics {
   val NumberOfCacheHits = counter("cache/hits")
 }
 
-````
+```
 
 Counters can then be incremented monotonically, or incremented by a given amount:
 
-````
-
+```
 import metrics._
 
 trait SomeFun {
@@ -149,15 +153,13 @@ trait SomeFun {
   }
 
 }
-
-````
+```
 
 #### Timers
 
 As the name suggests, **timers** are all about the amount of time take to perform a specific operation.
 
-
-````
+```
 package oncue.svc
 package yourproject
 
@@ -167,11 +169,11 @@ object metrics {
   val GetUserList = timer("db/get-user-list")
 }
 
-````
+```
+
 Timers can then record several different types of value:
 
-````
-
+```
 import metrics._
 import scalaz.concurrent.Task
 import scala.concurrent.Future
@@ -203,13 +205,16 @@ trait SomeFun {
 
 }
 
-````
+```
 
 #### Gauges
 
-Gauges represent the current state of a value. The best way to visualise this is a checking the oil on a car; the dipstick is the gauge of how much oil the vehicle currently has, and this changes over time, moving both up and down, but it can only have a single value at any particular reading.
+A gauge represents the current state of a value. A good analogy is checking the oil on a car; the dipstick is the gauge of how much oil the engine currently has, and this changes over time, moving both up and down, but it can only have a single value at any particular reading.
 
-````
+Use a gauge when you want to monitor the magnitude or amount of something at a particular point in time, or the average amount of something over a period, such as the number of concurrent connections, ongoing transactions, or messages in a queue. A gauge is **not** appropriate for counting or tallying occurrences of some event, such as the number of errors, number of sales, or messages received so far. For such things, use a _counter_ instead (see above).
+
+
+```
 package oncue.svc
 package yourproject
 
@@ -221,10 +226,11 @@ object metrics {
   val OilGauge = gauge("oil", 0d, Units.Count)
 }
 
-````
+```
+
 Unlike other metrics, gauges are strongly typed in their value, and must be given a default upon being created. To set the value later on in your code, you simply do the following:
 
-````
+```
 import metrics._
 
 trait SomeFun {
@@ -234,7 +240,8 @@ trait SomeFun {
     level
   }
 }
-````
+```
+
 By default, the following types are supported as values for gauges:
 
 * `String`
@@ -247,7 +254,7 @@ By default, the following types are supported as values for gauges:
 
 In addition to simply recording the value of the gauge, there is a specialised gauge that can also track numerical statistics like `mean`, `variance` etc. To use it, just adjust your `metrics` declaration like so:
 
-````
+```
 package oncue.svc
 package yourproject
 
@@ -258,7 +265,7 @@ object metrics {
   val OilGauge = numericGauge("oil", 0d, Units.Count)
 }
 
-````
+```
 
 
 #### Traffic Light
@@ -271,7 +278,7 @@ As an extension to the concept of `Gauge`, there is also the notion of a "traffi
 
 Traffic light metrics are used to derive actionable signals for operations (they can derive whatever they like too), but for example, one might put a traffic light metric on database access, or the status of a circuit breaker used to invoke a 3rd party system. Using traffic lights is super simple:
 
-````
+```
 package oncue.svc
 package yourproject
 
@@ -281,10 +288,10 @@ object metrics {
   val GeoLocationCircuit = trafficLight("circuit/geo")
 }
 
-````
+```
 And the actual usage in the circuit breaking code:
 
-````
+```
 import metrics._
 
 trait SomeFun {
@@ -301,14 +308,14 @@ trait SomeFun {
    */
   }
 }
-````
+```
 
 
 ### Monitoring Server
 
 All the metrics you define in your application, plus some additional platform metrics supplied by the monitoring library can be exposed via a baked in administration server. In order to use this server, one simply only needs to add the following line to the `main` of their application:
 
-````
+```
 import funnel.http.MonitoringServer
 import funnel.Monitoring
 
@@ -320,7 +327,7 @@ object Main {
   }
 }
 
-````
+```
 
 **NOTE: By application `main`, this does not have to be the actual main, but rather, the end of the world for your application (which however, would usually be the main). For Play! applications, this means the Global object.**
 
