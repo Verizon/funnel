@@ -108,8 +108,11 @@ class MonitoringServer(M: Monitoring, port: Int) {
         error => flush(400, error.toString, req),
         blist => {
           val cs: List[Command] = blist.flatMap(b => b.urls.map(u => Mirror(new URI(u), b.label)))
+
+          M.log.debug(s"recieved instruction to mirror '${cs.mkString(",")}'")
+
           val p0: Process[Task, Command] = Process.emitAll(cs)
-          val p = p0 to M.mirroringQueue.enqueue
+          val p: Process[Task, Unit] = p0.to(M.mirroringQueue.enqueue)
           p.run.run
 
           flush(202, Array.empty[Byte], req)

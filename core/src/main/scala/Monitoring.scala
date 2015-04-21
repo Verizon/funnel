@@ -154,6 +154,7 @@ trait Monitoring {
       for {
         _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))) )
         _ <- Task( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))) )
+        _  = log.debug(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
       } yield ()
 
     for {
@@ -173,7 +174,7 @@ trait Monitoring {
           val localName = formatURI(source) // TIM: remove this; keeping for now until we figure out how the source needs sanitising
 
           val received: Process[Task,Unit] = link(hook) {
-            attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
+            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, localName)))(
               source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> localName))
           }
 
@@ -188,6 +189,7 @@ trait Monitoring {
             err => log.error(err.getMessage), identity))
         }
         case Discard(source) => Task.delay {
+          log.info(s"Attempting to stop monitoring $source...")
           Option(urlSignals.get(source)).foreach(_.close.runAsync(_ => ()))
         }
       }.run
