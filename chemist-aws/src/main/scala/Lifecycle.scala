@@ -169,7 +169,7 @@ object Lifecycle {
   // looks like i can use this in a more generic way
   // to send previously unknown targets to flasks
   def sink(http: dispatch.Http): Sink[Task,Action] =
-    Process.emit {
+    Process.constant {
       case Redistributed(seq) =>
         for {
           _ <- Sharding.distribute(seq)(http)
