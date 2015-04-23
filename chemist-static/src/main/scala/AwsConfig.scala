@@ -7,6 +7,7 @@ import knobs._
 
 import concurrent.duration.Duration
 import scalaz.concurrent.Task
+import scalaz.stream.Process
 
 case class StaticConfig(
   resources: List[String],
@@ -35,7 +36,7 @@ object Config {
 
   private def readInstances(cfg: MutableConfig): Seq[Instance] = for {
     env   <- cfg.getEnv
-    id    <- env.keys
+    id    <- Process.eval(Task(env.keys)).flatMap(Process.emitAll)
     slot   = cfg.subconfig(id)
     u     <- slot.require("uri")
     uri    = new URI(u)
