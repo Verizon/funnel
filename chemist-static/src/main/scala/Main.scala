@@ -15,7 +15,7 @@ object Main {
     val k = (knobs.load(Required(
       FileResource(new File("/usr/share/oncue/etc/chemist.cfg")) or
       ClassPathResource("oncue/chemist.cfg")) :: Nil)).run
-    val s = new Static { val config = Config.readConfig(k) }
+    val s = new Static { val config = Config.readConfig(k).run }
 
     val monitoring = MonitoringServer.start(Monitoring.default, 5775)
 

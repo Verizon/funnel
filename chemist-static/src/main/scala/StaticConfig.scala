@@ -26,24 +26,22 @@ case class StaticConfig(
 }
 
 object Config {
-  def readConfig(cfg: MutableConfig): StaticConfig = {
-    val resources = cfg.require[List[String]]("chemist.resources-to-monitor").run
-    val network   = cfg.subconfig("chemist.network")
-    val timeout   = cfg.require[Duration]("chemist.command-timeout").run
-    val instances = cfg.subconfig("chemist.instances")
-    StaticConfig(resources, readNetwork(network), timeout, readInstances(instances))
-  }
+  def readConfig(cfg: MutableConfig): Task[StaticConfig] = for {
+    resources   <- cfg.require[List[String]]("chemist.resources-to-monitor")
+    network     <- readNetwork(cfg.subconfig("chemist.network"))
+    timeout     <- cfg.require[Duration]("chemist.command-timeout")
+    sub         <- cfg.base.at("chemist.instances")
+    instances   <- readInstances(sub)
+  } yield StaticConfig(resources, network, timeout, instances)
 
-  private def readNetwork(cfg: MutableConfig): NetworkConfig =
-    NetworkConfig(cfg.require[String]("host").run, cfg.require[Int]("port").run)
+  private[static] def readNetwork(cfg: MutableConfig): Task[NetworkConfig] = for {
+    host   <- cfg.require[String]("host")
+    port   <- cfg.require[Int]("port")
+  } yield NetworkConfig(host, port)
 
-  private def readInstances(cfg: MutableConfig): Seq[Instance] = (for {
-    env     <- Process.eval(cfg.getEnv)
-    ins     <- for {
-      id    <- Process.eval(Task(env.keys.toSeq)).flatMap(Process.emitAll)
-      slot   = cfg.subconfig(id)
-      u     <- Process.eval(slot.require[String]("uri"))
+  private[static] def readInstances(cfg: Config) = (for {
+      id    <- Process.eval(Task(cfg.env.keys.toSeq)).flatMap(Process.emitAll)
+      u     <- Process.eval(Task(cfg.require[String](id)))
       uri    = new URI(u)
-    } yield Instance(id, Location(Option(uri.getHost), "", uri.getPort, "", false), List(), Map())
-  } yield ins).runLog.run
+    } yield Instance(id, Location(Option(uri.getHost), "", uri.getPort, "", false), List(), Map())).runLog
 }
