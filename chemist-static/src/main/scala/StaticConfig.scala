@@ -2,10 +2,13 @@ package funnel
 package chemist
 package static
 
+import java.net.URI
+
 import dispatch.Http
 import knobs._
 
 import concurrent.duration.Duration
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
@@ -34,12 +37,13 @@ object Config {
   private def readNetwork(cfg: MutableConfig): NetworkConfig =
     NetworkConfig(cfg.require[String]("host").run, cfg.require[Int]("port").run)
 
-  private def readInstances(cfg: MutableConfig): Seq[Instance] = for {
-    env   <- cfg.getEnv
-    id    <- Process.eval(Task(env.keys)).flatMap(Process.emitAll)
-    slot   = cfg.subconfig(id)
-    u     <- slot.require("uri")
-    uri    = new URI(u)
-    i      = Instance(id, Location())
-  } yield i
+  private def readInstances(cfg: MutableConfig): Seq[Instance] = (for {
+    env     <- Process.eval(cfg.getEnv)
+    ins     <- for {
+      id    <- Process.eval(Task(env.keys.toSeq)).flatMap(Process.emitAll)
+      slot   = cfg.subconfig(id)
+      u     <- Process.eval(slot.require[String]("uri"))
+      uri    = new URI(u)
+    } yield Instance(id, Location(Option(uri.getHost), "", uri.getPort, "", false), List(), Map())
+  } yield ins).runLog.run
 }
