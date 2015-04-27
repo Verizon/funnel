@@ -40,7 +40,7 @@ object Server {
 
     unfiltered.netty.Server
       .http(platform.config.network.port, platform.config.network.host)
-      .resources(getClass.getResource("/oncue/www/"), cacheSeconds = 3600)
+      .resources(getClass.getResource("oncue/www/"), cacheSeconds = 3600)
       .handler(Server(chemist, platform))
       .run
   }
