@@ -28,11 +28,9 @@ lazy val agent = project.dependsOn(zeromq % "test->test;compile->compile", http,
 
 lazy val `agent-windows` = project.dependsOn(`zeromq-java`, http, nginx).configs(MultiJvm)
 
-lazy val aws = project
-
 lazy val chemist = project.dependsOn(core, http)
 
-lazy val `chemist-aws` = project.dependsOn(chemist % "test->test;compile->compile", aws)
+lazy val `chemist-aws` = project.dependsOn(chemist % "test->test;compile->compile")
 
 lazy val `chemist-static` = project.dependsOn(chemist % "test->test;compile->compile")
 
@@ -44,7 +42,7 @@ lazy val docs = project
 
 lazy val elastic = project.dependsOn(core, http)
 
-lazy val flask = project.dependsOn(aws % "test->test;compile->compile", riemann, elastic, messages, zeromq % "test->test;compile->compile")
+lazy val flask = project.dependsOn(riemann, elastic, messages, zeromq % "test->test;compile->compile")
 
 lazy val http = project.dependsOn(core)
 
