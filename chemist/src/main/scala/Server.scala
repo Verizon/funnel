@@ -39,7 +39,7 @@ object Server {
     }
 
     val p = this.getClass.getResource("/oncue/www/")
-    println(s"Setting web resource path to '${p}'")
+    log.info(s"Setting web resource path to '$p'")
 
     unfiltered.netty.Server
       .http(platform.config.network.port, platform.config.network.host)
