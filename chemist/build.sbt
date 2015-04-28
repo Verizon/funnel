@@ -16,5 +16,6 @@ libraryDependencies ++= Seq(
   "oncue.svc.knobs"         %% "core"                    % V.knobs,
   "net.databinder.dispatch" %% "dispatch-core"           % V.dispatch,
   "net.databinder"          %% "unfiltered-filter"       % V.unfiltered,
-  "net.databinder"          %% "unfiltered-netty-server" % V.unfiltered
+  "net.databinder"          %% "unfiltered-netty-server" % V.unfiltered,
+  "org.webjars.bower"        % "angular"                 % "1.3.15"
 )
