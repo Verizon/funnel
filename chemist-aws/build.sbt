@@ -14,6 +14,8 @@ ScalaTest.settings
 
 Custom.compilation
 
+libraryDependencies += "com.amazonaws" % "aws-java-sdk" % "1.8.6"
+
 name in Universal := "chemist-aws"
 
 fork in Test := true
