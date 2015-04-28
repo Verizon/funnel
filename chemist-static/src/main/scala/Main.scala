@@ -18,7 +18,9 @@ object Main {
     val s = new Static { val config = Config.readConfig(k).run }
 
     k.subscribe(Pattern("*.*"), {
-      case _ => chemist.bootstrap.run(s)
+      case _ => chemist.bootstrap.run(new Static {
+        val config = Config.readConfig(k).run
+      })
     })
 
     val monitoring = MonitoringServer.start(Monitoring.default, 5775)
