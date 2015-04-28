@@ -38,9 +38,12 @@ object Server {
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
+    val p = this.getClass.getResource("/oncue/www/")
+    log.info(s"Setting web resource path to '$p'")
+
     unfiltered.netty.Server
       .http(platform.config.network.port, platform.config.network.host)
-      .resources(getClass.getResource("oncue/www/"), cacheSeconds = 3600)
+      .resources(p, cacheSeconds = 3600)
       .handler(Server(chemist, platform))
       .run
   }
