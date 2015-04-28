@@ -13,6 +13,7 @@ import scalaz.syntax.applicative._
 import scala.concurrent.duration._
 import funnel.zeromq._, sockets._
 import agent.zeromq._
+import funnel.instruments._
 
 object Main {
   private val log = Logger[Main.type]
@@ -97,6 +98,9 @@ object Main {
      * instrument bridges (e.g. http, statsd etc).
      */
     val I = new Instruments(1.minute, Monitoring.default)
+
+    log.info("Launching the funnel HTTP server on 5775.")
+    funnel.http.MonitoringServer.start(Monitoring.default, 5775)
 
     /**
      * Attempt to create and bind endpoints for both the domain socket

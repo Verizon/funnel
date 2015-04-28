@@ -44,9 +44,8 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val riemann          = (riemannHost |@| riemannPort |@| ttl)(RiemannCfg)
     val elastic          = (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
       ElasticCfg(_, _, _, elasticDf, "foo", None, _))
-    val snsErrorTopic    = cfg.require[String]("flask.sns-error-topic")
     val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
-    Task((Options(name, cluster, elastic, riemann, snsErrorTopic, port), cfg))
+    Task((Options(name, cluster, elastic, riemann, port), cfg))
   }.run
 
   val log = Logger[this.type]

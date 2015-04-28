@@ -21,7 +21,8 @@ lazy val funnel = project.in(file(".")).aggregate(
   `agent-windows`,
   flask,
   chemist,
-  `chemist-aws`)
+  `chemist-aws`,
+  `chemist-static`)
 
 lazy val agent = project.dependsOn(zeromq % "test->test;compile->compile", http, nginx).configs(MultiJvm)
 
@@ -32,6 +33,8 @@ lazy val aws = project
 lazy val chemist = project.dependsOn(core, http, messages)
 
 lazy val `chemist-aws` = project.dependsOn(chemist % "test->test;compile->compile", aws)
+
+lazy val `chemist-static` = project.dependsOn(chemist % "test->test;compile->compile")
 
 lazy val core = project
 
