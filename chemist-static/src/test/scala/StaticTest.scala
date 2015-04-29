@@ -10,7 +10,6 @@ class StaticTest extends FlatSpec with Matchers {
   it should "load Instances from chemist.cfg" in {
     val instances = (for {
       cfg   <- (knobs.load(Required(
-        FileResource(new File("/usr/share/oncue/etc/chemist.cfg")) or
         ClassPathResource("oncue/chemist.cfg")) :: Nil))
       sub   <- cfg.base.at("chemist.instances")
       ins   <- Config.readInstances(sub)

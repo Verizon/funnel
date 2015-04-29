@@ -12,9 +12,8 @@ object Main {
 
     val chemist = new StaticChemist
 
-    val k = (knobs.load(Required(
-      FileResource(new File("/usr/share/oncue/etc/chemist.cfg")) or
-      ClassPathResource("oncue/chemist.cfg")) :: Nil)).run
+    val k = (knobs.load(List(Required(
+      FileResource(new File("/usr/share/oncue/etc/chemist.cfg")))))).run
     val s = new Static { val config = Config.readConfig(k).run }
 
     k.subscribe(Pattern("*.*"), {
