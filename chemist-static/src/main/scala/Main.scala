@@ -5,15 +5,16 @@ package static
 import java.io.File
 import scalaz.concurrent.Task
 import http.MonitoringServer
-import knobs.{FileResource,ClassPathResource,Pattern,Required}
+import knobs.{FileResource,ClassPathResource,Optional,Pattern,Required}
 
 object Main {
   def main(args: Array[String]): Unit = {
 
     val chemist = new StaticChemist
 
-    val k = (knobs.load(List(Required(
-      FileResource(new File("/usr/share/oncue/etc/chemist.cfg")))))).run
+    val k = knobs.load(
+      Required(ClassPathResource("oncue/chemist.cfg")) ::
+      Optional(FileResource(new File("/usr/share/oncue/etc/chemist.cfg"))) :: Nil).run
     val s = new Static { val config = Config.readConfig(k).run }
 
     k.subscribe(Pattern("*.*"), {
