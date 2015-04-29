@@ -43,5 +43,5 @@ object Config {
       id    <- Process.eval(Task(cfg.env.keys.toSeq)).flatMap(Process.emitAll)
       u     <- Process.eval(Task(cfg.require[String](id)))
       uri    = new URI(u)
-    } yield Instance(id.split(".")(0), Location(Option(uri.getHost), "", uri.getPort, "", false), List(), Map())).runLog
+    } yield Instance(id, Location(Option(uri.getHost), "", uri.getPort, "", false), List(), Map())).runLog
 }
