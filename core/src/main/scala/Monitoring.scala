@@ -169,13 +169,9 @@ trait Monitoring {
 
           urlSignals.put(source, hook)
 
-          // adding the `localName` onto the key here so that later in the
-          // process its possible to find the key we're specifically looking for
-          val localName = formatURI(source) // TIM: remove this; keeping for now until we figure out how the source needs sanitising
-
           val received: Process[Task,Unit] = link(hook) {
-            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, localName)))(
-              source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> localName))
+            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, source.toString)))(
+              source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> source.toString))
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>

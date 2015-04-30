@@ -1,6 +1,7 @@
 package funnel
 package elastic
 
+import java.net.URI
 import scala.concurrent.duration._
 import scalaz.stream._
 import scalaz._
@@ -9,7 +10,6 @@ import syntax.monad._
 import syntax.kleisli._
 import Kleisli._
 import \/._
-import Mapping._
 import knobs.IORef
 import java.util.Date
 import java.text.SimpleDateFormat
@@ -130,7 +130,8 @@ case class Elastic(M: Monitoring) {
   def elasticUngroup[A](flaskName: String, flaskCluster: String): Process1[ESGroup[A], Json] =
     await1[ESGroup[A]].flatMap { g =>
       emitAll(g.toSeq.map { case (name, m) =>
-        ("host" := name._2.getOrElse(flaskName)) ->:
+        ("uri" := name._2.getOrElse(flaskName)) ->:
+        ("host" := name._2.map(u => (new URI(u)).getHost)) ->:
         ("@timestamp" :=
           new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
           m.toList.foldLeft(("group" := name._1) ->: jEmptyObject) {
@@ -178,26 +179,6 @@ case class Elastic(M: Monitoring) {
             M.log.error(s"Configuration was $es. Document was: \n ${json}")},
       _ => ())))
   } yield ()
-
-  def keyField(k: Key[Any]): Field = {
-    import Reportable._
-    val path = k.name.split("/")
-    val last = path.last
-    val init = path.init
-    val z = Field(last,
-                  k typeOf match {
-                    case B => BoolField
-                    case D => DoubleField
-                    case S => StringField
-                    case Stats =>
-                      ObjectField(Properties(List(
-                        "last", "mean", "count", "variance", "skewness", "kurtosis"
-                      ).map(Field(_, DoubleField))))
-                  }, Json("units" := k.units, "description" := k.description))
-    init.foldRight(z) { (a, r) =>
-      Field(a, ObjectField(Properties(List(r))))
-    }
-  }
 
   // Returns true if the index was created. False if it already existed.
   def ensureIndex(url: Req): ES[Boolean] = ensureExists(url, createIndex(url))
