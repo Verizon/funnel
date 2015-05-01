@@ -11,8 +11,6 @@ case class Instance(
   tags: Map[String,String] = Map.empty
 ){
   def application: Option[Application] = {
-    println(tags)
-
     for {
       b <- tags.get("type").orElse(tags.get("Name"))
       c <- tags.get("revision").orElse(Some("unknown"))
