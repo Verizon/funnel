@@ -59,7 +59,11 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
 
   private def json[A : EncodeJson](a: ChemistK[A]) =
     a(platform).attemptRun.fold(
-      e => InternalServerError ~> JsonResponse(e.toString),
+      e => {
+        log.error(s"Unable to process response: ${e.toString} - ${e.getMessage}")
+        e.printStackTrace
+        InternalServerError ~> JsonResponse(e.toString)
+      },
       o => Ok ~> JsonResponse(o))
 
   private def decode[A : DecodeJson](req: HttpRequest[Any])(f: A => ResponseFunction[Any]) =
