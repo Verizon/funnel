@@ -23,7 +23,6 @@ object AwsChemist {
 }
 
 class StaticChemist extends Chemist[Static]{
-  import Sharding.Target
 
   val log = Logger[this.type]
 
@@ -33,6 +32,7 @@ class StaticChemist extends Chemist[Static]{
    */
   def bootstrap: ChemistK[Unit] = for {
     cfg <- config
+/*
     // read the list of all deployed machines
     l <- cfg.discovery.list.liftKleisli
     _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
@@ -72,6 +72,7 @@ class StaticChemist extends Chemist[Static]{
     } yield ()).liftKleisli
 
     _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
+ */
   } yield ()
 
   /**

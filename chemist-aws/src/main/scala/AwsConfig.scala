@@ -30,7 +30,7 @@ case class AwsConfig(
   includeVpcTargets: Boolean
 ) extends PlatformConfig {
   val discovery: Discovery = new Discovery(ec2, asg)
-  val repository: Repository = new StatefulRepository(discovery)
+  val repository: Repository = new StatefulRepository
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))

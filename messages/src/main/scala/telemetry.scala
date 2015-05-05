@@ -8,7 +8,7 @@ import sockets._
 import scalaz.stream._
 import scalaz.stream.async.mutable.{Signal,Queue}
 import scalaz.stream.async.{signalOf,unboundedQueue}
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Actor,Task}
 import scalaz.{-\/,\/,\/-}
 import java.net.URI
 
@@ -19,6 +19,8 @@ final case class Error(names: Names) extends Telemetry {
 }
 
 final case class NewKey(key: Key[_]) extends Telemetry
+final case class Monitored(i: InstanceID) extends Telemetry
+final case class Unmonitored(i: InstanceID) extends Telemetry
 
 object Telemetry extends TelemetryCodecs {
 
@@ -28,6 +30,8 @@ object Telemetry extends TelemetryCodecs {
       case NewKey(key) =>
         val bytes = keyEncode.encodeValid(key).toByteArray
         Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("key")), bytes)
+      case Monitored(i) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("monitor")), i.getBytes())
+      case Unmonitored(i) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("unmonitor")), i.getBytes())
     }
   }
 
@@ -42,27 +46,33 @@ object Telemetry extends TelemetryCodecs {
     }.run
   }
 
-  def telemetrySubscribeSocket(uri: URI, signal: Signal[Boolean]): (Signal[Set[Key[Any]]], Process[Task,Error], Process[Task,Unit]) = {
-    val keys = signalOf(Set.empty[Key[Any]])
-    val errors = unboundedQueue[Error]
-    val endpoint = telemetrySubscribeEndpoint(uri)
-    val p = Ø.link(endpoint)(signal) { socket =>
-      Ø.receive(socket) to fromTransported(keys, errors)
-    }
 
-    (keys, errors.dequeue, p)
+
+  def telemetrySubscribeSocket(uri: URI, signal: Signal[Boolean],
+                               id: InstanceID,
+                               keys: Actor[(InstanceID, Set[Key[Any]])],
+                               errors: Actor[Error],
+                               lifecycle: Actor[String \/ String]
+                               ): Task[Unit] = {
+    val endpoint = telemetrySubscribeEndpoint(uri)
+    Ø.link(endpoint)(signal) { socket =>
+      (Ø.receive(socket) to fromTransported(id, keys, errors, lifecycle))
+    }.run
   }
 
-  def fromTransported(keys: Signal[Set[Key[Any]]], errors: Queue[Error]): Sink[Task, Transported] = {
+  def fromTransported(id: InstanceID, keys: Actor[(InstanceID, Set[Key[Any]])], errors: Actor[Error], lifecycleSink: Actor[String \/ String]): Sink[Task, Transported] = {
     val currentKeys = collection.mutable.Set.empty[Key[Any]]
+
     Process.constant { x =>
       x match {
         case Transported(_, Versions.v1, _, Some(Topic("error")), bytes) =>
-          errors.enqueueOne(errorCodec.decodeValidValue(BitVector(bytes)))
+          Task.delay(errors ! errorCodec.decodeValidValue(BitVector(bytes)))
         case Transported(_, Versions.v1, _, Some(Topic("key")), bytes) =>
           Task(currentKeys += keyDecode.decodeValidValue(BitVector(bytes))).flatMap { k =>
-            keys.set(k.toSet)
+            Task.delay(keys ! id -> k.toSet)
           }
+        case Transported(_, Versions.v1, _, Some(Topic("monitor")), bytes) => Task.delay(lifecycleSink ! \/.right(new String(bytes)))
+        case Transported(_, Versions.v1, _, Some(Topic("unmonitor")), bytes) => Task.delay(lifecycleSink ! \/.left(new String(bytes)))
       }
     }
   }

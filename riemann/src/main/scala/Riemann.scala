@@ -120,8 +120,8 @@ object Riemann {
    */
   def publish(
     M: Monitoring,
-    ttlInSeconds: Float = 20f,
-    retries: Event = Events.every(1 minutes)
+    ttlInSeconds: Float = 20f /*, STU unused?
+    retries: Event = Events.every(1 minutes) */
   )(c: RiemannClient, a: Actor[Pusher]
   ): Task[Unit] = {
     Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream

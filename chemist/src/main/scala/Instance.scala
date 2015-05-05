@@ -12,15 +12,13 @@ case class Instance(
   tags: Map[String,String] = Map.empty
 ){
   def application: Option[Application] = {
-    println(tags)
-
     for {
       b <- tags.get("type").orElse(tags.get("Name"))
       c <- tags.get("revision").orElse(Some("unknown"))
     } yield Application(
       name = b,
       version = c,
-      qualifier = tags.get("aws:cloudformation:stack-name")
+      qualifier = tags.get("aws:cloudformation:stack-name")  // TODO: this looks suspiciously AWS specific
         .flatMap(_.split('-').lastOption.find(_.length > 3)))
   }
 

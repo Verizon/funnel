@@ -5,7 +5,6 @@ import scalaz.concurrent.Task
 import scalaz.syntax.kleisli._
 
 class TestChemist extends Chemist[TestPlatform]{
-  import Sharding.Target
 
   def bootstrap: ChemistK[Unit] =
     for {

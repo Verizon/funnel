@@ -1,8 +1,8 @@
 package funnel
 
 package object chemist {
-  type InstanceID  = String
   type HostAndPort = String
+  type Flask = InstanceID
 
   import scalaz.\/
   import scalaz.concurrent.Task

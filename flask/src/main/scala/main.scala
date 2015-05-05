@@ -84,9 +84,10 @@ class Flask(options: Options, val I: Instruments) {
       httpOrZmtp(alive)(uri) observe countDatapoints
 
     def retries(names: Names): Event =
-      Monitoring.defaultRetries andThen (_ ++ Process.eval[Task, Unit](
-        Q.enqueueOne(Error(names))
-          .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString)))))
+      Monitoring.defaultRetries andThen (_ ++ Process.eval[Task, Unit] {
+                               Q.enqueueAll(Seq(Error(names), Unmonitored())
+                                                          .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString))))
+                                         })
 
     import java.net.InetAddress
     val flaskName = options.name.getOrElse(InetAddress.getLocalHost.getHostName)

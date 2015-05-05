@@ -19,7 +19,7 @@ case class StaticConfig(
   instances: Seq[Instance]
 ) extends PlatformConfig {
   val discovery: Discovery = new StaticDiscovery(instances: _*)
-  val repository: Repository = new StatefulRepository(discovery)
+  val repository: Repository = new StatefulRepository
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
@@ -39,9 +39,17 @@ object Config {
     port   <- cfg.require[Int]("port")
   } yield NetworkConfig(host, port)
 
-  private[static] def readInstances(cfg: Config) = (for {
+  private[static] def readInstances(cfg: Config) = {
+    val go = for {
       id    <- Process.eval(Task(cfg.env.keys.toSeq)).flatMap(Process.emitAll)
       u     <- Process.eval(Task(cfg.require[String](id)))
+//      tu     <- Process.eval(Task(cfg.require[String](id)))
       uri    = new URI(u)
-    } yield Instance(id, Location(Option(uri.getHost), "", uri.getPort, "", false), List(), Map())).runLog
+//      turi    = new URI(tu)
+    } yield Instance(id,
+                     Location(uri.getHost, uri.getPort, "", "http", false),
+                     Location(uri.getHost, uri.getPort, "", "http", false),
+                     List(), Map())
+    go.runLog
+  }
 }

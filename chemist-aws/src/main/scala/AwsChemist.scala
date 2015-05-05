@@ -28,7 +28,6 @@ object AwsChemist {
 }
 
 class AwsChemist extends Chemist[Aws]{
-  import Sharding.Target
 
   val log = Logger[this.type]
 
@@ -47,6 +46,7 @@ class AwsChemist extends Chemist[Aws]{
     l <- cfg.discovery.list.liftKleisli
     _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
 
+/*
     // filter out all the instances that are in private networks
     // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
     z  = AwsChemist.filterInstances(l)(cfg)
@@ -82,6 +82,7 @@ class AwsChemist extends Chemist[Aws]{
     } yield ()).liftKleisli
 
     _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
+ */
   } yield ()
 
   /**
@@ -105,18 +106,11 @@ class AwsChemist extends Chemist[Aws]{
 
       // now the queues are setup with the right permissions,
       // start the lifecycle listener
-      _ <- Lifecycle.run(cfg.queue.topicName, cfg.resources, Lifecycle.sink(cfg.http), signalOf(true)
+      _ <- Lifecycle.run(cfg.queue.topicName, cfg.resources, signalOf(true)
             )(cfg.repository, cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery).liftKleisli
       _  = log.debug("lifecycle process started")
 
       _ <- Task.delay(log.info(">>>>>>>>>>>> initilization complete <<<<<<<<<<<<")).liftKleisli
     } yield ()
   }
-
-  protected def alterShard(id: InstanceID, state: AutoScalingEventKind): ChemistK[Unit] =
-    for {
-      cfg <- config
-      e  = AutoScalingEvent(id.toLowerCase, state)
-      _ <- Lifecycle.event(e, cfg.resources, signal)(cfg.repository, cfg.asg, cfg.ec2, cfg.discovery, cfg.http).liftKleisli
-    } yield ()
 }

@@ -10,7 +10,7 @@ import scalaz.std.string._
 
 class ShardingSpec extends FlatSpec with Matchers {
 
-  import Sharding.{Distribution,Target}
+  import Sharding.Distribution
 
   implicit lazy val log: Logger = Logger("chemist-spec")
 
@@ -59,12 +59,12 @@ class ShardingSpec extends FlatSpec with Matchers {
   }
 
   it should "correctly calculate how the new request should be sharded over known flasks" in {
-    Sharding.calculate(i1)(d1) should equal (
+    EvenSharding.calculate(i1)(d1) should equal (
       ("a", Target("u",SafeURL("http://eight.internal"))) ::
       ("c", Target("v",SafeURL("http://nine.internal"))) :: Nil
     )
 
-    Sharding.calculate(i2)(d1) should equal (
+    EvenSharding.calculate(i2)(d1) should equal (
       ("a", Target("v",SafeURL("http://omega.internal"))) ::
       ("c", Target("w",SafeURL("http://alpha.internal"))) ::
       ("b", Target("r",SafeURL("http://epsilon.internal"))) ::
@@ -75,6 +75,12 @@ class ShardingSpec extends FlatSpec with Matchers {
       ("d", Target("r",SafeURL("http://theta.internal"))) ::
       ("a", Target("p",SafeURL("http://zeta.internal"))) :: Nil
     )
+  }
+
+  it should "trigger capacity events when new flasks arrive" in {
+    val repo = new LoggingRepository
+    Sharding.platformHandler(repo)(PlatformEvent.NewFlask("asdf")).run
+    repo.increase.get should be (1)
   }
 
 }

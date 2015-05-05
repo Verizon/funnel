@@ -164,4 +164,62 @@ object JSON {
       ("asg-arn"     := e.asgARN) ->: jEmptyObject
     )
 
+
+  private def targetMessage(`type`: String, instance: String, flask: Option[String], time: Long) = {
+    ("type" := `type`) ->:
+    ("instance" := instance) ->:
+    ("time" := time) ->:
+    flask.fold(jEmptyObject)(f => ("flask" := f) ->: jEmptyObject)
+  }
+
+  import TargetLifecycle._
+
+  private def discoveryJson(d: Discovery) = {
+    ("type" := "Discovery") ->:
+    ("instance" := d.instance.id) ->:
+    ("targets" := d.targets ) ->:
+    ("time" := d.time ) ->:
+    jEmptyObject
+  }
+
+  implicit val targetMessagesToJson: EncodeJson[TargetMessage] =
+    EncodeJson {
+      case d @ Discovery(_, _, _) => discoveryJson(d)
+      case Assignment(i, f, l) => targetMessage("Assignment", i.id, Some(f), l)
+      case Confirmation(i, f, l) => targetMessage("Confirmation", i.id, Some(f), l)
+      case Migration(i, f, l) => targetMessage("Migration", i.id, Some(f), l)
+      case Unassignment(i, f, l) => targetMessage("Unassignment", i.id, Some(f), l)
+      case Unmonitoring(i, f, l) => targetMessage("Unmonitoring", i.id, Some(f), l)
+      case Terminated(i,t) => targetMessage("Terminated", i.id, None, t)
+    }
+
+
+  implicit val stateChangeToJson: EncodeJson[RepoEvent.StateChange] =
+    EncodeJson { sc =>
+      ("from-state" := sc.from.toString) ->:
+      ("to-state" := sc.to.toString) ->:
+      ("message" := sc.msg) ->:
+      jEmptyObject
+    }
+
+  implicit val newFlaskToJson: EncodeJson[RepoEvent.NewFlask] =
+    EncodeJson { nf =>
+      ("type" := "NewFlask") ->:
+      ("instance" := nf.instance.id) ->:
+      jEmptyObject
+    }
+
+  implicit val terminatedToJson: EncodeJson[RepoEvent.Terminated] =
+    EncodeJson { t =>
+      ("type" := "Terminated") ->:
+      ("instance" := t.id) ->:
+      jEmptyObject
+    }
+
+  implicit val repoEventToJson: EncodeJson[RepoEvent] =
+    EncodeJson {
+      case sc@RepoEvent.StateChange(_,_,_) => stateChangeToJson.encode(sc)
+      case nf@RepoEvent.NewFlask(_) => newFlaskToJson.encode(nf)
+      case t@RepoEvent.Terminated(_) => terminatedToJson.encode(t)
+    }
 }

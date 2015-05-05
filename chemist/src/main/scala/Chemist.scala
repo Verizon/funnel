@@ -8,12 +8,11 @@ import oncue.svc.funnel.BuildInfo
 import scalaz.{\/,-\/,\/-,Kleisli}
 import scalaz.syntax.kleisli._
 import scalaz.concurrent.Task
+import scalaz.stream.{Process,Process0, Sink}
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 import messages.Error
 
 trait Chemist[A <: Platform]{
-  import Sharding.Target
-
   type ChemistK[U] = Kleisli[Task, A, U]
 
   private val log = Logger[this.type]
@@ -55,8 +54,12 @@ trait Chemist[A <: Platform]{
    * Instruct flask to specifcally take a given shard out of service and
    * repartiion its given load to the rest of the system.
    */
-  def exclude(shard: InstanceID): ChemistK[Unit] =
-    alterShard(shard, Terminate)
+  def exclude(shard: InstanceID): ChemistK[Unit] = {
+      for {
+        cfg <- config
+        _ <- Sharding.platformHandler(cfg.repository)(PlatformEvent.Terminated(shard)).liftKleisli
+      } yield ()
+    }
 
   /**
    * Instruct flask to specifcally "launch" a given shard and
@@ -64,13 +67,17 @@ trait Chemist[A <: Platform]{
    *
    * NOTE: Assumes all added instances here are free of work already.
    */
-  def include(shard: InstanceID): ChemistK[Unit] =
-    alterShard(shard, Launch)
+  def include(id: InstanceID): ChemistK[Unit] =
+    for {
+      cfg <- config
+      flask <- cfg.discovery.lookupOne(id).liftKleisli
+      _ <- Sharding.platformHandler(cfg.repository)(PlatformEvent.NewFlask(flask)).liftKleisli
+    } yield ()
 
   /**
    * List out the last 100 lifecycle events that this chemist has seen.
    */
-  def history: ChemistK[Seq[AutoScalingEvent]] =
+  def history: ChemistK[Seq[RepoEvent]] =
     config.flatMapK(_.repository.historicalEvents)
 
   /**
@@ -92,8 +99,6 @@ trait Chemist[A <: Platform]{
   def init: ChemistK[Unit]
 
   //////////////////////// INTERNALS ////////////////////////////
-
-  protected def alterShard(id: InstanceID, state: AutoScalingEventKind): ChemistK[Unit]
 
   protected def platform: ChemistK[A] =
     Kleisli.ask[Task, A]
