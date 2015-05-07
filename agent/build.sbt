@@ -42,7 +42,7 @@ mainClass in Revolver.reStart := Some("funnel.agent.Main")
 javaOptions in Revolver.reStart += "-Xmx4g"
 
 // Revolver.reStartArgs :=
-//   ((sourceDirectory in Test).value / "resources/oncue/agent-jmx-cassandra.cfg"
+//   ((sourceDirectory in Test).value / "resources/oncue/agent-jmx-kafka.cfg"
 //     ).getCanonicalPath :: Nil
 
 unmanagedClasspath in Compile ++= Custom.toolsJar

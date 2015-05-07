@@ -16,4 +16,10 @@ class ParserSpec extends FlatSpec with Matchers {
     Parser.fromCanonicalName("org.apache.cassandra.db:columnfamily=schema_columns,keyspace=system,type=ColumnFamilies"
       ) should equal (right("org/apache/cassandra/db/columnfamilies/system/schema_columns"))
   }
+
+  it should "parse the janky jmx mbean names from kafka" in {
+    Parser.fromCanonicalName("\"kafka.server\":type=\"BrokerTopicMetrics\",name=\"AllTopicsBytesInPerSec\""
+      ) should equal (right("kafka/server/alltopicsbytesinpersec/brokertopicmetrics"))
+  }
+
 }

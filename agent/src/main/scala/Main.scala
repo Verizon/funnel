@@ -56,6 +56,8 @@ object Main {
       b <- knobs.aws.config
     } yield a ++ b
 
+    log.debug(s"Input configuration file was: ${config.run}")
+
     /**
      * Create a typed set of options using knobs.
      * For the proxy host, try looking up the local address of this
@@ -92,6 +94,8 @@ object Main {
         jmx    = (jmxName |@| jmxUri |@| jmxFreq |@| jmxQueries |@| jmxExcludes)(JmxConfig)
       )
     }.run
+
+    log.debug(s"Supplied options were: $options")
 
     /**
      * Setup the instruments instance that will be used by the remote
