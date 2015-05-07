@@ -48,7 +48,7 @@ object Main {
     val sources = args.toList.map(p =>
       Optional(FileResource(new File(p)))) :::
       Required(
-        FileResource(new File("/usr/share/oncue/etc/agent.cfg")) or
+        FileResource(new File("/usr/share/funnel-agent/etc/agent.cfg")) or
         ClassPathResource("oncue/agent.cfg")) :: Nil
 
     val config: Task[Config] = for {
@@ -56,7 +56,7 @@ object Main {
       b <- knobs.aws.config
     } yield a ++ b
 
-    log.debug(s"Input configuration file was: ${config.run}")
+    log.info(s"Input configuration file was: ${config.run}")
 
     /**
      * Create a typed set of options using knobs.
