@@ -153,7 +153,7 @@ trait Monitoring {
     def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] =
       for {
         _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))) )
-        _ <- Task( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))) )
+        _ <- Task( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))).filter(!_.isEmpty) )
         _  = log.debug(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
       } yield ()
 
