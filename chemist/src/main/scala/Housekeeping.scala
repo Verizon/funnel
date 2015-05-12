@@ -5,6 +5,7 @@ import scalaz.concurrent.Task
 import scalaz.std.string._
 import scalaz.syntax.apply._
 import journal.Logger
+import java.net.URI
 
 object Housekeeping {
   import Sharding._
@@ -16,10 +17,10 @@ object Housekeeping {
    *
    * This function should only really be used startup of chemist.
    */
-  def gatherAssignedTargets(instances: Seq[Instance])(http: dispatch.Http): Task[Distribution] =
+  def gatherAssignedTargets(flasks: Seq[Flask])(http: dispatch.Http): Task[Distribution] =
     (for {
-      a <- Task.gatherUnordered(instances.map(
-            i => requestAssignedTargets(i.location)(http).map(i.id -> _)))
+       a <- Task.gatherUnordered(flasks.map(
+            f => requestAssignedTargets(f.location)(http).map(f -> _)))
     } yield a.foldLeft(Distribution.empty){ (a,b) =>
       a.alter(b._1, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
     }) or Task.now(Distribution.empty)
@@ -41,7 +42,7 @@ object Housekeeping {
         Parse.decodeOption[List[Cluster]](c
         ).toList.flatMap(identity
         ).foldLeft(Set.empty[Target]){ (a,b) =>
-          b.urls.map(s => Target(b.label, SafeURL(s))).toSet
+          b.urls.map(s => Target(b.label, new URI(s))).toSet
         }
       }
     }

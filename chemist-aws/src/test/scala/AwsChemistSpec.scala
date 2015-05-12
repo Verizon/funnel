@@ -25,7 +25,7 @@ class ChemistAwsSpec extends FlatSpec with Matchers {
 
   def instance(isPrivate: Boolean, name: String): Instance = {
     val l = Location("127.0.0.1", 45698, "dc", isPrivateNetwork = isPrivate)
-    Instance(id = "x", location = l, firewalls = Nil, tags = Map("type" -> name, "revision" -> "1.2.3"))
+    AwsInstance(id = "x", location = l, firewalls = Nil, tags = Map("type" -> name, "revision" -> "1.2.3"))
   }
 
   val f1 = instance(true, "flask") ::

@@ -15,6 +15,7 @@ import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import funnel.aws._
 import messages.Error
 import messages.Telemetry._
+import java.net.URI
 
 /**
  * The purpose of this object is to manage all the "lifecycle" events
@@ -50,13 +51,13 @@ object Lifecycle {
    * In the event the message does not parse to an `AutoScalingEvent`,
    */
   def stream(queueName: String, resources: Seq[String], signal: Signal[Boolean]
-    )(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+    )(sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Process[Task, Throwable \/ Seq[PlatformEvent]] = {
       // adding this function to ensure that parse errors do not get
       // lifted into errors that will later fail the stream, and that
       // any errors in the interpreter are properly handled.
       def go(m: Message): Task[Throwable \/ Seq[PlatformEvent]] =
-        parseMessage(m).traverseU(interpreter(_, resources, signal)(r, asg, ec2, dsc)).handle {
+        parseMessage(m).traverseU(interpreter(_, resources, signal)(asg, ec2, dsc)).handle {
           case MessageParseException(err) =>
             log.warn(s"Unexpected recoverable error when parsing lifecycle message: $err")
            noop
@@ -90,52 +91,47 @@ object Lifecycle {
    *
    * Monitored \/ Unmonitored, I promise
    */
-  private def actionsFromLifecycle(flask: Instance): InstanceID \/ InstanceID => PlatformEvent = {
+  private def actionsFromLifecycle(flask: FlaskID): URI \/ URI => PlatformEvent = {
     case -\/(id) => Unmonitored(flask, id)
     case \/-(id) => Monitored(flask, id)
   }
 
   def lifecycleActor(repo: Repository): Actor[PlatformEvent] = Actor(a => Sharding.platformHandler(repo)(a).run)
   def errorActor(repo: Repository): Actor[Error] = Actor(e => repo.errorSink(e).run)
-  def keysActor(repo: Repository): Actor[(InstanceID, Set[Key[Any]])] = Actor{ case (fl, keys) => repo.keySink(fl, keys).run }
+  def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] = Actor{ case (fl, keys) => repo.keySink(fl, keys).run }
 
-  def monitorTelemetry(flask: Instance,
-                       keys: Actor[(InstanceID, Set[Key[Any]])],
+  def monitorTelemetry(flask: Flask,
+                       keys: Actor[(URI, Set[Key[Any]])],
                        errors: Actor[Error],
                        lifecycle: Actor[PlatformEvent],
                        signal: Signal[Boolean]): Task[Unit] = {
 
-    val lc: Actor[String \/ String] = lifecycle.contramap(actionsFromLifecycle(flask))
+    val lc: Actor[URI \/ URI] = lifecycle.contramap(actionsFromLifecycle(flask.id))
 
-    telemetrySubscribeSocket(flask.telemetryLocation.asURI(), signal, flask.id, keys, errors, lc)
+    telemetrySubscribeSocket(flask.telemetry.asURI(), signal, keys, errors, lc)
   }
 
 
   def interpreter(e: AutoScalingEvent, resources: Seq[String], signal: Signal[Boolean]
-    )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+    )(asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Seq[PlatformEvent]] = {
 
-    import funnel.chemist.TargetLifecycle
     log.debug(s"interpreting event: $e")
 
     // MOAR side-effects!
     LifecycleEvents.increment
 
-    val lifecycle = lifecycleActor(r)
-    val errors = errorActor(r)
-    val keys = keysActor(r)
 
-
-    def targetsFromId(id: InstanceID): Task[Seq[NewTarget]] =
+    def targetsFromId(id: TargetID): Task[Seq[NewTarget]] =
       for {
+        i <- dsc.lookupTargets(id)
+      _  = log.debug(s"Found instance metadata from remote: $i")
+      } yield i.toSeq.map(NewTarget)
 
-        i <- dsc.lookupOne(id)
-        _  = log.debug(s"Found instance metadata from remote: $i")
-
-        _ <- Sharding.platformHandler(r)(NewTarget(i))
-        _  = log.debug(s"Adding service instance '$id' to known entries")
-
-      } yield Target.fromInstance(resources)(i).toSeq.map(NewTarget(i, _))
+    def terminatedTargetsFromId(id: TargetID): Task[Seq[PlatformEvent]] =
+      for {
+        i <- dsc.lookupTargets(id)
+      } yield i.toSeq.map(t => TerminatedTarget(t.uri))
 
     def isFlask: Task[Boolean] =
       ASG.lookupByName(e.asgName)(asg).flatMap { a =>
@@ -147,19 +143,16 @@ object Lifecycle {
         ).fold(Task.now(false))(_ => Task.now(true))
       }
 
-    def newFlask(id: InstanceID): Task[Seq[PlatformEvent]] =
+    def newFlask(id: FlaskID): Task[Seq[PlatformEvent]] =
       for {
-        instance <- dsc.lookupOne(id)
-        _ = log.debug(s"monitoring telemetry on instance '$id'")
-        _ = monitorTelemetry(instance, keys, errors, lifecycle, signal)
-      } yield Seq(NewFlask(id))
+        flask <- dsc.lookupFlask(id)
+      } yield Seq(NewFlask(flask))
 
     e match {
       case AutoScalingEvent(_,Launch,_,_,_,_,_,_,_,_,_,_,id) =>
-        isFlask.ifM(newFlask(id), targetsFromId(id))
-
+        isFlask.ifM(newFlask(FlaskID(id)), targetsFromId(TargetID(id)))
       case AutoScalingEvent(_,Terminate,_,_,_,_,_,_,_,_,_,_,id) =>
-        Task.now(Seq(Terminated(id)))
+        isFlask.ifM(Task.now(Seq(TerminatedFlask(FlaskID(id)))), terminatedTargetsFromId(TargetID(id)))
 
       case _ => Task.now(Seq(NoOp))
     }
@@ -173,6 +166,17 @@ object Lifecycle {
     case \/-(a) => Process.emitAll(a)
   }
 
+  def telemetrySink(r: Repository, signal: Signal[Boolean]): Sink[Task, PlatformEvent] = {
+    val lifecycle = lifecycleActor(r)
+    val errors = errorActor(r)
+    val keys = keysActor(r)
+
+    Process.constant {
+      case NewFlask(f) => monitorTelemetry(f, keys, errors, lifecycle, signal)
+      case _ => Task.now(())
+    }
+  }
+
   /**
    * The main method for the lifecycle process. Run the `stream` method and then handle
    * failures that might occour on the process. This function is primarily used in the
@@ -182,7 +186,7 @@ object Lifecycle {
   def run(queueName: String, resources: Seq[String], signal: Signal[Boolean]
     )(repo: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
   ): Task[Unit] = {
-    val ourWorld = stream(queueName, resources, signal)(repo,sqs,asg,ec2,dsc) flatMap logErrors to Process.constant(Sharding.platformActionHandler(repo) _)
+    val ourWorld = stream(queueName, resources, signal)(sqs,asg,ec2,dsc) flatMap logErrors observe telemetrySink(repo, signal) to Process.constant(Sharding.platformHandler(repo) _)
     ourWorld.run.onFinish(_ => signal.set(false))
   }
 }

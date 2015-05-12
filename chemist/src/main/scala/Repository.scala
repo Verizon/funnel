@@ -22,13 +22,13 @@ trait Repository {
   /**
    * Maps IDs to the Instances, and the details of their last state change
    */
-  type InstanceM     = InstanceID  ==>> StateChange
-  type FlaskM     = InstanceID     ==>> Instance
+  type InstanceM = URI        ==>> StateChange
+  type FlaskM    = FlaskID    ==>> Flask
 
   /**
    * for any possible state of a target, a map of instances in that state
    */
-  type StateM        = TargetState ==>> InstanceM
+  type StateM    = TargetState ==>> InstanceM
 
   /////////////// audit operations //////////////////
 
@@ -42,17 +42,17 @@ trait Repository {
    */
   def errors: Task[Seq[Error]]
 
-  def keySink(flask: InstanceID, keys: Set[Key[Any]]): Task[Unit]
+  def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit]
 
   def errorSink(e: Error): Task[Unit]
 
   /////////////// instance operations ///////////////
 
-  def targetState(instanceId: InstanceID): TargetState
+  def targetState(instanceId: URI): TargetState
 
-  def target(id: InstanceID): Task[Instance]
-  def flask(id: InstanceID): Task[Instance]
-  def instance(id: InstanceID): Task[Instance] = flask(id) or target(id)
+//  def target(id: InstanceID): Task[Instance]
+//  def flask(id: InstanceID): Task[Instance]
+  def instance(id: URI): Option[Target]
 
   val lifecycleQ: async.mutable.Queue[RepoEvent]
 
@@ -60,9 +60,9 @@ trait Repository {
 
   def distribution: Task[Distribution]
   def mergeDistribution(d: Distribution): Task[Distribution]
-  def assignedTargets(flask: InstanceID): Task[Set[Target]]
+  def assignedTargets(flask: Flask): Task[Set[Target]]
 
-  def isFlask(id: InstanceID): Task[Boolean] = flask(id).attempt.map(_.isRight)
+//  def isFlask(id: InstanceID): Task[Boolean] = flask(id).attempt.map(_.isRight)
 
 //  def subscribe(events: Process[Task,TargetMessage]): Unit
 }
@@ -85,9 +85,9 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
    * stores a key-value map of instance-id -> host
    */
   val targets = new Ref[InstanceM](==>>.empty)
+  val flasks  = new Ref[FlaskM](==>>.empty)
 
-  val flasks = new Ref[FlaskM](==>>.empty)
-
+/*
   def target(id: InstanceID): Task[Instance] =
     targets.get.lookup(id) match {
       case None    => Task.fail(new IllegalArgumentException(s"No target with the ID $id"))
@@ -99,7 +99,7 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
       case None    => Task.fail(new IllegalArgumentException(s"No flask with the ID $id"))
       case Some(i) => Task.now(i)
     }
-
+ */
   private val emptyMap: InstanceM = ==>>.empty
   val stateMaps = new Ref[StateM](==>>(Unknown -> emptyMap,
                                        Unmonitored -> emptyMap,
@@ -134,7 +134,7 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
   def errors: Task[Seq[Error]] =
     Task.delay(errorStack.toSeq.toList)
 
-  def keySink(flask: InstanceID, keys: Set[Key[Any]]): Task[Unit] = Task.now(())
+   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit] = Task.now(())
 
   def errorSink(e: Error): Task[Unit] = errorStack.push(e)
 
@@ -147,37 +147,40 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
   private val repoCommandsQ: async.mutable.Queue[RepoCommand] = async.unboundedQueue
   val repoCommands: Process[Task, RepoCommand] = repoCommandsQ.dequeue
 
-  def lifecycle(resources: Seq[String]): Unit =  {
+  def lifecycle(): Unit =  {
     val go: RepoEvent => Process[Task, RepoCommand] = { re =>
       Process.eval(historyStack.push(re)).flatMap{ _ =>
         re match {
           case sc @ StateChange(from,to,msg) =>
-            val id = msg.instance.id
+            val id = msg.target.uri
             targets.update(_.insert(id, sc))
             stateMaps.update(_.update(from, (m => Some(m.delete(id)))))
             stateMaps.update(_.update(to, (m => Some(m.insert(id, sc)))))
             sc.to match {
               case Unknown =>
-                Process.emitAll(Target.fromInstance(resources)(sc.msg.instance).toSeq.map(RepoCommand.Monitor))
+                Process.emit(RepoCommand.Monitor(sc.msg.target))
               case _ => Process.halt
             }
-          case NewFlask(instance) =>
+          case NewFlask(flask) =>
 
-            flasks.get + (instance.id -> instance)
+            flasks.get + (flask.id -> flask)
             Process.halt
 
-          case RepoEvent.Terminated(id) =>
+          case RepoEvent.TerminatedFlask(id) =>
             flasks.get.lookup(id) match {
               case Some(_) =>
                 flasks.update(_.delete(id))
                 Process.emit(RepoCommand.ReassignWork(id))
-              case None => targets.get.lookup(id) match {
-                case Some(i) =>
-                  targets.update(_.delete(id))
-                  stateMaps.update(_.update(i.to, (m => Some(m.delete(i.msg.instance.id)))))
-                  Process.halt
-                case None => Process.halt
-              }
+              case None => Process.halt
+            }
+
+          case RepoEvent.TerminatedTarget(id) =>
+            targets.get.lookup(id) match {
+              case Some(i) =>
+                targets.update(_.delete(id))
+                stateMaps.update(_.update(i.to, (m => Some(m.delete(i.msg.target.uri)))))
+                Process.halt
+              case None => Process.halt
             }
         }
       }
@@ -193,12 +196,11 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
     }
   }
 
-//  def repoCommands(resources: Seq[String]): Process[Task,RepoCommand] = lifecycleQ.dequeue flatMap lifecycle(resources)
-
   /**
    * determine the current perceived state of a Target
    */
-  def targetState(id: InstanceID): TargetState = targets.get.lookup(id).fold[TargetState](TargetState.Unknown)(_.to)
+  def targetState(id: URI): TargetState = targets.get.lookup(id).fold[TargetState](TargetState.Unknown)(_.to)
+  def instance(id: URI): Option[Target] = targets.get.lookup(id).map(_.msg.target)
 
   /////////////// flask operations ///////////////
 
@@ -207,9 +209,9 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
   def mergeDistribution(d: Distribution): Task[Distribution] =
     Task.delay(D.update(_.unionWith(d)(_ ++ _)))
 
-  def assignedTargets(id: InstanceID): Task[Set[Target]] =
-    D.get.lookup(id) match {
-      case None => Task.fail(InstanceNotFoundException(id, "Flask"))
+  def assignedTargets(flask: Flask): Task[Set[Target]] =
+    D.get.lookup(flask) match {
+      case None => Task.fail(InstanceNotFoundException(flask.id.value, "Flask"))
       case Some(t) => Task.now(t)
     }
 }

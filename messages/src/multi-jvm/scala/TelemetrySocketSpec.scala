@@ -16,6 +16,8 @@ trait TelemetryMultiTest {
   val S  = signalOf[Boolean](true)
   val U1 = new URI("ipc:///tmp/u1.socket")
 
+  val dummyActor: Actor[Any] = Actor { _ => () }
+
   val testKeys = List(
     Key("key1", Reportable.B, Units.Count, "desc", Map("ka1" -> "va1")),
     Key("key2", Reportable.D, Units.Ratio, "desc", Map("kb1" -> "vb1")),
@@ -26,10 +28,10 @@ trait TelemetryMultiTest {
   )
 
   val errors = List(
-    Error(Names("kind1", "mine", "theirs")),
-    Error(Names("kind2", "mine", "theirs")),
-    Error(Names("kind3", "mine", "theirs")),
-    Error(Names("kind4", "mine", "theirs"))
+    Error(Names("kind1", "mine", new URI("http://theirs"))),
+    Error(Names("kind2", "mine", new URI("http://theirs"))),
+    Error(Names("kind3", "mine", new URI("http://theirs"))),
+    Error(Names("kind4", "mine", new URI("http://theirs")))
   )
 }
 
@@ -46,14 +48,12 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     sets.traverse_{ s => keysIn.set(s) }.run
 
-    Thread.sleep(100)
-
     val errorsS = Process.emitAll(errors)
 
     val pub: Task[Unit] = telemetryPublishSocket(U1, S, errorsS.wye(keysInD pipe keyChanges)(wye.merge))
     pub.runAsync {
       case -\/(e) => e.printStackTrace
-      case \/-(_) => 
+      case \/-(_) =>
     }
 
     Thread.sleep(200)
@@ -63,38 +63,28 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
 }
 
 class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
-
   "sub socket" should "sub" in {
-    val (keysout, errorsS, sub) = telemetrySubscribeSocket(U1, S)
-    val keysoutS = keysout.discrete
 
-    sub.run.runAsync {
-      case -\/(e) => e.printStackTrace
-      case \/-(_) => 
+    var keysOut: Map[URI, Set[Key[Any]]] = Map.empty
+    val keyActor: Actor[(URI, Set[Key[Any]])] = Actor {
+      case (uri,keys) => keysOut = keysOut + (uri -> keys)
     }
 
-    var keysOut: Set[Key[Any]] = Set.empty
-    val myAwesomeSink: Sink[Task,Set[Key[Any]]] = Process.constant { k =>
-      Task {
-        keysOut = k
-      }
-    }
+    var errorsOut: List[Error] = List.empty
+    val errorsActor: Actor[Error] = Actor(e => errorsOut = e :: errorsOut)
 
-    var errorsOut: List[Error] = Nil
-    val anotherAwesomeSink: Sink[Task,Error] = Process.constant { e =>
-      Task {
-        errorsOut = e :: errorsOut
-      }
-    }
+    val sub = telemetrySubscribeSocket(U1, S,
+                                       keyActor,
+                                       errorsActor,
+                                       dummyActor.asInstanceOf[Actor[URI\/URI]])
 
-    (keysoutS to myAwesomeSink).run.runAsync(_ => ())
-    (errorsS to anotherAwesomeSink).run.runAsync(_ => ())
+    sub.runAsync(_ => ())
 
-    Thread.sleep(1000)
-    keysout.close.run
-    S.set(false).run
+    Thread.sleep(10000)
 
-    keysOut should be (testKeys.toSet)
+    keysOut.size should be (1)
+    keysOut(U1) should be (testKeys.toSet)
+
     errorsOut.reverse should be (errors)
   }
 

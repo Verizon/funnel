@@ -10,6 +10,7 @@ import scalaz.syntax.traverse.{ToFunctorOps => _, _}
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Process1,Sink}
 import funnel.ClusterName
+import java.net.URI
 
 import journal.Logger
 
@@ -27,8 +28,8 @@ object Sharding {
    * obtain a list of flasks ordered by flasks with the least
    * assigned work first.
    */
-  def shards(d: Distribution): Set[Flask] =
-    sorted(d).keySet
+  def shards(d: Distribution): Seq[Flask] =
+    sorted(d).map(_._1)
 
   /**
    * sort the current distribution by the size of the url
@@ -36,16 +37,16 @@ object Sharding {
    * snapshot is ordered by flasks with least assigned
    * work first.
    */
-  def sorted(d: Distribution): Map[Flask, Set[Target]] =
-    d.toList.sortBy(_._2.size).toMap
+  def sorted(d: Distribution): Seq[(Flask, Set[Target])] =
+    d.toList.sortBy(_._2.size)
 
   /**
    * dump out the current snapshot of how chemist believes work
    * has been assigned to flasks.
    */
-  def snapshot(d: Distribution): Map[Flask, Map[ClusterName, List[SafeURL]]] =
+  def snapshot(d: Distribution): Map[Flask, Map[ClusterName, List[URI]]] =
     d.toList.map { case (i,s) =>
-      i -> s.groupBy(_.cluster).mapValues(_.toList.map(_.url))
+      i -> s.groupBy(_.cluster).mapValues(_.toList.map(_.uri))
     }.toMap
 
   /**
@@ -68,17 +69,17 @@ object Sharding {
     val existing = targets(d)
 
     // determine if any of the supplied urls are existing targets
-    val delta = next.map(_.url) &~ existing.map(_.url)
+    val delta = next.map(_.uri) &~ existing.map(_.uri)
 
     // having computed the targets that we actually care about,
     // rehydrae a `Set[Target]` from the given `Set[SafeURL]`
     delta.foldLeft(Set.empty[Target]){ (a,b) =>
-      a ++ next.filter(_.url == b)
+      a ++ next.filter(_.uri == b)
     }
   }
 
   ///////////////////////// IO functions ///////////////////////////
-
+/*
   /**
    * The goal here is given the `Set[Target]` be able to compute how things
    * should be sharded, update the state, and then yield the results such that
@@ -112,6 +113,7 @@ object Sharding {
     } yield x.toMap
   }
 
+ */
 
   /**
    * Handle the Actions emitted from the Platform
@@ -119,11 +121,12 @@ object Sharding {
   def platformHandler(repo: Repository)(a: PlatformEvent): Task[Unit] = {
     val lifecycle = TargetLifecycle.process(repo) _
     a match {
-      case PlatformEvent.NewTarget(instance, targets) =>
-        lifecycle(TargetLifecycle.Discovery(instance, targets, System.currentTimeMillis), repo.targetState(instance.id))
+      case PlatformEvent.NewTarget(target) =>
+        lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), repo.targetState(target.uri))
       case PlatformEvent.NewFlask(f) =>
         repo.lifecycleQ.enqueueOne(RepoEvent.NewFlask(f))
-      case PlatformEvent.Terminated(i) => repo.isFlask(i).ifM(Task.now(()), Task.now(())) // STU todo
+      case PlatformEvent.TerminatedFlask(i) => Task.now(())// STU TODO
+      case PlatformEvent.TerminatedTarget(i) => Task.now(())// STU TODO
       case PlatformEvent.Monitored(f, i) => Task.now(()) // repo.monitor(f, i)
       case PlatformEvent.Unmonitored(f, i) => Task.now(()) // repo.unmonitor(f, i)
       case PlatformEvent.NoOp => Task.now(())

@@ -3,6 +3,7 @@ package chemist
 
 import knobs.{loadImmutable,Required,FileResource,ClassPathResource}
 import java.io.File
+import java.net.URI
 import journal.Logger
 import oncue.svc.funnel.BuildInfo
 import scalaz.{\/,-\/,\/-,Kleisli}
@@ -23,7 +24,7 @@ trait Chemist[A <: Platform]{
    * Of all known monitorable services, dispaly the current work assignments
    * of funnel -> flask.
    */
-  def distribution: ChemistK[Map[InstanceID, Map[String, List[SafeURL]]]] =
+  def distribution: ChemistK[Map[Flask, Map[String, List[URI]]]] =
     config.flatMapK(_.repository.distribution.map(Sharding.snapshot))
 
   /**
@@ -34,30 +35,30 @@ trait Chemist[A <: Platform]{
   def distribute(targets: Set[Target]): ChemistK[Unit] =
     Task.now(()).liftKleisli
 
+
   /**
    * list all the shards currently known by chemist.
    */
-  def shards: ChemistK[List[Instance]] =
+  def shards: ChemistK[Set[Flask]] =
     for {
       cfg <- config
       a <- cfg.repository.distribution.map(Sharding.shards).liftKleisli
-      b <- Task.gatherUnordered(a.map(cfg.repository.instance).toSeq).liftKleisli
-    } yield b
-
+    } yield a.toSet
   /**
    * display all known node information about a specific shard
    */
-  def shard(id: InstanceID): ChemistK[Option[Instance]] =
-    shards.map(_.find(_.id.toLowerCase == id.trim.toLowerCase))
+  def shard(id: FlaskID): ChemistK[Option[Flask]] =
+    shards.map(_.find(_.id.value.toLowerCase == id.value.trim.toLowerCase))
+
 
   /**
    * Instruct flask to specifcally take a given shard out of service and
    * repartiion its given load to the rest of the system.
    */
-  def exclude(shard: InstanceID): ChemistK[Unit] = {
+  def exclude(shard: FlaskID): ChemistK[Unit] = {
       for {
         cfg <- config
-        _ <- Sharding.platformHandler(cfg.repository)(PlatformEvent.Terminated(shard)).liftKleisli
+        _ <- Sharding.platformHandler(cfg.repository)(PlatformEvent.TerminatedFlask(shard)).liftKleisli
       } yield ()
     }
 
@@ -67,10 +68,10 @@ trait Chemist[A <: Platform]{
    *
    * NOTE: Assumes all added instances here are free of work already.
    */
-  def include(id: InstanceID): ChemistK[Unit] =
+  def include(id: FlaskID): ChemistK[Unit] =
     for {
       cfg <- config
-      flask <- cfg.discovery.lookupOne(id).liftKleisli
+      flask <- cfg.discovery.lookupFlask(id).liftKleisli
       _ <- Sharding.platformHandler(cfg.repository)(PlatformEvent.NewFlask(flask)).liftKleisli
     } yield ()
 

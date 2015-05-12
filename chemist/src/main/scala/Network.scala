@@ -5,6 +5,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.{Process, Sink}
 import scalaz.syntax.apply._
 import journal.Logger
+import java.net.URI
 
 trait RemoteFlask {
   val commands: Sink[Task,FlaskCommand]
@@ -32,8 +33,8 @@ class HttpFlask(http: dispatch.Http) extends RemoteFlask {
 
     // FIXME: "safe" because we know we're passing in the default localhost
     // val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
-    val payload: Map[ClusterName, List[SafeURL]] =
-      targets.groupBy(_.cluster).mapValues(_.map(_.url).toList)
+    val payload: Map[ClusterName, List[URI]] =
+      targets.groupBy(_.cluster).mapValues(_.map(_.uri).toList)
 
     val uri = to.asURI(path = "mirror")
 
@@ -51,8 +52,8 @@ class HttpFlask(http: dispatch.Http) extends RemoteFlask {
 
     // FIXME: "safe" because we know we're passing in the default localhost
     // val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
-    val payload: Map[ClusterName, List[SafeURL]] =
-      targets.groupBy(_.cluster).mapValues(_.map(_.url).toList)
+    val payload: Map[ClusterName, List[URI]] =
+      targets.groupBy(_.cluster).mapValues(_.map(_.uri).toList)
 
     val uri = to.asURI(path = "discard")
 

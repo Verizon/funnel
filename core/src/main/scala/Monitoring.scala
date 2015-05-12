@@ -173,7 +173,7 @@ trait Monitoring {
           val localName = formatURI(source) // TIM: remove this; keeping for now until we figure out how the source needs sanitising
 
           val received: Process[Task,Unit] = link(hook) {
-            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, localName)))(
+            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, source)))(
               source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> localName))
           }
 

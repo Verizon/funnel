@@ -19,8 +19,8 @@ final case class Error(names: Names) extends Telemetry {
 }
 
 final case class NewKey(key: Key[_]) extends Telemetry
-final case class Monitored(i: InstanceID) extends Telemetry
-final case class Unmonitored(i: InstanceID) extends Telemetry
+final case class Monitored(i: URI) extends Telemetry
+final case class Unmonitored(i: URI) extends Telemetry
 
 object Telemetry extends TelemetryCodecs {
 
@@ -30,8 +30,8 @@ object Telemetry extends TelemetryCodecs {
       case NewKey(key) =>
         val bytes = keyEncode.encodeValid(key).toByteArray
         Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("key")), bytes)
-      case Monitored(i) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("monitor")), i.getBytes())
-      case Unmonitored(i) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("unmonitor")), i.getBytes())
+      case Monitored(i) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("monitor")), i.toString.getBytes())
+      case Unmonitored(i) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("unmonitor")), i.toString.getBytes())
     }
   }
 
@@ -42,25 +42,24 @@ object Telemetry extends TelemetryCodecs {
   def telemetryPublishSocket(uri: URI, signal: Signal[Boolean], telemetry: Process[Task,Telemetry]): Task[Unit] = {
     val e = telemetryPublishEndpoint(uri)
     Ø.link(e)(signal) { socket =>
-      telemetry  through Ø.write(socket)
+      telemetry through Ø.write(socket)
     }.run
   }
 
 
 
   def telemetrySubscribeSocket(uri: URI, signal: Signal[Boolean],
-                               id: InstanceID,
-                               keys: Actor[(InstanceID, Set[Key[Any]])],
+                               keys: Actor[(URI, Set[Key[Any]])],
                                errors: Actor[Error],
-                               lifecycle: Actor[String \/ String]
+                               lifecycle: Actor[URI \/ URI]
                                ): Task[Unit] = {
     val endpoint = telemetrySubscribeEndpoint(uri)
     Ø.link(endpoint)(signal) { socket =>
-      (Ø.receive(socket) to fromTransported(id, keys, errors, lifecycle))
+      (Ø.receive(socket) to fromTransported(uri, keys, errors, lifecycle))
     }.run
   }
 
-  def fromTransported(id: InstanceID, keys: Actor[(InstanceID, Set[Key[Any]])], errors: Actor[Error], lifecycleSink: Actor[String \/ String]): Sink[Task, Transported] = {
+  def fromTransported(id: URI, keys: Actor[(URI, Set[Key[Any]])], errors: Actor[Error], lifecycleSink: Actor[URI \/ URI]): Sink[Task, Transported] = {
     val currentKeys = collection.mutable.Set.empty[Key[Any]]
 
     Process.constant { x =>
@@ -71,8 +70,8 @@ object Telemetry extends TelemetryCodecs {
           Task(currentKeys += keyDecode.decodeValidValue(BitVector(bytes))).flatMap { k =>
             Task.delay(keys ! id -> k.toSet)
           }
-        case Transported(_, Versions.v1, _, Some(Topic("monitor")), bytes) => Task.delay(lifecycleSink ! \/.right(new String(bytes)))
-        case Transported(_, Versions.v1, _, Some(Topic("unmonitor")), bytes) => Task.delay(lifecycleSink ! \/.left(new String(bytes)))
+        case Transported(_, Versions.v1, _, Some(Topic("monitor")), bytes) => Task.delay(lifecycleSink ! \/.right(uriCodec.decodeValidValue(BitVector(bytes))))
+        case Transported(_, Versions.v1, _, Some(Topic("unmonitor")), bytes) => Task.delay(lifecycleSink ! \/.left(uriCodec.decodeValidValue(BitVector(bytes))))
       }
     }
   }
@@ -96,5 +95,7 @@ object Telemetry extends TelemetryCodecs {
 
 
 trait TelemetryCodecs extends KeyCodecs {
+
+  implicit val uriCodec: Codec[URI] = utf8.xmap[URI](new URI(_), _.toString)
   implicit lazy val errorCodec = Codec.derive[Names].xmap[Error](Error(_), _.names)
 }

@@ -10,16 +10,18 @@ import scalaz.syntax.kleisli._
 import scalaz.concurrent.Task
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 
-object AwsChemist {
+object StaticChemist {
   /**
    * filter out all the flask instances; these are not targets.
    * if the target is on a public network address, include it
    * otherwise, wtf, how did we arrive here - dont monitor it.
    */
+/*
   def filterInstances(instances: Seq[Instance])(cfg: StaticConfig): Seq[Instance] =
     instances.filterNot(cfg.discovery.isFlask).collect {
-      case b if (!b.location.isPrivateNetwork)                         => b
+      case b if (!b.location.isPrivateNetwork) => b
     }
+*/
 }
 
 class StaticChemist extends Chemist[Static]{
@@ -87,9 +89,4 @@ class StaticChemist extends Chemist[Static]{
       _ <- Task.delay(log.info(">>>>>>>>>>>> initilization complete <<<<<<<<<<<<")).liftKleisli
     } yield ()
   }
-
-  protected def alterShard(id: InstanceID, state: AutoScalingEventKind): ChemistK[Unit] =
-    for {
-      cfg <- config
-    } yield ()
 }

@@ -85,8 +85,8 @@ class Flask(options: Options, val I: Instruments) {
 
     def retries(names: Names): Event =
       Monitoring.defaultRetries andThen (_ ++ Process.eval[Task, Unit] {
-                               Q.enqueueAll(Seq(Error(names), Unmonitored())
-                                                          .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString))))
+                                           Q.enqueueAll(Seq(Error(names), Unmonitored(names.theirs)))
+                                                          .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString)))
                                          })
 
     import java.net.InetAddress
@@ -118,7 +118,7 @@ class Flask(options: Options, val I: Instruments) {
 
       runAsync(Riemann.publishToRiemann(
         I.monitoring, riemann.ttl.toSeconds.toFloat)(
-        R, s"${riemann.host}:${riemann.port}", retries)(flaskName))
+        R, s"${riemann.host}:${riemann.port}")(flaskName))
     }
   }
 }

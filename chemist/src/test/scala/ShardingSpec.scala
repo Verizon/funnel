@@ -7,21 +7,25 @@ import funnel.Monitoring
 import funnel.http.MonitoringServer
 import scalaz.==>>
 import scalaz.std.string._
+import java.net.URI
+import org.scalactic.TypeCheckedTripleEquals
 
-class ShardingSpec extends FlatSpec with Matchers {
+class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
 
   import Sharding.Distribution
 
   implicit lazy val log: Logger = Logger("chemist-spec")
 
   implicit def tuple2target(in: (String,String)): Target =
-    Target(in._1, SafeURL(in._2))
+    Target(in._1, new URI(in._2))
+
+  def fakeFlask(id: String) = Flask(FlaskID(id), Location.localhost, Location.telemetryLocalhost)
 
   val d1: Distribution = ==>>(
-    ("a", Set(("z","http://one.internal"))),
-    ("d", Set(("y","http://two.internal"), ("w","http://three.internal"), ("v","http://four.internal"))),
-    ("c", Set(("x","http://five.internal"))),
-    ("b", Set(("z","http://two.internal"), ("u","http://six.internal")))
+    (fakeFlask("a"), Set(("z","http://one.internal"))),
+    (fakeFlask("d"), Set(("y","http://two.internal"), ("w","http://three.internal"), ("v","http://four.internal"))),
+    (fakeFlask("c"), Set(("x","http://five.internal"))),
+    (fakeFlask("b"), Set(("z","http://two.internal"), ("u","http://six.internal")))
   )
 
   val i1: Set[Target] = Set(
@@ -44,11 +48,11 @@ class ShardingSpec extends FlatSpec with Matchers {
   )
 
   it should "correctly sort the map and return the flasks in order of their set length" in {
-    Sharding.shards(d1) should equal (Set("a", "c", "b", "d"))
+    Sharding.shards(d1).map(_.id.value) should equal (Seq("a", "c", "b", "d"))
   }
 
   it should "snapshot the exsiting shard distribution" in {
-    Sharding.sorted(d1).keySet should equal (Set("a", "c", "b", "d"))
+    Sharding.sorted(d1).map(_._1.id.value) should equal (Seq("a", "c", "b", "d"))
   }
 
   it should "correctly remove urls that are already being monitored" in {
@@ -59,28 +63,21 @@ class ShardingSpec extends FlatSpec with Matchers {
   }
 
   it should "correctly calculate how the new request should be sharded over known flasks" in {
-    EvenSharding.calculate(i1)(d1) should equal (
-      ("a", Target("u",SafeURL("http://eight.internal"))) ::
-      ("c", Target("v",SafeURL("http://nine.internal"))) :: Nil
-    )
+    EvenSharding.calculate(i1)(d1).map {
+      case (x,y) => x.id.value -> y
+    }.toSet should === (Set(
+                          "a" -> Target("u",new URI("http://eight.internal")),
+                          "c" -> Target("v",new URI("http://nine.internal"))))
 
-    EvenSharding.calculate(i2)(d1) should equal (
-      ("a", Target("v",SafeURL("http://omega.internal"))) ::
-      ("c", Target("w",SafeURL("http://alpha.internal"))) ::
-      ("b", Target("r",SafeURL("http://epsilon.internal"))) ::
-      ("d", Target("z",SafeURL("http://gamma.internal"))) ::
-      ("a", Target("u",SafeURL("http://beta.internal"))) ::
-      ("c", Target("z",SafeURL("http://omicron.internal"))) ::
-      ("b", Target("r",SafeURL("http://kappa.internal"))) ::
-      ("d", Target("r",SafeURL("http://theta.internal"))) ::
-      ("a", Target("p",SafeURL("http://zeta.internal"))) :: Nil
-    )
+    EvenSharding.calculate(i2)(d1).map(_._2).toSet should === (Set(
+                                                                 Target("v",new URI("http://omega.internal")),
+                                                                 Target("w",new URI("http://alpha.internal")),
+                                                                 Target("r",new URI("http://epsilon.internal")),
+                                                                 Target("z",new URI("http://gamma.internal")),
+                                                                 Target("u",new URI("http://beta.internal")),
+                                                                 Target("z",new URI("http://omicron.internal")),
+                                                                 Target("r",new URI("http://kappa.internal")),
+                                                                 Target("r",new URI("http://theta.internal")),
+                                                                 Target("p",new URI("http://zeta.internal"))))
   }
-
-  it should "trigger capacity events when new flasks arrive" in {
-    val repo = new LoggingRepository
-    Sharding.platformHandler(repo)(PlatformEvent.NewFlask("asdf")).run
-    repo.increase.get should be (1)
-  }
-
 }

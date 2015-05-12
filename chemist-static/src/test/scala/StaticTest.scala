@@ -5,6 +5,7 @@ package static
 import org.scalatest._
 import java.io.File
 import knobs.{FileResource,ClassPathResource,Required}
+import scalaz.concurrent.Task
 
 class StaticTest extends FlatSpec with Matchers {
   it should "load Instances from chemist.cfg" in {
@@ -13,19 +14,24 @@ class StaticTest extends FlatSpec with Matchers {
         FileResource(new File("/usr/share/oncue/etc/chemist.cfg")) or
         ClassPathResource("oncue/chemist.cfg")) :: Nil))
       sub   <- cfg.base.at("chemist.instances")
-      ins   <- Config.readInstances(sub)
-    } yield ins).run
-    instances.exists {
-      case Instance("instance1", Location(Some("alpha"), _, 1234, _, _), _, _) => true
+      ins   = Config.readInstances(sub)
+                     } yield ins).run
+
+    val x: Boolean = instances.exists {
+      case (TargetID("instance1"), targets) =>
+        targets.size == 1 && targets.foldLeft(true)((b,t) => t.uri.getPort()==1234)
       case _          => false
     } &&
     instances.exists {
-      case Instance("instance2", Location(Some("beta"), _, 5678, _, _), _, _) => true
+      case (TargetID("instance2"), targets) =>
+        targets.size == 1 && targets.foldLeft(true)((b,t) => t.uri.getPort() == 5678)
       case _          => false
     } &&
     instances.exists {
-      case Instance("instance3", Location(Some("delta"), _, 9012, _, _), _, _) => true
+      case (TargetID("instance3"), targets) =>
+        targets.size == 1 && targets.foldLeft(true)((b,t) => t.uri.getPort() == 9012)
       case _          => false
     }
+    x should be (true)
   }
 }

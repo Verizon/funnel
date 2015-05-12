@@ -88,13 +88,13 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
       GetShards.time(json(chemist.shards))
 
     case GET(Path(Seg("shards" :: id :: Nil))) =>
-      GetShardById.time(json(chemist.shard(id)))
+      GetShardById.time(json(chemist.shard(FlaskID(id))))
 
     case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
-      PostShardExclude.time(json(chemist.exclude(id)))
+      PostShardExclude.time(json(chemist.exclude(FlaskID(id))))
 
     case POST(Path(Seg("shards" :: id :: "include" :: Nil))) =>
-      PostShardInclude.time(json(chemist.include(id)))
+      PostShardInclude.time(json(chemist.include(FlaskID(id))))
 
   }
 }

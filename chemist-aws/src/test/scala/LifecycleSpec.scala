@@ -11,9 +11,11 @@ import scalaz.concurrent.Task
 import scalaz.stream.async.signalOf
 import scalaz.stream.async.mutable.Signal
 import scalaz.std.string._
-import Sharding.{Distribution,Target}
+import Sharding.Distribution
 
 class LifecycleSpec extends FlatSpec with Matchers {
+  import PlatformEvent._
+
   val ec2 = TestAmazonEC2(Fixtures.instances)
   val uuid = java.util.UUID.randomUUID.toString
   val sqs1 = TestAmazonSQS(Fixtures.asgEvent(Launch, name = uuid, instanceId = "i-flaskAAA"))
@@ -24,8 +26,7 @@ class LifecycleSpec extends FlatSpec with Matchers {
   val asg1 = TestAmazonASG.single(_ => uuid)
   // val asg1 = TestAmazonASG.single(_ => "test-group")
 
-  val dsc = new Discovery(ec2, asg1)
-  val r   = new StatefulRepository(dsc)
+  val dsc = new AwsDiscovery(ec2, asg1)
 
   val k1 = "i-dx947af7"
   val k2 = "i-15807647"
@@ -33,18 +34,19 @@ class LifecycleSpec extends FlatSpec with Matchers {
 
   val signal: Signal[Boolean] = signalOf(true)
 
-  private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): Throwable \/ Action =
-    Lifecycle.stream("name-of-queue", "stream/previous" :: Nil, signal)(r, sqs, asg, ec2, dsc
+  private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): Throwable \/ Seq[PlatformEvent] =
+    Lifecycle.stream("name-of-queue", "stream/previous" :: Nil, signal)(sqs, asg, ec2, dsc
       ).until(Process.emit(false)).runLast.run.get // never do this anywhere but tests
 
   behavior of "Lifecycle.stream"
 
   it should "side-effect and update the repository when a new flask is launched" in {
-    fromStream(sqs1, asg1) should equal ( \/-(NoOp) )
+    val \/-(Seq(NewFlask(f))) = fromStream(sqs1, asg1)
+    f.id.value should equal( "i-flaskAAA")
   }
 
   it should "side-effect and update the repository when a flask is terminated" in {
-    fromStream(sqs2, asg1) should equal ( \/-(Redistributed(Map.empty)) ) // empty because there is no work
+    fromStream(sqs2, asg1) should equal ( \/-(Seq(TerminatedFlask(FlaskID("i-flaskAAA"))))) // empty because there is no work
   }
 
   it should "produce a parse exception in the event the message on SQS cannot be parsed" in {
@@ -57,12 +59,14 @@ class LifecycleSpec extends FlatSpec with Matchers {
   import scalaz.{Unapply,Traverse}
   import scalaz.syntax.either._
 
-  def check(json: String): Task[Throwable \/ Action] =
+  def check(json: String): Task[Throwable \/ Seq[PlatformEvent]] =
     Lifecycle.parseMessage(TestMessage(json)
-      ).traverseU(Lifecycle.interpreter(_, resources, signal)(r, asg1, ec2, dsc))
+      ).traverse(Lifecycle.interpreter(_, resources, signal)(asg1, ec2, dsc))
+
 
   it should "parse messages and produce the right action" in {
-    check(Fixtures.asgEvent(Launch, instanceId = "i-flaskAAA")).run should equal (NoOp.right)
+    val \/-(Seq(NewFlask(f))) = check(Fixtures.asgEvent(Launch, instanceId = "i-flaskAAA")).run
+    f.id.value should equal("i-flaskAAA")
     check("INVALID-MESSAGE").map(_ => true).run should equal (true)
   }
 

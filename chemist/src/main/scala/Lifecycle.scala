@@ -88,7 +88,7 @@ object TargetLifecycle {
       override def toString = "Fin"
     }
 
-    implicit val stateOrder: Order[TargetState] = implicitly[Order[Int]].contramap(_.so)
+    implicit val stateOrder: Order[TargetState] = Order[Int].contramap(_.so)
   }
 
 
@@ -128,29 +128,29 @@ object TargetLifecycle {
 
   sealed abstract class TargetMessage {
     def transition: TargetTransition
-    def instance: Instance
+    def target: Target
     def time: Long
   }
 
-  case class Discovery(instance: Instance, targets: List[String], time: Long) extends TargetMessage {
+  case class Discovery(target: Target, time: Long) extends TargetMessage {
     val transition = Discover
   }
-  case class Assignment(instance: Instance, flask: InstanceID, time: Long) extends TargetMessage {
+  case class Assignment(target: Target, flask: FlaskID, time: Long) extends TargetMessage {
     val transition = Assign
   }
-  case class Confirmation(instance: Instance, flask: InstanceID, time: Long) extends TargetMessage {
+  case class Confirmation(target: Target, flask: FlaskID, time: Long) extends TargetMessage {
     val transition = Confirm
   }
-  case class Migration(instance: Instance, flask: InstanceID, time: Long) extends TargetMessage {
+  case class Migration(target: Target, flask: FlaskID, time: Long) extends TargetMessage {
     val transition = Migrate
   }
-  case class Unassignment(instance: Instance, flask: InstanceID, time: Long) extends TargetMessage {
+  case class Unassignment(target: Target, flask: FlaskID, time: Long) extends TargetMessage {
     val transition = Unassign
   }
-  case class Unmonitoring(instance: Instance, flask: InstanceID, time: Long) extends TargetMessage {
+  case class Unmonitoring(target: Target, flask: FlaskID, time: Long) extends TargetMessage {
     val transition = Unmonitor
   }
-  case class Terminated(instance: Instance, time: Long) extends TargetMessage {
+  case class Terminated(target: Target, time: Long) extends TargetMessage {
     val transition = Unmonitor
   }
 

@@ -1,4 +1,5 @@
 package funnel
+package messages
 
 import scodec._
 import scodec.bits._
