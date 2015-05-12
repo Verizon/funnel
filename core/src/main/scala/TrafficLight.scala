@@ -1,6 +1,6 @@
 package funnel
 
-case class TrafficLight(gauge: Gauge[Continuous[String], String]){
+case class TrafficLight(gauge: ContinuousGauge[TrafficLight.State]){
   import TrafficLight._
   def red = gauge.set(Red)
   def green = gauge.set(Green)
@@ -10,6 +10,8 @@ case class TrafficLight(gauge: Gauge[Continuous[String], String]){
   def key = gauge.key
 }
 object TrafficLight {
+  type State = String
+
   private[funnel] val Red = "red"
   private[funnel] val Amber = "amber"
   private[funnel] val Yellow = Amber
