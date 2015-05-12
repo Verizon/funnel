@@ -122,6 +122,24 @@ class Instruments(val window: Duration,
     g.buffer(bufferTime)
   }
 
+  /**
+   *
+   */
+  def edge(
+    label: String,
+    description: String = "",
+    origin: String,
+    destination: String): Edge =
+    Edge(
+      origin      = gauge(s"$label/origin", origin),
+      destination = gauge(s"$label/destination", destination),
+      timer       = timer(s"$label/timer"),
+      state       = trafficLight(s"$label/trafficlight")
+    )
+
+  /**
+   *
+   */
   def trafficLight(label: String, description: String = ""): TrafficLight =
     TrafficLight(gauge(label, TrafficLight.Red, Units.TrafficLight, description))
 
