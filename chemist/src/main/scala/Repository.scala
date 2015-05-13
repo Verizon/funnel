@@ -8,8 +8,6 @@ import scalaz.std.string._
 import scalaz.syntax.monad._
 import scalaz.stream.{Sink, Channel, Process, Process1, async}
 import java.net.URI
-import messages.Error
-import messages.Telemetry._
 import TargetLifecycle._
 
 /**

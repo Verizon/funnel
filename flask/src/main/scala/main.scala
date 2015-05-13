@@ -7,7 +7,7 @@ import scalaz.concurrent.Task
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.stream.{ io, Process, Sink }
-import scalaz.stream.async.mutable.Signal
+import scalaz.stream.async.mutable.{Queue,Signal}
 import knobs.{Config, Required, ClassPathResource, FileResource}
 import journal.Logger
 import funnel.{Events,DatapointParser,Datapoint,Names,Sigar,Monitoring,Instruments}
@@ -20,8 +20,7 @@ import zeromq._
 import sockets._
 import scalaz.stream._
 import scalaz.\/
-import messages._
-import Telemetry._
+import telemetry.Telemetry._
 
 /**
   * How to use: Modify oncue/flask.cfg on the classpath
@@ -64,10 +63,10 @@ class Flask(options: Options, val I: Instruments) {
     log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
   }, identity _))
 
-  private def httpOrZmtp(alive: Signal[Boolean])(uri: URI): Process[Task,Datapoint[Any]] =
+  private def httpOrZmtp(alive: Signal[Boolean], Q: Queue[Telemetry])(uri: URI): Process[Task,Datapoint[Any]] =
     Option(uri.getScheme).map(_.toLowerCase) match {
-      case Some("http") => SSE.readEvents(uri)
-      case Some("tcp")  => Mirror.from(alive)(uri)
+      case Some("http") => SSE.readEvents(uri, Q)
+      case Some("tcp")  => Mirror.from(alive, Q)(uri)
       case _            => Process.fail(new RuntimeException("Unknown URI scheme submitted."))
     }
 
@@ -81,7 +80,7 @@ class Flask(options: Options, val I: Instruments) {
                            (I.monitoring.keys.discrete pipe keyChanges).wye(Q.dequeue)(wye.merge)).runAsync(_ => ())
 
     def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
-      httpOrZmtp(alive)(uri) observe countDatapoints
+      httpOrZmtp(alive, Q)(uri) observe countDatapoints
 
     def retries(names: Names): Event =
       Monitoring.defaultRetries andThen (_ ++ Process.eval[Task, Unit] {

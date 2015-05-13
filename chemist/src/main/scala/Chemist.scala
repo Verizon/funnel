@@ -11,7 +11,6 @@ import scalaz.syntax.kleisli._
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Process0, Sink}
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
-import messages.Error
 
 trait Chemist[A <: Platform]{
   type ChemistK[U] = Kleisli[Task, A, U]

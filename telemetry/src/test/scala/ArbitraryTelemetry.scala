@@ -1,5 +1,5 @@
 package funnel
-package messages
+package telemetry
 
 import org.scalacheck._
 import Arbitrary._

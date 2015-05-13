@@ -13,8 +13,7 @@ import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import funnel.aws._
-import messages.Error
-import messages.Telemetry._
+import telemetry.Telemetry._
 import java.net.URI
 
 /**

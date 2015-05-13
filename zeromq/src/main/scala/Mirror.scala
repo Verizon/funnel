@@ -3,17 +3,22 @@ package zeromq
 
 import java.net.URI
 import java.util.concurrent.{ExecutorService,ScheduledExecutorService}
-import scalaz.stream.async.mutable.Signal
+import scalaz.stream.async.mutable.{Queue, Signal}
 import scalaz.stream.{Process,Process1}
 import scalaz.concurrent.Task
 
 object Mirror {
   import sockets._
 
-  def from(alive: Signal[Boolean], discriminator: List[Array[Byte]] = Nil)(uri: URI): Process[Task, Datapoint[Any]] = {
+  def from(alive: Signal[Boolean], Q: Queue[Telemetry], discriminator: List[Array[Byte]] = Nil)(uri: URI): Process[Task, Datapoint[Any]] = {
     val t = if(discriminator.isEmpty) topics.all else topics.specific(discriminator)
-    Endpoint(subscribe &&& (connect ~ t), uri).fold(Process.fail(_), l =>
-      Ø.link(l)(alive)(Ø.receive).pipe(fromTransported)
+    Endpoint(subscribe &&& (connect ~ t), uri).fold({e =>
+                                                      Q.enqueueOne(Unmonitored(uri)).run
+                                                      Process.fail(e)
+                                                    }, {l =>
+                                                      Q.enqueueOne(Monitored(uri)).run
+                                                      Ø.link(l)(alive)(Ø.receive).pipe(fromTransported)
+                                                    }
     )
   }
 

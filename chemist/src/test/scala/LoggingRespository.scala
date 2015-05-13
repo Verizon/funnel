@@ -7,7 +7,6 @@ import scalaz.concurrent.Task
 import funnel.internals._
 import scalaz.std.string._
 import scalaz.stream.async
-import messages.Error
 import java.net.URI
 
 class LoggingRepository extends Repository {

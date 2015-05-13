@@ -169,7 +169,7 @@ trait Monitoring {
           urlSignals.put(source, hook)
 
           val received: Process[Task,Unit] = link(hook) {
-            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, source.toString)))(
+            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, new URI(source.toString))))(
               source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> source.toString))
           }
 

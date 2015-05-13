@@ -1,5 +1,5 @@
 package funnel
-package messages
+package telemetry
 
 import scalaz.concurrent._
 import scalaz.syntax.traverse._

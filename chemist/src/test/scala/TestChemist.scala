@@ -14,6 +14,4 @@ class TestChemist extends Chemist[TestPlatform]{
   def init: ChemistK[Unit] =
     Task.now(()).liftKleisli
 
-  protected def alterShard(id: String,state: AutoScalingEventKind): ChemistK[Unit] = ???
-
 }

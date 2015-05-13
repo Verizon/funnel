@@ -1,5 +1,5 @@
 package funnel
-package messages
+package telemetry
 
 import scodec._
 import scodec.bits._

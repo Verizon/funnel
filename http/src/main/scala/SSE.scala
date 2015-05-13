@@ -8,6 +8,7 @@ import java.net.{URL,URI}
 import scalaz.concurrent.Task
 import scalaz.stream._
 import scalaz.stream.{Process => P}
+import scalaz.stream.async.mutable.{Queue,Signal}
 
 object SSE {
 
@@ -118,11 +119,17 @@ object SSE {
    * Return a stream of all events from the given URL.
    * Example: `readEvents("http://localhost:8001/stream/sliding/jvm")`.
    */
-  def readEvents(uri: URI)(implicit S: ExecutorService = Monitoring.serverPool):
+  def readEvents(uri: URI, Q: Queue[Telemetry])(implicit S: ExecutorService = Monitoring.serverPool):
       Process[Task, Datapoint[Any]] =
     urlLinesR(uri.toURL)(S).attempt().pipeO(blockParser.map {
       case (_,data) => parseOrThrow[Datapoint[Any]](data)
-    }).flatMap(_.fold(Process.fail, Process.emit))
+                                            }).flatMap(_.fold({e =>
+                                                                Q.enqueueOne(Unmonitored(uri)).run
+                                                                Process.fail(e)
+                                                              }, {s =>
+                                                                Q.enqueueOne(Monitored(uri)).run
+                                                                Process.emit(s)
+                                                              }))
 
   // various helper functions
 
