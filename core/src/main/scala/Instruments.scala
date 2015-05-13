@@ -128,39 +128,40 @@ class Instruments(val window: Duration,
    *
    * This will create the following instruments and keys:
    *
-   * A string gauge  @ `now/$label/origin`.
-   * A string gauge  @ `now/$label/destination`.
-   * A timer         @ `?/$label/timer`
-   *   where `?` is `now`, `previous`, and `sliding`.
-   * A traffic light @ `now/$label/status`
+   * A string gauge  `now/$$label/origin`.
+   * A string gauge  `now/$$label/destination`.
+   * A timer         `?/$$label/timer` where `?` is `now`, `previous`, and `sliding`.
+   * A traffic light `now/$$label/status`
+   *
+   * @param label The name of the traffic light metric
+   * @param description A human-readable descirption of the semantics of this metric
+   * @param origin The source of the request. Typically this should be the IP address of the calling host
+   * @param destination The target of the outbound request; typically this is IP or DNS.
    */
   def edge(
     label: String,
     description: String = "",
     origin: String,
-    destination: String): Edge = {
-      def addEdge[A](k: Key[A]) = k.setAttribute("edge", label)
+    destination: String): Edge =
       Edge(
         origin = gauge(
           label  = s"$label/origin",
-          init   = origin,
-          keyMod = addEdge),
+          init   = origin),
         destination = gauge(
           label  = s"$label/destination",
-          init   =  destination,
-          keyMod = addEdge),
+          init   =  destination),
         timer = timer(
-          label  = s"$label/timer",
-          keyMod = addEdge),
+          label  = s"$label/timer"),
         status = trafficLight(
-          label  = s"$label/status",
-          keyMod = addEdge)
+          label  = s"$label/status")
       )
-  }
 
   /**
    * Return a `TrafficLight` - a gauge whose value can be `Red`, `Amber`,
-   * or `Green`. The initial value is `Red`. The key is `now/$label`.
+   * or `Green`. The initial value is `Red`. The key is `now/$$label`.
+   *
+   * @param label The name of the traffic light metric
+   * @param description A human-readable descirption of the semantics of this metric
    */
   def trafficLight(label: String, description: String = ""): TrafficLight =
     TrafficLight(gauge(label, TrafficLight.Red, Units.TrafficLight, description))
