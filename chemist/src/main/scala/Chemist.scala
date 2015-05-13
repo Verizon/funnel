@@ -8,6 +8,9 @@ import journal.Logger
 import oncue.svc.funnel.BuildInfo
 import scalaz.{\/,-\/,\/-,Kleisli}
 import scalaz.syntax.kleisli._
+import scalaz.syntax.traverse._
+import scalaz.syntax.id._
+import scalaz.std.vector._
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Process0, Sink}
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
@@ -90,7 +93,57 @@ trait Chemist[A <: Platform]{
    * Force chemist to re-read the world. Useful if for some reason
    * Chemist gets into a weird state at runtime.
    */
-  def bootstrap: ChemistK[Unit]
+  /**
+   * Force chemist to re-read the world from AWS. Useful if for some reason
+   * Chemist gets into a weird state at runtime.
+   */
+  def bootstrap: ChemistK[Unit] = for {
+    cfg <- config
+
+    // from the whole world, figure out which are flask instances
+    f  <- cfg.discovery.listFlasks.liftKleisli
+    _  = log.info(s"found ${f.length} flasks in the running instance list...")
+
+    // update the distribution with new capacity seeds
+    _ <- f.toVector.traverse_(flask => Sharding.platformHandler(cfg.repository)(PlatformEvent.NewFlask(flask))).liftKleisli
+    _  = log.debug("increased the known monitoring capactiy based on discovered flasks")
+
+    // read the list of all deployed machines
+    l <- cfg.discovery.listTargets.liftKleisli
+    _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
+
+    // filter out all the instances that are in private networks
+    // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
+    z  <- filterInstances(l)
+    _  = log.info(s"located ${z.length} instances that appear to be monitorable")
+
+    // set the result to an in-memory list of "the world"
+    targets = z.flatMap { case (id,targets) => targets.toSeq.map(PlatformEvent.NewTarget) } //the fact that I'm throwing ID away here is suspect
+    _ <- targets.toVector.traverse_(Sharding.platformHandler(cfg.repository)).liftKleisli
+    _  = log.info("added instances to the repository...")
+
+/* STU: is this taken care of by housekeeping yet?
+    // ask those flasks for their current work and yield a `Distribution`
+    d <- Sharding.gatherAssignedTargets(f)(cfg.http).liftKleisli
+    _  = log.debug("read the existing state of assigned work from the remote instances")
+
+    // update the distribution accordingly
+    _ <- cfg.repository.mergeDistribution(d).liftKleisli
+    _  = log.debug("merged the currently assigned work into the current distribution")
+
+    _ <- (for {
+      h <- Sharding.locateAndAssignDistribution(t, cfg.repository)
+      g <- Sharding.distribute(h)(cfg.http)
+    } yield ()).liftKleisli
+ */
+    _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
+
+  } yield ()
+
+  /**
+   * Platform specific way of filtering instances we can discover but we might not want to monitor
+   */
+  def filterInstances(instances: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]]
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources
@@ -109,6 +162,7 @@ trait Chemist[A <: Platform]{
 }
 
 object Chemist {
+
 
   private def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {

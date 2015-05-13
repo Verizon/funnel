@@ -16,23 +16,6 @@ import scalaz.stream.async.mutable.Signal
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 import funnel.aws._
 
-object AwsChemist {
-  /**
-   * filter out all the flask instances; these are not targets.
-   * if the config says to include vpc targets, include them if the target is in a private network
-   * if the target is on a public network address, include it
-   * otherwise, wtf, how did we arrive here - dont monitor it.
-   */
-  def filterInstances(instances: Seq[(TargetID, Set[Target])])(cfg: AwsConfig): Seq[(TargetID, Set[Target])] =
-    instances.map {
-      case (id, targets) =>
-        id -> targets.collect {
-          case b if cfg.includeVpcTargets => b
-          case b if (!b.isPrivateNetwork) => b
-        }
-    }.filter(_._2.nonEmpty)
-}
-
 class AwsChemist extends Chemist[Aws]{
 
   val log = Logger[this.type]
@@ -42,52 +25,23 @@ class AwsChemist extends Chemist[Aws]{
    */
   private val signal: Signal[Boolean] = signalOf(true)
 
+
   /**
-   * Force chemist to re-read the world from AWS. Useful if for some reason
-   * Chemist gets into a weird state at runtime.
+   * if the config says to include vpc targets, include them if the target is in a private network
+   * if the target is on a public network address, include it
+   * otherwise, wtf, how did we arrive here - dont monitor it.
    */
-  def bootstrap: ChemistK[Unit] = for {
-    cfg <- config
+  def filterInstances(instances: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]] =
+    config.map { cfg =>
+      instances.map {
+        case (id, targets) =>
+          id -> targets.collect {
+            case b if cfg.includeVpcTargets => b
+            case b if (!b.isPrivateNetwork) => b
+          }
+      }.filter(_._2.nonEmpty)
+    }
 
-    // from the whole world, figure out which are flask instances
-    f  <- cfg.discovery.listFlasks.liftKleisli
-    _  = log.info(s"found ${f.length} flasks in the running instance list...")
-
-    // update the distribution with new capacity seeds
-    _ <- f.toVector.traverse_(flask => PlatformEvent.NewFlask(flask) |> Sharding.platformHandler(cfg.repository)).liftKleisli
-    _  = log.debug("increased the known monitoring capactiy based on discovered flasks")
-
-    // read the list of all deployed machines
-    l <- cfg.discovery.listTargets.liftKleisli
-    _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
-
-    // filter out all the instances that are in private networks
-    // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
-    z  = AwsChemist.filterInstances(l)(cfg)
-    _  = log.info(s"located ${z.length} instances that appear to be monitorable")
-
-    // set the result to an in-memory list of "the world"
-    targets = z.flatMap { case (id,targets) => targets.toSeq.map(PlatformEvent.NewTarget) } //the fact that I'm throwing ID away here is suspect
-    _ <- targets.toVector.traverse_(Sharding.platformHandler(cfg.repository)).liftKleisli
-    _  = log.info("added instances to the repository...")
-
-/* STU: is this taken care of by housekeeping yet?
-    // ask those flasks for their current work and yield a `Distribution`
-    d <- Sharding.gatherAssignedTargets(f)(cfg.http).liftKleisli
-    _  = log.debug("read the existing state of assigned work from the remote instances")
-
-    // update the distribution accordingly
-    _ <- cfg.repository.mergeDistribution(d).liftKleisli
-    _  = log.debug("merged the currently assigned work into the current distribution")
-
-    _ <- (for {
-      h <- Sharding.locateAndAssignDistribution(t, cfg.repository)
-      g <- Sharding.distribute(h)(cfg.http)
-    } yield ()).liftKleisli
- */
-    _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
-
-  } yield ()
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources
