@@ -152,7 +152,7 @@ trait Monitoring {
     def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] =
       for {
         _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))) )
-        _ <- Task( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))) )
+        _ <- Task( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))).filter(!_.isEmpty) )
         _  = log.debug(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
       } yield ()
 
@@ -168,13 +168,9 @@ trait Monitoring {
 
           urlSignals.put(source, hook)
 
-          // adding the `localName` onto the key here so that later in the
-          // process its possible to find the key we're specifically looking for
-          val localName = formatURI(source) // TIM: remove this; keeping for now until we figure out how the source needs sanitising
-
           val received: Process[Task,Unit] = link(hook) {
-            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, source)))(
-              source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> localName))
+            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, source.toString)))(
+              source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> source.toString))
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>

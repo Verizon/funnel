@@ -139,6 +139,46 @@ class Instruments(val window: Duration,
     g.buffer(bufferTime)
   }
 
+  /**
+   * Return an `Edge` with the given initial `origin` and `destination`.
+   * See [[Edge]] for more information.
+   *
+   * This will create the following instruments and keys:
+   *
+   * A string gauge  @ `now/$label/origin`.
+   * A string gauge  @ `now/$label/destination`.
+   * A timer         @ `?/$label/timer`
+   *   where `?` is `now`, `previous`, and `sliding`.
+   * A traffic light @ `now/$label/status`
+   */
+  def edge(
+    label: String,
+    description: String = "",
+    origin: String,
+    destination: String): Edge = {
+      def addEdge[A](k: Key[A]) = k.setAttribute("edge", label)
+      Edge(
+        origin = gauge(
+          label  = s"$label/origin",
+          init   = origin,
+          keyMod = addEdge),
+        destination = gauge(
+          label  = s"$label/destination",
+          init   =  destination,
+          keyMod = addEdge),
+        timer = timer(
+          label  = s"$label/timer",
+          keyMod = addEdge),
+        status = trafficLight(
+          label  = s"$label/status",
+          keyMod = addEdge)
+      )
+  }
+
+  /**
+   * Return a `TrafficLight`--a gauge whose value can be `Red`, `Amber`,
+   * or `Green`. The initial value is `Red`. The key is `now/$label`.
+   */
   def trafficLight(label: String,
                    description: String = "",
                    keyMod: Key[String] => Key[String] = identity[Key[String]]): TrafficLight =

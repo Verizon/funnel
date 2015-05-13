@@ -48,13 +48,15 @@ object Main {
     val sources = args.toList.map(p =>
       Optional(FileResource(new File(p)))) :::
       Required(
-        FileResource(new File("/usr/share/oncue/etc/agent.cfg")) or
+        FileResource(new File("/usr/share/funnel-agent/etc/agent.cfg")) or
         ClassPathResource("oncue/agent.cfg")) :: Nil
 
     val config: Task[Config] = for {
       a <- knobs.loadImmutable(sources)
       b <- knobs.aws.config
     } yield a ++ b
+
+    log.info(s"Input configuration file was: ${config.run}")
 
     /**
      * Create a typed set of options using knobs.
@@ -92,6 +94,8 @@ object Main {
         jmx    = (jmxName |@| jmxUri |@| jmxFreq |@| jmxQueries |@| jmxExcludes)(JmxConfig)
       )
     }.run
+
+    log.debug(s"Supplied options were: $options")
 
     /**
      * Setup the instruments instance that will be used by the remote

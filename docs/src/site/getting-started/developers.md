@@ -8,7 +8,7 @@ section: "getting-started"
 
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
-```
+``` scala
 libraryDependencies += "funnel" %% "http" % "x.y.z"
 ```
 
@@ -26,7 +26,7 @@ You will likely never touch these dependencies directly, but its important to be
 
 With the dependency setup complete, you can now start instrumenting your code. The first thing you need to do is create a `metrics.scala` file, which should look something like this:
 
-```
+``` scala
 package oncue.svc
 package myproject
 
@@ -52,7 +52,7 @@ The goal of this `metrics` object is to define your metrics up front, and force 
 
 At first blush, clearly having a single namespace for the entire world of application metrics could become unwieldy, so it is recommended to organise your metrics with nested objects, based on logical application layering. Here's a more complete example from the SU service that illustrates this pattern:
 
-```
+``` scala
 package oncue.svc.su
 
 import funnel.instruments._
@@ -111,10 +111,9 @@ object metrics {
       "time taken to request all the artifacts from inventory service")
   }
 }
-
 ```
 
-The 1.0.x series of `funnel-core` has four supported metric types: `Counter`, `Timer`, `Gauge` and `TrafficLight`.
+The 1.0.x series of `funnel-core` has five  supported metric types: `Counter`, `Timer`, `Gauge`, `TrafficLight`, and `Edge`.
 
 
 #### Counters
@@ -125,7 +124,7 @@ You should **not** use a counter for a magnitude or amount that represents the c
 
 For example, to create a counter for the number of cache hits:
 
-```
+``` scala
 package oncue.svc
 package yourproject
 
@@ -134,12 +133,11 @@ import funnel.instruments._
 object metrics {
   val NumberOfCacheHits = counter("cache/hits")
 }
-
 ```
 
 Counters can then be incremented monotonically, or incremented by a given amount:
 
-```
+``` scala
 import metrics._
 
 trait SomeFun {
@@ -159,7 +157,7 @@ trait SomeFun {
 
 As the name suggests, **timers** are all about the amount of time take to perform a specific operation.
 
-```
+``` scala
 package oncue.svc
 package yourproject
 
@@ -168,12 +166,11 @@ import funnel.instruments._
 object metrics {
   val GetUserList = timer("db/get-user-list")
 }
-
 ```
 
 Timers can then record several different types of value:
 
-```
+``` scala
 import metrics._
 import scalaz.concurrent.Task
 import scala.concurrent.Future
@@ -204,7 +201,6 @@ trait SomeFun {
   }
 
 }
-
 ```
 
 #### Gauges
@@ -214,7 +210,7 @@ A gauge represents the current state of a value. A good analogy is checking the 
 Use a gauge when you want to monitor the magnitude or amount of something at a particular point in time, or the average amount of something over a period, such as the number of concurrent connections, ongoing transactions, or messages in a queue. A gauge is **not** appropriate for counting or tallying occurrences of some event, such as the number of errors, number of sales, or messages received so far. For such things, use a _counter_ instead (see above).
 
 
-```
+``` scala
 package oncue.svc
 package yourproject
 
@@ -225,12 +221,11 @@ object metrics {
   // gauges require an initial value
   val OilGauge = gauge("oil", 0d, Units.Count)
 }
-
 ```
 
 Unlike other metrics, gauges are strongly typed in their value, and must be given a default upon being created. To set the value later on in your code, you simply do the following:
 
-```
+``` scala
 import metrics._
 
 trait SomeFun {
@@ -254,7 +249,7 @@ By default, the following types are supported as values for gauges:
 
 In addition to simply recording the value of the gauge, there is a specialised gauge that can also track numerical statistics like `mean`, `variance` etc. To use it, just adjust your `metrics` declaration like so:
 
-```
+``` scala
 package oncue.svc
 package yourproject
 
@@ -264,7 +259,6 @@ object metrics {
   // gauges require an initial value
   val OilGauge = numericGauge("oil", 0d, Units.Count)
 }
-
 ```
 
 
@@ -278,7 +272,7 @@ As an extension to the concept of `Gauge`, there is also the notion of a "traffi
 
 Traffic light metrics are used to derive actionable signals for operations (they can derive whatever they like too), but for example, one might put a traffic light metric on database access, or the status of a circuit breaker used to invoke a 3rd party system. Using traffic lights is super simple:
 
-```
+``` scala
 package oncue.svc
 package yourproject
 
@@ -287,11 +281,11 @@ import funnel.instruments._
 object metrics {
   val GeoLocationCircuit = trafficLight("circuit/geo")
 }
-
 ```
+
 And the actual usage in the circuit breaking code:
 
-```
+``` scala
 import metrics._
 
 trait SomeFun {
@@ -310,12 +304,51 @@ trait SomeFun {
 }
 ```
 
+### Edge
+
+An `Edge` instrument provides inter-service telemetry. Its purpose is to
+monitor the status and timings of service-to-service connections. It's just
+an aggregation of four other instruments:
+
+* `origin`: A continuous string gauge
+* `destination`: Another continuous string gauge
+* `timer`: A timer
+* `status`: A traffic light
+
+The `origin` is the actual origin of the connection. The `destination` is
+where the connection is being made to. The `timer` is a measure of some
+latency or roundtrip timing between the origin and destination, and the
+`status` is some notion of the overall status of the connection
+(Red, Amber, or Green).
+
+In a typical use case, we're making a connection from one service to
+another, relying on some discovery service or load balancer to provide us
+with an actual host to connect to. The `origin` is the local hostname,
+and the `destination` should be the actual remote hostname. Each time we are
+redirected to a new host for the service, we should set the `destination`
+to the name of that host. When we make a request across the connection, we
+should time it with the edge `timer`. If we detect that the remote host is
+down, we should set the `status` traffic light to `Red`. In a connection
+configured with a circuit-breaker, we can use `Amber` to indicate the
+"half-open" state.
+
+Edges are created with:
+
+``` scala
+import funnel.instruments._
+
+val anEdge = edge("myservice/otherservice",
+                  "The edge from my service to some other service",
+                  "10.0.0.1",
+                  "10.0.0.2")
+```
+
 
 ### Monitoring Server
 
 All the metrics you define in your application, plus some additional platform metrics supplied by the monitoring library can be exposed via a baked in administration server. In order to use this server, one simply only needs to add the following line to the `main` of their application:
 
-```
+``` scala
 import funnel.http.MonitoringServer
 import funnel.Monitoring
 
@@ -326,7 +359,6 @@ object Main {
     // your application code starts here
   }
 }
-
 ```
 
 **NOTE: By application `main`, this does not have to be the actual main, but rather, the end of the world for your application (which however, would usually be the main). For Play! applications, this means the Global object.**

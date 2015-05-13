@@ -14,8 +14,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 package object funnel {
-  type DatapointParser = java.net.URI => Process[Task,Datapoint[Any]]
-  type ClusterName     = String
-//STU  type InstanceID      = String
-
+  type DatapointParser    = java.net.URI => Process[Task,Datapoint[Any]]
+  type ClusterName        = String
+  type ContinuousGauge[A] = Gauge[Continuous[A],A]
 }

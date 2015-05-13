@@ -29,7 +29,7 @@ class StaticChemist extends Chemist[Static]{
   val log = Logger[this.type]
 
   /**
-   * Force chemist to re-read the world from AWS. Useful if for some reason
+   * Force chemist to re-read the world. Useful if for some reason
    * Chemist gets into a weird state at runtime.
    */
   def bootstrap: ChemistK[Unit] = for {
@@ -41,7 +41,7 @@ class StaticChemist extends Chemist[Static]{
 
     // filter out all the instances that are in private networks
     // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
-    z  = AwsChemist.filterInstances(l)(cfg)
+    z  = StaticChemist.filterInstances(l)(cfg)
     _  = log.info(s"located ${z.length} instances that appear to be monitorable")
 
     // convert the instance list into reachable targets
@@ -77,15 +77,13 @@ class StaticChemist extends Chemist[Static]{
  */
   } yield ()
 
-  /**
-   * Initilize the chemist serivce by trying to create the various resources
-   * that are required to operate. Once complete, execute the boostrap.
-   */
+
+  /* Initilize the chemist serivce by trying to create the various resources
+   * that are required to operate. Once complete, execute the boostrap. */
   lazy val init: ChemistK[Unit] = {
     log.debug("attempting to read the world of deployed instances")
     for {
       cfg <- config
-
       _ <- Task.delay(log.info(">>>>>>>>>>>> initilization complete <<<<<<<<<<<<")).liftKleisli
     } yield ()
   }
