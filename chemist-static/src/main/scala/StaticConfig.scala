@@ -64,7 +64,7 @@ object Config {
       val sub = cfg.subconfig(id)
       val cn = sub.require[String]("clusterName")
       val uris = sub.require[List[String]]("uris")
-      TargetID(id) -> uris.map(u => Target(cn, new URI(u))).toSet
+      TargetID(id) -> uris.map(u => Target(cn, new URI(u), false)).toSet
     }.toMap
   }
 }

@@ -11,7 +11,7 @@ case class AwsInstance(
   telemetryLocation: Location = Location.telemetryLocalhost,
   firewalls: Seq[String], // essentially security groups
   tags: Map[String,String] = Map.empty
-) extends Instance {
+) { // extends Instance {
   def application: Option[Application] = {
     for {
       b <- tags.get("type").orElse(tags.get("Name"))
@@ -23,12 +23,12 @@ case class AwsInstance(
         .flatMap(_.split('-').lastOption.find(_.length > 3)))
   }
 
-  override def asURI: URI = location.asURI()
+  def asURI: URI = location.asURI()
 
   def targets: Set[Target] =
     (for {
        a <- application
-     } yield Target.defaultResources.map(r => Target(a.toString, location.asURI(r)))
+     } yield Target.defaultResources.map(r => Target(a.toString, location.asURI(r), location.isPrivateNetwork))
     ).getOrElse(Set.empty[Target])
 
   def asFlask: Flask = Flask(FlaskID(id), location, telemetryLocation)

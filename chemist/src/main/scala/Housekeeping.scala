@@ -42,7 +42,7 @@ object Housekeeping {
         Parse.decodeOption[List[Cluster]](c
         ).toList.flatMap(identity
         ).foldLeft(Set.empty[Target]){ (a,b) =>
-          b.urls.map(s => Target(b.label, new URI(s))).toSet
+          b.urls.map(s => Target(b.label, new URI(s), false)).toSet
         }
       }
     }

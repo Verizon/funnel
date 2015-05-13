@@ -36,10 +36,10 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
 
 
   val T1 = Set(
-    Target("test1",new URI("http://127.0.0.1:8080/stream/uptime")),
-    Target("test1",new URI("http://127.0.0.1:8080/stream/now")),
-    Target("test1",new URI("http://127.0.0.1:8081/stream/uptime")),
-    Target("test1",new URI("http://127.0.0.1:8081/stream/now"))
+    Target("test1",new URI("http://127.0.0.1:8080/stream/uptime"), false),
+    Target("test1",new URI("http://127.0.0.1:8080/stream/now"), false),
+    Target("test1",new URI("http://127.0.0.1:8081/stream/uptime"), false),
+    Target("test1",new URI("http://127.0.0.1:8081/stream/now"), false)
   )
 
   val H = dispatch.Http.configure(
@@ -71,7 +71,8 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
     Clocks.instrument(i)
     JVM.instrument(i)
   }
-/* STU todo
+/* STU todo what is this actually testing?
+
   it should "sucsessfully be able to stream events from two local monitoring instances to a local flask" in {
     F1.processMirroringEvents(
       funnel.http.SSE.readEvents,

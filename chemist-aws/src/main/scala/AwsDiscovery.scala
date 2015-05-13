@@ -37,8 +37,15 @@ class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
    * List all of the instances in the given AWS account that respond to a rudimentry
    * verification that Funnel is running on port 5775 and is network accessible.
    */
-  def list: Task[Seq[(TargetID, Set[Target])]] =
+  def listTargets: Task[Seq[(TargetID, Set[Target])]] =
     instances(_ => true).map(_.map(in => TargetID(in.id) -> in.targets))
+
+  /**
+   * List all of the instances in the given AWS account that respond to a rudimentry
+   * verification that Funnel is running on port 5775 and is network accessible.
+   */
+  def listFlasks: Task[Seq[Flask]] =
+    instances(isFlask).map(_.map(in => Flask(FlaskID(in.id), in.location, in.telemetryLocation)))
 
   /**
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
@@ -102,7 +109,7 @@ class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
       i.application.map(_.name.startsWith("flask")).getOrElse(false)
     }
 
-  def isFlask(i: Instance): Boolean =
+  def isFlask(i: AwsInstance): Boolean =
     i.application.map(_.name.startsWith("flask")).getOrElse(false)
 
 

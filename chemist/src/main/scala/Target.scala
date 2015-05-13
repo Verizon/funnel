@@ -8,7 +8,7 @@ import java.net.URI
 
 case class TargetID(value: String) extends AnyVal
 
-case class Target(cluster: ClusterName, uri: URI)
+case class Target(cluster: ClusterName, uri: URI, isPrivateNetwork: Boolean)
 
 object Target {
   val defaultResources = Set("stream/previous")

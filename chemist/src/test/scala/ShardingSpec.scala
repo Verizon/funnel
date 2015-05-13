@@ -17,7 +17,7 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
   implicit lazy val log: Logger = Logger("chemist-spec")
 
   implicit def tuple2target(in: (String,String)): Target =
-    Target(in._1, new URI(in._2))
+    Target(in._1, new URI(in._2), false)
 
   def fakeFlask(id: String) = Flask(FlaskID(id), Location.localhost, Location.telemetryLocalhost)
 
@@ -66,18 +66,18 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
     EvenSharding.calculate(i1)(d1).map {
       case (x,y) => x.id.value -> y
     }.toSet should === (Set(
-                          "a" -> Target("u",new URI("http://eight.internal")),
-                          "c" -> Target("v",new URI("http://nine.internal"))))
+                          "a" -> Target("u",new URI("http://eight.internal"), false),
+                          "c" -> Target("v",new URI("http://nine.internal"), false)))
 
     EvenSharding.calculate(i2)(d1).map(_._2).toSet should === (Set(
-                                                                 Target("v",new URI("http://omega.internal")),
-                                                                 Target("w",new URI("http://alpha.internal")),
-                                                                 Target("r",new URI("http://epsilon.internal")),
-                                                                 Target("z",new URI("http://gamma.internal")),
-                                                                 Target("u",new URI("http://beta.internal")),
-                                                                 Target("z",new URI("http://omicron.internal")),
-                                                                 Target("r",new URI("http://kappa.internal")),
-                                                                 Target("r",new URI("http://theta.internal")),
-                                                                 Target("p",new URI("http://zeta.internal"))))
+                                                                 Target("v",new URI("http://omega.internal"), false),
+                                                                 Target("w",new URI("http://alpha.internal"), false),
+                                                                 Target("r",new URI("http://epsilon.internal"), false),
+                                                                 Target("z",new URI("http://gamma.internal"), false),
+                                                                 Target("u",new URI("http://beta.internal"), false),
+                                                                 Target("z",new URI("http://omicron.internal"), false),
+                                                                 Target("r",new URI("http://kappa.internal"), false),
+                                                                 Target("r",new URI("http://theta.internal"), false),
+                                                                 Target("p",new URI("http://zeta.internal"), false)))
   }
 }
