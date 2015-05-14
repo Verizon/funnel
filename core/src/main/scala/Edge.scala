@@ -23,7 +23,7 @@ package oncue.svc.funnel
  *
  * An `Edge` should be constructed using the [[Instruments.edge]] method.
  */
-case class Edge(
+case class Edge private[funnel](
   origin: ContinuousGauge[Edge.Origin],
   destination: ContinuousGauge[Edge.Destination],
   timer: Timer[Periodic[Stats]],
