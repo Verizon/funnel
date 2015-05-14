@@ -1,4 +1,4 @@
-package funnel
+package oncue.svc.funnel
 
 /**
  * An `Edge` instrument provides inter-service telemetry. Its purpose is to
