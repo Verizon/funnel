@@ -136,6 +136,8 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
         lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), targetState(target.uri))
       case PlatformEvent.NewFlask(f) => lifecycleQ.enqueueOne(RepoEvent.NewFlask(f))
       case PlatformEvent.TerminatedFlask(i) =>
+        // This one is a little weird, we are enqueueing this to ourseles
+        // we should probably eliminate this re-enqueing
         repoCommandsQ.enqueueOne(RepoCommand.ReassignWork(i))
 
       case PlatformEvent.TerminatedTarget(i) => {
