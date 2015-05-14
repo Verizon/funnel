@@ -24,6 +24,7 @@ class LoggingRepository extends Repository {
   def errorSink(e: Error): Task[Unit] = Task.now(())
 
   /////////////// instance operations ///////////////
+  def platformHandler(a: PlatformEvent): Task[Unit] = ???
 
   def targetState(instanceId: URI): TargetState = Unknown
 

@@ -115,23 +115,6 @@ object Sharding {
 
  */
 
-  /**
-   * Handle the Actions emitted from the Platform
-   */
-  def platformHandler(repo: Repository)(a: PlatformEvent): Task[Unit] = {
-    val lifecycle = TargetLifecycle.process(repo) _
-    a match {
-      case PlatformEvent.NewTarget(target) =>
-        lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), repo.targetState(target.uri))
-      case PlatformEvent.NewFlask(f) =>
-        repo.lifecycleQ.enqueueOne(RepoEvent.NewFlask(f))
-      case PlatformEvent.TerminatedFlask(i) => Task.now(())// STU TODO
-      case PlatformEvent.TerminatedTarget(i) => Task.now(())// STU TODO
-      case PlatformEvent.Monitored(f, i) => Task.now(()) // repo.monitor(f, i)
-      case PlatformEvent.Unmonitored(f, i) => Task.now(()) // repo.unmonitor(f, i)
-      case PlatformEvent.NoOp => Task.now(())
-    }
-  }
 
 }
 

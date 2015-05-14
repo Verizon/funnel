@@ -60,7 +60,7 @@ trait Chemist[A <: Platform]{
   def exclude(shard: FlaskID): ChemistK[Unit] = {
       for {
         cfg <- config
-        _ <- Sharding.platformHandler(cfg.repository)(PlatformEvent.TerminatedFlask(shard)).liftKleisli
+        _ <- cfg.repository.platformHandler(PlatformEvent.TerminatedFlask(shard)).liftKleisli
       } yield ()
     }
 
@@ -74,7 +74,7 @@ trait Chemist[A <: Platform]{
     for {
       cfg <- config
       flask <- cfg.discovery.lookupFlask(id).liftKleisli
-      _ <- Sharding.platformHandler(cfg.repository)(PlatformEvent.NewFlask(flask)).liftKleisli
+      _ <- cfg.repository.platformHandler(PlatformEvent.NewFlask(flask)).liftKleisli
     } yield ()
 
   /**
@@ -105,7 +105,7 @@ trait Chemist[A <: Platform]{
     _  = log.info(s"found ${f.length} flasks in the running instance list...")
 
     // update the distribution with new capacity seeds
-    _ <- f.toVector.traverse_(flask => Sharding.platformHandler(cfg.repository)(PlatformEvent.NewFlask(flask))).liftKleisli
+    _ <- f.toVector.traverse_(flask => cfg.repository.platformHandler(PlatformEvent.NewFlask(flask))).liftKleisli
     _  = log.debug("increased the known monitoring capactiy based on discovered flasks")
 
     // read the list of all deployed machines
@@ -114,12 +114,12 @@ trait Chemist[A <: Platform]{
 
     // filter out all the instances that are in private networks
     // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
-    z  <- filterInstances(l)
+    z  <- filterTargets(l)
     _  = log.info(s"located ${z.length} instances that appear to be monitorable")
 
     // set the result to an in-memory list of "the world"
     targets = z.flatMap { case (id,targets) => targets.toSeq.map(PlatformEvent.NewTarget) } //the fact that I'm throwing ID away here is suspect
-    _ <- targets.toVector.traverse_(Sharding.platformHandler(cfg.repository)).liftKleisli
+    _ <- targets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
     _  = log.info("added instances to the repository...")
 
 /* STU: is this taken care of by housekeeping yet?
@@ -143,7 +143,7 @@ trait Chemist[A <: Platform]{
   /**
    * Platform specific way of filtering instances we can discover but we might not want to monitor
    */
-  def filterInstances(instances: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]]
+  def filterTargets(targets: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]]
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources

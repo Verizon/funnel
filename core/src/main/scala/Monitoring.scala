@@ -9,6 +9,7 @@ import scalaz.{Nondeterminism,==>>}
 import scalaz.stream._
 import scalaz.stream.merge._
 import scalaz.stream.async
+import async.mutable.Queue
 import scalaz.syntax.traverse._
 import scalaz.syntax.monad._
 import scalaz.std.option._
@@ -138,6 +139,7 @@ trait Monitoring {
 
   def processMirroringEvents(
     parse: DatapointParser,
+    Q: Queue[Telemetry],
     myName: String = "Funnel Mirror",
     nodeRetries: Names => Event = _ => defaultRetries
   ): Task[Unit] = {
@@ -175,9 +177,9 @@ trait Monitoring {
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
             if (urls.contains(source)) Process.halt // skip it, alread running
-            else Process.eval_(modifyActive(cluster, _ + source)) ++ // add to active at start
+            else Process.eval_(modifyActive(cluster, _ + source)) ++ Process.eval_(Q.enqueueOne(Monitored(source)))// add to active at start
               // and remove it when done
-              received.onComplete(Process.eval_(modifyActive(cluster, _ - source)))
+              received.onComplete(Process.eval_(modifyActive(cluster, _ - source)) ++ Process.eval_(Q.enqueueOne(Unmonitored(source))))
           }
 
           Task.fork(receivedIdempotent.run).runAsync(_.fold(

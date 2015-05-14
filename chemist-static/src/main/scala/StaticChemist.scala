@@ -15,7 +15,7 @@ class StaticChemist extends Chemist[Static]{
 
   val log = Logger[this.type]
 
-  def filterInstances(instances: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]] = Applicative[ChemistK].point(instances)
+  def filterTargets(instances: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]] = Applicative[ChemistK].point(instances)
 
   /* Initilize the chemist serivce by trying to create the various resources
    * that are required to operate. Once complete, execute the boostrap. */

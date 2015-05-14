@@ -44,6 +44,7 @@ trait Repository {
 
   def errorSink(e: Error): Task[Unit]
 
+  def platformHandler(a: PlatformEvent): Task[Unit]
   /////////////// instance operations ///////////////
 
   def targetState(instanceId: URI): TargetState
@@ -85,19 +86,6 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
   val targets = new Ref[InstanceM](==>>.empty)
   val flasks  = new Ref[FlaskM](==>>.empty)
 
-/*
-  def target(id: InstanceID): Task[Instance] =
-    targets.get.lookup(id) match {
-      case None    => Task.fail(new IllegalArgumentException(s"No target with the ID $id"))
-      case Some(i) => Task.now(i.msg.instance)
-    }
-
-  def flask(id: InstanceID): Task[Instance] =
-    flasks.get.lookup(id) match {
-      case None    => Task.fail(new IllegalArgumentException(s"No flask with the ID $id"))
-      case Some(i) => Task.now(i)
-    }
- */
   private val emptyMap: InstanceM = ==>>.empty
   val stateMaps = new Ref[StateM](==>>(Unknown -> emptyMap,
                                        Unmonitored -> emptyMap,
@@ -138,6 +126,49 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
 
   /////////////// target lifecycle ///////////////
 
+  /**
+   * Handle the Actions emitted from the Platform
+   */
+  def platformHandler(a: PlatformEvent): Task[Unit] = {
+    val lifecycle = TargetLifecycle.process(this) _
+    a match {
+      case PlatformEvent.NewTarget(target) =>
+        lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), targetState(target.uri))
+      case PlatformEvent.NewFlask(f) => lifecycleQ.enqueueOne(RepoEvent.NewFlask(f))
+      case PlatformEvent.TerminatedFlask(i) =>
+        repoCommandsQ.enqueueOne(RepoCommand.ReassignWork(i))
+
+      case PlatformEvent.TerminatedTarget(i) => {
+        val target = targets.get.lookup(i)
+        target.map { t =>
+          Task {
+            targets.update(_.delete(i))
+            stateMaps.update(_.update(t.to, m => Some(m.delete(i))))
+            ()
+          }
+        }.getOrElse(Task.now(()))
+      }
+      case PlatformEvent.Monitored(f, i) =>
+        // TODO: what is this was unexpected? then the lifecycle call will result in nothing
+        val target = targets.get.lookup(i)
+        target.map { t =>
+          lifecycle(TargetLifecycle.Confirmation(t.msg.target, f, System.currentTimeMillis), t.to)
+        } getOrElse Task.now(())
+
+      case PlatformEvent.Unmonitored(f, i) => {
+        val target = targets.get.lookup(i)
+        target.map { t =>
+          // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
+          lifecycle(TargetLifecycle.Unmonitoring(t.msg.target, f, System.currentTimeMillis), t.to)
+        } getOrElse {
+          // if we didn't even know about the target, what do we do? start monitoring it? nothing?
+          Task.now(())
+        }
+      }
+      case PlatformEvent.NoOp => Task.now(())
+    }
+  }
+
   // inbound events from TargetLifecycle
   val lifecycleQ: async.mutable.Queue[RepoEvent] = async.unboundedQueue
 
@@ -157,14 +188,17 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
             sc.to match {
               case Unknown =>
                 Process.emit(RepoCommand.Monitor(sc.msg.target))
+
+              // TODO when we implement flask transition we need to hanle double monitored stuff
               case _ => Process.halt
             }
           case NewFlask(flask) =>
 
-            flasks.get + (flask.id -> flask)
+            flasks.update(_ + (flask.id -> flask))
             Process.halt
 
           case RepoEvent.TerminatedFlask(id) =>
+
             flasks.get.lookup(id) match {
               case Some(_) =>
                 flasks.update(_.delete(id))

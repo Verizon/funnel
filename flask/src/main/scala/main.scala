@@ -97,7 +97,7 @@ class Flask(options: Options, val I: Instruments) {
     options.metricTTL.foreach(t => runAsync(I.monitoring.keySenescence(Events.every(t)).run))
 
     log.info("Booting the mirroring process...")
-    runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), flaskName, retries))
+    runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName, retries))
 
     options.elastic.foreach { elastic =>
       log.info("Booting the elastic search sink...")

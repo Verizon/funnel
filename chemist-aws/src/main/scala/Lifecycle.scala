@@ -95,7 +95,7 @@ object Lifecycle {
     case \/-(id) => Monitored(flask, id)
   }
 
-  def lifecycleActor(repo: Repository): Actor[PlatformEvent] = Actor(a => Sharding.platformHandler(repo)(a).run)
+  def lifecycleActor(repo: Repository): Actor[PlatformEvent] = Actor(a => repo.platformHandler(a).run)
   def errorActor(repo: Repository): Actor[Error] = Actor(e => repo.errorSink(e).run)
   def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] = Actor{ case (fl, keys) => repo.keySink(fl, keys).run }
 
@@ -110,7 +110,6 @@ object Lifecycle {
     telemetrySubscribeSocket(flask.telemetry.asURI(), signal, keys, errors, lc)
   }
 
-
   def interpreter(e: AutoScalingEvent, resources: Seq[String], signal: Signal[Boolean]
     )(asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Seq[PlatformEvent]] = {
@@ -119,7 +118,6 @@ object Lifecycle {
 
     // MOAR side-effects!
     LifecycleEvents.increment
-
 
     def targetsFromId(id: TargetID): Task[Seq[NewTarget]] =
       for {
@@ -185,7 +183,7 @@ object Lifecycle {
   def run(queueName: String, resources: Seq[String], signal: Signal[Boolean]
     )(repo: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
   ): Task[Unit] = {
-    val ourWorld = stream(queueName, resources, signal)(sqs,asg,ec2,dsc) flatMap logErrors observe telemetrySink(repo, signal) to Process.constant(Sharding.platformHandler(repo) _)
+    val ourWorld = stream(queueName, resources, signal)(sqs,asg,ec2,dsc) flatMap logErrors observe telemetrySink(repo, signal) to Process.constant(repo.platformHandler _)
     ourWorld.run.onFinish(_ => signal.set(false))
   }
 }

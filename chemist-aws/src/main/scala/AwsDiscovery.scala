@@ -78,7 +78,7 @@ class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
-  def lookupOne(id: String): Task[AwsInstance] = {
+  private def lookupOne(id: String): Task[AwsInstance] = {
     lookupMany(Seq(id)).flatMap {
       _.filter(_.id == id).headOption match {
         case None => Task.fail(InstanceNotFoundException(id))
@@ -91,7 +91,7 @@ class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
    * Lookup the `Instance` metadata for a set of `InstanceID`.
    * @see funnel.chemist.Deployed.lookupOne
    */
-  def lookupMany(ids: Seq[String]): Task[Seq[AwsInstance]] =
+  private def lookupMany(ids: Seq[String]): Task[Seq[AwsInstance]] =
     for {
       a <- EC2.reservations(ids)(ec2)
       _  = log.debug(s"Deployed.lookupMany, a = ${a.length}")
@@ -153,7 +153,8 @@ class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
           datacenter = in.getPlacement.getAvailabilityZone,
           isPrivateNetwork = (extdns.isEmpty && intdns.nonEmpty)
       )
-      val tloc = loc.copy(port=5776, protocol="tcp")
+      // TODO, we'll need to do something different in the meesos world where ports are remappped
+      val tloc = loc.copy(port=7390, protocol="tcp")
       AwsInstance(
         id = in.getInstanceId,
         location = loc,
