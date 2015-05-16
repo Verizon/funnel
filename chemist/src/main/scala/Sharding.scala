@@ -16,7 +16,7 @@ import journal.Logger
 
 object Sharding {
 
-  type Distribution = Flask ==>> Set[Target]
+  type Distribution = FlaskID ==>> Set[Target]
 
   object Distribution {
     def empty: Distribution = ==>>()
@@ -28,7 +28,7 @@ object Sharding {
    * obtain a list of flasks ordered by flasks with the least
    * assigned work first.
    */
-  def shards(d: Distribution): Seq[Flask] =
+  def shards(d: Distribution): Seq[FlaskID] =
     sorted(d).map(_._1)
 
   /**
@@ -37,14 +37,14 @@ object Sharding {
    * snapshot is ordered by flasks with least assigned
    * work first.
    */
-  def sorted(d: Distribution): Seq[(Flask, Set[Target])] =
+  def sorted(d: Distribution): Seq[(FlaskID, Set[Target])] =
     d.toList.sortBy(_._2.size)
 
   /**
    * dump out the current snapshot of how chemist believes work
    * has been assigned to flasks.
    */
-  def snapshot(d: Distribution): Map[Flask, Map[ClusterName, List[URI]]] =
+  def snapshot(d: Distribution): Map[FlaskID, Map[ClusterName, List[URI]]] =
     d.toList.map { case (i,s) =>
       i -> s.groupBy(_.cluster).mapValues(_.toList.map(_.uri))
     }.toMap
@@ -79,43 +79,34 @@ object Sharding {
   }
 
   ///////////////////////// IO functions ///////////////////////////
-/*
-  /**
-   * The goal here is given the `Set[Target]` be able to compute how things
-   * should be sharded, update the state, and then yield the results such that
-   * its possible to test to the nearest edge of the world without actually
-   * doing the side effect and calling the shards to assign the work (which would
-   * of course result in `Task[Unit]` and be a nightmare to test)
-   */
-  def locateAndAssignDistribution(t: Set[Target], r: Repository, s: Sharder): Task[Map[Location, Seq[Target]]] = {
-    for {
-      // read the current distribution from the repository
-      x    <- r.distribution
 
-      // compute a new distribution given these new inputs
-      (a,d) = s.distribution(t)(x)
-      _     = log.debug(s"Sharding.distribute a=$a, d=$d")
-
-      // given we only want to issue commands to flasks once, lets bunch
-      // up those targets that have been assigned to the same flask so we
-      // can send them all over as a batch
-      grouped: Map[Flask, Seq[Target]] = a.groupBy(_._1).mapValues(_.map(_._2))
-      _ = log.debug(s"Sharding.distribute,grouped = $grouped")
-
-      tasks = grouped.map { case (f,seq) =>
-        r.instance(f).map(_.location).map((_,seq))
+  def distribute(repo: Repository, sharder: Sharder, remote: RemoteFlask, dist: Distribution)(ts: Set[Target]): Task[Unit] = {
+    val s = sharder.calculate(ts)(dist)
+    s.toVector.traverse_ { x =>
+      val flask = repo.flask(x._1)
+      flask.fold(Task.delay(log.error("asked to assign to an unknown flask: " + x._1))){ f =>
+        remote.command(FlaskCommand.Monitor(f,Seq(x._2))) >> repo.platformHandler(PlatformEvent.Assigned(x._1, x._2))
       }
-
-      // pre-emtivly update our new state as the sending will take longer
-      // than updating and we dont want the world to change under our feet
-      _ <- r.mergeDistribution(d)
-      x <- Task.gatherUnordered(tasks.toList)
-    } yield x.toMap
+    }
   }
 
- */
-
-
+  def handleRepoCommand(repo: Repository, sharder: Sharder, remote: RemoteFlask)(c: RepoCommand): Task[Unit] = {
+    Task.delay(log.info(s"handleRepoCommand: $c")) >>
+    repo.distribution.flatMap { dist =>
+      c match {
+        case RepoCommand.Monitor(t) =>
+          distribute(repo, sharder, remote, dist)(Set(t))
+        case RepoCommand.Unmonitor(fl, t) =>
+          remote.command(FlaskCommand.Unmonitor(fl, Seq(t)))
+        case RepoCommand.Telemetry(fl) =>
+          remote.command(FlaskCommand.Telemetry(fl))
+        case RepoCommand.AssignWork(fl) =>
+          repo.unassignedTargets flatMap distribute(repo, sharder, remote, dist)
+        case RepoCommand.ReassignWork(fl) =>
+          repo.assignedTargets(fl) flatMap distribute(repo, sharder, remote, dist)
+      }
+    }
+  }
 }
 
 trait Sharder {
@@ -124,7 +115,7 @@ trait Sharder {
    * Given the new set of urls to monitor, compute how said urls
    * should be distributed over the known flask instances
    */
-  def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)]
+  def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)]
 
   /**
    * provide the new distribution based on the result of calculating
@@ -136,14 +127,14 @@ trait Sharder {
    * 2. `Distribution` is that same sequence folded into a `Distribution` instance which can
    *     then be added to the existing state of the world.
    */
-  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution)
+  def distribution(s: Set[Target])(d: Distribution): (Seq[(FlaskID,Target)], Distribution)
 }
 
 object EvenSharding extends Sharder {
   import Sharding._
   private lazy val log = Logger[EvenSharding.type]
 
-  def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
+  def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)] = {
     val servers = shards(d)
     val ss      = servers.size
     val input   = deduplicate(s)(d)
@@ -164,7 +155,7 @@ object EvenSharding extends Sharder {
     }
   }
 
-  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution) = {
+  def distribution(s: Set[Target])(d: Distribution): (Seq[(FlaskID,Target)], Distribution) = {
     // this check is needed as otherwise the fold gets stuck in a gnarly
     // infinate loop, and this function never completes.
     if(s.isEmpty) (Seq.empty,d)

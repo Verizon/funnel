@@ -39,31 +39,22 @@ trait Repository {
    * the most recent mirroring errors
    */
   def errors: Task[Seq[Error]]
-
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit]
-
   def errorSink(e: Error): Task[Unit]
-
   def platformHandler(a: PlatformEvent): Task[Unit]
   /////////////// instance operations ///////////////
 
   def targetState(instanceId: URI): TargetState
-
-//  def target(id: InstanceID): Task[Instance]
-//  def flask(id: InstanceID): Task[Instance]
   def instance(id: URI): Option[Target]
-
+  def flask(id: FlaskID): Option[Flask]
   val lifecycleQ: async.mutable.Queue[RepoEvent]
 
   /////////////// flask operations ///////////////
 
   def distribution: Task[Distribution]
   def mergeDistribution(d: Distribution): Task[Distribution]
-  def assignedTargets(flask: Flask): Task[Set[Target]]
-
-//  def isFlask(id: InstanceID): Task[Boolean] = flask(id).attempt.map(_.isRight)
-
-//  def subscribe(events: Process[Task,TargetMessage]): Unit
+  def assignedTargets(flask: FlaskID): Task[Set[Target]]
+  def unassignedTargets: Task[Set[Target]]
 }
 
 import com.amazonaws.services.ec2.AmazonEC2
@@ -120,9 +111,19 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
   def errors: Task[Seq[Error]] =
     Task.delay(errorStack.toSeq.toList)
 
-   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit] = Task.now(())
+  def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit] = Task.now(())
 
   def errorSink(e: Error): Task[Unit] = errorStack.push(e)
+
+  /////////////// instance operations ///////////////
+  def unassignedTargets: Task[Set[Target]] =
+    Task(stateMaps.get.lookup(TargetState.Unmonitored).fold(Set.empty[Target])(m => m.values.map(_.msg.target).toSet))
+
+  def assignedTargets(flask: FlaskID): Task[Set[Target]] =
+    D.get.lookup(flask) match {
+      case None => Task.fail(InstanceNotFoundException(flask.value, "Flask"))
+      case Some(t) => Task.now(t)
+    }
 
   /////////////// target lifecycle ///////////////
 
@@ -133,11 +134,22 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
     val lifecycle = TargetLifecycle.process(this) _
     a match {
       case PlatformEvent.NewTarget(target) =>
+        Task.delay(log.info("platformHandler -- new target: " + target)) >>
         lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), targetState(target.uri))
-      case PlatformEvent.NewFlask(f) => lifecycleQ.enqueueOne(RepoEvent.NewFlask(f))
+
+      case PlatformEvent.NewFlask(f) =>
+        Task.delay(log.info("platformHandler -- new task: " + f)) >>
+        Task {
+          D.update(_.insert(f.id, Set.empty))
+          flasks.update(_.insert(f.id, f))
+        } >>
+        repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f)) >>
+        repoCommandsQ.enqueueOne(RepoCommand.AssignWork(f))
+
       case PlatformEvent.TerminatedFlask(i) =>
         // This one is a little weird, we are enqueueing this to ourseles
         // we should probably eliminate this re-enqueing
+        Task.delay(log.info("platformHandler -- terminated flask: " + i)) >>
         repoCommandsQ.enqueueOne(RepoCommand.ReassignWork(i))
 
       case PlatformEvent.TerminatedTarget(i) => {
@@ -152,12 +164,14 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
       }
       case PlatformEvent.Monitored(f, i) =>
         // TODO: what is this was unexpected? then the lifecycle call will result in nothing
+        log.info(s"platformHandler -- $i monitored by $f")
         val target = targets.get.lookup(i)
         target.map { t =>
           lifecycle(TargetLifecycle.Confirmation(t.msg.target, f, System.currentTimeMillis), t.to)
         } getOrElse Task.now(())
 
       case PlatformEvent.Unmonitored(f, i) => {
+        log.info(s"platformHandler -- $i no longer monitored by by $f")
         val target = targets.get.lookup(i)
         target.map { t =>
           // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
@@ -167,6 +181,9 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
           Task.now(())
         }
       }
+      case PlatformEvent.Assigned(fl, t) =>
+        Task.delay(log.info(s"platformHandler -- $t assigned to $fl")) >>
+        lifecycle(TargetLifecycle.Assignment(t, fl, System.currentTimeMillis), targetState(t.uri))
       case PlatformEvent.NoOp => Task.now(())
     }
   }
@@ -180,6 +197,7 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
 
   def lifecycle(): Unit =  {
     val go: RepoEvent => Process[Task, RepoCommand] = { re =>
+      log.info(s"lifecycle: $re")
       Process.eval(historyStack.push(re)).flatMap{ _ =>
         re match {
           case sc @ StateChange(from,to,msg) =>
@@ -188,7 +206,7 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
             stateMaps.update(_.update(from, (m => Some(m.delete(id)))))
             stateMaps.update(_.update(to, (m => Some(m.insert(id, sc)))))
             sc.to match {
-              case Unknown =>
+              case Unmonitored =>
                 Process.emit(RepoCommand.Monitor(sc.msg.target))
 
               // TODO when we implement flask transition we need to hanle double monitored stuff
@@ -204,6 +222,7 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
             flasks.get.lookup(id) match {
               case Some(_) =>
                 flasks.update(_.delete(id))
+
                 Process.emit(RepoCommand.ReassignWork(id))
               case None => Process.halt
             }
@@ -235,6 +254,7 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
    */
   def targetState(id: URI): TargetState = targets.get.lookup(id).fold[TargetState](TargetState.Unknown)(_.to)
   def instance(id: URI): Option[Target] = targets.get.lookup(id).map(_.msg.target)
+  def flask(id: FlaskID): Option[Flask] = flasks.get.lookup(id)
 
   /////////////// flask operations ///////////////
 
@@ -243,9 +263,4 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
   def mergeDistribution(d: Distribution): Task[Distribution] =
     Task.delay(D.update(_.unionWith(d)(_ ++ _)))
 
-  def assignedTargets(flask: Flask): Task[Set[Target]] =
-    D.get.lookup(flask) match {
-      case None => Task.fail(InstanceNotFoundException(flask.id.value, "Flask"))
-      case Some(t) => Task.now(t)
-    }
 }

@@ -77,8 +77,9 @@ class Flask(options: Options, val I: Instruments) {
 
     val Q = async.unboundedQueue[Telemetry]
     telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
-                           (I.monitoring.keys.discrete pipe keyChanges).wye(Q.dequeue)(wye.merge)).runAsync(_ => ())
+                           Q.dequeue.wye(I.monitoring.keys.discrete pipe keyChanges)(wye.merge)).runAsync(_ => ())
 
+    Q.enqueueOne(Error(Names("is", "this thing", new URI("http://on")))).run
     def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
       httpOrZmtp(alive, Q)(uri) observe countDatapoints
 
@@ -119,6 +120,7 @@ class Flask(options: Options, val I: Instruments) {
         I.monitoring, riemann.ttl.toSeconds.toFloat)(
         R, s"${riemann.host}:${riemann.port}")(flaskName))
     }
+    Q.enqueueOne(Error(Names("how about", "this thing", new URI("http://localhost")))).run
   }
 }
 

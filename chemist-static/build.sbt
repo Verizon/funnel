@@ -12,8 +12,6 @@ Revolver.settings
 
 ScalaTest.settings
 
-Custom.compilation
-
 name in Universal := "chemist-static"
 
 fork in Test := true

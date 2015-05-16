@@ -84,31 +84,10 @@ object Lifecycle {
     } yield c
   }
 
-  /**
-   * used to contramap the Sharding handler towards the Unmonitored \/
-   * Monitored stream we get from telemetry
-   *
-   * Monitored \/ Unmonitored, I promise
-   */
-  private def actionsFromLifecycle(flask: FlaskID): URI \/ URI => PlatformEvent = {
-    case -\/(id) => Unmonitored(flask, id)
-    case \/-(id) => Monitored(flask, id)
-  }
-
   def lifecycleActor(repo: Repository): Actor[PlatformEvent] = Actor(a => repo.platformHandler(a).run)
   def errorActor(repo: Repository): Actor[Error] = Actor(e => repo.errorSink(e).run)
   def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] = Actor{ case (fl, keys) => repo.keySink(fl, keys).run }
 
-  def monitorTelemetry(flask: Flask,
-                       keys: Actor[(URI, Set[Key[Any]])],
-                       errors: Actor[Error],
-                       lifecycle: Actor[PlatformEvent],
-                       signal: Signal[Boolean]): Task[Unit] = {
-
-    val lc: Actor[URI \/ URI] = lifecycle.contramap(actionsFromLifecycle(flask.id))
-
-    telemetrySubscribeSocket(flask.telemetry.asURI(), signal, keys, errors, lc)
-  }
 
   def interpreter(e: AutoScalingEvent, resources: Seq[String], signal: Signal[Boolean]
     )(asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery

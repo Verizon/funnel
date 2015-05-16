@@ -22,7 +22,7 @@ object Housekeeping {
        a <- Task.gatherUnordered(flasks.map(
             f => requestAssignedTargets(f.location)(http).map(f -> _)))
     } yield a.foldLeft(Distribution.empty){ (a,b) =>
-      a.alter(b._1, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
+      a.alter(b._1.id, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
     }) or Task.now(Distribution.empty)
 
   import funnel.http.{Cluster,JSON => HJSON}

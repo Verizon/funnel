@@ -14,6 +14,7 @@ object PlatformEvent {
   final case class TerminatedFlask(f: FlaskID) extends PlatformEvent
   final case class Monitored(flask: FlaskID, target: URI) extends PlatformEvent
   final case class Unmonitored(flask: FlaskID, target: URI) extends PlatformEvent
+  final case class Assigned(flask: FlaskID, target: Target) extends PlatformEvent
   final case object NoOp extends PlatformEvent
 }
 
@@ -29,6 +30,7 @@ trait RepoCommand
 object RepoCommand {
   case class Monitor(target: Target) extends RepoCommand
   case class Unmonitor(flask: Flask, target: Target) extends RepoCommand
+  case class Telemetry(flask: Flask) extends RepoCommand
   case class AssignWork(flask: Flask) extends RepoCommand
   case class ReassignWork(flask: FlaskID) extends RepoCommand
 }
@@ -37,6 +39,7 @@ trait FlaskCommand
 object FlaskCommand {
   case class Monitor(flask: Flask, target: Seq[Target]) extends FlaskCommand
   case class Unmonitor(flask: Flask, target: Seq[Target]) extends FlaskCommand
+  case class Telemetry(flask: Flask) extends FlaskCommand
   case object Report extends FlaskCommand
 }
 

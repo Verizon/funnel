@@ -11,8 +11,10 @@ import scalaz.stream.async.{signalOf,unboundedQueue}
 import scalaz.concurrent.{Actor,Task}
 import scalaz.{-\/,\/,\/-}
 import java.net.URI
+import journal.Logger
 
 object Telemetry extends TelemetryCodecs {
+  private lazy val log = Logger[Telemetry]
 
   implicit val transportedTelemetry = Transportable[Telemetry] { t =>
     t match {
@@ -32,7 +34,7 @@ object Telemetry extends TelemetryCodecs {
   def telemetryPublishSocket(uri: URI, signal: Signal[Boolean], telemetry: Process[Task,Telemetry]): Task[Unit] = {
     val e = telemetryPublishEndpoint(uri)
     Ø.link(e)(signal) { socket =>
-      telemetry through Ø.write(socket)
+      (Process.emit(Error(Names("hello", "there", new URI("http://localhost")))) ++ telemetry) through Ø.write(socket)
     }.run
   }
 
@@ -45,6 +47,7 @@ object Telemetry extends TelemetryCodecs {
                                ): Task[Unit] = {
     val endpoint = telemetrySubscribeEndpoint(uri)
     Ø.link(endpoint)(signal) { socket =>
+      log.info(s"connected to telemetry socket on $uri")
       (Ø.receive(socket) to fromTransported(uri, keys, errors, lifecycle))
     }.run
   }
@@ -53,6 +56,7 @@ object Telemetry extends TelemetryCodecs {
     val currentKeys = collection.mutable.Set.empty[Key[Any]]
 
     Process.constant { x =>
+      log.error("FROMTRANSPORTED: " + x)
       x match {
         case Transported(_, Versions.v1, _, Some(Topic("error")), bytes) =>
           Task.delay(errors ! errorCodec.decodeValidValue(BitVector(bytes)))

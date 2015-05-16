@@ -2,21 +2,55 @@ package funnel
 package chemist
 
 import scalaz.concurrent.Task
-import scalaz.stream.{Process, Sink}
+import scalaz.stream.{Process, Sink, async}
+import async.mutable.Signal
 import scalaz.syntax.apply._
+import scalaz.{-\/,\/,\/-}
+import scalaz.concurrent.Actor
 import journal.Logger
 import java.net.URI
 
 trait RemoteFlask {
-  val commands: Sink[Task,FlaskCommand]
+  def command(c: FlaskCommand): Task[Unit]
 }
 
-class HttpFlask(http: dispatch.Http) extends RemoteFlask {
+object LoggingRemote extends RemoteFlask {
+  private lazy val log = Logger[HttpFlask]
+
+  def command(c: FlaskCommand): Task[Unit] = {
+    Task.delay {
+      log.info("LoggingRemote recieved: " + c)
+    }
+  }
+
+}
+
+class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) extends RemoteFlask {
   import FlaskCommand._
 
   private lazy val log = Logger[HttpFlask]
 
-  val commands: Sink[Task,FlaskCommand] = Process.constant {
+  val keys: Actor[(URI, Set[Key[Any]])] = Actor {
+    case (uri, keys) =>
+      log.error(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KEYS via telemetry: $uri -> ${keys.size}")
+      repo.keySink(uri, keys).run
+  }
+
+  val errors: Actor[Error] = Actor {
+    case error =>
+      log.error(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ERROR via telemetry: $error")
+      repo.errorSink(error).run
+  }
+
+  val lifecycle: Actor[PlatformEvent] = Actor {
+    case ev =>
+      log.error(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LIFECYCLE via telemetry: $ev")
+      repo.platformHandler(ev).run
+  }
+
+  def command(c: FlaskCommand): Task[Unit] = c match {
+    case Telemetry(flask) =>
+      Task(monitorTelemetry(flask, keys, errors, lifecycle, signal).runAsync(_ => ()))
     case Monitor(flask, targets) =>
       monitor(flask.location, targets).void
     case Unmonitor(flask, targets) =>
@@ -59,6 +93,29 @@ class HttpFlask(http: dispatch.Http) extends RemoteFlask {
 
     val req = Task.delay(url(uri.toString) << payload.toList.asJson.nospaces) <* Task.delay(log.debug(s"submitting to $uri: $payload"))
     req.flatMap(r => fromScalaFuture(http(r OK as.String)))
+  }
+
+  /**
+   * used to contramap the Sharding handler towards the Unmonitored \/
+   * Monitored stream we get from telemetry
+   *
+   * Monitored \/ Unmonitored, I promise
+   */
+  private def actionsFromLifecycle(flask: FlaskID): URI \/ URI => PlatformEvent = {
+    case -\/(id) => PlatformEvent.Unmonitored(flask, id)
+    case \/-(id) => PlatformEvent.Monitored(flask, id)
+  }
+
+  def monitorTelemetry(flask: Flask,
+                       keys: Actor[(URI, Set[Key[Any]])],
+                       errors: Actor[Error],
+                       lifecycle: Actor[PlatformEvent],
+                       signal: Signal[Boolean]): Task[Unit] = {
+
+    import telemetry.Telemetry._
+
+    val lc: Actor[URI \/ URI] = lifecycle.contramap(actionsFromLifecycle(flask.id))
+    telemetrySubscribeSocket(flask.telemetry.asURI(), signal, keys, errors, lc)
   }
 
 }

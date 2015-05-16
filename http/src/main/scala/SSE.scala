@@ -85,7 +85,7 @@ object SSE {
         else if (line.startsWith(":")) awaitingEvent
         else {
           val (k,v) = parseLine(line)
-          if (k != "event") throw ParseError("expected 'event'")
+          if (k != "event") throw ParseError(s"expected 'event', got $k")
           collectingData(v, new StringBuilder)
         }
       }
@@ -120,16 +120,14 @@ object SSE {
    * Example: `readEvents("http://localhost:8001/stream/sliding/jvm")`.
    */
   def readEvents(uri: URI, Q: Queue[Telemetry])(implicit S: ExecutorService = Monitoring.serverPool):
-      Process[Task, Datapoint[Any]] =
+      Process[Task, Datapoint[Any]] = {
+    println("urllines: " + uri)
     urlLinesR(uri.toURL)(S).attempt().pipeO(blockParser.map {
       case (_,data) => parseOrThrow[Datapoint[Any]](data)
-                                            }).flatMap(_.fold({e =>
-                                                                Q.enqueueOne(Unmonitored(uri)).run
-                                                                Process.fail(e)
-                                                              }, {s =>
-                                                                Q.enqueueOne(Monitored(uri)).run
-                                                                Process.emit(s)
+                                            }).flatMap(_.fold({e => Process.fail(e)
+                                                              }, {s => Process.emit(s)
                                                               }))
+  }
 
   // various helper functions
 

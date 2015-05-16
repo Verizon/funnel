@@ -26,7 +26,7 @@ trait Chemist[A <: Platform]{
    * Of all known monitorable services, dispaly the current work assignments
    * of funnel -> flask.
    */
-  def distribution: ChemistK[Map[Flask, Map[String, List[URI]]]] =
+  def distribution: ChemistK[Map[FlaskID, Map[String, List[URI]]]] =
     config.flatMapK(_.repository.distribution.map(Sharding.snapshot))
 
   /**
@@ -41,7 +41,7 @@ trait Chemist[A <: Platform]{
   /**
    * list all the shards currently known by chemist.
    */
-  def shards: ChemistK[Set[Flask]] =
+  def shards: ChemistK[Set[FlaskID]] =
     for {
       cfg <- config
       a <- cfg.repository.distribution.map(Sharding.shards).liftKleisli
@@ -49,8 +49,8 @@ trait Chemist[A <: Platform]{
   /**
    * display all known node information about a specific shard
    */
-  def shard(id: FlaskID): ChemistK[Option[Flask]] =
-    shards.map(_.find(_.id.value.toLowerCase == id.value.trim.toLowerCase))
+  def shard(id: FlaskID): ChemistK[Option[Flask]] = config map { x => x.repository.flask(id) }
+
 
 
   /**
@@ -162,7 +162,6 @@ trait Chemist[A <: Platform]{
 }
 
 object Chemist {
-
 
   private def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {

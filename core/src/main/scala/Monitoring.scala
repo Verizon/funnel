@@ -177,9 +177,9 @@ trait Monitoring {
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
             if (urls.contains(source)) Process.halt // skip it, alread running
-            else Process.eval_(modifyActive(cluster, _ + source)) ++ Process.eval_(Q.enqueueOne(Monitored(source)))// add to active at start
+            else Process.eval_(Q.enqueueOne(Monitored(source))) ++ Process.eval_(modifyActive(cluster, _ + source)) // add to active at start
               // and remove it when done
-              received.onComplete(Process.eval_(modifyActive(cluster, _ - source)) ++ Process.eval_(Q.enqueueOne(Unmonitored(source))))
+              received.onComplete(Process.eval_(Q.enqueueOne(Unmonitored(source))) ++ Process.eval_(modifyActive(cluster, _ - source)))
           }
 
           Task.fork(receivedIdempotent.run).runAsync(_.fold(

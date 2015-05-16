@@ -78,7 +78,7 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
                                        errorsActor,
                                        dummyActor.asInstanceOf[Actor[URI\/URI]])
 
-    sub.runAsync(_ => ())
+    sub.runAsync(x => println("RESULT OF RUNNING TELEMETRY: " + x))
 
     Thread.sleep(10000)
 
