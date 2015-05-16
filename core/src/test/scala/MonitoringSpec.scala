@@ -216,9 +216,11 @@ object MonitoringSpec extends Properties("monitoring") {
       import instruments._
       val t = timer("uno")
       t.time { Thread.sleep(50) }
+      // Make sure we wait for the time buffer to catch up
+      Thread.sleep(instruments.bufferTime.toMillis * 2)
       val r = Monitoring.default.latest(t.keys.now).run.mean
-      // println("Sleeping for 50ms took: " + r)
-      (r - 50).abs < 1000
+      //println("Sleeping for 50ms took: " + r)
+      r > 0 && (r - 50).abs < 1000
     }
     go || go || go
   }
@@ -236,9 +238,10 @@ object MonitoringSpec extends Properties("monitoring") {
       }
       val delta = System.nanoTime - t0
       val updateTime = (delta.nanoseconds) / N.toDouble
-      Thread.sleep(100)
+      // Make sure we wait for the time buffer to catch up
+      Thread.sleep(instruments.bufferTime.toMillis * 2)
       val m = Monitoring.default.latest(t.keys.now).run.mean
-      // println("timer:updateTime: " + updateTime)
+      //println("timer:updateTime: " + updateTime + ", m: " + m)
       updateTime.toNanos < 1000 && m == 50
     }
     go || go || go
