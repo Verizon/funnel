@@ -18,28 +18,28 @@ class SpecMultiJvmTarget1 extends FlatSpec with Target with Matchers {
   import funnel.http._
   val port = 2001
   MonitoringServer.start(M, port)
-  Thread.sleep(100000)
+  Thread.sleep(75000)
 }
 
 class SpecMultiJvmTarget2 extends FlatSpec with Target with Matchers {
   import funnel.http._
   val port = 2002
   MonitoringServer.start(M, port)
-  Thread.sleep(100000)
+  Thread.sleep(75000)
 }
 
 class SpecMultiJvmTarget3 extends FlatSpec with Target with Matchers {
   import funnel.http._
   val port = 2003
   MonitoringServer.start(M, port)
-  Thread.sleep(100000)
+  Thread.sleep(75000)
 }
 
 class SpecMultiJvmTarget4 extends FlatSpec with Target with Matchers {
   import funnel.http._
   val port = 2004
   MonitoringServer.start(M, port)
-  Thread.sleep(100000)
+  Thread.sleep(75000)
 }
 
 
@@ -48,7 +48,7 @@ class SpecMultiJvmFlask1 extends FlatSpec with Matchers {
   import funnel.http._
   import funnel.flask._
   import java.io.File
-  import scalaz.concurrent.Task
+  import scalaz.concurrent.{Task,Strategy}
   import knobs.{ ClassPathResource, Config, Required }
   import scala.concurrent.duration.DurationInt
 
@@ -60,11 +60,11 @@ class SpecMultiJvmFlask1 extends FlatSpec with Matchers {
   val app = new funnel.flask.Flask(options, I)
   MonitoringServer.start(Monitoring.default, 5775)
   app.run(Array())
-  Thread.sleep(100000)
+  Thread.sleep(70000)
 }
 
 class SpecMultiJvmChemist extends FlatSpec with Matchers {
-  import scalaz.concurrent.Actor
+  import scalaz.concurrent.{Actor,Strategy}
   import funnel.chemist._
   import java.net.URI
   import PlatformEvent._
@@ -73,12 +73,12 @@ class SpecMultiJvmChemist extends FlatSpec with Matchers {
 
   val signal = async.signalOf(true)
   val repo = new StatefulRepository
-  val lifecycleActor: Actor[PlatformEvent] = Actor(a => repo.platformHandler(a).run)
+  val lifecycleActor: Actor[PlatformEvent] = Actor[PlatformEvent](a => repo.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
   repo.lifecycle()
-  Thread.sleep(6000)
-
   val http = Http()
   (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, EvenSharding, new HttpFlask(http, repo, signal)) _)).run.runAsync(_ => ())
+
+  Thread.sleep(6000)
 
   lifecycleActor ! NewTarget(Target("test", new URI("http://localhost:2001/stream/previous"), false))
   lifecycleActor ! NewTarget(Target("test", new URI("http://localhost:2002/stream/previous"), false))
@@ -86,6 +86,5 @@ class SpecMultiJvmChemist extends FlatSpec with Matchers {
   lifecycleActor ! NewTarget(Target("test", new URI("http://localhost:2004/stream/previous"), false))
   lifecycleActor ! NewFlask(Flask(FlaskID("flask1"), Location.localhost, Location.telemetryLocalhost))
 
-  Thread.sleep(120000)
-  println("aaaaaaaaaaaaaaaaaaaaaaaa: "  + repo.flasks.get)
+  Thread.sleep(100000)
 }

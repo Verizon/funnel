@@ -46,6 +46,6 @@ object EC2 {
       else aggregated
     }
 
-    Task(fetch(Nil))
+    Task(fetch(Nil))(funnel.chemist.Chemist.serverPool)
   }
 }

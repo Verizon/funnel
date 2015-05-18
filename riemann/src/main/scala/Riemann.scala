@@ -27,6 +27,7 @@ object Riemann {
   ): Actor[Pusher] = {
     implicit val S = Strategy.Executor(Monitoring.serverPool)
     implicit val P = Monitoring.schedulingPool
+
     val a = Actor.actor[Pusher] {
       case Hold(e) => store = (e :: store)
       case Flush   => {
@@ -34,9 +35,9 @@ object Riemann {
         log.debug(s"successfully sent batch of ${store.length}")
         store = Nil
       }
-    }
+    }(S)
 
-    Process.awakeEvery(1.minute).evalMap {_ =>
+    Process.awakeEvery(1.minute)(S,P).evalMap {_ =>
       Task(a(Flush))
     }.run.runAsync(_ => ())
 

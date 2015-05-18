@@ -1,6 +1,7 @@
 package funnel
 package chemist
 
+import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import Sharding.Distribution
 import scalaz.{-\/,==>>}
@@ -117,7 +118,7 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
 
   /////////////// instance operations ///////////////
   def unassignedTargets: Task[Set[Target]] =
-    Task(stateMaps.get.lookup(TargetState.Unmonitored).fold(Set.empty[Target])(m => m.values.map(_.msg.target).toSet))
+    Task(stateMaps.get.lookup(TargetState.Unmonitored).fold(Set.empty[Target])(m => m.values.map(_.msg.target).toSet))(Chemist.serverPool)
 
   def assignedTargets(flask: FlaskID): Task[Set[Target]] =
     D.get.lookup(flask) match {
@@ -142,7 +143,7 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
         Task {
           D.update(_.insert(f.id, Set.empty))
           flasks.update(_.insert(f.id, f))
-        } >>
+        }(Chemist.serverPool) >>
         repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f)) >>
         repoCommandsQ.enqueueOne(RepoCommand.AssignWork(f))
 
@@ -159,7 +160,7 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
             targets.update(_.delete(i))
             stateMaps.update(_.update(t.to, m => Some(m.delete(i))))
             ()
-          }
+          }(Chemist.serverPool)
         }.getOrElse(Task.now(()))
       }
       case PlatformEvent.Monitored(f, i) =>
@@ -189,10 +190,10 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
   }
 
   // inbound events from TargetLifecycle
-  val lifecycleQ: async.mutable.Queue[RepoEvent] = async.unboundedQueue
+  val lifecycleQ: async.mutable.Queue[RepoEvent] = async.unboundedQueue(Strategy.Executor(Chemist.serverPool))
 
   // outbound events to be consumed by Sharding
-  private val repoCommandsQ: async.mutable.Queue[RepoCommand] = async.unboundedQueue
+  private val repoCommandsQ: async.mutable.Queue[RepoCommand] = async.unboundedQueue(Strategy.Executor(Chemist.serverPool))
   val repoCommands: Process[Task, RepoCommand] = repoCommandsQ.dequeue
 
   def lifecycle(): Unit =  {

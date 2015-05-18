@@ -7,7 +7,6 @@ import zeromq._
 import sockets._
 import scalaz.stream._
 import scalaz.stream.async.mutable.{Signal,Queue}
-import scalaz.stream.async.{signalOf,unboundedQueue}
 import scalaz.concurrent.{Actor,Task}
 import scalaz.{-\/,\/,\/-}
 import java.net.URI
@@ -18,12 +17,19 @@ object Telemetry extends TelemetryCodecs {
 
   implicit val transportedTelemetry = Transportable[Telemetry] { t =>
     t match {
-      case e @ Error(_) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("error")), errorCodec.encodeValid(e).toByteArray)
+      case e @ Error(_) =>
+        val t = Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("error")), errorCodec.encodeValid(e).toByteArray)
+        t
       case NewKey(key) =>
         val bytes = keyEncode.encodeValid(key).toByteArray
-        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("key")), bytes)
-      case Monitored(i) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("monitor")), i.toString.getBytes())
-      case Unmonitored(i) => Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("unmonitor")), i.toString.getBytes())
+        val t = Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("key")), bytes)
+        t
+      case Monitored(i) =>
+        log.info("MONITOR")
+        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("monitor")), i.toString.getBytes())
+      case Unmonitored(i) =>
+        log.info("UNMONITOR")
+        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("unmonitor")), i.toString.getBytes())
     }
   }
 
@@ -66,6 +72,8 @@ object Telemetry extends TelemetryCodecs {
           }
         case Transported(_, Versions.v1, _, Some(Topic("monitor")), bytes) => Task.delay(lifecycleSink ! \/.right(uriCodec.decodeValidValue(BitVector(bytes))))
         case Transported(_, Versions.v1, _, Some(Topic("unmonitor")), bytes) => Task.delay(lifecycleSink ! \/.left(uriCodec.decodeValidValue(BitVector(bytes))))
+        case x => log.error("unexpected message from telemetry: " + x)
+          Task.now(())
       }
     }
   }

@@ -2,6 +2,7 @@ package funnel
 package zeromq
 
 import java.net.URI
+import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import scalaz.stream.{Channel,Process,io,async}
 import scalaz.stream.async.mutable.Queue
@@ -14,7 +15,7 @@ class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   lazy val S  = async.signalOf[Boolean](true)
   lazy val W  = 20.seconds
 
-  lazy val Q: Queue[Telemetry] = async.unboundedQueue
+  lazy val Q: Queue[Telemetry] = async.unboundedQueue(Strategy.Executor(Monitoring.serverPool))
 
   lazy val U1 = new URI("ipc:///tmp/u1.socket")
   lazy val E1 = Endpoint.unsafeApply(publish &&& bind, U1)

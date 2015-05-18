@@ -144,23 +144,26 @@ trait Monitoring {
     nodeRetries: Names => Event = _ => defaultRetries
   ): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
-    val alive     = signal[Unit](S)
-    val active    = signal[Set[URI]](S)
+    val alive     = async.signalOf[Unit](())(S)
+    val active    = async.signalOf[Set[URI]](Set.empty)(S)
 
     /**
      * Update the running state of the world by updating the URLs we know about
      * to mirror, and the cluster -> url mapping.
      */
-    def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] =
+    def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] = {
+      log.error("modifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActive")
       for {
-        _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))) )
-        _ <- Task( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))).filter(!_.isEmpty) )
+        _ <- active.compareAndSet{ a => log.error("HELLO") ; Option(f(a.getOrElse(Set.empty[URI]))) }
+        _ = log.error("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        _ <- Task.delay( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))).filter(!_.isEmpty) )
+        _ = println("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
         _  = log.debug(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
+        _ = println("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
       } yield ()
+    }
 
     for {
-      _ <- active.set(Set.empty)
-      _ <- alive.set(())
       _ <- mirroringCommands.evalMap {
         case Mirror(source, cluster) => Task.delay {
           log.info(s"Attempting to monitor '$cluster' located at '$source'")
@@ -177,12 +180,12 @@ trait Monitoring {
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
             if (urls.contains(source)) Process.halt // skip it, alread running
-            else Process.eval_(Q.enqueueOne(Monitored(source))) ++ Process.eval_(modifyActive(cluster, _ + source)) // add to active at start
+            else Process.eval_(modifyActive(cluster, _ + source).flatMap{ x => println("111111111111111111111111"); Q.enqueueOne(Monitored(source)).onFinish(x => Task.now(println("stuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu: :  " + x)))}) // add to active at start
               // and remove it when done
-              received.onComplete(Process.eval_(Q.enqueueOne(Unmonitored(source))) ++ Process.eval_(modifyActive(cluster, _ - source)))
+              received.onComplete(Process.eval_(Q.enqueueOne(Unmonitored(source)) >> modifyActive(cluster, _ - source)))
           }
 
-          Task.fork(receivedIdempotent.run).runAsync(_.fold(
+          Task.fork(receivedIdempotent.run)(Monitoring.serverPool).runAsync(_.fold(
             err => log.error(err.getMessage), identity))
         }
         case Discard(source) => Task.delay {
@@ -517,7 +520,7 @@ object Monitoring {
         case Process.Halt(e) => signal.fail(e.asThrowable).run
         case _ => ()
       }
-    }
+    }(Strategy.Executor(Monitoring.serverPool))
     ((i: I) => hub ! i, signal)
   }
 

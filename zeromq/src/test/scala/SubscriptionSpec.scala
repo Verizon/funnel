@@ -4,6 +4,7 @@ package zeromq
 import java.net.URI
 import org.scalatest.matchers.{Matcher,MatchResult}
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
+import scalaz.concurrent.Strategy
 import scalaz.stream.async
 import async.mutable.Queue
 import scala.concurrent.duration._
@@ -17,7 +18,7 @@ class SubscriptionSpec extends FlatSpec
 
   lazy val S  = async.signalOf[Boolean](true)
   lazy val W  = 30.seconds
-  lazy val Q: Queue[Telemetry] = async.unboundedQueue
+  lazy val Q: Queue[Telemetry] = async.unboundedQueue(Strategy.Executor(Monitoring.serverPool))
 
   lazy val U1 = new URI("ipc:///tmp/u1.socket")
   lazy val E1 = Endpoint.unsafeApply(publish &&& bind, U1)

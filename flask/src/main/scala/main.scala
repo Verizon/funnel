@@ -3,6 +3,7 @@ package flask
 
 import com.aphyr.riemann.client.RiemannClient
 import scala.concurrent.duration._
+import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import scalaz.std.option._
 import scalaz.syntax.applicative._
@@ -38,7 +39,7 @@ class Flask(options: Options, val I: Instruments) {
 
   val S = MonitoringServer.start(I.monitoring, options.funnelPort)
 
-  lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)
+  lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)(Strategy.Executor(Monitoring.serverPool))
 
 
   private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
@@ -75,11 +76,12 @@ class Flask(options: Options, val I: Instruments) {
     def countDatapoints: Sink[Task, Datapoint[Any]] =
       io.channel(_ => Task(mirrorDatapoints.increment))
 
-    val Q = async.unboundedQueue[Telemetry]
-    telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
-                           Q.dequeue.wye(I.monitoring.keys.discrete pipe keyChanges)(wye.merge)).runAsync(_ => ())
+    val Q = async.unboundedQueue[Telemetry](Strategy.Executor(funnel.Monitoring.serverPool))
 
-    Q.enqueueOne(Error(Names("is", "this thing", new URI("http://on")))).run
+    telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
+                           Q.dequeue.wye(I.monitoring.keys.discrete pipe keyChanges)(wye.merge)(Strategy.Executor(Monitoring.serverPool))).runAsync(_ => ())
+
+
     def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
       httpOrZmtp(alive, Q)(uri) observe countDatapoints
 

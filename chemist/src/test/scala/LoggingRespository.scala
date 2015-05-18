@@ -3,6 +3,7 @@ package chemist
 
 import java.util.concurrent.atomic.AtomicInteger
 import scalaz.==>>
+import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import funnel.internals._
 import scalaz.std.string._
@@ -31,12 +32,12 @@ class LoggingRepository extends Repository {
   def instance(id: URI): Option[Target] = all.get.lookup(id).map(_.msg.target)
 
   def countTask[A](i: AtomicInteger, t: Task[A]): Task[A] = t.onFinish { _ =>
-    Task { val _ = i.incrementAndGet }
+    Task.delay { val _ = i.incrementAndGet }
   }
 
   val increase = new AtomicInteger(0)
 
-  val lifecycleQ: async.mutable.Queue[RepoEvent] = async.unboundedQueue
+  val lifecycleQ: async.mutable.Queue[RepoEvent] = async.unboundedQueue(Strategy.Executor(Chemist.serverPool))
 
   /////////////// flask operations ///////////////
   import Sharding.Distribution

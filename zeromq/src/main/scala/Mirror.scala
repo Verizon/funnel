@@ -11,6 +11,7 @@ object Mirror {
   import sockets._
 
   def from(alive: Signal[Boolean], Q: Queue[Telemetry], discriminator: List[Array[Byte]] = Nil)(uri: URI): Process[Task, Datapoint[Any]] = {
+    Q.enqueueOne(Error(Names("does this ever", "work", new URI("http://localhost")))).run
     val t = if(discriminator.isEmpty) topics.all else topics.specific(discriminator)
     Endpoint(subscribe &&& (connect ~ t), uri).fold({e =>
                                                       Q.enqueueOne(Unmonitored(uri)).run
@@ -33,7 +34,8 @@ object Mirror {
       case Versions.v2 => sys.error("not implemented yet!")
     }
   } ++ fromTransported
-/*
+
+  /*
   // fairly ugly hack, but it works for now
   private[zeromq] def fromTransported(t: Transported): Process[Task, Datapoint[Any]] = {
     import http.JSON._, http.SSE

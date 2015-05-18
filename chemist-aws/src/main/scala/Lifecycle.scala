@@ -2,6 +2,7 @@ package funnel
 package chemist
 package aws
 
+import scalaz.concurrent.Strategy
 import scalaz.{\/,-\/,\/-}
 import scalaz.syntax.traverse._
 import scalaz.syntax.monad._
@@ -84,9 +85,9 @@ object Lifecycle {
     } yield c
   }
 
-  def lifecycleActor(repo: Repository): Actor[PlatformEvent] = Actor(a => repo.platformHandler(a).run)
-  def errorActor(repo: Repository): Actor[Error] = Actor(e => repo.errorSink(e).run)
-  def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] = Actor{ case (fl, keys) => repo.keySink(fl, keys).run }
+  def lifecycleActor(repo: Repository): Actor[PlatformEvent] = Actor[PlatformEvent](a => repo.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
+  def errorActor(repo: Repository): Actor[Error] = Actor[Error](e => repo.errorSink(e).run)(Strategy.Executor(Chemist.serverPool))
+  def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] = Actor[(URI, Set[Key[Any]])]{ case (fl, keys) => repo.keySink(fl, keys).run }(Strategy.Executor(Chemist.serverPool))
 
 
   def interpreter(e: AutoScalingEvent, resources: Seq[String], signal: Signal[Boolean]
@@ -142,17 +143,6 @@ object Lifecycle {
     case \/-(a) => Process.emitAll(a)
   }
 
-  def telemetrySink(r: Repository, signal: Signal[Boolean]): Sink[Task, PlatformEvent] = {
-    val lifecycle = lifecycleActor(r)
-    val errors = errorActor(r)
-    val keys = keysActor(r)
-
-    Process.constant {
-      case NewFlask(f) => monitorTelemetry(f, keys, errors, lifecycle, signal)
-      case _ => Task.now(())
-    }
-  }
-
   /**
    * The main method for the lifecycle process. Run the `stream` method and then handle
    * failures that might occour on the process. This function is primarily used in the
@@ -162,7 +152,7 @@ object Lifecycle {
   def run(queueName: String, resources: Seq[String], signal: Signal[Boolean]
     )(repo: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
   ): Task[Unit] = {
-    val ourWorld = stream(queueName, resources, signal)(sqs,asg,ec2,dsc) flatMap logErrors observe telemetrySink(repo, signal) to Process.constant(repo.platformHandler _)
+    val ourWorld = stream(queueName, resources, signal)(sqs,asg,ec2,dsc) flatMap logErrors to Process.constant(repo.platformHandler _)
     ourWorld.run.onFinish(_ => signal.set(false))
   }
 }

@@ -1,6 +1,7 @@
 package funnel
 package chemist
 
+import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import scalaz.stream.{Process, Sink, async}
 import async.mutable.Signal
@@ -30,27 +31,28 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
 
   private lazy val log = Logger[HttpFlask]
 
-  val keys: Actor[(URI, Set[Key[Any]])] = Actor {
+  val keys: Actor[(URI, Set[Key[Any]])] = Actor[(URI, Set[Key[Any]])] {
     case (uri, keys) =>
       log.error(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KEYS via telemetry: $uri -> ${keys.size}")
       repo.keySink(uri, keys).run
-  }
+  }(Strategy.Executor(Chemist.serverPool))
 
-  val errors: Actor[Error] = Actor {
+  val errors: Actor[Error] = Actor[Error] {
     case error =>
       log.error(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ERROR via telemetry: $error")
       repo.errorSink(error).run
-  }
+  }(Strategy.Executor(Chemist.serverPool))
 
-  val lifecycle: Actor[PlatformEvent] = Actor {
+  val lifecycle: Actor[PlatformEvent] = Actor[PlatformEvent] {
     case ev =>
       log.error(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LIFECYCLE via telemetry: $ev")
       repo.platformHandler(ev).run
-  }
+  }(Strategy.Executor(Chemist.serverPool))
 
   def command(c: FlaskCommand): Task[Unit] = c match {
     case Telemetry(flask) =>
-      Task(monitorTelemetry(flask, keys, errors, lifecycle, signal).runAsync(_ => ()))
+      val t = monitorTelemetry(flask, keys, errors, lifecycle, signal)
+      Task.delay(t.runAsync(_ => ()))
     case Monitor(flask, targets) =>
       monitor(flask.location, targets).void
     case Unmonitor(flask, targets) =>

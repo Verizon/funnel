@@ -121,7 +121,6 @@ object SSE {
    */
   def readEvents(uri: URI, Q: Queue[Telemetry])(implicit S: ExecutorService = Monitoring.serverPool):
       Process[Task, Datapoint[Any]] = {
-    println("urllines: " + uri)
     urlLinesR(uri.toURL)(S).attempt().pipeO(blockParser.map {
       case (_,data) => parseOrThrow[Datapoint[Any]](data)
                                             }).flatMap(_.fold({e => Process.fail(e)

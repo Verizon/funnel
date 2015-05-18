@@ -17,4 +17,7 @@ package object funnel {
   type DatapointParser    = java.net.URI => Process[Task,Datapoint[Any]]
   type ClusterName        = String
   type ContinuousGauge[A] = Gauge[Continuous[A],A]
+
+  implicit val dontUseTheDefaultStrategy: scalaz.concurrent.Strategy = null
+  implicit val theDefaultStrategyCausesProblems: scalaz.concurrent.Strategy = null
 }
