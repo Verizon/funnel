@@ -33,21 +33,21 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
 
   val keys: Actor[(URI, Set[Key[Any]])] = Actor[(URI, Set[Key[Any]])] {
     case (uri, keys) =>
-      log.error(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KEYS via telemetry: $uri -> ${keys.size}")
+      println(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KEYS via telemetry: $uri -> ${keys.size}")
       repo.keySink(uri, keys).run
-  }(Strategy.Executor(Chemist.serverPool))
+  }
 
   val errors: Actor[Error] = Actor[Error] {
     case error =>
       log.error(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ERROR via telemetry: $error")
       repo.errorSink(error).run
-  }(Strategy.Executor(Chemist.serverPool))
+  }
 
   val lifecycle: Actor[PlatformEvent] = Actor[PlatformEvent] {
     case ev =>
-      log.error(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LIFECYCLE via telemetry: $ev")
+      println(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LIFECYCLE via telemetry: $ev")
       repo.platformHandler(ev).run
-  }(Strategy.Executor(Chemist.serverPool))
+  }
 
   def command(c: FlaskCommand): Task[Unit] = c match {
     case Telemetry(flask) =>

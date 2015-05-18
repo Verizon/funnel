@@ -65,6 +65,7 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
   }
 
   private def addFlask(fid: String): Unit = {
+
   }
 
   private def addInstruments(i: Instruments): Unit = {
@@ -74,6 +75,7 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
 ///* STU todo what is this actually testing?
 
   it should "sucsessfully be able to stream events from two local monitoring instances to a local flask" in {
+    F1.mirroringQueue.enqueueAll(T1.toSeq.map(t => Mirror(t.uri, t.cluster))).run
     val Q = scalaz.stream.async.unboundedQueue[Telemetry](Strategy.Executor(Chemist.serverPool))
     F1.processMirroringEvents(
       funnel.http.SSE.readEvents(_,Q),

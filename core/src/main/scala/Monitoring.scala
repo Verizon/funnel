@@ -152,25 +152,19 @@ trait Monitoring {
      * to mirror, and the cluster -> url mapping.
      */
     def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] = {
-      println("modifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActive")
       for {
         _ <- active.compareAndSet{ a => log.error("HELLO") ; Option(f(a.getOrElse(Set.empty[URI]))) }
-        _ = println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         _ <- Task.delay( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))).filter(!_.isEmpty) )
-        _ = println("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
-        _  = println(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
-        _ = println("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
+        _  = log.debug(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
       } yield ()
     }
 
-    println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     for {
       _ <- mirroringCommands.evalMap {
         case Mirror(source, cluster) => Task.delay {
           log.info(s"Attempting to monitor '$cluster' located at '$source'")
           val S = Strategy.Executor(Monitoring.serverPool)
-          val hook = signal[Unit](S)
-          hook.set(()).runAsync(_ => ())
+          val hook = async.signalOf[Unit](())(S)
 
           urlSignals.put(source, hook)
 
@@ -181,9 +175,7 @@ trait Monitoring {
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
             if (urls.contains(source)) Process.halt // skip it, alread running
-            else Process.eval_(modifyActive(cluster, _ + source).flatMap{ x => println("111111111111111111111111"); Q.enqueueOne(Monitored(source)).onFinish(x => Task.now(println("stuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu: :  " + x)))}) // add to active at start
-              // and remove it when done
-              received.onComplete(Process.eval_(Q.enqueueOne(Unmonitored(source)) >> modifyActive(cluster, _ - source)))
+            else Process.eval_(modifyActive(cluster, _ + source) >> Q.enqueueOne(Monitored(source))) ++ received.onComplete(Process.eval_(Q.enqueueOne(Unmonitored(source))))
           }
 
           Task.fork(receivedIdempotent.run)(Monitoring.serverPool).runAsync(_.fold(

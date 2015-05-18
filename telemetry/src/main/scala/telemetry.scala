@@ -62,7 +62,6 @@ object Telemetry extends TelemetryCodecs {
     val currentKeys = collection.mutable.Set.empty[Key[Any]]
 
     Process.constant { x =>
-      log.error("FROMTRANSPORTED: " + x)
       x match {
         case Transported(_, Versions.v1, _, Some(Topic("error")), bytes) =>
           Task.delay(errors ! errorCodec.decodeValidValue(BitVector(bytes)))
