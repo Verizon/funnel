@@ -88,28 +88,28 @@ object Metric extends scalaz.Monad[Metric] {
     // variance issues prevent us from putting these directly on `Metric`
 
     /** Publish this `Metric` to `M` whenever `ticks` emits a value. */
-    def publish(ticks: Event)(label: String, units: Units = Units.None)(
+    def publish(ticks: Event, initialValue: A)(label: String, units: Units = Units.None)(
                 implicit R: Reportable[A],
                 M: Monitoring = Monitoring.default): Key[A] =
-      M.publish(label, units)(ticks)(self).run
+      M.publish(label, units, initialValue)(ticks)(self).run
 
     /** Publish this `Metric` to `M` every `d` elapsed time. */
-    def publishEvery(d: Duration)(label: String, units: Units = Units.None)(
+    def publishEvery(d: Duration, initialValue: A)(label: String, units: Units = Units.None)(
                      implicit R: Reportable[A],
                      M: Monitoring = Monitoring.default): Key[A] =
-      publish(Events.every(d))(label, units)
+      publish(Events.every(d), initialValue)(label, units)
 
     /** Publish this `Metric` to `M` when `k` is updated. */
-    def publishOnChange(k: Key[Any])(label: String, units: Units = Units.None)(
+    def publishOnChange(k: Key[Any], initialValue: A)(label: String, units: Units = Units.None)(
                         implicit R: Reportable[A],
                         M: Monitoring = Monitoring.default): Key[A] =
-      publish(Events.changed(k))(label, units)
+      publish(Events.changed(k), initialValue)(label, units)
 
     /** Publish this `Metric` to `M` when either `k` or `k2` is updated. */
-    def publishOnChanges(k: Key[Any], k2: Key[Any])(
+    def publishOnChanges(k: Key[Any], k2: Key[Any], initialValue: A)(
                          label: String, units: Units = Units.None)(
                          implicit R: Reportable[A],
                          M: Monitoring = Monitoring.default): Key[A] =
-      publish(Events.or(Events.changed(k), Events.changed(k2)))(label, units)
+      publish(Events.or(Events.changed(k), Events.changed(k2)), initialValue)(label, units)
   }
 }

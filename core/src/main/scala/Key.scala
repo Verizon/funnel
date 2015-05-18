@@ -11,7 +11,8 @@ final case class Key[+A] private[funnel](name: String,
                                          typeOf: Reportable[A],
                                          units: Units,
                                          description: String,
-                                         attributes: Map[String, String]) {
+                                         attributes: Map[String, String],
+                                         initialValue: A) {
 
   /** Check if the name of the key ends with the given suffix */
   def endsWith(suffix: String): Boolean = name.endsWith(suffix)
@@ -66,8 +67,13 @@ object Key {
     override def toString = "Key.EndsWith("+suffix+")"
   }
 
-  def apply[A](name: String, units: Units, desc: String = "", attribs: Map[String, String] = Map())(
-    implicit R: Reportable[A]): Key[A] = Key(name, R, units, desc, attribs)
+  def apply[A](name: String,
+               units: Units,
+               initialValue: A,
+               desc: String = "",
+               attribs: Map[String, String] = Map())(
+               implicit R: Reportable[A]): Key[A] =
+    Key(name, R, units, desc, attribs, initialValue)
 
   implicit def keyToMetric[A](k: Key[A]): Metric[A] = Metric.key(k)
 }

@@ -63,66 +63,42 @@ trait KeyCodecs extends Codecs { self =>
     }
   }
 
+  def dataEncode[A](k: Key[A], a: A) =
+    k.typeOf match {
+      case Reportable.B => codecs.bool.encode(a.asInstanceOf[Boolean])
+      case Reportable.D => codecs.double.encode(a.asInstanceOf[Double])
+      case Reportable.S => utf8.encode(a.asInstanceOf[String])
+      case Reportable.Stats => statsCodec.encode(a.asInstanceOf[Stats])
+    }
 
   val datapointEncode: Encoder[Datapoint[Any]] = new Encoder[Datapoint[Any]] {
     def encode(d: Datapoint[Any]): Err \/ BitVector = {
       for {
         bk <- keyEncode.encode(d.key)
-        bv <- d.key.typeOf match {
-          case Reportable.B => codecs.bool.encode(d.value.asInstanceOf[Boolean])
-          case Reportable.D => codecs.double.encode(d.value.asInstanceOf[Double])
-          case Reportable.S => utf8.encode(d.value.asInstanceOf[String])
-          case Reportable.Stats => statsCodec.encode(d.value.asInstanceOf[Stats])
-        }
+        bv <- dataEncode(d.key, d.value)
       } yield bk ++ bv
     }
   }
 
   val datapointDecode: Decoder[Datapoint[Any]] = new Decoder[Datapoint[Any]] {
     def decode(bits: BitVector): Err \/ (BitVector, Datapoint[Any]) = {
+      def go(R: Reportable[Any]) = for {
+        key_ <- _decodeKey(R).decode(bits)
+        (bits2, key) = key_
+        v_ <- _decodeData(bits2, R)
+        (bits3,v) = v_
+      } yield bits3 -> Datapoint(key, v)
       uint8.decode(bits) flatMap {
-        case (bits,disc) =>
+        case (bits,disc) => go(
           disc match {
-            case 1 =>
-              for {
-                key_ <- _decodeKey(Reportable.B).decode(bits)
-                (bits2, key) = key_
-
-                v_ <- codecs.bool.decode(bits2)
-                (bits3,v) = v_
-              } yield bits3 -> Datapoint(key,v)
-
-            case 2 =>
-              for {
-                key_ <- _decodeKey(Reportable.D).decode(bits)
-                (bits2, key) = key_
-
-                v_ <- codecs.double.decode(bits2)
-                (bits3,v) = v_
-              } yield bits3 -> Datapoint(key,v)
-
-            case 3 =>
-              for {
-                key_ <- _decodeKey(Reportable.S).decode(bits)
-                (bits2, key) = key_
-
-                v_ <- utf8.decode(bits2)
-                (bits3,v) = v_
-              } yield bits3 -> Datapoint(key,v)
-
-            case _ =>
-              for {
-                key_ <- _decodeKey(Reportable.Stats).decode(bits)
-                (bits2, key) = key_
-
-                v_ <- statsCodec.decode(bits2)
-                (bits3,v) = v_
-              } yield bits3 -> Datapoint(key,v)
-          }
+            case 1 => Reportable.B
+            case 2 => Reportable.D
+            case 3 => Reportable.S
+            case _ => Reportable.Stats
+          })
       }
     }
   }
-
 
   private def _decodeKey(reportable: Reportable[Any]): Decoder[Key[Any]] = new Decoder[Key[Any]] {
     def decode(bits: BitVector): Err \/ (BitVector, Key[Any]) = {
@@ -139,10 +115,20 @@ trait KeyCodecs extends Codecs { self =>
         attributes_ <- self.map[String,String].decode(bits3)
         (bits4, attributes) = attributes_
 
-      } yield bits4 -> Key(name, reportable, units, desc, attributes)
+        initialValue_ <- _decodeData(bits4, reportable)
+        (bits5, initialValue) = initialValue_
+
+      } yield bits5 -> Key(name, reportable, units, desc, attributes, initialValue)
     }
   }
 
+  private def _decodeData(bits: BitVector, reportable: Reportable[Any]) =
+    reportable match {
+      case Reportable.B => codecs.bool.decode(bits)
+      case Reportable.D => codecs.double.decode(bits)
+      case Reportable.S => utf8.decode(bits)
+      case Reportable.Stats => statsCodec.decode(bits)
+    }
 
   implicit val statsCodec: Codec[Stats] = (
     codecs.optional(codecs.bool, codecs.double) ~

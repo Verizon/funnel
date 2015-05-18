@@ -104,7 +104,7 @@ object MonitoringSpec extends Properties("monitoring") {
    * buffered signal.
    */
   property("bufferedSignal") = forAll { (xs: List[Long]) =>
-    val (snk, s) = Monitoring.bufferedSignal(B.counter(0))
+    val (snk, s) = Monitoring.bufferedSignal(0.0, B.counter(0))
     xs.foreach(snk)
     val expected = xs.sum
     // this will 'eventually' become true, and loop otherwise
@@ -154,7 +154,7 @@ object MonitoringSpec extends Properties("monitoring") {
   property("bufferedSignal-profiling") = secure {
     def go: Boolean = {
       val N = 100000
-      val (snk, s) = Monitoring.bufferedSignal(B.counter(0))
+      val (snk, s) = Monitoring.bufferedSignal(0.0, B.counter(0))
       val t0 = System.nanoTime
       (0 to N).foreach(x => snk(x))
       val expected = (0 to N).map(_.toDouble).sum
@@ -216,9 +216,11 @@ object MonitoringSpec extends Properties("monitoring") {
       import instruments._
       val t = timer("uno")
       t.time { Thread.sleep(50) }
+      // Make sure we wait for the time buffer to catch up
+      Thread.sleep(instruments.bufferTime.toMillis * 2)
       val r = Monitoring.default.latest(t.keys.now).run.mean
-      // println("Sleeping for 50ms took: " + r)
-      (r - 50).abs < 1000
+      //println("Sleeping for 50ms took: " + r)
+      r > 0 && (r - 50).abs < 1000
     }
     go || go || go
   }
@@ -236,9 +238,10 @@ object MonitoringSpec extends Properties("monitoring") {
       }
       val delta = System.nanoTime - t0
       val updateTime = (delta.nanoseconds) / N.toDouble
-      Thread.sleep(100)
+      // Make sure we wait for the time buffer to catch up
+      Thread.sleep(instruments.bufferTime.toMillis * 2)
       val m = Monitoring.default.latest(t.keys.now).run.mean
-      // println("timer:updateTime: " + updateTime)
+      //println("timer:updateTime: " + updateTime + ", m: " + m)
       updateTime.toNanos < 1000 && m == 50
     }
     go || go || go
@@ -274,7 +277,7 @@ object MonitoringSpec extends Properties("monitoring") {
   /** Check that when publishing, we get the count that was published. */
   property("pub/sub") = forAll(Gen.nonEmptyListOf(Gen.choose(1,10))) { a =>
     val M = Monitoring.default
-    val (k, snk) = M.topic[Long,Double]("count", Units.Count, "", identity)(B.ignoreTime(B.counter(0)))
+    val (k, snk) = M.topic[Long,Double]("count", Units.Count, "", 0.0, identity)(B.ignoreTime(B.counter(0)))
     val count = M.get(k)
     a.foreach { a => snk(a) }
     val expected = a.sum
