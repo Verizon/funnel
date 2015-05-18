@@ -22,10 +22,10 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
   def fakeFlask(id: String) = Flask(FlaskID(id), Location.localhost, Location.telemetryLocalhost)
 
   val d1: Distribution = ==>>(
-    (fakeFlask("a"), Set(("z","http://one.internal"))),
-    (fakeFlask("d"), Set(("y","http://two.internal"), ("w","http://three.internal"), ("v","http://four.internal"))),
-    (fakeFlask("c"), Set(("x","http://five.internal"))),
-    (fakeFlask("b"), Set(("z","http://two.internal"), ("u","http://six.internal")))
+    (fakeFlask("a").id, Set(("z","http://one.internal"))),
+    (fakeFlask("d").id, Set(("y","http://two.internal"), ("w","http://three.internal"), ("v","http://four.internal"))),
+    (fakeFlask("c").id, Set(("x","http://five.internal"))),
+    (fakeFlask("b").id, Set(("z","http://two.internal"), ("u","http://six.internal")))
   )
 
   val i1: Set[Target] = Set(
@@ -48,11 +48,11 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
   )
 
   it should "correctly sort the map and return the flasks in order of their set length" in {
-    Sharding.shards(d1).map(_.id.value) should equal (Seq("a", "c", "b", "d"))
+    Sharding.shards(d1).map(_.value) should equal (Seq("a", "c", "b", "d"))
   }
 
   it should "snapshot the exsiting shard distribution" in {
-    Sharding.sorted(d1).map(_._1.id.value) should equal (Seq("a", "c", "b", "d"))
+    Sharding.sorted(d1).map(_._1.value) should equal (Seq("a", "c", "b", "d"))
   }
 
   it should "correctly remove urls that are already being monitored" in {
@@ -64,7 +64,7 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
 
   it should "correctly calculate how the new request should be sharded over known flasks" in {
     EvenSharding.calculate(i1)(d1).map {
-      case (x,y) => x.id.value -> y
+      case (x,y) => x.value -> y
     }.toSet should === (Set(
                           "a" -> Target("u",new URI("http://eight.internal"), false),
                           "c" -> Target("v",new URI("http://nine.internal"), false)))

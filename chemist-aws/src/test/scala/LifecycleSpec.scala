@@ -5,6 +5,7 @@ package aws
 import org.scalatest.{FlatSpec,Matchers}
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
+import scalaz.concurrent.Strategy
 import scalaz.{\/,\/-,-\/,==>>}
 import scalaz.stream.{Process,Sink}
 import scalaz.concurrent.Task
@@ -32,7 +33,7 @@ class LifecycleSpec extends FlatSpec with Matchers {
   val k2 = "i-15807647"
 
 
-  val signal: Signal[Boolean] = signalOf(true)
+  val signal: Signal[Boolean] = signalOf(true)(Strategy.Executor(Chemist.serverPool))
 
   private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): Throwable \/ Seq[PlatformEvent] =
     Lifecycle.stream("name-of-queue", "stream/previous" :: Nil, signal)(sqs, asg, ec2, dsc

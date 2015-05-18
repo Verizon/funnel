@@ -116,7 +116,7 @@ trait Monitoring {
   private[funnel] val mirroringQueue =
     async.unboundedQueue[Command](Strategy.Executor(Monitoring.serverPool))
 
-  private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue
+  private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue observe(io.stdOut.contramap[Command](_.toString))
 
   private val urlSignals = new ConcurrentHashMap[URI, Signal[Unit]]
 
@@ -152,17 +152,18 @@ trait Monitoring {
      * to mirror, and the cluster -> url mapping.
      */
     def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] = {
-      log.error("modifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActive")
+      println("modifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActivemodifyActive")
       for {
         _ <- active.compareAndSet{ a => log.error("HELLO") ; Option(f(a.getOrElse(Set.empty[URI]))) }
-        _ = log.error("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        _ = println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         _ <- Task.delay( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))).filter(!_.isEmpty) )
         _ = println("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
-        _  = log.debug(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
+        _  = println(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
         _ = println("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
       } yield ()
     }
 
+    println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     for {
       _ <- mirroringCommands.evalMap {
         case Mirror(source, cluster) => Task.delay {

@@ -8,6 +8,7 @@ import funnel.http.MonitoringServer
 import scalaz.==>>
 import concurrent.duration._
 import java.net.URI
+import scalaz.concurrent.Strategy
 
 class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   import Sharding.Distribution
@@ -63,30 +64,33 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
     H.shutdown()
   }
 
-  private def addFlask(fid: String): Unit = ???//{
-//    R.increaseCapacity(fid).run
-//  }
+  private def addFlask(fid: String): Unit = {
+  }
 
   private def addInstruments(i: Instruments): Unit = {
     Clocks.instrument(i)
     JVM.instrument(i)
   }
-/* STU todo what is this actually testing?
+///* STU todo what is this actually testing?
 
   it should "sucsessfully be able to stream events from two local monitoring instances to a local flask" in {
+    val Q = scalaz.stream.async.unboundedQueue[Telemetry](Strategy.Executor(Chemist.serverPool))
     F1.processMirroringEvents(
-      funnel.http.SSE.readEvents,
+      funnel.http.SSE.readEvents(_,Q),
+      Q,
       "intspec").runAsync(println)
 
-    val x = for {
-      a <- Sharding.locateAndAssignDistribution(T1,R)
-      b <- Sharding.distribute(a)(H)
-    } yield b
+    Thread.sleep(10000)
 
-    x.run
+//    val x = for {
+//      a <- Sharding.locateAndAssignDistribution(T1,R)
+//      b <- Sharding.distribute(a)(H)
+//    } yield b
+
+//    x.run
   }
 
- */
+// */
 
 }
 

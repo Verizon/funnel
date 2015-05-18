@@ -35,6 +35,10 @@ class LoggingRepository extends Repository {
     Task.delay { val _ = i.incrementAndGet }
   }
 
+  def assignedTargets(flask: funnel.chemist.FlaskID): scalaz.concurrent.Task[Set[funnel.chemist.Target]] = ???
+  def flask(id: funnel.chemist.FlaskID): Option[funnel.chemist.Flask] = ???
+  def unassignedTargets: scalaz.concurrent.Task[Set[funnel.chemist.Target]] = ???
+
   val increase = new AtomicInteger(0)
 
   val lifecycleQ: async.mutable.Queue[RepoEvent] = async.unboundedQueue(Strategy.Executor(Chemist.serverPool))

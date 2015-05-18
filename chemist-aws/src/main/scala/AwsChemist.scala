@@ -38,6 +38,7 @@ class AwsChemist extends Chemist[Aws]{
           id -> targets.collect {
             case b if cfg.includeVpcTargets => b
             case b if (!b.isPrivateNetwork) => b
+
           }
       }.filter(_._2.nonEmpty)
     }
