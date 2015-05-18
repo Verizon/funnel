@@ -23,6 +23,7 @@ object Main {
   case class ProxyConfig(host: String, port: Int)
   case class ZeromqConfig(socket: String, proxy: Option[ProxyConfig])
   case class NginxConfig(uri: String, frequency: Duration)
+
   case class JmxConfig(
     name: String,
     uri: String,
@@ -30,8 +31,13 @@ object Main {
     queries: List[String] = Nil,
     exclusions: List[String] = Nil)
 
+  case class AgentConfig(
+    systemCollection: Boolean,
+    jvmCollection: Boolean
+  )
+
   case class Options(
-    enableSystemMetrics: Boolean,
+    agent: Option[AgentConfig],
     http: Option[HttpConfig],
     statsd: Option[StatsdConfig],
     zeromq: Option[ZeromqConfig],
@@ -67,7 +73,9 @@ object Main {
      */
     val options: Options = config.map { cfg =>
       // general
-      val systemMetrics = cfg.lookup[Boolean]("enable-system-metrics").getOrElse(false)
+      val systemMetrics = cfg.lookup[Boolean]("enable-system-metrics")
+      val jvmMetrics    = cfg.lookup[Boolean]("enable-jvm-metrics")
+
       // http
       val httpHost    = cfg.lookup[String]("agent.http.host")
       val httpPort    = cfg.lookup[Int]("agent.http.port")
@@ -90,7 +98,7 @@ object Main {
       val jmxExcludes = cfg.lookup[List[String]]("agent.jmx.exclude-attribute-patterns")
 
       Options(
-        enableSystemMetrics = systemMetrics,
+        agent  = (systemMetrics |@| jvmMetrics)(AgentConfig),
         http   = (httpHost |@| httpPort)(HttpConfig),
         statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
         zeromq = proxySocket.map(ZeromqConfig(_, (proxyHost |@| proxyPort)(ProxyConfig))),
@@ -107,10 +115,20 @@ object Main {
      */
     val I = new Instruments(1.minute, Monitoring.default)
 
-    if(options.enableSystemMetrics){
-      log.info("Enabling the collection of system metrics.")
-      Clocks.instrument(I)
-      Sigar.instrument(I)
+    // always add the system clocks so we know how long the agent has
+    // actually been running.
+    Clocks.instrument(I)
+
+    options.agent.foreach { agentcfg =>
+      if(agentcfg.systemCollection){
+        log.info("Enabling the collection of system metrics.")
+        Sigar.instrument(I)
+      }
+
+      if(agentcfg.jvmCollection){
+        log.info("Enabling the collection of agent JVM metrics.")
+        JVM.instrument(I)
+      }
     }
 
     log.info("Launching the funnel HTTP server on 5775.")
