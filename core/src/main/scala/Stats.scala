@@ -23,6 +23,8 @@ class Stats(moments: Moments, val last: Option[Double]) {
 }
 
 object Stats {
+  val empty = new Stats(MomentsGroup.zero, None)
+
   def apply(d: Double): Stats =
     new Stats(Moments(d), Some(d))
 
@@ -31,7 +33,7 @@ object Stats {
               s.lastOption)
 
   implicit def statsGroup: Group[Stats] = new Group[Stats] {
-    def zero = new Stats(MomentsGroup.zero, None)
+    def zero = empty
     override def negate(s: Stats) = new Stats(MomentsGroup.negate(s.get), None)
     def plus(s1: Stats, s2: Stats): Stats = s1 ++ s2
   }

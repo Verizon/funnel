@@ -49,12 +49,13 @@ trait ArbitraryTelemetry {
   }
 
   val keyGen: Gen[Key[Any]] = for {
-    name <- arbitrary[String]
-    typeOf <- reportableGen
-    units <- unitsGen
+    name        <- arbitrary[String]
+    typeOf      <- reportableGen
+    units       <- unitsGen
     description <- arbitrary[String]
-    attributes <- arbitrary[Map[String,String]]
-  } yield Key(name, typeOf, units, description, attributes)
+    attributes  <- arbitrary[Map[String,String]]
+    init        <- dataGen(typeOf)
+  } yield Key(name, typeOf, units, description, attributes, init)
 
   implicit val arbKey: Arbitrary[Key[Any]] = Arbitrary(keyGen)
 
@@ -76,27 +77,17 @@ trait ArbitraryTelemetry {
       new funnel.Stats(com.twitter.algebird.Moments(m0, m1, m2, m3, m4), last)
     }
 
-  val datapointGen: Gen[Datapoint[Any]] =
-    keyGen flatMap { k =>
-      k.typeOf match {
-        case Reportable.B =>
-          arbitrary[Boolean] flatMap { v =>
-            Datapoint(k, v)
-          }
-        case Reportable.D =>
-          arbitrary[Double] flatMap { v =>
-            Datapoint(k, v)
-          }
-        case Reportable.S =>
-          arbitrary[String] flatMap { v =>
-            Datapoint(k, v)
-          }
-        case Reportable.Stats =>
-          arbitrary[Boolean] flatMap { v =>
-            Datapoint(k, v)
-          }
-      }
+  def dataGen[A](r: Reportable[A]): Gen[A] =
+    r match {
+      case Reportable.B => arbitrary[Boolean]
+      case Reportable.D => arbitrary[Double]
+      case Reportable.S => arbitrary[String]
+      case Reportable.Stats => statsGen
     }
 
+  val datapointGen: Gen[Datapoint[Any]] = for {
+    k <- keyGen
+    v <- dataGen(k.typeOf)
+  } yield Datapoint(k, v)
 
 }

@@ -111,8 +111,9 @@ object JSON {
     typeOf <- (c --\ "type").as[Reportable[Any]]
     u      <- (c --\ "units").as[Units]
     desc   <- (c --\ "description").as[String].option
+    init   <- DecodeReportable(typeOf).tryDecode(c --\ "initialValue")
     attrs  <- c.as[Map[String, String]].map(_ - "name" - "type" - "units" - "description")
-  } yield Key(name, typeOf, u, desc getOrElse "", attrs) }
+  } yield Key(name, typeOf, u, desc getOrElse "", attrs, init) }
 
   implicit def EncodeStats: EncodeJson[funnel.Stats] =
     jencode7L((s: funnel.Stats) =>
