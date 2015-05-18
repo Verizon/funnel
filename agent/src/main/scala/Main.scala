@@ -31,6 +31,7 @@ object Main {
     exclusions: List[String] = Nil)
 
   case class Options(
+    enableSystemMetrics: Boolean,
     http: Option[HttpConfig],
     statsd: Option[StatsdConfig],
     zeromq: Option[ZeromqConfig],
@@ -65,6 +66,8 @@ object Main {
      * known interfaces host if that fails.
      */
     val options: Options = config.map { cfg =>
+      // general
+      val systemMetrics = cfg.lookup[Boolean]("enable-system-metrics").getOrElse(false)
       // http
       val httpHost    = cfg.lookup[String]("agent.http.host")
       val httpPort    = cfg.lookup[Int]("agent.http.port")
@@ -87,6 +90,7 @@ object Main {
       val jmxExcludes = cfg.lookup[List[String]]("agent.jmx.exclude-attribute-patterns")
 
       Options(
+        enableSystemMetrics = systemMetrics,
         http   = (httpHost |@| httpPort)(HttpConfig),
         statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
         zeromq = proxySocket.map(ZeromqConfig(_, (proxyHost |@| proxyPort)(ProxyConfig))),
@@ -102,6 +106,12 @@ object Main {
      * instrument bridges (e.g. http, statsd etc).
      */
     val I = new Instruments(1.minute, Monitoring.default)
+
+    if(options.enableSystemMetrics){
+      log.info("Enabling the collection of system metrics.")
+      Clocks.instrument(I)
+      Sigar.instrument(I)
+    }
 
     log.info("Launching the funnel HTTP server on 5775.")
     funnel.http.MonitoringServer.start(Monitoring.default, 5775)
