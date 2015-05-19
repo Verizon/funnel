@@ -80,6 +80,10 @@ object TargetLifecycle {
       override def toString = "DoubleAssigned"
     }
 
+    case object Problematic extends TargetState(7) {
+      override def toString = "Exception"
+    }
+
     case object DoubleMonitored extends TargetState(5) {
       override def toString = "DoubleMonitored"
     }
@@ -98,6 +102,7 @@ object TargetLifecycle {
   case object Confirm extends TargetTransition
   case object Migrate extends TargetTransition
   case object Unassign extends TargetTransition
+  case object Exceptional extends TargetTransition
   case object Unmonitor extends TargetTransition
 
 
@@ -113,6 +118,7 @@ object TargetLifecycle {
                           Monitored.node,
                           DoubleAssigned.node,
                           DoubleMonitored.node,
+                          Problematic.node,
                           Fin.node)
 
                                 // From          // To             // Msg
@@ -123,6 +129,13 @@ object TargetLifecycle {
                           LEdge(Monitored,       DoubleAssigned,  Assign),
                           LEdge(DoubleAssigned,  DoubleMonitored, Confirm),
                           LEdge(DoubleMonitored, Assigned,        Unmonitor),
+                          LEdge(Unknown,         Problematic,     Exceptional),
+                          LEdge(Unmonitored,     Problematic,     Exceptional),
+                          LEdge(Assigned,        Problematic,     Exceptional),
+                          LEdge(Monitored,       Problematic,     Exceptional),
+                          LEdge(DoubleAssigned,  Problematic,     Exceptional),
+                          LEdge(DoubleMonitored, Problematic,     Exceptional),
+                          LEdge(Fin,             Problematic,     Exceptional),
                           LEdge(Monitored,       Unmonitored,     Unmonitor))
 
   val targetLifecycle: G = mkGraph(nodes, edges)
@@ -151,8 +164,11 @@ object TargetLifecycle {
   case class Unmonitoring(target: Target, flask: FlaskID, time: Long) extends TargetMessage {
     val transition = Unmonitor
   }
+  case class Problem(target: Target, flask: FlaskID, msg: String, time: Long) extends TargetMessage {
+    val transition = Exceptional
+  }
   case class Terminated(target: Target, time: Long) extends TargetMessage {
-    val transition = Unmonitor
+    val transition = Exceptional
   }
 
 

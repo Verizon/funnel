@@ -23,6 +23,7 @@ class LoggingRepository extends Repository {
   def errors: Task[Seq[Error]] = Task.now(Seq())
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit] = Task.now(())
   def errorSink(e: Error): Task[Unit] = Task.now(())
+  def instances: Task[Seq[(URI, RepoEvent.StateChange)]] = Task.now(Seq())
 
   /////////////// instance operations ///////////////
   def platformHandler(a: PlatformEvent): Task[Unit] = ???

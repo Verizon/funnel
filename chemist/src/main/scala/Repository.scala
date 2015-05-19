@@ -84,6 +84,7 @@ class StatefulRepository extends Repository {
                                        Unmonitored -> emptyMap,
                                        Assigned -> emptyMap,
                                        Monitored -> emptyMap,
+                                       Problematic -> emptyMap,
                                        DoubleAssigned -> emptyMap,
                                        DoubleMonitored -> emptyMap,
                                        Fin -> emptyMap))
@@ -181,6 +182,17 @@ class StatefulRepository extends Repository {
         target.map { t =>
           // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
           lifecycle(TargetLifecycle.Unmonitoring(t.msg.target, f, System.currentTimeMillis), t.to)
+        } getOrElse {
+          // if we didn't even know about the target, what do we do? start monitoring it? nothing?
+          Task.now(())
+        }
+      }
+      case PlatformEvent.Problem(f, i, msg) => {
+        log.error(s"platformHandler -- $i no exception from  $f: $msg")
+        val target = targets.get.lookup(i)
+        target.map { t =>
+          // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
+          lifecycle(TargetLifecycle.Problem(t.msg.target, f, msg, System.currentTimeMillis), t.to)
         } getOrElse {
           // if we didn't even know about the target, what do we do? start monitoring it? nothing?
           Task.now(())

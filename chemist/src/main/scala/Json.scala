@@ -115,6 +115,12 @@ object JSON {
       case Unassignment(target, f, l) => targetMessage("Unassignment", target.uri, Some(f), l)
       case Unmonitoring(target, f, l) => targetMessage("Unmonitoring", target.uri, Some(f), l)
       case Terminated(target,t) => targetMessage("Terminated", target.uri, None, t)
+      case Problem(target,f,m,t) =>
+        ("type" := "Progblem") ->:
+        ("instance" := target.uri) ->:
+        ("time" := t) ->:
+        ("flask" := f) ->:
+        ("msg" := m) ->: jEmptyObject
     }
 
 

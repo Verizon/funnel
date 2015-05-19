@@ -8,15 +8,15 @@ import scalaz.stream.async._
 import scalaz.stream.{Process,Channel,io, Sink, wye}
 import scalaz.std.anyVal._
 import java.net.URI
-import scalaz.{-\/,\/,\/-}
+import scalaz.{-\/,\/,\/-,Either3}
 import Telemetry._
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
 
 trait TelemetryMultiTest {
-  val S  = signalOf[Boolean](true)
+  val S  = signalOf[Boolean](true)(Strategy.Executor(Monitoring.serverPool))
   val U1 = new URI("ipc:///tmp/u1.socket")
 
-  val dummyActor: Actor[Any] = Actor { _ => () }
+  val dummyActor: Actor[Any] = Actor[Any]{ _ => () }(Strategy.Executor(Monitoring.serverPool))
 
   val testKeys = List(
     Key("key1", Reportable.B, Units.Count, "desc", Map("ka1" -> "va1")),
@@ -41,7 +41,7 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
   "publish socket" should "publish" in {
     S.set(true).run
 
-    val keysIn = signalOf(Set.empty[Key[Any]])
+    val keysIn = signalOf(Set.empty[Key[Any]])(Strategy.Executor(Monitoring.serverPool))
     val keysInD = keysIn.discrete
 
     val sets: Vector[Set[Key[Any]]] = testKeys.tails.toVector.reverse.map(_.toSet).filterNot(_.isEmpty)
@@ -50,13 +50,13 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     val errorsS = Process.emitAll(errors)
 
-    val pub: Task[Unit] = telemetryPublishSocket(U1, S, errorsS.wye(keysInD pipe keyChanges)(wye.merge))
+    val pub: Task[Unit] = telemetryPublishSocket(U1, S, errorsS.wye(keysInD pipe keyChanges)(wye.merge)(Strategy.Executor(Monitoring.serverPool)))
     pub.runAsync {
       case -\/(e) => e.printStackTrace
       case \/-(_) =>
     }
 
-    Thread.sleep(200)
+    Thread.sleep(2000)
     keysIn.close.run
     Thread.sleep(200)
   }
@@ -66,21 +66,24 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
   "sub socket" should "sub" in {
 
     var keysOut: Map[URI, Set[Key[Any]]] = Map.empty
-    val keyActor: Actor[(URI, Set[Key[Any]])] = Actor {
+    val keyActor: Actor[(URI, Set[Key[Any]])] = Actor[(URI,Set[Key[Any]])] {
       case (uri,keys) => keysOut = keysOut + (uri -> keys)
-    }
+    }(Strategy.Executor(Monitoring.serverPool))
 
     var errorsOut: List[Error] = List.empty
-    val errorsActor: Actor[Error] = Actor(e => errorsOut = e :: errorsOut)
+    val errorsActor: Actor[Error] = Actor[Error] { e =>
+      errorsOut = e :: errorsOut
+    }(Strategy.Executor(Monitoring.serverPool))
 
+    Thread.sleep(1000)
     val sub = telemetrySubscribeSocket(U1, S,
                                        keyActor,
                                        errorsActor,
-                                       dummyActor.asInstanceOf[Actor[URI\/URI]])
+                                       dummyActor.asInstanceOf[Actor[Either3[URI,URI,(URI,String)]]])
 
     sub.runAsync(x => println("RESULT OF RUNNING TELEMETRY: " + x))
 
-    Thread.sleep(10000)
+    Thread.sleep(5000)
 
     keysOut.size should be (1)
     keysOut(U1) should be (testKeys.toSet)

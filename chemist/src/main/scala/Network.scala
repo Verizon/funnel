@@ -6,7 +6,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.{Process, Sink, async}
 import async.mutable.Signal
 import scalaz.syntax.apply._
-import scalaz.{-\/,\/,\/-}
+import scalaz.{-\/,\/,\/-, Either3,Left3,Middle3,Right3}
 import scalaz.concurrent.Actor
 import journal.Logger
 import java.net.URI
@@ -92,14 +92,15 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
   }
 
   /**
-   * used to contramap the Sharding handler towards the Unmonitored \/
+   * used to contramap the Sharding handler towards the Unmonitored Either3
    * Monitored stream we get from telemetry
    *
-   * Monitored \/ Unmonitored, I promise
+   * Either3[Monitored, Unmonitored,Problem], I promise
    */
-  private def actionsFromLifecycle(flask: FlaskID): URI \/ URI => PlatformEvent = {
-    case -\/(id) => PlatformEvent.Unmonitored(flask, id)
-    case \/-(id) => PlatformEvent.Monitored(flask, id)
+  private def actionsFromLifecycle(flask: FlaskID): Either3[URI, URI, (URI, String)] => PlatformEvent = {
+    case Left3(id) => PlatformEvent.Unmonitored(flask, id)
+    case Middle3(id) => PlatformEvent.Monitored(flask, id)
+    case Right3((id,msg)) => PlatformEvent.Problem(flask, id, msg)
   }
 
   def monitorTelemetry(flask: Flask,
@@ -111,7 +112,7 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
     import telemetry.Telemetry.telemetrySubscribeSocket
 
     log.info(s"attempting to monitor telemetry on ${flask.telemetry.asURI()}")
-    val lc: Actor[URI \/ URI] = lifecycle.contramap(actionsFromLifecycle(flask.id))
+    val lc: Actor[Either3[URI, URI, (URI,String)]] = lifecycle.contramap(actionsFromLifecycle(flask.id))
     telemetrySubscribeSocket(flask.telemetry.asURI(), signal, keys, errors, lc)
   }
 

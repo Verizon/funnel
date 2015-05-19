@@ -98,11 +98,11 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
     confirmed should be (Some(1))
   }
 
-  "the repository" should "have gotten the umonitor event" in {
+  "the repository" should "have gotten the problem event" in {
     val history = repo.historicalEvents.run
 
     val unmonitored: Option[Int] = history.collectFirst {
-      case RepoEvent.StateChange(_, TargetState.Unmonitored, Unmonitoring(_, _, _)) => 1
+      case RepoEvent.StateChange(_, TargetState.Problematic, TargetLifecycle.Problem(_, _, _, _)) => 1
     }
 
     unmonitored should be (Some(1))
@@ -111,10 +111,8 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
   "the repository" should "be monitoring 1 but not 2" in {
     val state = repo.stateMaps.get
     println("repository states: " + state)
-    println("unmonitored: " + state.lookup(TargetState.Unmonitored))
-    val t2 = repo.targets.get.lookup(U2)
-    // perhaps we should have an exception state?
-    List(TargetState.Unmonitored, TargetState.Assigned) should contain (t2.get.to)
+    println("unmonitored: " + state.lookup(TargetState.Problematic))
+    state.lookup(TargetState.Problematic).get.lookup(U2).map(_.msg.target.uri) should be (Some(U2))
     state.lookup(TargetState.Monitored).get.lookup(U1).map(_.msg.target.uri) should be (Some(U1))
   }
 

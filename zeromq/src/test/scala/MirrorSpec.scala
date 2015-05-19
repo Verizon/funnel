@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 
 class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
-  lazy val S  = async.signalOf[Boolean](true)
+  lazy val S  = async.signalOf[Boolean](true)(Strategy.Executor(Monitoring.serverPool))
   lazy val W  = 20.seconds
 
   lazy val Q: Queue[Telemetry] = async.unboundedQueue(Strategy.Executor(Monitoring.serverPool))

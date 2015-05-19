@@ -81,6 +81,8 @@ object RespositorySpec extends Properties("StaticRepository") with ArbitraryLife
         Confirmation(i, FlaskID(""), System.currentTimeMillis)
       case DoubleAssigned =>
         Assignment(i, FlaskID(""), System.currentTimeMillis)
+      case Problematic =>
+        Problem(i, FlaskID(""), "msg", System.currentTimeMillis)
       case DoubleMonitored =>
         Confirmation(i, FlaskID(""), System.currentTimeMillis)
       case Fin =>

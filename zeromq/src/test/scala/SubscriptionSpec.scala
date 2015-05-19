@@ -16,7 +16,7 @@ class SubscriptionSpec extends FlatSpec
     with Matchers
     with BeforeAndAfterAll {
 
-  lazy val S  = async.signalOf[Boolean](true)
+  lazy val S  = async.signalOf[Boolean](true)(Strategy.Executor(Monitoring.serverPool))
   lazy val W  = 30.seconds
   lazy val Q: Queue[Telemetry] = async.unboundedQueue(Strategy.Executor(Monitoring.serverPool))
 

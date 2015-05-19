@@ -13,6 +13,7 @@ object PlatformEvent {
   final case class TerminatedTarget(u: URI) extends PlatformEvent
   final case class TerminatedFlask(f: FlaskID) extends PlatformEvent
   final case class Monitored(flask: FlaskID, target: URI) extends PlatformEvent
+  final case class Problem(flask: FlaskID, target: URI, msg: String) extends PlatformEvent
   final case class Unmonitored(flask: FlaskID, target: URI) extends PlatformEvent
   final case class Assigned(flask: FlaskID, target: Target) extends PlatformEvent
   final case object NoOp extends PlatformEvent

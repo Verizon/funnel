@@ -12,4 +12,5 @@ final case class Error(names: Names) extends Telemetry {
 final case class NewKey(key: Key[_]) extends Telemetry
 final case class Monitored(i: URI) extends Telemetry
 final case class Unmonitored(i: URI) extends Telemetry
+final case class Problem(i: URI, msg: String) extends Telemetry
 

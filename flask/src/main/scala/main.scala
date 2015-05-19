@@ -88,7 +88,7 @@ class Flask(options: Options, val I: Instruments) {
     def retries(names: Names): Event = {
       val retries = if(args.contains("noretries")) Events.takeEvery(10.seconds, 1) else Monitoring.defaultRetries
       retries andThen (_ ++ Process.eval[Task, Unit] {
-                         Q.enqueueAll(Seq(Error(names), Unmonitored(names.theirs)))
+                         Q.enqueueAll(Seq(Error(names), Problem(names.theirs, "there wasn an error")))
                            .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString)))
                        })
     }
