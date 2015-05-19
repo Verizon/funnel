@@ -17,12 +17,12 @@ trait TelemetryMultiTest {
   val U1 = new URI("ipc:///tmp/u1.socket")
 
   val testKeys = List(
-    Key("key1", Reportable.B, Units.Count, "desc", Map("ka1" -> "va1"), false),
-    Key("key2", Reportable.D, Units.Ratio, "desc", Map("kb1" -> "vb1"), 0.0),
-    Key("key3", Reportable.S, Units.TrafficLight, "desc", Map("kc1" -> "vc1"), TrafficLight.Red),
-    Key("key4", Reportable.B, Units.Load, "desc", Map("kd1" -> "vd1"), false),
-    Key("key5", Reportable.D, Units.Count, "desc", Map("ke1" -> "ve1"), 0.0),
-    Key("key6", Reportable.S, Units.TrafficLight, "desc", Map("kf1" -> "vf1"), TrafficLight.Red)
+    Key("key1", Reportable.B, Units.Count, "desc", Map("ka1" -> "va1")),
+    Key("key2", Reportable.D, Units.Ratio, "desc", Map("kb1" -> "vb1")),
+    Key("key3", Reportable.S, Units.TrafficLight, "desc", Map("kc1" -> "vc1")),
+    Key("key4", Reportable.B, Units.Load, "desc", Map("kd1" -> "vd1")),
+    Key("key5", Reportable.D, Units.Count, "desc", Map("ke1" -> "ve1")),
+    Key("key6", Reportable.S, Units.TrafficLight, "desc", Map("kf1" -> "vf1"))
   )
 
   val errors = List(
@@ -53,7 +53,7 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
     val pub: Task[Unit] = telemetryPublishSocket(U1, S, errorsS.wye(keysInD pipe keyChanges)(wye.merge))
     pub.runAsync {
       case -\/(e) => e.printStackTrace
-      case \/-(_) =>
+      case \/-(_) => 
     }
 
     Thread.sleep(100)
@@ -69,7 +69,7 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     sub.run.runAsync {
       case -\/(e) => e.printStackTrace
-      case \/-(_) =>
+      case \/-(_) => 
     }
 
     var keysOut: Set[Key[Any]] = Set.empty

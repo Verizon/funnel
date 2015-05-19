@@ -15,7 +15,7 @@ object MirroringExample {
 
   def main(args: Array[String]): Unit = {
 
-    val health = Key[String]("now/health", Units.TrafficLight, TrafficLight.Red)
+    val health = Key[String]("now/health", Units.TrafficLight)
 
     implicit val P = Monitoring.schedulingPool
 
