@@ -49,6 +49,7 @@ trait Repository {
   def instance(id: URI): Option[Target]
   def flask(id: FlaskID): Option[Flask]
   val lifecycleQ: async.mutable.Queue[RepoEvent]
+  def instances: Task[Seq[(URI, StateChange)]]
 
   /////////////// flask operations ///////////////
 
@@ -62,7 +63,7 @@ import com.amazonaws.services.ec2.AmazonEC2
 import funnel.internals._
 import journal.Logger
 
-class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
+class StatefulRepository extends Repository {
   import RepoEvent._
   import TargetState._
   private val log = Logger[StatefulRepository]
@@ -117,6 +118,9 @@ class StatefulRepository/*(discovery: Discovery)*/ extends Repository {
   def errorSink(e: Error): Task[Unit] = errorStack.push(e)
 
   /////////////// instance operations ///////////////
+  def instances: Task[Seq[(URI, StateChange)]] =
+    Task(targets.get.toList)
+
   def unassignedTargets: Task[Set[Target]] =
     Task(stateMaps.get.lookup(TargetState.Unmonitored).fold(Set.empty[Target])(m => m.values.map(_.msg.target).toSet))(Chemist.serverPool)
 

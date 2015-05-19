@@ -119,6 +119,7 @@ object TargetLifecycle {
   val edges: Seq[M] = Seq(LEdge(Unknown,         Unmonitored,     Discover),
                           LEdge(Unmonitored,     Assigned,        Assign),
                           LEdge(Assigned,        Monitored,       Confirm),
+                          LEdge(Assigned,        Unmonitored,     Unmonitor),
                           LEdge(Monitored,       DoubleAssigned,  Assign),
                           LEdge(DoubleAssigned,  DoubleMonitored, Confirm),
                           LEdge(DoubleMonitored, Assigned,        Unmonitor),

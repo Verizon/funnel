@@ -51,8 +51,6 @@ trait Chemist[A <: Platform]{
    */
   def shard(id: FlaskID): ChemistK[Option[Flask]] = config map { x => x.repository.flask(id) }
 
-
-
   /**
    * Instruct flask to specifcally take a given shard out of service and
    * repartiion its given load to the rest of the system.
@@ -82,6 +80,12 @@ trait Chemist[A <: Platform]{
    */
   def history: ChemistK[Seq[RepoEvent]] =
     config.flatMapK(_.repository.historicalEvents)
+
+  /**
+   * List out the all the known Funnels and the state they are in.
+   */
+  def states: ChemistK[Seq[(URI, RepoEvent.StateChange)]] =
+    config.flatMapK(_.repository.instances)
 
   /**
    * List out the last 100 Errors that this chemist has seen.

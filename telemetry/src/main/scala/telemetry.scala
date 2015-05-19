@@ -60,7 +60,6 @@ object Telemetry extends TelemetryCodecs {
     val currentKeys = collection.mutable.Set.empty[Key[Any]]
 
     Process.constant { x =>
-      log.info("FROMTRANSPORTED: " + x)
       val y = {
         x match {
           case Transported(_, Versions.v1, _, Some(Topic("error")), bytes) =>
@@ -89,7 +88,6 @@ object Telemetry extends TelemetryCodecs {
             Task.now(())
         }
       }
-      log.info("result: " + y)
       y
     }
   }

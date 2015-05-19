@@ -13,21 +13,22 @@ abstract trait Target {
   Clocks.instrument(I)
 }
 
-class SpecMultiJvmTarget1 extends FlatSpec with Target with Matchers {
+class ChemistIntMultiJvmTarget1 extends FlatSpec with Target with Matchers {
   import funnel.http._
   val port = 2001
   MonitoringServer.start(M, port)
-  Thread.sleep(20000)
+  Thread.sleep(40000)
 }
 
-class SpecMultiJvmTarget2 extends FlatSpec with Target with Matchers {
+// this one dies after 20 seconds, so it should be detected and unmonitored
+class ChemistIntMultiJvmTarget2 extends FlatSpec with Target with Matchers {
   import funnel.http._
   val port = 2002
   MonitoringServer.start(M, port)
   Thread.sleep(20000)
 }
 
-class SpecMultiJvmFlask1 extends FlatSpec with Matchers {
+class ChemistIntMultiJvmFlask1 extends FlatSpec with Matchers {
   import funnel._
   import funnel.http._
   import funnel.flask._
@@ -43,11 +44,12 @@ class SpecMultiJvmFlask1 extends FlatSpec with Matchers {
   val I = new funnel.Instruments(1.minute)
   val app = new funnel.flask.Flask(options, I)
   MonitoringServer.start(Monitoring.default, 5775)
-  app.run(Array())
-  Thread.sleep(20000)
+  app.run(Array("noretries"))
+  Thread.sleep(40000)
+  println("flask shutting down")
 }
 
-class SpecMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAfterAll {
+class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAfterAll {
   import scalaz.concurrent.{Actor,Strategy}
   import funnel.chemist._
   import java.net.URI
@@ -60,7 +62,10 @@ class SpecMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAfterAll 
   val signal = async.signalOf(true)
   val repo = new StatefulRepository
 
-  val log = Logger[SpecMultiJvmChemist]
+  val log = Logger[ChemistIntMultiJvmChemist]
+
+  val U1 = new URI("http://localhost:2001/stream/now")
+  val U2 = new URI("http://localhost:2002/stream/now")
 
   override def beforeAll(): Unit = {
     println("initializing Chemist")
@@ -74,11 +79,11 @@ class SpecMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAfterAll 
 
     Thread.sleep(6000)
 
-    lifecycleActor ! NewTarget(Target("test", new URI("http://localhost:2001/stream/now"), false))
-    lifecycleActor ! NewTarget(Target("test", new URI("http://localhost:2002/stream/now"), false))
     lifecycleActor ! NewFlask(Flask(FlaskID("flask1"), Location.localhost, Location.telemetryLocalhost))
+    lifecycleActor ! NewTarget(Target("test", U1, false))
+    lifecycleActor ! NewTarget(Target("test", U2, false))
 
-    Thread.sleep(20000)
+    Thread.sleep(40000)
   }
 
   "the repository" should "have events in the history" in {
@@ -93,9 +98,40 @@ class SpecMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAfterAll 
     confirmed should be (Some(1))
   }
 
+  "the repository" should "have gotten the umonitor event" in {
+    val history = repo.historicalEvents.run
+
+    val unmonitored: Option[Int] = history.collectFirst {
+      case RepoEvent.StateChange(_, TargetState.Unmonitored, Unmonitoring(_, _, _)) => 1
+    }
+
+    unmonitored should be (Some(1))
+  }
+
+  "the repository" should "be monitoring 1 but not 2" in {
+    val state = repo.stateMaps.get
+    println("repository states: " + state)
+    println("unmonitored: " + state.lookup(TargetState.Unmonitored))
+    val t2 = repo.targets.get.lookup(U2)
+    // perhaps we should have an exception state?
+    List(TargetState.Unmonitored, TargetState.Assigned) should contain (t2.get.to)
+    state.lookup(TargetState.Monitored).get.lookup(U1).map(_.msg.target.uri) should be (Some(U1))
+  }
 
   override def afterAll(): Unit = {
     signal.set(false).run
   }
 
+  "the repository" should "have logged errors" in {
+    import funnel._
+    val errors = repo.errors.run
+
+    println("errors: " + errors)
+
+    errors.size should be > 0
+
+    errors.collectFirst {
+      case Error(Names(_, _, u)) => u
+    } should be (Some(U2))
+  }
 }
