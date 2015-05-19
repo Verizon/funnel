@@ -17,7 +17,7 @@ import scalaz.std.string._
 import scalaz.{\/, ~>, Monad}
 import Events.Event
 import scalaz.stream.async.mutable.Signal
-import scalaz.stream.async.signal
+import scalaz.stream.async.signalOf
 import journal.Logger
 import internals._
 
@@ -143,8 +143,8 @@ trait Monitoring {
     nodeRetries: Names => Event = _ => defaultRetries
   ): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
-    val alive     = signal[Unit](S)
-    val active    = signal[Set[URI]](S)
+    val alive     = signalOf[Unit](())(S)
+    val active    = signalOf[Set[URI]](Set.empty)(S)
 
     /**
      * Update the running state of the world by updating the URLs we know about
@@ -164,8 +164,8 @@ trait Monitoring {
         case Mirror(source, cluster) => Task.delay {
           log.info(s"Attempting to monitor '$cluster' located at '$source'")
           val S = Strategy.Executor(Monitoring.serverPool)
-          val hook = signal[Unit](S)
-          hook.set(()).runAsync(_ => ())
+          val hook = signalOf[Unit](())(S)
+          hook.get.runAsync(_ => ())
 
           urlSignals.put(source, hook)
 
@@ -274,7 +274,7 @@ trait Monitoring {
     // we merge the `e` stream and the stream of datapoints for the
     // given prefix; if we ever encounter two ticks in a row from `e`,
     // we reset all matching keys back to their default
-    val alive = signal[Unit](Strategy.Sequential); alive.set(()).run
+    val alive = signalOf[Unit](())(Strategy.Sequential)
     val pts = Monitoring.subscribe(this)(f).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
         log.debug(s"$msg no more data points for '$f', resetting...")
@@ -293,7 +293,7 @@ trait Monitoring {
    * between two triggerings of the event `e`.
    */
   def keySenescence(e: Event): Process[Task, Unit] = mergeN(distinctKeys.map { k =>
-    val alive = signal[Unit](Strategy.Sequential); alive.set(()).run
+    val alive = signalOf[Unit](())(Strategy.Sequential)
     val pts = Monitoring.subscribe(this)(_ == k).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
         log.debug(s"TTL: no more data points for '$k', removing...")
@@ -414,8 +414,7 @@ object Monitoring {
     val t0 = System.nanoTime
     implicit val S = Strategy.Executor(ES)
     val P = Process
-    val keys_ = signal[Set[Key[Any]]](S)
-    keys_.set(Set.empty).run
+    val keys_ = signalOf[Set[Key[Any]]](Set.empty)(S)
 
     case class Topic[I,O](
       publish: ((I,Duration)) => Unit,
@@ -503,11 +502,13 @@ object Monitoring {
       buf: Process1[I,O])(
       implicit ES: ExecutorService = defaultPool):
       (I => Unit, Signal[O]) = {
-    val signal = scalaz.stream.async.signal[O](Strategy.Executor(ES))
-    var cur = buf.unemit match {
+    val signal = signalOf[O]()(Strategy.Executor(ES))
+
+    var cur: Process[I,O] = buf.unemit match {
       case (h, t) if h.nonEmpty => signal.set(h.last).run; t
       case (h, t) => t
     }
+
     val hub = Actor.actor[I] { i =>
       val (h, t) = process1.feed1(i)(cur).unemit
       if (h.nonEmpty) signal.set(h.last).run

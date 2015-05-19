@@ -1,7 +1,7 @@
 package funnel
 
 import java.util.concurrent.{ExecutorService, ScheduledExecutorService}
-import scalaz.stream.Process
+import scalaz.stream.time.awakeEvery
 import scalaz.concurrent.Strategy
 import scala.concurrent.duration._
 
@@ -17,7 +17,7 @@ object Clocks {
     val remaining =
       I.currentRemaining("now/remaining", s"Time until the next period of ${I.window} begins")
     val uptime = I.uptime("uptime")
-    Process.awakeEvery(t)(Strategy.Executor(ES),TS).map { _ =>
+    awakeEvery(t)(Strategy.Executor(ES),TS).map { _ =>
       elapsed.set(())
       remaining.set(())
       uptime.set(())

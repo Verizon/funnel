@@ -4,7 +4,7 @@ import java.util.concurrent.{ExecutorService, ScheduledExecutorService}
 import collection.JavaConversions._
 import scala.concurrent.duration._
 import scalaz.concurrent.Strategy
-import scalaz.stream._
+import scalaz.stream._, time.awakeEvery
 import journal.Logger
 
 /** Functions for adding various system metrics collected by SIGAR to a `Monitoring` instance. */
@@ -144,7 +144,7 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
     // Side effects FTL!
     val _ = (TCP, LoadAverage, FileSystem, CPU.Aggregate, Mem)
 
-    Process.awakeEvery(t)(Strategy.Executor(ES), TS).map { _ =>
+    awakeEvery(t)(Strategy.Executor(ES), TS).map { _ =>
       import org.hyperic.sigar.{Cpu, CpuPerc}
 
       def cpuUsage(cpu: CpuPerc, m: CpuStats) = {
