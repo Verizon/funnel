@@ -6,7 +6,7 @@ import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 
 organization in Global  := "oncue.svc.funnel"
 
-scalaVersion in Global  := "2.10.4"
+scalaVersion in Global  := "2.10.5"
 
 lazy val funnel = project.in(file(".")).aggregate(
   core,

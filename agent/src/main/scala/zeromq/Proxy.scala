@@ -3,7 +3,7 @@ package agent
 package zeromq
 
 import funnel.zeromq._
-import scalaz.stream.async.signal
+import scalaz.stream.async.{signal,signalOf}
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.Process
 import scalaz.concurrent.Task

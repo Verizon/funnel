@@ -502,9 +502,9 @@ object Monitoring {
       buf: Process1[I,O])(
       implicit ES: ExecutorService = defaultPool):
       (I => Unit, Signal[O]) = {
-    val signal = signalOf[O]()(Strategy.Executor(ES))
+  val signal = signalOf[O](null.asInstanceOf[O])(Strategy.Executor(ES))
 
-    var cur: Process[I,O] = buf.unemit match {
+    var cur = buf.unemit match {
       case (h, t) if h.nonEmpty => signal.set(h.last).run; t
       case (h, t) => t
     }

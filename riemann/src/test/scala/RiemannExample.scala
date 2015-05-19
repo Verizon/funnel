@@ -1,7 +1,7 @@
 package funnel
 package riemann
 
-import scalaz.stream.Process
+import scalaz.stream.{Process,time}
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
 
@@ -29,7 +29,7 @@ object Main {
 
     implicit val P = Monitoring.schedulingPool
 
-    val t1 = Process.awakeEvery(2.seconds).map { _ =>
+    val t1 = time.awakeEvery(2.seconds).map { _ =>
              c.increment
              t.time(Thread.sleep(100))
              randomLight(l)
