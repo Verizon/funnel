@@ -25,11 +25,9 @@ object Telemetry extends TelemetryCodecs {
         val t = Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("key")), bytes)
         t
       case Monitored(i) =>
-        log.info("MONITOR")
-        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("monitor")), i.toString.getBytes())
+        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("monitor")), uriCodec.encodeValid(i).toByteArray)
       case Unmonitored(i) =>
-        log.info("UNMONITOR")
-        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("unmonitor")), i.toString.getBytes())
+        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("unmonitor")), uriCodec.encodeValid(i).toByteArray)
     }
   }
 
@@ -62,18 +60,37 @@ object Telemetry extends TelemetryCodecs {
     val currentKeys = collection.mutable.Set.empty[Key[Any]]
 
     Process.constant { x =>
-      x match {
-        case Transported(_, Versions.v1, _, Some(Topic("error")), bytes) =>
-          Task.delay(errors ! errorCodec.decodeValidValue(BitVector(bytes)))
-        case Transported(_, Versions.v1, _, Some(Topic("key")), bytes) =>
-          Task(currentKeys += keyDecode.decodeValidValue(BitVector(bytes))).flatMap { k =>
-            Task.delay(keys ! id -> k.toSet)
+      log.info("FROMTRANSPORTED: " + x)
+      val y = {
+        x match {
+          case Transported(_, Versions.v1, _, Some(Topic("error")), bytes) =>
+          errorCodec.decode(BitVector(bytes)) match {
+            case -\/(err) => Task.delay(log.error(s"Error parsing error from telemetry $err"))
+            case \/-((_,err)) => Task.delay(errors ! errorCodec.decodeValidValue(BitVector(bytes)))
           }
-        case Transported(_, Versions.v1, _, Some(Topic("monitor")), bytes) => Task.delay(lifecycleSink ! \/.right(uriCodec.decodeValidValue(BitVector(bytes))))
-        case Transported(_, Versions.v1, _, Some(Topic("unmonitor")), bytes) => Task.delay(lifecycleSink ! \/.left(uriCodec.decodeValidValue(BitVector(bytes))))
-        case x => log.error("unexpected message from telemetry: " + x)
-          Task.now(())
+          case Transported(_, Versions.v1, _, Some(Topic("key")), bytes) =>
+          keyDecode.decode(BitVector(bytes)) match {
+            case -\/(err) => Task.delay(log.error(s"Error parsing keys from telemetry $err"))
+            case \/-((_,k)) =>
+              currentKeys += k
+              Task.delay(keys ! id -> currentKeys.toSet)
+          }
+          case Transported(_, Versions.v1, _, Some(Topic("monitor")), bytes) =>
+            uriCodec.decode(BitVector(bytes)) match {
+              case -\/(err) => Task.delay(log.error(s"Error parsing monitor from telemetry $err"))
+              case \/-((_,uri)) => Task.delay(lifecycleSink ! \/.right(uri))
+            }
+          case Transported(_, Versions.v1, _, Some(Topic("unmonitor")), bytes) =>
+            uriCodec.decode(BitVector(bytes)) match {
+              case -\/(err) => Task.delay(log.error(s"Error parsing unmonitor from telemetry $err"))
+              case \/-((_,uri)) => Task.delay(lifecycleSink ! \/.left(uri))
+            }
+          case x => log.error("unexpected message from telemetry: " + x)
+            Task.now(())
+        }
       }
+      log.info("result: " + y)
+      y
     }
   }
 

@@ -33,7 +33,7 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
 
   val keys: Actor[(URI, Set[Key[Any]])] = Actor[(URI, Set[Key[Any]])] {
     case (uri, keys) =>
-      println(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KEYS via telemetry: $uri -> ${keys.size}")
+      log.warn(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KEYS via telemetry: $uri -> ${keys.size}")
       repo.keySink(uri, keys).run
   }
 
@@ -45,7 +45,7 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
 
   val lifecycle: Actor[PlatformEvent] = Actor[PlatformEvent] {
     case ev =>
-      println(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LIFECYCLE via telemetry: $ev")
+      log.warn(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LIFECYCLE via telemetry: $ev")
       repo.platformHandler(ev).run
   }
 
@@ -114,8 +114,9 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
                        lifecycle: Actor[PlatformEvent],
                        signal: Signal[Boolean]): Task[Unit] = {
 
-    import telemetry.Telemetry._
+    import telemetry.Telemetry.telemetrySubscribeSocket
 
+    log.info(s"attempting to monitor telemetry on ${flask.telemetry.asURI()}")
     val lc: Actor[URI \/ URI] = lifecycle.contramap(actionsFromLifecycle(flask.id))
     telemetrySubscribeSocket(flask.telemetry.asURI(), signal, keys, errors, lc)
   }

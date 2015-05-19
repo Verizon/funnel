@@ -7,41 +7,25 @@ abstract trait Target {
   import scala.concurrent.duration.DurationInt
   import funnel._
 
-  val W = 30.seconds
+  val W = 10.seconds
   val M = Monitoring.instance
   val I = new Instruments(W, M)
   Clocks.instrument(I)
-  JVM.instrument(I)
 }
 
 class SpecMultiJvmTarget1 extends FlatSpec with Target with Matchers {
   import funnel.http._
   val port = 2001
   MonitoringServer.start(M, port)
-  Thread.sleep(75000)
+  Thread.sleep(20000)
 }
 
 class SpecMultiJvmTarget2 extends FlatSpec with Target with Matchers {
   import funnel.http._
   val port = 2002
   MonitoringServer.start(M, port)
-  Thread.sleep(75000)
+  Thread.sleep(20000)
 }
-
-class SpecMultiJvmTarget3 extends FlatSpec with Target with Matchers {
-  import funnel.http._
-  val port = 2003
-  MonitoringServer.start(M, port)
-  Thread.sleep(75000)
-}
-
-class SpecMultiJvmTarget4 extends FlatSpec with Target with Matchers {
-  import funnel.http._
-  val port = 2004
-  MonitoringServer.start(M, port)
-  Thread.sleep(75000)
-}
-
 
 class SpecMultiJvmFlask1 extends FlatSpec with Matchers {
   import funnel._
@@ -60,31 +44,58 @@ class SpecMultiJvmFlask1 extends FlatSpec with Matchers {
   val app = new funnel.flask.Flask(options, I)
   MonitoringServer.start(Monitoring.default, 5775)
   app.run(Array())
-  Thread.sleep(70000)
+  Thread.sleep(20000)
 }
 
-class SpecMultiJvmChemist extends FlatSpec with Matchers {
+class SpecMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAfterAll {
   import scalaz.concurrent.{Actor,Strategy}
   import funnel.chemist._
   import java.net.URI
   import PlatformEvent._
   import scalaz.stream.{Process, async}
   import dispatch._
+  import journal.Logger
+  import TargetLifecycle._
 
   val signal = async.signalOf(true)
   val repo = new StatefulRepository
-  val lifecycleActor: Actor[PlatformEvent] = Actor[PlatformEvent](a => repo.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
-  repo.lifecycle()
-  val http = Http()
-  (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, EvenSharding, new HttpFlask(http, repo, signal)) _)).run.runAsync(_ => ())
 
-  Thread.sleep(6000)
+  val log = Logger[SpecMultiJvmChemist]
 
-  lifecycleActor ! NewTarget(Target("test", new URI("http://localhost:2001/stream/previous"), false))
-  lifecycleActor ! NewTarget(Target("test", new URI("http://localhost:2002/stream/previous"), false))
-  lifecycleActor ! NewTarget(Target("test", new URI("http://localhost:2003/stream/previous"), false))
-  lifecycleActor ! NewTarget(Target("test", new URI("http://localhost:2004/stream/previous"), false))
-  lifecycleActor ! NewFlask(Flask(FlaskID("flask1"), Location.localhost, Location.telemetryLocalhost))
+  override def beforeAll(): Unit = {
+    println("initializing Chemist")
+    val lifecycleActor: Actor[PlatformEvent] = Actor[PlatformEvent](a => repo.platformHandler(a)
+.run)(Strategy.Executor(Chemist.serverPool))
+    repo.lifecycle()
+    val http = Http()
+    val networkFlask = new HttpFlask(http, repo, signal)
 
-  Thread.sleep(100000)
+    (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, EvenSharding, networkFlask) _)).run.runAsync(_ => ())
+
+    Thread.sleep(6000)
+
+    lifecycleActor ! NewTarget(Target("test", new URI("http://localhost:2001/stream/now"), false))
+    lifecycleActor ! NewTarget(Target("test", new URI("http://localhost:2002/stream/now"), false))
+    lifecycleActor ! NewFlask(Flask(FlaskID("flask1"), Location.localhost, Location.telemetryLocalhost))
+
+    Thread.sleep(20000)
+  }
+
+  "the repository" should "have events in the history" in {
+    val history = repo.historicalEvents.run
+    log.info("history : " + history.toString)
+    history.size should be > 0
+
+    val confirmed: Option[Int] = history.collectFirst {
+      case RepoEvent.StateChange(_, TargetState.Monitored, Confirmation(_, _, _)) => 1
+    }
+
+    confirmed should be (Some(1))
+  }
+
+
+  override def afterAll(): Unit = {
+    signal.set(false).run
+  }
+
 }
