@@ -23,6 +23,7 @@ object Main {
   case class ProxyConfig(host: String, port: Int)
   case class ZeromqConfig(socket: String, proxy: Option[ProxyConfig])
   case class NginxConfig(uri: String, frequency: Duration)
+
   case class JmxConfig(
     name: String,
     uri: String,
@@ -30,7 +31,13 @@ object Main {
     queries: List[String] = Nil,
     exclusions: List[String] = Nil)
 
+  case class AgentConfig(
+    systemCollection: Boolean,
+    jvmCollection: Boolean
+  )
+
   case class Options(
+    agent: Option[AgentConfig],
     http: Option[HttpConfig],
     statsd: Option[StatsdConfig],
     zeromq: Option[ZeromqConfig],
@@ -65,6 +72,10 @@ object Main {
      * known interfaces host if that fails.
      */
     val options: Options = config.map { cfg =>
+      // general
+      val systemMetrics = cfg.lookup[Boolean]("enable-system-metrics")
+      val jvmMetrics    = cfg.lookup[Boolean]("enable-jvm-metrics")
+
       // http
       val httpHost    = cfg.lookup[String]("agent.http.host")
       val httpPort    = cfg.lookup[Int]("agent.http.port")
@@ -87,6 +98,7 @@ object Main {
       val jmxExcludes = cfg.lookup[List[String]]("agent.jmx.exclude-attribute-patterns")
 
       Options(
+        agent  = (systemMetrics |@| jvmMetrics)(AgentConfig),
         http   = (httpHost |@| httpPort)(HttpConfig),
         statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
         zeromq = proxySocket.map(ZeromqConfig(_, (proxyHost |@| proxyPort)(ProxyConfig))),
@@ -102,6 +114,22 @@ object Main {
      * instrument bridges (e.g. http, statsd etc).
      */
     val I = new Instruments(1.minute, Monitoring.default)
+
+    // always add the system clocks so we know how long the agent has
+    // actually been running.
+    Clocks.instrument(I)
+
+    options.agent.foreach { agentcfg =>
+      if(agentcfg.systemCollection){
+        log.info("Enabling the collection of system metrics.")
+        Sigar.instrument(I)
+      }
+
+      if(agentcfg.jvmCollection){
+        log.info("Enabling the collection of agent JVM metrics.")
+        JVM.instrument(I)
+      }
+    }
 
     log.info("Launching the funnel HTTP server on 5775.")
     funnel.http.MonitoringServer.start(Monitoring.default, 5775)
