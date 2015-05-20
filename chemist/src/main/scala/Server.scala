@@ -6,6 +6,7 @@ import unfiltered.response._
 import unfiltered.netty._
 import argonaut._, Argonaut._
 import scalaz.concurrent.Task
+import scalaz.stream.Process
 import scalaz.{\/,-\/,\/-}
 import journal.Logger
 
@@ -28,6 +29,14 @@ object Server {
   // there seems to be a bug in Task that makes doing what we previously had here
   // not possible. The server gets into a hang/deadlock situation.
   def unsafeStart[U <: Platform](chemist: Chemist[U], platform: U): Unit = {
+    val repo = platform.config.repository
+
+    (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, EvenSharding, platform.config.remoteFlask) _)).run.runAsync {
+      case -\/(err) => log.error("Error starting processing of Platform events")
+      case \/-(t) => log.info("result of platform processing: " + t)
+    }
+
+
     chemist.bootstrap(platform).runAsync {
       case -\/(err) => log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
       case \/-(_)   => log.info("Sucsessfully bootstrap chemist at startup.")

@@ -12,6 +12,8 @@ import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import dispatch.Http
 import concurrent.duration.Duration
 import funnel.aws._
+import scalaz.stream.async.signalOf
+import scalaz.concurrent.Strategy
 
 case class QueueConfig(
   queueName: String,
@@ -34,6 +36,8 @@ case class AwsConfig(
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
+  val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
+  val remoteFlask = new HttpFlask(http, repository, signal)
 }
 
 object Config {

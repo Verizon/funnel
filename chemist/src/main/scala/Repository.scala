@@ -57,6 +57,8 @@ trait Repository {
   def mergeDistribution(d: Distribution): Task[Distribution]
   def assignedTargets(flask: FlaskID): Task[Set[Target]]
   def unassignedTargets: Task[Set[Target]]
+
+  def repoCommands: Process[Task, RepoCommand]
 }
 
 import com.amazonaws.services.ec2.AmazonEC2
