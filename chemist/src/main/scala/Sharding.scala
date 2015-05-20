@@ -1,32 +1,25 @@
 package funnel
 package chemist
 
-import scalaz.==>>
+import scalaz.{==>>,Order}
 import scalaz.std.string._
+import scalaz.std.tuple._
+import scalaz.std.vector._
+import scalaz.syntax.monad._
+import scalaz.syntax.traverse.{ToFunctorOps => _, _}
 import scalaz.concurrent.Task
+import scalaz.stream.{Process,Process1,Sink}
 import funnel.ClusterName
+import java.net.URI
+
 import journal.Logger
 
 object Sharding {
 
-  type Flask = InstanceID
-  type Distribution = Flask ==>> Set[Target]
+  type Distribution = FlaskID ==>> Set[Target]
 
   object Distribution {
     def empty: Distribution = ==>>()
-  }
-
-  case class Target(cluster: ClusterName, url: SafeURL)
-
-  object Target {
-    val defaultResources = Seq("stream/previous")
-
-    def fromInstance(resources: Seq[String] = defaultResources)(i: Instance): Set[Target] =
-      (for {
-        a <- i.application
-        b <- i.asURL.toOption
-      } yield resources.map(r => Target(a.toString, SafeURL(b+r))).toSet
-      ).getOrElse(Set.empty[Target])
   }
 
   private lazy val log = Logger[Sharding.type]
@@ -35,8 +28,8 @@ object Sharding {
    * obtain a list of flasks ordered by flasks with the least
    * assigned work first.
    */
-  def shards(d: Distribution): Set[Flask] =
-    sorted(d).keySet
+  def shards(d: Distribution): Seq[FlaskID] =
+    sorted(d).map(_._1)
 
   /**
    * sort the current distribution by the size of the url
@@ -44,16 +37,16 @@ object Sharding {
    * snapshot is ordered by flasks with least assigned
    * work first.
    */
-  def sorted(d: Distribution): Map[Flask, Set[Target]] =
-    d.toList.sortBy(_._2.size).toMap
+  def sorted(d: Distribution): Seq[(FlaskID, Set[Target])] =
+    d.toList.sortBy(_._2.size)
 
   /**
    * dump out the current snapshot of how chemist believes work
    * has been assigned to flasks.
    */
-  def snapshot(d: Distribution): Map[Flask, Map[ClusterName, List[SafeURL]]] =
+  def snapshot(d: Distribution): Map[FlaskID, Map[ClusterName, List[URI]]] =
     d.toList.map { case (i,s) =>
-      i -> s.groupBy(_.cluster).mapValues(_.toList.map(_.url))
+      i -> s.groupBy(_.cluster).mapValues(_.toList.map(_.uri))
     }.toMap
 
   /**
@@ -67,6 +60,64 @@ object Sharding {
     }
 
   /**
+   * Given a set of inputs, check against the current known set of urls
+   * that we're not already monitoring the inputs (thus ensuring that
+   * the cluster is not having duplicated monitoring items)
+   */
+  private[chemist] def deduplicate(next: Set[Target])(d: Distribution): Set[Target] = {
+    // get the full list of targets we currently know about
+    val existing = targets(d)
+
+    // determine if any of the supplied urls are existing targets
+    val delta = next.map(_.uri) &~ existing.map(_.uri)
+
+    // having computed the targets that we actually care about,
+    // rehydrae a `Set[Target]` from the given `Set[SafeURL]`
+    delta.foldLeft(Set.empty[Target]){ (a,b) =>
+      a ++ next.filter(_.uri == b)
+    }
+  }
+
+  ///////////////////////// IO functions ///////////////////////////
+
+  def distribute(repo: Repository, sharder: Sharder, remote: RemoteFlask, dist: Distribution)(ts: Set[Target]): Task[Unit] = {
+    val s = sharder.calculate(ts)(dist)
+    s.toVector.traverse_ { x =>
+      val flask = repo.flask(x._1)
+      flask.fold(Task.delay(log.error("asked to assign to an unknown flask: " + x._1))){ f =>
+        remote.command(FlaskCommand.Monitor(f,Seq(x._2))) >> repo.platformHandler(PlatformEvent.Assigned(x._1, x._2))
+      }
+    }
+  }
+
+  def handleRepoCommand(repo: Repository, sharder: Sharder, remote: RemoteFlask)(c: RepoCommand): Task[Unit] = {
+    Task.delay(log.info(s"handleRepoCommand: $c")) >>
+    repo.distribution.flatMap { dist =>
+      c match {
+        case RepoCommand.Monitor(t) =>
+          distribute(repo, sharder, remote, dist)(Set(t))
+        case RepoCommand.Unmonitor(fl, t) =>
+          remote.command(FlaskCommand.Unmonitor(fl, Seq(t)))
+        case RepoCommand.Telemetry(fl) =>
+          remote.command(FlaskCommand.Telemetry(fl))
+        case RepoCommand.AssignWork(fl) =>
+          repo.unassignedTargets flatMap distribute(repo, sharder, remote, dist)
+        case RepoCommand.ReassignWork(fl) =>
+          repo.assignedTargets(fl) flatMap distribute(repo, sharder, remote, dist)
+      }
+    }
+  }
+}
+
+trait Sharder {
+  import Sharding._
+  /**
+   * Given the new set of urls to monitor, compute how said urls
+   * should be distributed over the known flask instances
+   */
+  def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)]
+
+  /**
    * provide the new distribution based on the result of calculating
    * how the new set should actually be distributed. main benifit here
    * is simply making the operations opaque (handling missing key cases)
@@ -76,7 +127,35 @@ object Sharding {
    * 2. `Distribution` is that same sequence folded into a `Distribution` instance which can
    *     then be added to the existing state of the world.
    */
-  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution) = {
+  def distribution(s: Set[Target])(d: Distribution): (Seq[(FlaskID,Target)], Distribution)
+}
+
+object EvenSharding extends Sharder {
+  import Sharding._
+  private lazy val log = Logger[EvenSharding.type]
+
+  def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)] = {
+    val servers = shards(d)
+    val ss      = servers.size
+    val input   = deduplicate(s)(d)
+    val is      = input.size // caching operation as its O(n)
+    val foo = if(is < ss) servers.take(is) else servers
+
+    log.debug(s"calculating the target distribution: servers=$servers, input=$input")
+
+    if(ss == 0){
+      log.warn("there are no flask servers currently registered to distribute work too.")
+      Nil // needed for when there are no Flask's in-memory; causes SOE.
+    } else {
+      // interleave the input with the known flask servers ordered by the
+      // flask that currently has the least amount of work assigned.
+      Stream.continually(input).flatten.zip(
+        Stream.continually(foo).flatten).take(is.max(foo.size)
+          ).toList.map(t => (t._2, t._1))
+    }
+  }
+
+  def distribution(s: Set[Target])(d: Distribution): (Seq[(FlaskID,Target)], Distribution) = {
     // this check is needed as otherwise the fold gets stuck in a gnarly
     // infinate loop, and this function never completes.
     if(s.isEmpty) (Seq.empty,d)
@@ -99,153 +178,5 @@ object Sharding {
     }
   }
 
-  /**
-   * Given the new set of urls to monitor, compute how said urls
-   * should be distributed over the known flask instances
-   */
-  private[chemist] def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
-    val servers = shards(d)
-    val ss      = servers.size
-    val input   = deduplicate(s)(d)
-    val is      = input.size // caching operation as its O(n)
-    val foo = if(is < ss) servers.take(is) else servers
-
-    log.debug(s"calculating the target distribution: servers=$servers, input=$input")
-
-    if(ss == 0){
-      log.warn("there are no flask servers currently registered to distribute work too.")
-      Nil // needed for when there are no Flask's in-memory; causes SOE.
-    } else {
-      // interleave the input with the known flask servers ordered by the
-      // flask that currently has the least amount of work assigned.
-      Stream.continually(input).flatten.zip(
-        Stream.continually(foo).flatten).take(is.max(foo.size)
-          ).toList.map(t => (t._2, t._1))
-    }
-  }
-
-  /**
-   * Given a set of inputs, check against the current known set of urls
-   * that we're not already monitoring the inputs (thus ensuring that
-   * the cluster is not having duplicated monitoring items)
-   */
-  private[chemist] def deduplicate(next: Set[Target])(d: Distribution): Set[Target] = {
-    // get the full list of targets we currently know about
-    val existing = targets(d)
-
-    // determine if any of the supplied urls are existing targets
-    val delta = next.map(_.url) &~ existing.map(_.url)
-
-    // having computed the targets that we actually care about,
-    // rehydrae a `Set[Target]` from the given `Set[SafeURL]`
-    delta.foldLeft(Set.empty[Target]){ (a,b) =>
-      a ++ next.filter(_.url == b)
-    }
-  }
-
-  ///////////////////////// IO functions ///////////////////////////
-
-  /**
-   * The goal here is given the `Set[Target]` be able to compute how things
-   * should be sharded, update the state, and then yield the results such that
-   * its possible to test to the nearest edge of the world without actually
-   * doing the side effect and calling the shards to assign the work (which would
-   * of course result in `Task[Unit]` and be a nightmare to test)
-   */
-  def locateAndAssignDistribution(t: Set[Target], r: Repository): Task[Map[Location, Seq[Target]]] = {
-    for {
-      // read the current distribution from the repository
-      x    <- r.distribution
-      // compute a new distribution given these new inputs
-      (a,d) = distribution(t)(x)
-      _     = log.debug(s"Sharding.distribute a=$a, d=$d")
-      // given we only want to issue commands to flasks once, lets bunch
-      // up those targets that have been assigned to the same flask so we
-      // can send them all over as a batch
-      grouped: Map[Flask, Seq[Target]] = a.groupBy(_._1).mapValues(_.map(_._2))
-      _ = log.debug(s"Sharding.distribute,grouped = $grouped")
-
-      tasks = grouped.map { case (f,seq) =>
-        r.instance(f).map(_.location).map((_,seq))
-      }
-      // pre-emtivly update our new state as the sending will take longer
-      // than updating and we dont want the world to change under our feet
-      _ <- r.mergeDistribution(d)
-      x <- Task.gatherUnordered(tasks.toList)
-    } yield x.toMap
-  }
-
-  /**
-   * Given a computer set of locations -> targets, actually send them to the
-   * relevant shard node API.
-   */
-  def distribute(locations: Map[Location, Seq[Target]])(http: dispatch.Http): Task[List[String]] =
-    Task.gatherUnordered(
-      locations.map { case (loc,targets) =>
-        send(loc,targets)(http)
-      }.toSeq
-    )
-
-  /**
-   * Given a collection of flask instances, find out what exactly they are already
-   * mirroring and absorb that into the view of the world.
-   *
-   * This function should only really be used startup of chemist.
-   */
-  def gatherAssignedTargets(instances: Seq[Instance])(http: dispatch.Http): Task[Distribution] =
-    (for {
-      a <- Task.gatherUnordered(instances.map(
-            i => requestAssignedTargets(i.location)(http).map(i.id -> _)))
-    } yield a.foldLeft(Distribution.empty){ (a,b) =>
-      a.alter(b._1, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
-    }) or Task.now(Distribution.empty)
-
-  import funnel.http.{Cluster,JSON => HJSON}
-
-  /**
-   * Call out to the specific location and grab the list of things the flask
-   * is already mirroring.
-   */
-  private def requestAssignedTargets(location: Location)(http: dispatch.Http): Task[Set[Target]] = {
-    import argonaut._, Argonaut._, JSON._, HJSON._
-    import dispatch._, Defaults._
-
-    for {
-      a <- location.asURL(path = "mirror/sources").fold(Task.fail(_), Task.now(_))
-      b  = url(a.toString)
-      _  = log.debug(s"requesting assigned targets from $a")
-
-      c <- fromScalaFuture(http(b OK as.String))
-    } yield {
-      Parse.decodeOption[List[Cluster]](c
-        ).toList.flatMap(identity
-        ).foldLeft(Set.empty[Target]){ (a,b) =>
-          b.urls.map(s => Target(b.label, SafeURL(s))).toSet
-        }
-    }
-  }
-
-  /**
-   * Touch the network and do the I/O using Dispatch.
-   */
-  private def send(to: Location, targets: Seq[Target])(http: dispatch.Http): Task[String] = {
-    import dispatch._, Defaults._
-    import argonaut._, Argonaut._
-    import JSON.ClustersToJSON
-
-    // FIXME: "safe" because we know we're passing in the default localhost
-    // val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
-    val payload: Map[ClusterName, List[SafeURL]] =
-      targets.groupBy(_.cluster).mapValues(_.map(_.url).toList)
-
-    for {
-      a <- to.asURL(path = "mirror").fold(Task.fail(_), Task.now(_))
-      b  = url(a.toString) << payload.toList.asJson.nospaces
-      _  = log.debug(s"submitting to $a: $payload")
-      c <- fromScalaFuture(http(b OK as.String))
-    } yield c
-  }
 
 }
-
-

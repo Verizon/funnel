@@ -6,4 +6,5 @@ trait PlatformConfig {
   def network: NetworkConfig
   def discovery: Discovery
   def repository: Repository
+  def remoteFlask: RemoteFlask
 }

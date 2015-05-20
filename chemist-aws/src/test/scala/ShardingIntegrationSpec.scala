@@ -7,9 +7,11 @@ import funnel.{Monitoring,Instruments,Clocks,JVM}
 import funnel.http.MonitoringServer
 import scalaz.==>>
 import concurrent.duration._
+import java.net.URI
+import scalaz.concurrent.Strategy
 
 class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
-  import Sharding.{Distribution,Target}
+  import Sharding.Distribution
 
   val W = 30.seconds
 
@@ -29,14 +31,16 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
 
   val E = TestAmazonEC2(Fixtures.instance(id = "i-localhost9090", publicDns = "localhost"))
   val A = TestAmazonASG.single(_ => java.util.UUID.randomUUID.toString)
-  val D = new Discovery(E,A)
-  val R = new StatefulRepository(D)
+//  val D = new AwsDiscovery(E,A)
+  val R = new StatefulRepository
+
+
 
   val T1 = Set(
-    Target("test1",SafeURL("http://127.0.0.1:8080/stream/uptime")),
-    Target("test1",SafeURL("http://127.0.0.1:8080/stream/now")),
-    Target("test1",SafeURL("http://127.0.0.1:8081/stream/uptime")),
-    Target("test1",SafeURL("http://127.0.0.1:8081/stream/now"))
+    Target("test1",new URI("http://127.0.0.1:8080/stream/uptime"), false),
+    Target("test1",new URI("http://127.0.0.1:8080/stream/now"), false),
+    Target("test1",new URI("http://127.0.0.1:8081/stream/uptime"), false),
+    Target("test1",new URI("http://127.0.0.1:8081/stream/now"), false)
   )
 
   val H = dispatch.Http.configure(
@@ -61,28 +65,34 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
   }
 
   private def addFlask(fid: String): Unit = {
-    R.increaseCapacity(fid).run
+
   }
 
   private def addInstruments(i: Instruments): Unit = {
     Clocks.instrument(i)
     JVM.instrument(i)
   }
+///* STU todo what is this actually testing?
 
   it should "sucsessfully be able to stream events from two local monitoring instances to a local flask" in {
+    F1.mirroringQueue.enqueueAll(T1.toSeq.map(t => Mirror(t.uri, t.cluster))).run
+    val Q = scalaz.stream.async.unboundedQueue[Telemetry](Strategy.Executor(Chemist.serverPool))
     F1.processMirroringEvents(
-      funnel.http.SSE.readEvents,
+      funnel.http.SSE.readEvents(_,Q),
+      Q,
       "intspec").runAsync(println)
 
-    val x = for {
-      a <- Sharding.locateAndAssignDistribution(T1,R)
-      b <- Sharding.distribute(a)(H)
-    } yield b
+    Thread.sleep(10000)
 
-    x.run
+//    val x = for {
+//      a <- Sharding.locateAndAssignDistribution(T1,R)
+//      b <- Sharding.distribute(a)(H)
+//    } yield b
+
+//    x.run
   }
 
-
+// */
 
 }
 

@@ -12,6 +12,8 @@ import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import dispatch.Http
 import concurrent.duration.Duration
 import funnel.aws._
+import scalaz.stream.async.signalOf
+import scalaz.concurrent.Strategy
 
 case class QueueConfig(
   queueName: String,
@@ -29,11 +31,13 @@ case class AwsConfig(
   commandTimeout: Duration,
   includeVpcTargets: Boolean
 ) extends PlatformConfig {
-  val discovery: Discovery = new Discovery(ec2, asg)
-  val repository: Repository = new StatefulRepository(discovery)
+  val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg)
+  val repository: Repository = new StatefulRepository
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
+  val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
+  val remoteFlask = new HttpFlask(http, repository, signal)
 }
 
 object Config {

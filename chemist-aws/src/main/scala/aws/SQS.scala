@@ -17,6 +17,7 @@ import scalaz.concurrent.{Strategy,Task}
 import scala.collection.JavaConverters._
 import concurrent.duration._
 import java.util.concurrent.{ExecutorService,ScheduledExecutorService}
+import funnel.chemist.Chemist
 
 object SQS {
   // hard-coded for now as these are so slow moving.
@@ -63,7 +64,7 @@ object SQS {
       val attrs = client.getQueueAttributes(
         new GetQueueAttributesRequest(url, List("QueueArn").asJava)).getAttributes.asScala
       attrs.get("QueueArn")
-    }.flatMap {
+    }(Chemist.serverPool).flatMap {
       case None => Task.fail(new RuntimeException("The specified URL did not have an associated SQS ARN in the specified region."))
       case Some(m) => Task.now(m)
     }

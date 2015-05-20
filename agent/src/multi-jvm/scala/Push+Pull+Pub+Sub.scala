@@ -3,7 +3,6 @@ package agent
 
 import funnel.zeromq._, sockets._
 import scalaz.concurrent.{Task,Strategy}
-import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process
 import scala.concurrent.duration._
 

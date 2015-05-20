@@ -1,7 +1,6 @@
 package funnel
 package chemist
 
-
 /**
  * Whatever genius decided that java.net.URL would actually
  * reach out to the DNS to do an equality check... *sigh*
@@ -12,7 +11,7 @@ package chemist
  * explicit when you want to go down to a `java.net.URL`.
  */
 case class SafeURL(underlying: String){
-  def toJavaURL = new java.net.URL(underlying)
+ def toJavaURL = new java.net.URL(underlying)
 }
 object SafeURL {
   def apply(u: java.net.URL): SafeURL = SafeURL(u.toString)

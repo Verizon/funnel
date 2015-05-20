@@ -6,6 +6,7 @@ import java.net.URL
 import org.scalacheck._
 import Prop._
 import scala.concurrent.duration._
+import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
@@ -30,7 +31,7 @@ object MirroringExample {
       val reqs = I.counter("reqs")
       val svr = MonitoringServer.start(M, port)
 
-      Process.awakeEvery(2.seconds).takeWhile(_ < (ttl.seconds)).map { _ =>
+      Process.awakeEvery(2.seconds)(Strategy.Executor(Monitoring.serverPool), Monitoring.schedulingPool).takeWhile(_ < (ttl.seconds)).map { _ =>
         reqs.incrementBy((math.random * 10).toInt)
         ok.green
       }.onComplete(Process.eval_(
@@ -50,7 +51,7 @@ object MirroringExample {
 
     val urls: Process[Task, (URL,String)] = // cluster comes online gradually
       Process.emitAll(accountCluster ++ decodingCluster).flatMap {
-        case (url,group) => Process.sleep(2.seconds) ++
+        case (url,group) => Process.sleep(2.seconds)(Strategy.Executor(Monitoring.serverPool), Monitoring.schedulingPool) ++
                             Process.emit(new URL(url) -> group)
       }
 

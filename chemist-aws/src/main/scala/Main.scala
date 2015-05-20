@@ -3,11 +3,11 @@ package chemist
 package aws
 
 import scalaz.concurrent.Task
+import scalaz.syntax.monad._
 import http.MonitoringServer
 
 object Main {
   def main(args: Array[String]): Unit = {
-
     val chemist = new AwsChemist
 
     val aws = new Aws {

@@ -2,12 +2,12 @@ package funnel
 package flask
 
 import scala.concurrent.duration._
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Strategy,Task}
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
 import scalaz.stream.Process
-import scalaz.stream.async.signal
+import scalaz.stream.async.signalOf
 import com.amazonaws.auth.BasicAWSCredentials
 import argonaut._, Argonaut._
 import journal.Logger
@@ -63,8 +63,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   ]
   """
 
-  val ready = signal[Boolean]
-  ready.set(false)
+  val ready = signalOf(false)(Strategy.Executor(Monitoring.serverPool))
 
   implicit val B = scalaz.std.anyVal.booleanInstance.conjunction
   implicit val s = scalaz.stream.DefaultScheduler

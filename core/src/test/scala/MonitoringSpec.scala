@@ -80,6 +80,7 @@ object MonitoringSpec extends Properties("monitoring") {
     ok && out2.length === 2 && out2(0) === xs.sum && out2(1) === xs.sum
   }
 
+
   /* Check that if all events occur at same moment, `sliding` has no effect. */
   property("sliding-id") = forAll(Gen.nonEmptyListOf(Gen.choose(1,10))) { xs =>
     val c = B.sliding(5.minutes)(identity[Int])(Group.intGroup)
@@ -114,6 +115,7 @@ object MonitoringSpec extends Properties("monitoring") {
     true
   }
 
+
   /*
    * Check that subscribing and filtering is the same as
    * filtering and subscribing.
@@ -142,7 +144,6 @@ object MonitoringSpec extends Properties("monitoring") {
     val d = (xs.length - ys.length).abs
     d <= 2 // Each of xs and ys could gain or lose one tick, for a total of 2
   }
-
 
   /* Check that `distinct` combinator works. */
   property("distinct") = forAll(Gen.nonEmptyListOf(Gen.choose(-10L,10L))) { xs =>
@@ -211,6 +212,7 @@ object MonitoringSpec extends Properties("monitoring") {
     }
     go || go || go
   }
+
 
   /* Simple sanity check of a timer. */
   property("timer-ex") = secure {

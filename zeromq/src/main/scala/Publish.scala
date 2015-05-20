@@ -2,6 +2,7 @@ package funnel
 package zeromq
 
 import argonaut.EncodeJson
+import scalaz.concurrent.Strategy
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.Process
 import scalaz.concurrent.Task
@@ -14,7 +15,7 @@ object Publish {
   import scalaz.stream.async.signalOf
 
   private[zeromq] val UTF8 = java.nio.charset.Charset.forName("UTF-8")
-  private[zeromq] val alive: Signal[Boolean] = signalOf[Boolean](true)
+  private[zeromq] val alive: Signal[Boolean] = signalOf[Boolean](true)(Strategy.Executor(Monitoring.serverPool))
   val defaultUnixSocket = "/var/run/funnel.socket"
   val defaultTcpSocket  = "127.0.0.1:7390"
 
