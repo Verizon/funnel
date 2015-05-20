@@ -24,7 +24,8 @@ abstract class PeriodicGauge[A](implicit A: Group[A]) extends Instrument[Periodi
              implicit S: ScheduledExecutorService = Monitoring.schedulingPool,
              S2: ExecutorService = Monitoring.defaultPool): PeriodicGauge[A] =
     new PeriodicGauge[A] {
-      def append(a: A) = Gauge.buffer(d, A.zero)(A.plus, _ => A.zero, self.append).apply(a)
+      val b = new Gauge.Buffer(d, A.zero)(A.plus, _ => A.zero, self.append)
+      def append(a: A) = b(a)
       def keys = self.keys
     }
 }
