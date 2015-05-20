@@ -9,6 +9,8 @@ ScalaTest.settings
 
 Custom.compilation
 
+ContinuousIntegration.produceCoverageReport := false
+
 fork in test := true
 
 initialCommands in console := """
@@ -19,7 +21,6 @@ import TargetState._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 """
-
 
 libraryDependencies ++= Seq(
   "intelmedia.ws.common"    %% "logging-s3"              % "10.+",
