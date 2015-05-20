@@ -1,6 +1,7 @@
 package funnel
 package riemann
 
+import scalaz.concurrent.Strategy
 import scalaz.stream.Process
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
@@ -29,14 +30,13 @@ object Main {
 
     implicit val P = Monitoring.schedulingPool
 
-    val t1 = Process.awakeEvery(2.seconds).map { _ =>
+    val t1 = Process.awakeEvery(2.seconds)(Strategy.Executor(Monitoring.serverPool), Monitoring.schedulingPool).map { _ =>
              c.increment
              t.time(Thread.sleep(100))
              randomLight(l)
            }.run.runAsyncInterruptibly(println, stop)
 
-    val t2 = Riemann.publish(Monitoring.default, 10f,
-        Events.every(10.seconds))(R, Riemann.collector(R)).runAsyncInterruptibly(println, stop)
+    val t2 = Riemann.publish(Monitoring.default, 10f)(R, Riemann.collector(R)).runAsyncInterruptibly(println, stop)
 
     println
     println("Press [Enter] to quit...")

@@ -3,18 +3,13 @@ package chemist
 
 import scalaz.concurrent.Task
 import scalaz.syntax.kleisli._
+import scalaz.Applicative
 
 class TestChemist extends Chemist[TestPlatform]{
-  import Sharding.Target
 
-  def bootstrap: ChemistK[Unit] =
-    for {
-      cfg <- config
-    } yield ()
+  def filterTargets(instances: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]] = Applicative[ChemistK].point(instances)
 
   def init: ChemistK[Unit] =
     Task.now(()).liftKleisli
-
-  protected def alterShard(id: String,state: AutoScalingEventKind): ChemistK[Unit] = ???
 
 }

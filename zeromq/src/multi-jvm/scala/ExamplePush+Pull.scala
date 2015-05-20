@@ -3,7 +3,6 @@ package zeromq
 
 import funnel._, zeromq._
 import scalaz.concurrent.{Task,Strategy}
-import java.util.concurrent.atomic.AtomicBoolean
 import scalaz.stream.Process
 import scala.concurrent.duration._
 import java.net.URI

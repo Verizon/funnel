@@ -76,11 +76,17 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
     case GET(Path("/status")) =>
       GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
+    case GET(Path("/errors")) =>
+      GetStatus.time(Ok ~> JsonResponse(Chemist.version))
+
     case GET(Path("/distribution")) =>
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
 
     case GET(Path("/lifecycle/history")) =>
       GetLifecycleHistory.time(json(chemist.history.map(_.toList)))
+
+    case GET(Path("/lifecycle/states")) =>
+      GetLifecycleStates.time(json(chemist.states.map(_.toList)))
 
     case POST(Path("/distribute")) =>
       PostDistribute.time(NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)"))
@@ -92,13 +98,13 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
       GetShards.time(json(chemist.shards))
 
     case GET(Path(Seg("shards" :: id :: Nil))) =>
-      GetShardById.time(json(chemist.shard(id)))
+      GetShardById.time(json(chemist.shard(FlaskID(id))))
 
     case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
-      PostShardExclude.time(json(chemist.exclude(id)))
+      PostShardExclude.time(json(chemist.exclude(FlaskID(id))))
 
     case POST(Path(Seg("shards" :: id :: "include" :: Nil))) =>
-      PostShardInclude.time(json(chemist.include(id)))
+      PostShardInclude.time(json(chemist.include(FlaskID(id))))
 
   }
 }

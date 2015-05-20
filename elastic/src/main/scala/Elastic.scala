@@ -3,6 +3,7 @@ package elastic
 
 import java.net.URI
 import scala.concurrent.duration._
+import scalaz.concurrent.Strategy
 import scalaz.stream._
 import scalaz._
 import concurrent.Strategy.Executor
@@ -233,7 +234,7 @@ case class Elastic(M: Monitoring) {
       d   <- duration.lift[Task]
       timeout = Process.awakeEvery(d)(Executor(Monitoring.serverPool), Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
       subscription = Monitoring.subscribe(M)(k => cfg.groups.exists(g => k.startsWith(g))).map(Option.apply)
-      -   <- (timeout.wye(subscription)(wye.merge).translate(lift) |>
+      -   <- (timeout.wye(subscription)(wye.merge)(Strategy.Executor((Monitoring.serverPool))).translate(lift) |>
               elasticGroup(cfg.groups) |> elasticUngroup(flaskName, flaskCluster)).evalMap(
                 json  => esURL.lift[Task] >>= (r => elasticJson(r.POST, json))
               ).run

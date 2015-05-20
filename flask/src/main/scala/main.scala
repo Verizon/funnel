@@ -3,11 +3,12 @@ package flask
 
 import com.aphyr.riemann.client.RiemannClient
 import scala.concurrent.duration._
+import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.stream.{ io, Process, Sink }
-import scalaz.stream.async.mutable.Signal
+import scalaz.stream.async.mutable.{Queue,Signal}
 import knobs.{Config, Required, ClassPathResource, FileResource}
 import journal.Logger
 import funnel.{Events,DatapointParser,Datapoint,Names,Sigar,Monitoring,Instruments}
@@ -20,8 +21,7 @@ import zeromq._
 import sockets._
 import scalaz.stream._
 import scalaz.\/
-import messages._
-import Telemetry._
+import telemetry.Telemetry._
 
 /**
   * How to use: Modify oncue/flask.cfg on the classpath
@@ -39,7 +39,7 @@ class Flask(options: Options, val I: Instruments) {
 
   val S = MonitoringServer.start(I.monitoring, options.funnelPort)
 
-  lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)
+  lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)(Strategy.Executor(Monitoring.serverPool))
 
 
   private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
@@ -64,10 +64,10 @@ class Flask(options: Options, val I: Instruments) {
     log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
   }, identity _))
 
-  private def httpOrZmtp(alive: Signal[Boolean])(uri: URI): Process[Task,Datapoint[Any]] =
+  private def httpOrZmtp(alive: Signal[Boolean], Q: Queue[Telemetry])(uri: URI): Process[Task,Datapoint[Any]] =
     Option(uri.getScheme).map(_.toLowerCase) match {
-      case Some("http") => SSE.readEvents(uri)
-      case Some("tcp")  => Mirror.from(alive)(uri)
+      case Some("http") => SSE.readEvents(uri, Q)
+      case Some("tcp")  => Mirror.from(alive, Q)(uri)
       case _            => Process.fail(new RuntimeException("Unknown URI scheme submitted."))
     }
 
@@ -76,17 +76,22 @@ class Flask(options: Options, val I: Instruments) {
     def countDatapoints: Sink[Task, Datapoint[Any]] =
       io.channel(_ => Task(mirrorDatapoints.increment))
 
-    val Q = async.unboundedQueue[Telemetry]
+    val Q = async.unboundedQueue[Telemetry](Strategy.Executor(funnel.Monitoring.serverPool))
+
     telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
-                           (I.monitoring.keys.discrete pipe keyChanges).wye(Q.dequeue)(wye.merge)).runAsync(_ => ())
+                           Q.dequeue.wye(I.monitoring.keys.discrete pipe keyChanges)(wye.merge)(Strategy.Executor(Monitoring.serverPool))).runAsync(_ => ())
+
 
     def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
-      httpOrZmtp(alive)(uri) observe countDatapoints
+      httpOrZmtp(alive, Q)(uri) observe countDatapoints
 
-    def retries(names: Names): Event =
-      Monitoring.defaultRetries andThen (_ ++ Process.eval[Task, Unit](
-        Q.enqueueOne(Error(names))
-          .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString)))))
+    def retries(names: Names): Event = {
+      val retries = if(args.contains("noretries")) Events.takeEvery(10.seconds, 1) else Monitoring.defaultRetries
+      retries andThen (_ ++ Process.eval[Task, Unit] {
+                         Q.enqueueAll(Seq(Error(names), Problem(names.theirs, "there wasn an error")))
+                           .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString)))
+                       })
+    }
 
     import java.net.InetAddress
     val flaskName = options.name.getOrElse(InetAddress.getLocalHost.getHostName)
@@ -97,7 +102,7 @@ class Flask(options: Options, val I: Instruments) {
     options.metricTTL.foreach(t => runAsync(I.monitoring.keySenescence(Events.every(t)).run))
 
     log.info("Booting the mirroring process...")
-    runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), flaskName, retries))
+    runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName, retries))
 
     options.elastic.foreach { elastic =>
       log.info("Booting the elastic search sink...")
@@ -117,8 +122,9 @@ class Flask(options: Options, val I: Instruments) {
 
       runAsync(Riemann.publishToRiemann(
         I.monitoring, riemann.ttl.toSeconds.toFloat)(
-        R, s"${riemann.host}:${riemann.port}", retries)(flaskName))
+        R, s"${riemann.host}:${riemann.port}")(flaskName))
     }
+    Q.enqueueOne(Error(Names("how about", "this thing", new URI("http://localhost")))).run
   }
 }
 

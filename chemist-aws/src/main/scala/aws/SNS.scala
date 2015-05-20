@@ -7,7 +7,7 @@ import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.services.sns.model.{CreateTopicRequest, PublishRequest}
 import com.amazonaws.auth.BasicAWSCredentials
 import scalaz.concurrent.Task
-
+import funnel.chemist.Chemist
 object SNS {
 
   def client(
@@ -27,20 +27,20 @@ object SNS {
   def create(topicName: String)(client: AmazonSNS): Task[ARN] = Task {
     val req = new CreateTopicRequest(topicName) // cfg.require[String]("aws.snsTopic")
     client.createTopic(req).getTopicArn // idempotent operation
-  }
+  }(Chemist.serverPool)
 
   def publish(topicName: String, payload: String)(client: AmazonSNS): Task[Unit] = {
     create(topicName)(client).flatMap { arn =>
       Task {
         val preq = new PublishRequest(arn, payload)
         val pres = client.publish(preq)
-      }
+      }(Chemist.serverPool)
     }
   }
 
   def subscribe(snsArn: ARN, targetArn: ARN, protocol: String = "sqs")(client: AmazonSNS): Task[ARN] =
     for {
-      a <- Task(client.subscribe(snsArn, protocol, targetArn).getSubscriptionArn)
-      b <- Task(client.setSubscriptionAttributes(a, "RawMessageDelivery", "true"))
+      a <- Task(client.subscribe(snsArn, protocol, targetArn).getSubscriptionArn)(Chemist.serverPool)
+      b <- Task(client.setSubscriptionAttributes(a, "RawMessageDelivery", "true"))(Chemist.serverPool)
     } yield a
 }

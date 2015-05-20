@@ -1,7 +1,6 @@
 package funnel
 
 import java.net.URI
-import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory, ConcurrentHashMap}
 import scala.concurrent.duration._
 import scala.language.higherKinds
@@ -10,6 +9,7 @@ import scalaz.{Nondeterminism,==>>}
 import scalaz.stream._
 import scalaz.stream.merge._
 import scalaz.stream.async
+import async.mutable.Queue
 import scalaz.syntax.traverse._
 import scalaz.syntax.monad._
 import scalaz.std.option._
@@ -116,7 +116,7 @@ trait Monitoring {
   private[funnel] val mirroringQueue =
     async.unboundedQueue[Command](Strategy.Executor(Monitoring.serverPool))
 
-  private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue
+  private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue observe(io.stdOut.contramap[Command](_.toString))
 
   private val urlSignals = new ConcurrentHashMap[URI, Signal[Unit]]
 
@@ -139,49 +139,46 @@ trait Monitoring {
 
   def processMirroringEvents(
     parse: DatapointParser,
+    Q: Queue[Telemetry],
     myName: String = "Funnel Mirror",
     nodeRetries: Names => Event = _ => defaultRetries
   ): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
-    val alive     = signal[Unit](S)
-    val active    = signal[Set[URI]](S)
+    val alive     = async.signalOf[Unit](())(S)
+    val active    = async.signalOf[Set[URI]](Set.empty)(S)
 
     /**
      * Update the running state of the world by updating the URLs we know about
      * to mirror, and the cluster -> url mapping.
      */
-    def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] =
+    def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] = {
       for {
-        _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))) )
-        _ <- Task( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))).filter(!_.isEmpty) )
+        _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))))
+        _ <- Task.delay( clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))).filter(!_.isEmpty) )
         _  = log.debug(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
       } yield ()
+    }
 
     for {
-      _ <- active.set(Set.empty)
-      _ <- alive.set(())
       _ <- mirroringCommands.evalMap {
         case Mirror(source, cluster) => Task.delay {
           log.info(s"Attempting to monitor '$cluster' located at '$source'")
           val S = Strategy.Executor(Monitoring.serverPool)
-          val hook = signal[Unit](S)
-          hook.set(()).runAsync(_ => ())
+          val hook = async.signalOf[Unit](())(S)
 
           urlSignals.put(source, hook)
 
           val received: Process[Task,Unit] = link(hook) {
-            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, source.toString)))(
+            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, new URI(source.toString))))(
               source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> source.toString))
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
             if (urls.contains(source)) Process.halt // skip it, alread running
-            else Process.eval_(modifyActive(cluster, _ + source)) ++ // add to active at start
-              // and remove it when done
-              received.onComplete(Process.eval_(modifyActive(cluster, _ - source)))
+            else Process.eval_(modifyActive(cluster, _ + source) >> Q.enqueueOne(Monitored(source))) ++ received.onComplete(Process.eval_(Q.enqueueOne(Problem(source, ""))))
           }
 
-          Task.fork(receivedIdempotent.run).runAsync(_.fold(
+          Task.fork(receivedIdempotent.run)(Monitoring.serverPool).runAsync(_.fold(
             err => log.error(err.getMessage), identity))
         }
         case Discard(source) => Task.delay {
@@ -516,7 +513,7 @@ object Monitoring {
         case Process.Halt(e) => signal.fail(e.asThrowable).run
         case _ => ()
       }
-    }
+    }(Strategy.Executor(Monitoring.serverPool))
     ((i: I) => hub ! i, signal)
   }
 

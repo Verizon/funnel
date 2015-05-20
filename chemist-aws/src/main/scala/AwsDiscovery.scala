@@ -2,11 +2,15 @@ package funnel
 package chemist
 package aws
 
-import java.net.URL
+import java.net.{URI,URL}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
+import scalaz.\/
+import scalaz.std.vector._
 import scalaz.stream.Process
+import scalaz.syntax.monadPlus._
+import scalaz.syntax.std.option._
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
@@ -23,7 +27,7 @@ import funnel.aws._
  * 2. They are running a Funnel server on port 5775 - this is used to validate that
  *    the instance is in fact a useful server for the sake of work sharding.
  */
-class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discovery {
+class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
 
   private val log = Logger[Discovery]
 
@@ -33,14 +37,48 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
    * List all of the instances in the given AWS account that respond to a rudimentry
    * verification that Funnel is running on port 5775 and is network accessible.
    */
-  def list: Task[Seq[Instance]] =
-    instances(_ => true)
+  def listTargets: Task[Seq[(TargetID, Set[Target])]] =
+    instances(_ => true).map(_.map(in => TargetID(in.id) -> in.targets))
+
+  /**
+   * List all of the instances in the given AWS account that respond to a rudimentry
+   * verification that Funnel is running on port 5775 and is network accessible.
+   */
+  def listFlasks: Task[Seq[Flask]] =
+    instances(isFlask).map(_.map(in => Flask(FlaskID(in.id), in.location, in.telemetryLocation)))
 
   /**
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
-  def lookupOne(id: InstanceID): Task[Instance] = {
+  def lookupFlask(id: FlaskID): Task[Flask] = {
+    lookupMany(Seq(id.value)).flatMap {
+      _.filter(_.id == id.value).headOption match {
+        case None => Task.fail(InstanceNotFoundException(id.value))
+        case Some(i) => Task.now(i.asFlask)
+      }
+    }
+  }
+
+  /**
+   * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
+   * of the useful AWS metadata encoded into an internal representation.
+   */
+  def lookupTargets(id: TargetID): Task[Set[Target]] = {
+    lookupMany(Seq(id.value)).flatMap {
+      _.filter(_.id == id.value).headOption match {
+        case None => Task.fail(InstanceNotFoundException(id.value))
+        case Some(i) => Task.now(i.targets)
+      }
+    }
+  }
+
+
+  /**
+   * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
+   * of the useful AWS metadata encoded into an internal representation.
+   */
+  private def lookupOne(id: String): Task[AwsInstance] = {
     lookupMany(Seq(id)).flatMap {
       _.filter(_.id == id).headOption match {
         case None => Task.fail(InstanceNotFoundException(id))
@@ -50,27 +88,34 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
   }
 
   /**
-   * Lookup the `Instace` metadata for a set of `InstanceID`.
+   * Lookup the `Instance` metadata for a set of `InstanceID`.
    * @see funnel.chemist.Deployed.lookupOne
    */
-  def lookupMany(ids: Seq[InstanceID]): Task[Seq[Instance]] =
+  private def lookupMany(ids: Seq[String]): Task[Seq[AwsInstance]] =
     for {
       a <- EC2.reservations(ids)(ec2)
       _  = log.debug(s"Deployed.lookupMany, a = ${a.length}")
       b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
+      (fails,successes) = b.toVector.separate
       _  = log.debug(s"Deployed.lookupMany b = ${b.length}")
-    } yield b
+      _  = fails.foreach(x => log.error(x))
+    } yield successes
 
 
   ///////////////////////////// filters /////////////////////////////
 
-  def isFlask(i: Instance): Boolean =
+  def isFlask(id: String): Task[Boolean] =
+    lookupOne(id).map { i =>
+      i.application.map(_.name.startsWith("flask")).getOrElse(false)
+    }
+
+  def isFlask(i: AwsInstance): Boolean =
     i.application.map(_.name.startsWith("flask")).getOrElse(false)
 
 
   ///////////////////////////// internal api /////////////////////////////
 
-  private def instances(f: Instance => Boolean): Task[Seq[Instance]] =
+  private def instances(f: AwsInstance => Boolean): Task[Seq[AwsInstance]] =
     for {
       a <- readAutoScallingGroups
       // apply the specified filter if we want to remove specific groups for a reason
@@ -87,29 +132,37 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
    * This is kind of horrible, but it is what it is. The AWS api's really do not help here at all.
    * Sorry!
    */
-  private def readAutoScallingGroups: Task[Seq[Instance]] =
+  private def readAutoScallingGroups: Task[Seq[AwsInstance]] =
     for {
       g <- ASG.list(asg)
       _  = log.debug(s"Found ${g.length} auto-scalling groups with ${g.map(_.instances.length).reduceLeft(_ + _)} instances...")
       r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))
     } yield r
 
-  private def fromAWSInstance(in: AWSInstance): Instance = {
+  private def fromAWSInstance(in: AWSInstance): String \/ AwsInstance = {
     val sgs: List[String] = in.getSecurityGroups.asScala.toList.map(_.getGroupName)
     val extdns: Option[String] =
       if(in.getPublicDnsName.nonEmpty) Option(in.getPublicDnsName) else None
     val intdns = Option(in.getPrivateDnsName)
 
-    Instance(
-      id = in.getInstanceId,
-      location = Location(
-        dns = extdns orElse intdns,
-        datacenter = in.getPlacement.getAvailabilityZone,
-        isPrivateNetwork = (extdns.isEmpty && intdns.nonEmpty)
-      ),
-      firewalls = sgs,
-      tags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
-    )
+    val host = (extdns orElse intdns) \/> s"instance had no ip: ${in.getInstanceId}"
+    host map { h =>
+      val loc = Location(
+          host = h,
+          port = 5775,
+          datacenter = in.getPlacement.getAvailabilityZone,
+          isPrivateNetwork = (extdns.isEmpty && intdns.nonEmpty)
+      )
+      // TODO, we'll need to do something different in the meesos world where ports are remappped
+      val tloc = loc.copy(port=7390, protocol="tcp")
+      AwsInstance(
+        id = in.getInstanceId,
+        location = loc,
+        telemetryLocation = tloc,
+        firewalls = sgs,
+        tags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
+      )
+    }
   }
 
   import scala.io.Source
@@ -128,9 +181,9 @@ class Discovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends chemist.Discover
    * by the supplied group `g`, are in fact running a funnel instance and it is
    * ready to start sending metrics if we connect to its `/stream` function.
    */
-  private def validate(instance: Instance): Task[Instance] = {
+  private def validate(instance: AwsInstance): Task[AwsInstance] = {
     for {
-      a <- Task(instance.asURL.flatMap(fetch))(Chemist.defaultPool)
+      a <- Task(fetch(instance.asURI.toURL))(Chemist.defaultPool)
       b <- a.fold(e => Task.fail(e), o => Task.now(o))
     } yield instance
   }

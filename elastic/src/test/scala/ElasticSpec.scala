@@ -24,7 +24,7 @@ class ElasticSpec extends FlatSpec with Matchers {
       Process(Option.empty[Datapoint[Any]]) ++
       Process.sleep(5.seconds)(S, scheduler) ++
       Process(Option.empty[Datapoint[Any]])
-    val input = timeout.wye(dps ++ Process.sleep(15.seconds)(S, scheduler))(wye.merge).translate(lift)
+    val input = timeout.wye(dps ++ Process.sleep(15.seconds)(S, scheduler))(wye.merge)(S).translate(lift)
     val ogs = input |> elasticGroup(List("k"))
     val result = ogs.runLast.run(cfg).run
     result should be ('defined)
