@@ -9,8 +9,9 @@ import knobs._
 
 import concurrent.duration.Duration
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Strategy,Task}
 import scalaz.stream.Process
+import scalaz.stream.async.signalOf
 
 case class StaticConfig(
   resources: List[String],
@@ -24,6 +25,8 @@ case class StaticConfig(
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
+  val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
+  val remoteFlask = new HttpFlask(http, repository, signal)
 }
 
 object Config {

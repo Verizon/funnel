@@ -7,7 +7,7 @@ import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import funnel.internals._
 import scalaz.std.string._
-import scalaz.stream.async
+import scalaz.stream.{Process,async}
 import java.net.URI
 
 class LoggingRepository extends Repository {
@@ -49,4 +49,7 @@ class LoggingRepository extends Repository {
   def distribution: Task[Distribution] = countTask(increase, Task.now(Distribution.empty))
   def mergeDistribution(d: Distribution): Task[Distribution] = Task.now(Distribution.empty)
   def assignedTargets(flask: Flask): Task[Set[Target]] = Task.now(Set.empty)
+
+  def repoCommands: Process[Task, RepoCommand] = ???
+
 }
