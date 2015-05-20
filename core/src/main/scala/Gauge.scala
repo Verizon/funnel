@@ -22,7 +22,7 @@ trait Gauge[K,A] extends Instrument[K] { self =>
   def buffer(d: Duration)(
              implicit S: ScheduledExecutorService = Monitoring.schedulingPool,
              S2: ExecutorService = Monitoring.defaultPool): Gauge[K, A] = new Gauge[K, A] {
-    val b = Gauge.buffer[Option[A]](d, None)((_, a) => a, a => a, a => set(a.get))
+    val b = new Gauge.Buffer[Option[A]](d, None)((_, a) => a, a => a, a => self.set(a.get))
     def set(a: A): Unit = b(Some(a))
     def keys = self.keys
   }
@@ -35,35 +35,38 @@ trait Gauge[K,A] extends Instrument[K] { self =>
 
 object Gauge {
 
-  def buffer[A](d: Duration, init: A)(append: (A, A) => A, reset: A => A, k: A => Unit)(
+  class Buffer[A](d: Duration, init: A)(append: (A, A) => A, reset: A => A, publish: A => Unit)(
     implicit S: ScheduledExecutorService = Monitoring.schedulingPool,
-    S2: ExecutorService = Monitoring.defaultPool): A => Unit = {
-      if (d < (100 microseconds))
-        sys.error("buffer size be at least 100 microseconds, was: " + d)
+    S2: ExecutorService = Monitoring.defaultPool) { self =>
+      if (d < 100.microseconds)
+        sys.error("buffer size must be at least 100 microseconds, was: " + d)
 
       var delta = init
       var scheduled = false
       val nanos = d.toNanos
       val later = Strategy.Executor(S2)
 
-      lazy val send: Actor[Option[A]] = actor[Option[A]] { msg =>
+      val send: Actor[Option[A]] = actor[Option[A]] { msg =>
         msg.map { a =>
           delta = append(delta, a)
           if (!scheduled) {
             scheduled = true
-            val task = new Runnable {
-              def run = send(None)
-            }
             S.schedule(task, nanos, TimeUnit.NANOSECONDS)
           }
         } getOrElse {
           scheduled = false
-          k(delta)
+          publish(delta)
           delta = reset(delta)
         }
       }(later)
 
-      a => send(Some(a))
+      val task = new Runnable {
+        def run = {
+          self.send(None)
+        }
+      }
+
+      def apply(a: A) = send(Some(a))
     }
 
   def scale[K](k: Double)(g: Gauge[K,Double]): Gauge[K,Double] =

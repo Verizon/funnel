@@ -36,7 +36,7 @@ class Instruments(val window: Duration,
    * See [[funnel.Periodic]].
    */
   def periodicGauge[O:Reportable:Group](
-    label: String, units: Units = Units.None, description: String = "", init: O,
+    label: String, units: Units = Units.None, description: String = "",
     keyMod: Key[O] => Key[O] = identity[Key[O]] _): PeriodicGauge[O] = {
       val O = implicitly[Group[O]]
       val kinded = andKind("periodic", keyMod)
@@ -46,13 +46,13 @@ class Instruments(val window: Duration,
         val sliding = B.sliding(window)(identity[O])(O)
         val (nowK, incrNow) =
           monitoring.topic[O,O](
-            s"now/$label", units, nowL(description), O.zero, kinded)(now)
+            s"now/$label", units, nowL(description), kinded)(now)
         val (prevK, incrPrev) =
           monitoring.topic[O,O](
-            s"previous/$label", units, previousL(description), O.zero, kinded)(prev)
+            s"previous/$label", units, previousL(description), kinded)(prev)
         val (slidingK, incrSliding) =
           monitoring.topic[O,O](
-            s"sliding/$label", units, slidingL(description), O.zero, kinded)(sliding)
+            s"sliding/$label", units, slidingL(description), kinded)(sliding)
         def append(n: O): Unit = {
           incrNow(n); incrPrev(n); incrSliding(n)
         }
