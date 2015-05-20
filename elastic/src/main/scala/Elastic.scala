@@ -234,7 +234,7 @@ case class Elastic(M: Monitoring) {
       timeout = time.awakeEvery(d)(Executor(Monitoring.serverPool), Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
       subscription = Monitoring.subscribe(M)(k => cfg.groups.exists(g => k.startsWith(g))).map(Option.apply)
       -   <- (timeout.wye(subscription)(wye.merge).translate(lift) |>
-              elasticGroup(cfg.groups) |> elasticUngroup(flaskName, flaskCluster)).evalMap(
+              elasticGroup(cfg.groups) |> elasticUngroup(flaskName, flaskCluster)).evalMap[ES, Unit](
                 json  => esURL.lift[Task] >>= (r => elasticJson(r.POST, json))
               ).run
     } yield ()

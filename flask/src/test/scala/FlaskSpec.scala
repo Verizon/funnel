@@ -7,7 +7,7 @@ import scalaz.std.option._
 import scalaz.syntax.applicative._
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
 import scalaz.stream.Process
-import scalaz.stream.async.signal
+import scalaz.stream.async.signalOf
 import com.amazonaws.auth.BasicAWSCredentials
 import argonaut._, Argonaut._
 import journal.Logger
@@ -63,8 +63,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   ]
   """
 
-  val ready = signal[Boolean]
-  ready.set(false)
+  val ready = signalOf[Boolean](false)
 
   implicit val B = scalaz.std.anyVal.booleanInstance.conjunction
   implicit val s = scalaz.stream.DefaultScheduler

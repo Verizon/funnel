@@ -6,7 +6,7 @@ import scala.concurrent.duration._
 import scalaz.concurrent.Task
 import scalaz.std.option._
 import scalaz.syntax.applicative._
-import scalaz.stream.{ io, Process, Sink }
+import scalaz.stream.{ channel, Process, Sink }
 import scalaz.stream.async.mutable.Signal
 import knobs.{Config, Required, ClassPathResource, FileResource}
 import journal.Logger
@@ -74,7 +74,7 @@ class Flask(options: Options, val I: Instruments) {
   def run(args: Array[String]): Unit = {
 
     def countDatapoints: Sink[Task, Datapoint[Any]] =
-      io.channel(_ => Task(mirrorDatapoints.increment))
+      channel.lift(_ => Task(mirrorDatapoints.increment))
 
     val Q = async.unboundedQueue[Telemetry]
     telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
