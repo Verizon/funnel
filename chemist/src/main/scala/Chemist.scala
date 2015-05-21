@@ -126,20 +126,16 @@ trait Chemist[A <: Platform]{
     _ <- targets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
     _  = log.info("added instances to the repository...")
 
-/* STU: is this taken care of by housekeeping yet?
     // ask those flasks for their current work and yield a `Distribution`
-    d <- Sharding.gatherAssignedTargets(f)(cfg.http).liftKleisli
+    d <- Housekeeping.gatherAssignedTargets(f)(cfg.http).liftKleisli
     _  = log.debug("read the existing state of assigned work from the remote instances")
 
     // update the distribution accordingly
-    _ <- cfg.repository.mergeDistribution(d).liftKleisli
+    d2 <- cfg.repository.mergeDistribution(d).liftKleisli
     _  = log.debug("merged the currently assigned work into the current distribution")
 
-    _ <- (for {
-      h <- Sharding.locateAndAssignDistribution(t, cfg.repository)
-      g <- Sharding.distribute(h)(cfg.http)
-    } yield ()).liftKleisli
- */
+    _ <- Sharding.distribute(cfg.repository, cfg.sharder, cfg.remoteFlask, d2)(targets.map(_.target).toSet).liftKleisli
+
     _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
 
   } yield ()
