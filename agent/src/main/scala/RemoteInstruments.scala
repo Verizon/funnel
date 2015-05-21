@@ -12,7 +12,7 @@ object RemoteInstruments {
 
   type Name = String
 
-  private val counters     = new ConcurrentHashMap[Name, Counter[Periodic[Double]]]
+  private val counters     = new ConcurrentHashMap[Name, Counter]
   private val timers       = new ConcurrentHashMap[Name, Timer[Periodic[Stats]]]
   private val stringGauges = new ConcurrentHashMap[Name, Gauge[Continuous[String],String]]
   private val doubleGauges = new ConcurrentHashMap[Name, Gauge[Periodic[Stats],Double]]
@@ -58,7 +58,7 @@ object RemoteInstruments {
   }
 
   private[agent] def counter(m: ArbitraryMetric)(I: Instruments): Task[Unit] = {
-    val counter = lookup[Counter[Periodic[Double]]](m.name)(counters).getOrElse {
+    val counter = lookup[Counter](m.name)(counters).getOrElse {
       val c = I.counter(m.name)
       counters.putIfAbsent(m.name, c)
       c

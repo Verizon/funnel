@@ -175,7 +175,7 @@ object MonitoringSpec extends Properties("monitoring") {
    * with concurrent producers.
    */
   property("profiling") = secure {
-    def go: Boolean = {
+    def go: Prop = {
       import instruments._
       val c = counter("uno")
       val ok = gauge("tres", false)
@@ -199,13 +199,15 @@ object MonitoringSpec extends Properties("monitoring") {
       }
       val publishTime = Duration.fromNanos(System.nanoTime - t0) / N.toDouble
       val okResult = Monitoring.default.latest(ok.keys.now).run
+      Thread.sleep(instruments.bufferTime.toMillis * 2)
 
-      // println("update time: " + updateTime.toNanos)
-      // println("publishTime: " + publishTime.toNanos)
+      //println("update time: " + updateTime)
+      //println("publishTime: " + publishTime)
+      //println("OK result:" + okResult)
       // I am seeing about 40.nanoseconds for update times,
       // 100 nanos for publishing
-      updateTime.toNanos < 1000 &&
-      publishTime.toNanos < 2000 &&
+      (s"Gauge latency should be < 1000 ns (was $updateTime)" |: (updateTime.toNanos < 1000)) &&
+      (s"Publish latency should be < 2000 ns (was $publishTime)" |: (publishTime.toNanos < 2000)) &&
       okResult
     }
     go || go || go

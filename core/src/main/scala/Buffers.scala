@@ -3,6 +3,7 @@ package funnel
 import scala.concurrent.duration._
 import scalaz.stream._
 import scalaz.stream.{Process => P}
+import scalaz.Monoid
 import com.twitter.algebird.Group
 
 /**
@@ -53,6 +54,13 @@ object Buffers {
   /** Emits a running sum of its inputs, starting from `init`. */
   def counter(init: Long): Process1[Long,Double] =
     process1.scan(init.toDouble)(_ + _)
+
+  /**
+   * Emits a running sum of its inputs, starting from the `zero`
+   * value of the given `Monoid`.
+   */
+  def sum[A](implicit A: Monoid[A]): Process1[A,A] =
+    process1.scan(A.zero)(A.append(_, _))
 
   /** Emits only values not yet seen. */
   def distinct[A]: Process1[A, A] = {
