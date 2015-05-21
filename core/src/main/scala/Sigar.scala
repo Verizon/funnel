@@ -136,7 +136,7 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
   def instrument(
     implicit ES: ExecutorService = Monitoring.defaultPool,
              TS: ScheduledExecutorService = Monitoring.schedulingPool,
-             t: Duration = 30 seconds,
+             t: Duration = 2.seconds,
              log: String => Unit): Unit = {
 
     // Make the side effects happen.
