@@ -36,12 +36,12 @@ class Instruments(val window: Duration,
    * See [[funnel.Periodic]].
    */
   def periodicGauge[O:Reportable:Group](
-    label: String, units: Units = Units.None, description: String = "",
+    label: String, units: Units = Units.None, description: String = "", init: O,
     keyMod: Key[O] => Key[O] = identity[Key[O]] _): PeriodicGauge[O] = {
       val O = implicitly[Group[O]]
       val kinded = andKind("periodic", keyMod)
       val c = new PeriodicGauge[O] {
-        val now = B.resetEvery(window)(B.sum[O])
+        val now = B.resetEvery(window)(B.accum[O,O](init)(O.plus))
         val prev = B.emitEvery(window)(now)
         val sliding = B.sliding(window)(identity[O])(O)
         val (nowK, incrNow) =
@@ -72,7 +72,8 @@ class Instruments(val window: Duration,
               init: Int = 0,
               description: String = "",
               keyMod: Key[Double] => Key[Double] = identity): Counter =
-    new Counter(periodicGauge[Double](label, Units.Count, description, keyMod))
+    new Counter(periodicGauge[Double](
+      label, Units.Count, description, init, andKind("counter", keyMod)))
 
   // todo: histogramgauge, histogramCount, histogramTimer
   // or maybe we just modify the existing combinators to
