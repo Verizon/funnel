@@ -12,8 +12,10 @@ SbtMultiJvm.multiJvmSettings
 
 Custom.testing
 
-libraryDependencies += "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test"
-
+libraryDependencies ++= Seq(
+  "org.typelevel"   %% "scodec-core"          % "1.6.+",
+  "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test"
+)
 
 initialCommands in console := """
 import funnel._
