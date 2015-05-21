@@ -9,10 +9,10 @@ section: "getting-started"
 This document outlines the various steps required to migrate from one version of funnel to another.
 
 * [3.0 to 3.2](#30to32)
-* [2.1 to 3.2](#21to30)
+* [2.1 to 3.0](#21to30)
 * [1.7 to 2.x](#17to20)
 
-<a name="21to30"></a>
+<a name="30to32"></a>
 
 # 3.0 to 3.2
 
