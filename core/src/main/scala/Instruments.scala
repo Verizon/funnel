@@ -7,6 +7,7 @@ import java.util.concurrent.{ExecutorService,TimeUnit}
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
+import scalaz.stream.process1.lift
 
 /**
  * Provider of counters, gauges, and timers, tied to some
@@ -23,33 +24,46 @@ class Instruments(val window: Duration,
   private def slidingL(s: String) = if (s == "") s else s"$s (past $window)"
 
   /**
+   * Return a `PeriodicGauge` with the given starting value.
+   * Keys updated by this `PeriodicGauge` are `now/label`,
+   * `previous/label` and `sliding/label`.
+   * See [[funnel.Periodic]].
+   */
+  def periodicGauge[O:Reportable:Group](
+    label: String, units: Units[O] = Units.None, description: String = "", init: O): PeriodicGauge[O] = {
+      val O = implicitly[Group[O]]
+      val c = new PeriodicGauge[O] {
+        val now = B.resetEvery(window)(B.accum[O,O](init)(O.plus))
+        val prev = B.emitEvery(window)(now)
+        val sliding = B.sliding(window)(identity[O])(O)
+        val (nowK, incrNow) =
+          monitoring.topic[O,O](
+            s"now/$label", units, nowL(description))(now)
+        val (prevK, incrPrev) =
+          monitoring.topic[O,O](
+            s"previous/$label", units, previousL(description))(prev)
+        val (slidingK, incrSliding) =
+          monitoring.topic[O,O](
+            s"sliding/$label", units, slidingL(description))(sliding)
+        def append(n: O): Unit = {
+          incrNow(n); incrPrev(n); incrSliding(n)
+        }
+        def keys = Periodic[O](nowK, prevK, slidingK)
+      }
+      c.buffer(bufferTime) // only publish updates this often
+  }
+
+  /**
    * Return a `Counter` with the given starting count.
    * Keys updated by this `Counter` are `now/label`,
    * `previous/label` and `sliding/label`.
-   * See [[oncue.svc.funnel.Periodic]].
+   * See [[funnel.Periodic]].
+   * You should use counters only for metrics that are monotonic.
    */
   def counter(label: String,
               init: Int = 0,
-              description: String = ""): Counter[Periodic[Double]] = {
-    val c = new Counter[Periodic[Double]] {
-      val count = B.resetEvery(window)(B.counter(init))
-      val previousCount = B.emitEvery(window)(count)
-      val slidingCount = B.sliding(window)(identity[Double])(Group.doubleGroup)
-      val u: Units[Double] = Units.Count
-      val (nowK, incrNow) =
-        monitoring.topic(s"now/$label", u, nowL(description))(count)
-      val (prevK, incrPrev) =
-        monitoring.topic(s"previous/$label", u, previousL(description))(previousCount)
-      val (slidingK, incrSliding) =
-        monitoring.topic(s"sliding/$label", u, slidingL(description))(slidingCount)
-      def incrementBy(n: Int): Unit = {
-        incrNow(n); incrPrev(n); incrSliding(n)
-      }
-      def keys = Periodic(nowK, prevK, slidingK)
-
-      incrementBy(0)
-    }
-    c.buffer(bufferTime) // only publish updates this often
+              description: String = ""): Counter = {
+    new Counter(periodicGauge[Double](label, Units.Count, description, init))
   }
 
   // todo: histogramgauge, histogramCount, histogramTimer
