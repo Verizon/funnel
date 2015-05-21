@@ -139,8 +139,8 @@ object MonitoringSpec extends Properties("monitoring") {
       filter(_.key.name.contains("previous/jvm/gc/ParNew/time"))
     val b2 = Monitoring.subscribe(Monitoring.default)(
       _.name.contains("previous/jvm/gc/ParNew/time"))
-    val xs = listenFor(1.minute)(b1)
-    val ys = listenFor(1.minute)(b2)
+    val xs = listenFor(30.seconds)(b1)
+    val ys = listenFor(30.seconds)(b2)
     val d = (xs.length - ys.length).abs
     d <= 2 // Each of xs and ys could gain or lose one tick, for a total of 2
   }
@@ -301,7 +301,7 @@ object MonitoringSpec extends Properties("monitoring") {
     // this test takes about 45 seconds
     val (a,b) = ab.splitAt(ab.length / 2)
     val M = Monitoring.instance
-    val I = new Instruments(5.minutes, M)
+    val I = new Instruments(30.seconds, M)
     import I._
     val aN = counter("a")
     val bN = counter("b")

@@ -37,6 +37,7 @@ trait TelemetryMultiTest {
 
 
 class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
+  import scala.concurrent.duration.DurationInt
 
   "publish socket" should "publish" in {
     S.set(true).run
@@ -50,15 +51,17 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     val errorsS = Process.emitAll(errors)
 
-    val pub: Task[Unit] = telemetryPublishSocket(U1, S, errorsS.wye(keysInD pipe keyChanges)(wye.merge)(Strategy.Executor(Monitoring.serverPool)))
+    val ST = Strategy.Executor(Monitoring.serverPool)
+
+    val events = errorsS.wye(keysInD pipe keyChanges)(wye.merge)(ST)
+    val pub: Task[Unit] = telemetryPublishSocket(U1, S, events)
     pub.runAsync {
       case -\/(e) => e.printStackTrace
       case \/-(_) =>
     }
 
-    Thread.sleep(2000)
+    Thread.sleep(5000)
     keysIn.close.run
-    Thread.sleep(200)
   }
 }
 
@@ -67,7 +70,8 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     var keysOut: Map[URI, Set[Key[Any]]] = Map.empty
     val keyActor: Actor[(URI, Set[Key[Any]])] = Actor[(URI,Set[Key[Any]])] {
-      case (uri,keys) => keysOut = keysOut + (uri -> keys)
+      case (uri,keys) =>
+        keysOut = keysOut + (uri -> keys)
     }(Strategy.Executor(Monitoring.serverPool))
 
     var errorsOut: List[Error] = List.empty
@@ -75,7 +79,7 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
       errorsOut = e :: errorsOut
     }(Strategy.Executor(Monitoring.serverPool))
 
-    Thread.sleep(1000)
+    Thread.sleep(100)
     val sub = telemetrySubscribeSocket(U1, S,
                                        keyActor,
                                        errorsActor,
@@ -85,10 +89,11 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     Thread.sleep(5000)
 
+    errorsOut.reverse should be (errors)
+
     keysOut.size should be (1)
     keysOut(U1) should be (testKeys.toSet)
 
-    errorsOut.reverse should be (errors)
   }
 
 }
