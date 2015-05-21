@@ -104,6 +104,7 @@ object TargetLifecycle {
   case object Unassign extends TargetTransition
   case object Exceptional extends TargetTransition
   case object Unmonitor extends TargetTransition
+  case object Terminate extends TargetTransition
 
 
   type S = LNode[TargetState, Unit]
@@ -136,6 +137,13 @@ object TargetLifecycle {
                           LEdge(DoubleAssigned,  Problematic,     Exceptional),
                           LEdge(DoubleMonitored, Problematic,     Exceptional),
                           LEdge(Fin,             Problematic,     Exceptional),
+                          LEdge(Unknown,         Fin,             Terminate),
+                          LEdge(Unmonitored,     Fin,             Terminate),
+                          LEdge(Assigned,        Fin,             Terminate),
+                          LEdge(Monitored,       Fin,             Terminate),
+                          LEdge(DoubleAssigned,  Fin,             Terminate),
+                          LEdge(DoubleMonitored, Fin,             Terminate),
+                          LEdge(Problematic,     Fin,             Terminate),
                           LEdge(Monitored,       Unmonitored,     Unmonitor))
 
   val targetLifecycle: G = mkGraph(nodes, edges)
@@ -168,7 +176,7 @@ object TargetLifecycle {
     val transition = Exceptional
   }
   case class Terminated(target: Target, time: Long) extends TargetMessage {
-    val transition = Exceptional
+    val transition = Terminate
   }
 
 
