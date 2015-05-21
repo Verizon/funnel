@@ -279,7 +279,16 @@ class StatefulRepository extends Repository {
 
   def distribution: Task[Distribution] = Task.now(D.get)
 
-  def mergeDistribution(d: Distribution): Task[Distribution] =
-    Task.delay(D.update(_.unionWith(d)(_ ++ _)))
-
+  def mergeDistribution(d: Distribution): Task[Distribution] = Task {
+    d.toList.foreach {
+      case (fl, targets) =>
+        targets.foreach { t =>
+          val sc = StateChange(TargetState.Unknown, TargetState.Monitored, Confirmation(t, fl, System.currentTimeMillis))
+          stateMaps.update(_.map(_.delete(t.uri)))
+          stateMaps.update(_.update(TargetState.Monitored, m => Some(m.insert(t.uri, sc))))
+          this.targets.update(_.insert(t.uri, sc))
+        }
+    }
+    D.update(_.unionWith(d)(_ ++ _))
+  } (Chemist.serverPool)
 }
