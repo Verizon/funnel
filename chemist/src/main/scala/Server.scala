@@ -80,7 +80,7 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
 
   def intent = {
     case GET(Path("/")) =>
-      GetRoot.time(Redirect("/index.html"))
+      GetRoot.time(Redirect("index.html"))
 
     case GET(Path("/status")) =>
       GetStatus.time(Ok ~> JsonResponse(Chemist.version))
