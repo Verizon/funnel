@@ -1,4 +1,4 @@
-package funnel
+package oncue.svc.funnel
 
 import com.twitter.algebird.Group
 import java.util.concurrent.{ExecutorService, ScheduledExecutorService}

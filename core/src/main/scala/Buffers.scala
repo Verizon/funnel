@@ -60,7 +60,14 @@ object Buffers {
    * value of the given `Monoid`.
    */
   def sum[A](implicit A: Monoid[A]): Process1[A,A] =
-    process1.scan(A.zero)(A.append(_, _))
+    accum(A.zero)(A.append(_, _))
+
+  /**
+   * Emits a running accumulation of its inputs, starting from `z`,
+   * and appending new values with `f`.
+   */
+  def accum[A,B](z: B)(f: (B, A) => B): Process1[A, B] =
+    process1.scan(z)(f)
 
   /** Emits only values not yet seen. */
   def distinct[A]: Process1[A, A] = {

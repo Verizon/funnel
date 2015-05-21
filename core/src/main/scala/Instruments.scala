@@ -30,21 +30,21 @@ class Instruments(val window: Duration,
    * See [[funnel.Periodic]].
    */
   def periodicGauge[O:Reportable:Group](
-    label: String, units: Units = Units.None, description: String = ""): PeriodicGauge[O] = {
+    label: String, units: Units[O] = Units.None, description: String = "", init: O): PeriodicGauge[O] = {
       val O = implicitly[Group[O]]
       val c = new PeriodicGauge[O] {
-        val now = B.resetEvery(window)(B.sum[O])
+        val now = B.resetEvery(window)(B.accum[O,O](init)(O.plus))
         val prev = B.emitEvery(window)(now)
         val sliding = B.sliding(window)(identity[O])(O)
         val (nowK, incrNow) =
           monitoring.topic[O,O](
-            s"now/$label", units, nowL(description), kinded)(now)
+            s"now/$label", units, nowL(description))(now)
         val (prevK, incrPrev) =
           monitoring.topic[O,O](
-            s"previous/$label", units, previousL(description), kinded)(prev)
+            s"previous/$label", units, previousL(description))(prev)
         val (slidingK, incrSliding) =
           monitoring.topic[O,O](
-            s"sliding/$label", units, slidingL(description), kinded)(sliding)
+            s"sliding/$label", units, slidingL(description))(sliding)
         def append(n: O): Unit = {
           incrNow(n); incrPrev(n); incrSliding(n)
         }
@@ -62,8 +62,9 @@ class Instruments(val window: Duration,
    */
   def counter(label: String,
               init: Int = 0,
-              description: String = ""): Counter =
+              description: String = ""): Counter = {
     new Counter(periodicGauge[Double](label, Units.Count, description, init))
+  }
 
   // todo: histogramgauge, histogramCount, histogramTimer
   // or maybe we just modify the existing combinators to
