@@ -12,5 +12,10 @@ class IntegrationChemist extends Chemist[IntegrationPlatform]{
     Applicative[ChemistK].point(instances)
 
   def init: ChemistK[Unit] =
-    Task.now(()).liftKleisli
+    for {
+      c <- config
+      _ <- Task.now(c.statefulRepository.lifecycle()).liftKleisli
+    } yield ()
+
+    // Task.now(config).liftKleisli
 }

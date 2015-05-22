@@ -1,40 +1,24 @@
-package funnel.integration
+package funnel
+package integration
 
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
+import scala.concurrent.duration._
+import journal.Logger
 
-class IntegrationTarget(val port: Int) extends FlatSpec {
-  import scala.concurrent.duration.DurationInt
-  import funnel._
-
-  val W = 10.seconds
-  val M = Monitoring.instance
-  val I = new Instruments(W, M)
-  Clocks.instrument(I)
-}
-
-class ChemistIntMultiJvmTarget1 extends IntegrationTarget(port = 2001) {
-  import funnel.http._
-  MonitoringServer.start(M, port)
-  Thread.sleep(40000)
-}
+class ChemistIntMultiJvmTarget1 extends IntegrationTarget(
+  port = 2001, delay = 40.seconds)
 
 // this one dies after 20 seconds, so it should be detected and unmonitored
-class ChemistIntMultiJvmTarget2 extends IntegrationTarget(port = 2002) {
-  import funnel.http._
-  MonitoringServer.start(M, port)
-  Thread.sleep(20000)
-}
+class ChemistIntMultiJvmTarget2 extends IntegrationTarget(
+  port = 2002, delay = 20.seconds)
 
 class ChemistIntMultiJvmFlask1 extends FlatSpec {
-  import funnel._
   import funnel.http._
   import funnel.flask._
   import java.io.File
   import scalaz.concurrent.{Task,Strategy}
-  import knobs.{ ClassPathResource, Config, Required }
-  import scala.concurrent.duration.DurationInt
 
-  val config: Task[Config] = knobs.loadImmutable(List(Required(ClassPathResource("oncue/flask.cfg"))))
+  val log = Logger[this.type]
 
   val options = funnel.Options(Some("flask1"), Some("cluster1"), None, None, 6775, telemetryPort = 7390)
 
@@ -43,15 +27,15 @@ class ChemistIntMultiJvmFlask1 extends FlatSpec {
   MonitoringServer.start(Monitoring.default, 5775)
   app.run(Array("noretries"))
   Thread.sleep(40000)
-  println("flask shutting down")
+  log.debug("flask shutting down")
 }
 
 class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAfterAll {
   import java.net.URI
-  import scalaz.concurrent.{Actor,Strategy}
+  import scalaz.Kleisli
+  import scalaz.concurrent.{Actor,Strategy,Task}
   import scalaz.stream.{Process, async}
   import funnel.chemist._, PlatformEvent._, TargetLifecycle._
-  import journal.Logger
   import dispatch._
 
   val log = Logger[ChemistIntMultiJvmChemist]
@@ -60,22 +44,23 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
     val config = new IntegrationConfig
   }
 
-  val core = new IntegrationChemist
+  val ichemist = new IntegrationChemist
 
   val U1 = new URI("http://localhost:2001/stream/now")
   val U2 = new URI("http://localhost:2002/stream/now")
 
+  implicit class KleisliExeSyntax[A](k: Kleisli[Task,IntegrationPlatform,A]){
+    def exe: A = k.apply(platform).run
+  }
+
   override def beforeAll(): Unit = {
     log.info("initializing Chemist")
 
-    Future(Server.unsafeStart(core, platform))(scala.concurrent.ExecutionContext.Implicits.global)
-
-    platform.config.statefulRepository.lifecycle()
+    // just fucking fork the shit out of it.
+    Future(Server.unsafeStart(ichemist, platform))(scala.concurrent.ExecutionContext.Implicits.global)
 
     val lifecycleActor: Actor[PlatformEvent] = Actor[PlatformEvent](
       a => platform.config.repository.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
-
-    // (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, EvenSharding, networkFlask) _)).run.runAsync(_ => ())
 
     Thread.sleep(6000)
 
@@ -90,7 +75,7 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
     platform.config.signal.set(false).run
   }
 
-  behavior of "the repository"
+  behavior of "repository"
 
   it should "have events in the history" in {
     val history = platform.config.repository.historicalEvents.run
@@ -134,4 +119,15 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
       case Error(Names(_, _, u)) => u
     } should be (Some(U2))
   }
+
+  behavior of "chemist"
+
+  it should "list the appropriate flask ids" in {
+    ichemist.shards.exe should equal ( Set(FlaskID("flask1")) )
+  }
+
+  it should "show more detailed flask information" in {
+    ichemist.shard(FlaskID("flask1")).exe should equal ( 1 )
+  }
+
 }
