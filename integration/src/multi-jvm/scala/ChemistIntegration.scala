@@ -39,7 +39,7 @@ class ChemistIntMultiJvmFlask1 extends FlatSpec with Matchers {
 
   val config: Task[Config] = knobs.loadImmutable(List(Required(ClassPathResource("oncue/flask.cfg"))))
 
-  val options = funnel.Options(Some("flask1"), Some("cluster1"), None, None, 6775, telemetryPort = 7391)
+  val options = funnel.Options(Some("flask1"), Some("cluster1"), None, None, 6775, telemetryPort = 7390)
 
   val I = new funnel.Instruments(1.minute)
   val app = new funnel.flask.Flask(options, I)
