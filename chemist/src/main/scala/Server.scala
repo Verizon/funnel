@@ -55,7 +55,6 @@ object Server {
     unfiltered.netty.Server
       .http(platform.config.network.port, platform.config.network.host)
       .resources(p, cacheSeconds = 3600)
-      .resources(this.getClass.getResource("/META-INF/resources/webjars"), cacheSeconds = 3600)
       .handler(Server(chemist, platform))
       .run
   }
