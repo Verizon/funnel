@@ -6,12 +6,16 @@ flask {
   # uses that instead.
   # name = "flask"
 
+  metric-ttl = 24 hours
+
   collect-local-metrics = true
+
   local-metric-frequency = 30
 
   network {
     host = "127.0.0.1"
-    port = 5775
+    http-port = 5775
+    telemetry-port = 7390
   }
 
   elastic-search {

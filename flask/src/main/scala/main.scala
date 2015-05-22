@@ -158,11 +158,11 @@ object Main {
     val riemann          = (riemannHost |@| riemannPort |@| ttl)(RiemannCfg)
     val elastic          = (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
       ElasticCfg(_, _, _, elasticDf, esTemplate, esTemplateLoc, _, esPublishTimeout.toNanos.nanos, elasticTimeout))
-    val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
+    val httpPort         = cfg.lookup[Int]("flask.network.http-port").getOrElse(5775)
     val metricTTL        = cfg.lookup[Duration]("flask.metric-ttl")
-    val telemetryPort        = cfg.lookup[Int]("telemetryPort").getOrElse(7391)
+    val telemetryPort    = cfg.require[Int]("flask.network.telemetry-port")
 
-    Task((Options(name, cluster, elastic, riemann, port, metricTTL, telemetryPort), cfg))
+    Task((Options(name, cluster, elastic, riemann, httpPort, metricTTL, telemetryPort), cfg))
   }.run
 
   val I = new Instruments(1.minute)

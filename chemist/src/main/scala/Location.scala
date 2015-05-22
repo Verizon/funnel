@@ -25,7 +25,7 @@ object Location {
   def telemetryLocalhost: Location =
     Location(
       host = "127.0.0.1",
-      port = 7391,
+      port = 7390,
       datacenter = "local",
       protocol = "tcp")
 }
