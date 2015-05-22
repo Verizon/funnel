@@ -1,7 +1,7 @@
 package funnel
 package chemist
 
-import oncue.quiver._
+import quiver._
 
 import scalaz.Order
 import scalaz.std.anyVal._
