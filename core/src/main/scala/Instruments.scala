@@ -173,7 +173,7 @@ class Instruments(val window: Duration,
   def edge(
     label: String,
     description: String = "",
-    origin: String,
+    origin: Edge.Origin,
     destination: Edge.Destination): Edge = {
       def addEdge[A](k: Key[A]): Key[A] = k.setAttribute("edge", label)
       Edge(
