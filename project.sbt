@@ -47,7 +47,7 @@ lazy val flask = project.dependsOn(riemann, elastic, telemetry, zeromq % "test->
 
 lazy val http = project.dependsOn(core)
 
-lazy val integration = project.dependsOn(flask, riemann, chemist % "test->test;compile->compile").configs(MultiJvm)
+lazy val integration = project.dependsOn(flask, chemist % "test->test;compile->compile").configs(MultiJvm)
 
 lazy val nginx = project.dependsOn(core)
 
