@@ -32,8 +32,11 @@ object Server {
     val repo = platform.config.repository
 
     (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, EvenSharding, platform.config.remoteFlask) _)).run.runAsync {
-      case -\/(err) => log.error("Error starting processing of Platform events")
-      case \/-(t)   => log.info("result of platform processing: " + t)
+      case -\/(err) =>
+        log.error(s"Error starting processing of Platform events: $err")
+        err.printStackTrace
+
+      case \/-(t)   => log.info(s"result of platform processing $t")
     }
 
     chemist.bootstrap(platform).runAsync {

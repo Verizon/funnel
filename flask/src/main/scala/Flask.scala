@@ -41,7 +41,6 @@ class Flask(options: Options, val I: Instruments) {
 
   lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)(Strategy.Executor(Monitoring.serverPool))
 
-
   private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
     server.stop()
     signal.set(false).flatMap(_ => signal.close).run
