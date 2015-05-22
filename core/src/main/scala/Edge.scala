@@ -25,7 +25,7 @@ package funnel
  */
 case class Edge private [funnel] (
   origin: ContinuousGauge[Edge.Origin],
-  destination: ContinuousGauge[Edge.Destination],
+  destination: ContinuousGauge[Set[Edge.Destination]],
   timer: Timer[Periodic[Stats]],
   status: TrafficLight
 )
