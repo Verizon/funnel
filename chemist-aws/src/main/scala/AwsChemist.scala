@@ -43,7 +43,6 @@ class AwsChemist extends Chemist[Aws]{
       }.filter(_._2.nonEmpty)
     }
 
-
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources
    * that are required to operate. Once complete, execute the boostrap.
