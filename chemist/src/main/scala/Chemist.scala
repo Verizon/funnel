@@ -37,7 +37,6 @@ trait Chemist[A <: Platform]{
   def distribute(targets: Set[Target]): ChemistK[Unit] =
     Task.now(()).liftKleisli
 
-
   /**
    * list all the shards currently known by chemist.
    */
@@ -49,7 +48,8 @@ trait Chemist[A <: Platform]{
   /**
    * display all known node information about a specific shard
    */
-  def shard(id: FlaskID): ChemistK[Option[Flask]] = config map { x => x.repository.flask(id) }
+  def shard(id: FlaskID): ChemistK[Option[Flask]] =
+    config.map(_.repository.flask(id))
 
   /**
    * Instruct flask to specifcally take a given shard out of service and

@@ -13,7 +13,7 @@ abstract trait Target {
   Clocks.instrument(I)
 }
 
-class ChemistIntMultiJvmTarget1 extends FlatSpec with Target with Matchers {
+class ChemistIntMultiJvmTarget1 extends FlatSpec with Target {
   import funnel.http._
   val port = 2001
   MonitoringServer.start(M, port)
@@ -21,14 +21,14 @@ class ChemistIntMultiJvmTarget1 extends FlatSpec with Target with Matchers {
 }
 
 // this one dies after 20 seconds, so it should be detected and unmonitored
-class ChemistIntMultiJvmTarget2 extends FlatSpec with Target with Matchers {
+class ChemistIntMultiJvmTarget2 extends FlatSpec with Target {
   import funnel.http._
   val port = 2002
   MonitoringServer.start(M, port)
   Thread.sleep(20000)
 }
 
-class ChemistIntMultiJvmFlask1 extends FlatSpec with Matchers {
+class ChemistIntMultiJvmFlask1 extends FlatSpec {
   import funnel._
   import funnel.http._
   import funnel.flask._
@@ -69,8 +69,8 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
 
   override def beforeAll(): Unit = {
     println("initializing Chemist")
-    val lifecycleActor: Actor[PlatformEvent] = Actor[PlatformEvent](a => repo.platformHandler(a)
-.run)(Strategy.Executor(Chemist.serverPool))
+    val lifecycleActor: Actor[PlatformEvent] = Actor[PlatformEvent](
+      a => repo.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
     repo.lifecycle()
     val http = Http()
     val networkFlask = new HttpFlask(http, repo, signal)
