@@ -28,6 +28,6 @@ libraryDependencies ++= Seq(
   "net.databinder.dispatch" %% "dispatch-core"           % V.dispatch,
   "net.databinder"          %% "unfiltered-filter"       % V.unfiltered,
   "net.databinder"          %% "unfiltered-netty-server" % V.unfiltered,
-  "oncue"                   %% "quiver"                  % "3.0.+",
+  "oncue.quiver"            %% "core"                    % "3.1.+",
   "oncue.typelevel"         %% "shapeless-scalacheck"    % "0.4.0" % "test"
 )
