@@ -33,9 +33,8 @@ object Server {
 
     (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, EvenSharding, platform.config.remoteFlask) _)).run.runAsync {
       case -\/(err) => log.error("Error starting processing of Platform events")
-      case \/-(t) => log.info("result of platform processing: " + t)
+      case \/-(t)   => log.info("result of platform processing: " + t)
     }
-
 
     chemist.bootstrap(platform).runAsync {
       case -\/(err) => log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
