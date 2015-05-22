@@ -173,18 +173,18 @@ class Instruments(val window: Duration,
   def edge(
     label: String,
     description: String = "",
-    origin: String,
-    destination: String): Edge = {
-      def addEdge[A](k: Key[A]) = k.setAttribute("edge", label)
+    origin: Edge.Origin,
+    destination: Edge.Destination): Edge = {
+      def addEdge[A](k: Key[A]): Key[A] = k.setAttribute("edge", label)
       Edge(
         origin = gauge(
           label  = s"$label/origin",
           init   = origin,
-          keyMod = addEdge),
+          keyMod = addEdge[Edge.Origin]),
         destination = gauge(
           label  = s"$label/destination",
-          init   =  destination,
-          keyMod = addEdge),
+          init   = destination,
+          keyMod = addEdge[Edge.Destination]),
         timer = timer(
           label  = s"$label/timer",
           keyMod = addEdge),
