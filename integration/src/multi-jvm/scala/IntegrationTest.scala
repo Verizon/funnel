@@ -20,11 +20,11 @@ class ChemistIntMultiJvmFlask1 extends FlatSpec {
 
   val log = Logger[this.type]
 
-  val options = funnel.Options(Some("flask1"), Some("cluster1"), None, None, 6775, telemetryPort = 7390)
+  val options = IntegrationFixtures.flask1Options
 
   val I = new funnel.Instruments(1.minute)
   val app = new funnel.flask.Flask(options, I)
-  MonitoringServer.start(Monitoring.default, 5775)
+  // MonitoringServer.start(Monitoring.default, 5775)
   app.run(Array("noretries"))
   Thread.sleep(40000)
   log.debug("flask shutting down")
@@ -37,6 +37,7 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
   import scalaz.stream.{Process, async}
   import funnel.chemist._, PlatformEvent._, TargetLifecycle._
   import dispatch._
+  import IntegrationFixtures.flask1Options
 
   val log = Logger[ChemistIntMultiJvmChemist]
 
@@ -53,6 +54,9 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
     def exe: A = k.apply(platform).run
   }
 
+  private def localLocation(port: Int): Location =
+    Location.localhost.copy(port = port)
+
   override def beforeAll(): Unit = {
     log.info("initializing Chemist")
 
@@ -64,7 +68,9 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
 
     Thread.sleep(6000)
 
-    lifecycleActor ! NewFlask(Flask(FlaskID("flask1"), Location.localhost, Location.telemetryLocalhost))
+    lifecycleActor ! NewFlask(Flask(FlaskID("flask1"),
+      localLocation(flask1Options.funnelPort),
+      localLocation(flask1Options.telemetryPort)))
     lifecycleActor ! NewTarget(Target("test", U1, false))
     lifecycleActor ! NewTarget(Target("test", U2, false))
 

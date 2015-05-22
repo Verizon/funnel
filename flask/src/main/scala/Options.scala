@@ -1,4 +1,5 @@
 package funnel
+package flask
 
 import funnel.elastic.ElasticCfg
 import scala.concurrent.duration._
