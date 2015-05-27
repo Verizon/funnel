@@ -131,4 +131,12 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
     ichemist.shard(FlaskID("flask1")).exe should equal ( Some(flask1) )
   }
 
+  it should "show the correct distribution" in {
+    println("===========================")
+    // println(ichemist.states.exe)
+    println(ichemist.distribution.exe)
+    // println(platform.config.statefulRepository.stateMaps)
+    println("===========================")
+  }
+
 }
