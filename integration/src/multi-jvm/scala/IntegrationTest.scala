@@ -79,8 +79,9 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
   behavior of "repository"
 
   it should "have events in the history" in {
-    val history = platform.config.repository.historicalEvents.run
+    val history = platform.config.repository.historicalRepoEvents.run
     log.info("history : " + history.toString)
+    log.info("phistory : " + platform.config.repository.historicalPlatformEvents.run.toString)
     history.size should be > 0
 
     val confirmed: Option[Int] = history.collectFirst {
@@ -91,7 +92,7 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
   }
 
   it should "have gotten the problem event" in {
-    val history = platform.config.repository.historicalEvents.run
+    val history = platform.config.repository.historicalRepoEvents.run
 
     val unmonitored: Option[Int] = history.collectFirst {
       case RepoEvent.StateChange(_, TargetState.Problematic, TargetLifecycle.Problem(_, _, _, _)) => 1

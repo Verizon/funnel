@@ -94,7 +94,10 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
 
     case GET(Path("/lifecycle/history")) =>
-      GetLifecycleHistory.time(json(chemist.history.map(_.toList)))
+      GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
+
+    case GET(Path("/platform/history")) =>
+      GetLifecycleHistory.time(json(chemist.platformHistory.map(_.toList)))
 
     case GET(Path("/lifecycle/states")) =>
       GetLifecycleStates.time(json(chemist.states.map(_.toList)))
