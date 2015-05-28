@@ -17,7 +17,7 @@ import scalaz.std.string._
 import scalaz.{\/, ~>, Monad}
 import Events.Event
 import scalaz.stream.async.mutable.Signal
-import scalaz.stream.async.signalOf
+import scalaz.stream.async.{signalOf,signalUnset}
 import journal.Logger
 import internals._
 
@@ -502,7 +502,8 @@ object Monitoring {
       buf: Process1[I,O])(
       implicit ES: ExecutorService = defaultPool):
       (I => Unit, Signal[O]) = {
-  val signal = signalOf[O](null.asInstanceOf[O])(Strategy.Executor(ES))
+    val S = Strategy.Executor(ES)
+    val signal = signalUnset[O](S)
 
     var cur = buf.unemit match {
       case (h, t) if h.nonEmpty => signal.set(h.last).run; t
@@ -517,7 +518,7 @@ object Monitoring {
         case Process.Halt(e) => signal.fail(e.asThrowable).run
         case _ => ()
       }
-    }
+    }(S)
     ((i: I) => hub ! i, signal)
   }
 
