@@ -9,6 +9,7 @@ import scalaz.stream._
 import scalaz.stream.async.mutable.{Signal,Queue}
 import scalaz.stream.async.{signalOf,unboundedQueue}
 import scalaz.concurrent.Task
+import scalaz.concurrent.Strategy
 import scalaz.{-\/,\/,\/-}
 import java.net.URI
 
@@ -42,9 +43,9 @@ object Telemetry extends TelemetryCodecs {
     }.run
   }
 
-  def telemetrySubscribeSocket(uri: URI, signal: Signal[Boolean]): (Signal[Set[Key[Any]]], Process[Task,Error], Process[Task,Unit]) = {
-    val keys = signalOf(Set.empty[Key[Any]])
-    val errors = unboundedQueue[Error]
+  def telemetrySubscribeSocket(uri: URI, signal: Signal[Boolean])(implicit S: Strategy): (Signal[Set[Key[Any]]], Process[Task,Error], Process[Task,Unit]) = {
+    val keys = signalOf(Set.empty[Key[Any]])(S)
+    val errors = unboundedQueue[Error](S)
     val endpoint = telemetrySubscribeEndpoint(uri)
     val p = Ø.link(endpoint)(signal) { socket =>
       Ø.receive(socket) to fromTransported(keys, errors)

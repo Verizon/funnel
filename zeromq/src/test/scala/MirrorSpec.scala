@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 
 class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
-  lazy val S  = signalOf[Boolean](true)
+  lazy val S  = signalOf[Boolean](true)(scalaz.concurrent.Strategy.Executor(Monitoring.defaultPool))
   lazy val W  = 20.seconds
 
   lazy val U1 = new URI("ipc:///tmp/u1.socket")

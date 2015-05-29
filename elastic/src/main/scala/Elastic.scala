@@ -231,9 +231,10 @@ case class Elastic(M: Monitoring) {
       cfg <- getConfig
       ref <- lift(IORef(Set[Key[Any]]()))
       d   <- duration.lift[Task]
-      timeout = time.awakeEvery(d)(Executor(Monitoring.serverPool), Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
+      s = Executor(Monitoring.serverPool)
+      timeout = time.awakeEvery(d)(s, Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
       subscription = Monitoring.subscribe(M)(k => cfg.groups.exists(g => k.startsWith(g))).map(Option.apply)
-      -   <- (timeout.wye(subscription)(wye.merge).translate(lift) |>
+      -   <- (timeout.wye(subscription)(wye.merge)(s).translate(lift) |>
               elasticGroup(cfg.groups) |> elasticUngroup(flaskName, flaskCluster)).evalMap[ES, Unit](
                 json  => esURL.lift[Task] >>= (r => elasticJson(r.POST, json))
               ).run

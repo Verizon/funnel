@@ -34,9 +34,9 @@ object Riemann {
         log.debug(s"successfully sent batch of ${store.length}")
         store = Nil
       }
-    }
+    }(S)
 
-    time.awakeEvery(1.minute).evalMap {_ =>
+    time.awakeEvery(1.minute)(S, P).evalMap {_ =>
       Task(a(Flush))
     }.run.runAsync(_ => ())
 

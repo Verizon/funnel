@@ -14,7 +14,7 @@ class SubscriptionSpec extends FlatSpec
     with Matchers
     with BeforeAndAfterAll {
 
-  lazy val S  = signalOf[Boolean](true)
+  lazy val S  = signalOf[Boolean](true)(scalaz.concurrent.Strategy.Executor(Monitoring.defaultPool))
   lazy val W  = 30.seconds
 
   lazy val U1 = new URI("ipc:///tmp/u1.socket")
