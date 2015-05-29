@@ -35,12 +35,14 @@ class Flask(options: Options, val I: Instruments) {
 
   val log = Logger[this.type]
 
+  val pool = scalaz.concurrent.Strategy.Executor(Monitoring.defaultPool)
+
   val mirrorDatapoints = I.counter("mirror/datapoints")
 
   val S = MonitoringServer.start(I.monitoring, options.funnelPort)
 
-  lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)
-
+  lazy val signal: Signal[Boolean] =
+    scalaz.stream.async.signalOf(true)(pool)
 
   private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
     server.stop()
@@ -76,9 +78,9 @@ class Flask(options: Options, val I: Instruments) {
     def countDatapoints: Sink[Task, Datapoint[Any]] =
       channel.lift(_ => Task(mirrorDatapoints.increment))
 
-    val Q = async.unboundedQueue[Telemetry]
+    val Q = async.unboundedQueue[Telemetry](pool)
     telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
-                           (I.monitoring.keys.discrete pipe keyChanges).wye(Q.dequeue)(wye.merge)).runAsync(_ => ())
+                           (I.monitoring.keys.discrete pipe keyChanges).wye(Q.dequeue)(wye.merge)(pool)).runAsync(_ => ())
 
     def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
       httpOrZmtp(alive)(uri) observe countDatapoints

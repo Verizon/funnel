@@ -8,6 +8,10 @@ import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.Nondeterminism
 import scalaz.stream.{process1, Process}
+import scalaz.std.list._
+import scalaz.std.tuple._
+import scalaz.syntax.functor._
+import scalaz.syntax.foldable._
 
 object MonitoringSpec extends Properties("monitoring") {
 
@@ -104,8 +108,8 @@ object MonitoringSpec extends Properties("monitoring") {
    * buffered signal.
    */
   property("bufferedSignal") = forAll { (xs: List[Long]) =>
-    val (snk, s) = Monitoring.bufferedSignal(B.counter(0))
-    xs.foreach(snk)
+    val (snk, s) = Monitoring.bufferedSignal(B.counter(0)).run
+    xs.traverse_(snk).run
     val expected = xs.sum
     // this will 'eventually' become true, and loop otherwise
     while (s.continuous.once.runLastOr(0.0).run !== expected) {
@@ -154,9 +158,9 @@ object MonitoringSpec extends Properties("monitoring") {
   property("bufferedSignal-profiling") = secure {
     def go: Boolean = {
       val N = 100000
-      val (snk, s) = Monitoring.bufferedSignal(B.counter(0))
+      val (snk, s) = Monitoring.bufferedSignal(B.counter(0)).run
       val t0 = System.nanoTime
-      (0 to N).foreach(x => snk(x))
+      (0 to N).toList.traverse_(x => snk(x)).run
       val expected = (0 to N).map(_.toDouble).sum
       while (s.continuous.once.runLastOr(0.0).run !== expected) {
         Thread.sleep(10)
@@ -277,9 +281,9 @@ object MonitoringSpec extends Properties("monitoring") {
   /** Check that when publishing, we get the count that was published. */
   property("pub/sub") = forAll(Gen.nonEmptyListOf(Gen.choose(1,10))) { a =>
     val M = Monitoring.default
-    val (k, snk) = M.topic[Long,Double]("count", Units.Count, "", identity)(B.ignoreTime(B.counter(0)))
+    val (k, snk) = M.topic[Long,Double]("count", Units.Count, "", identity)(B.ignoreTime(B.counter(0))).map(_.run)
     val count = M.get(k)
-    a.foreach { a => snk(a) }
+    a.traverse_(x => snk(x)).run
     val expected = a.sum
     var got = count.continuous.once.runLastOr(0.0).run
     while (got !== expected) {

@@ -13,7 +13,7 @@ import Telemetry._
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
 
 trait TelemetryMultiTest {
-  val S  = signalOf[Boolean](true)
+  val S  = signalOf[Boolean](true)(Strategy.Sequential)
   val U1 = new URI("ipc:///tmp/u1.socket")
 
   val testKeys = List(
@@ -36,10 +36,12 @@ trait TelemetryMultiTest {
 
 class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
 
+  val strategy = scalaz.concurrent.Strategy.Executor(Monitoring.defaultPool)
+
   "publish socket" should "publish" in {
     S.set(true).run
 
-    val keysIn = signalOf(Set.empty[Key[Any]])
+    val keysIn = signalOf(Set.empty[Key[Any]])(strategy)
     val keysInD = keysIn.discrete
 
     val sets: Vector[Set[Key[Any]]] = testKeys.tails.toVector.reverse.map(_.toSet).filterNot(_.isEmpty)
@@ -50,10 +52,10 @@ class SpecMultiJvmPub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     val errorsS = Process.emitAll(errors)
 
-    val pub: Task[Unit] = telemetryPublishSocket(U1, S, errorsS.wye(keysInD pipe keyChanges)(wye.merge))
+    val pub: Task[Unit] = telemetryPublishSocket(U1, S, errorsS.wye(keysInD pipe keyChanges)(wye.merge)(strategy))
     pub.runAsync {
       case -\/(e) => e.printStackTrace
-      case \/-(_) => 
+      case \/-(_) =>
     }
 
     Thread.sleep(100)
@@ -69,7 +71,7 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
 
     sub.run.runAsync {
       case -\/(e) => e.printStackTrace
-      case \/-(_) => 
+      case \/-(_) =>
     }
 
     var keysOut: Set[Key[Any]] = Set.empty

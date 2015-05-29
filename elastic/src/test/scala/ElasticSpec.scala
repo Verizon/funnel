@@ -10,7 +10,6 @@ import scalaz.stream._
 class ElasticSpec extends FlatSpec with Matchers {
   val scheduler = Monitoring.schedulingPool
   val S = Executor(Monitoring.serverPool)
-
   val E = Elastic(Monitoring.default)
 
   import E._
@@ -24,7 +23,7 @@ class ElasticSpec extends FlatSpec with Matchers {
       Process(Option.empty[Datapoint[Any]]) ++
       time.sleep(5.seconds)(S, scheduler) ++
       Process(Option.empty[Datapoint[Any]])
-    val input = timeout.wye(dps ++ time.sleep(15.seconds)(S, scheduler))(wye.merge).translate(lift)
+    val input = timeout.wye(dps ++ time.sleep(15.seconds)(S, scheduler))(wye.merge)(S).translate(lift)
     val ogs = input |> elasticGroup(List("k"))
     val result = ogs.runLast.run(cfg).run
     result should be ('defined)

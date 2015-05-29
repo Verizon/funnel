@@ -17,7 +17,8 @@ object MirroringExample {
 
     val health = Key[String]("now/health", Units.TrafficLight)
 
-    implicit val P = Monitoring.schedulingPool
+    val P = Monitoring.schedulingPool
+    val S = scalaz.concurrent.Strategy.Executor(Monitoring.defaultPool)
 
     /**
      * Generate some bogus activity for a `Monitoring` instance,
@@ -30,7 +31,7 @@ object MirroringExample {
       val reqs = I.counter("reqs")
       val svr = MonitoringServer.start(M, port)
 
-      time.awakeEvery(2.seconds).takeWhile(_ < (ttl.seconds)).map { _ =>
+      time.awakeEvery(2.seconds)(S, P).takeWhile(_ < (ttl.seconds)).map { _ =>
         reqs.incrementBy((math.random * 10).toInt)
         ok.green
       }.onComplete(Process.eval_(
@@ -50,7 +51,7 @@ object MirroringExample {
 
     val urls: Process[Task, (URL,String)] = // cluster comes online gradually
       Process.emitAll(accountCluster ++ decodingCluster).flatMap {
-        case (url,group) => time.sleep(2.seconds) ++
+        case (url,group) => time.sleep(2.seconds)(S, P) ++
                             Process.emit(new URL(url) -> group)
       }
 

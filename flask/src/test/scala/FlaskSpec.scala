@@ -63,7 +63,9 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   ]
   """
 
-  val ready = signalOf[Boolean](false)
+  import scalaz.concurrent.Strategy
+
+  val ready = signalOf[Boolean](false)(Strategy.Sequential)
 
   implicit val B = scalaz.std.anyVal.booleanInstance.conjunction
   implicit val s = scalaz.stream.DefaultScheduler
