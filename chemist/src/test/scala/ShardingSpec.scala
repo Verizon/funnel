@@ -63,21 +63,23 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
   }
 
   it should "correctly calculate how the new request should be sharded over known flasks" in {
-    EvenSharding.calculate(i1)(d1).map {
+    val (s, newdist) = EvenSharding.distribution(i1)(d1)
+    s.map {
       case (x,y) => x.value -> y
     }.toSet should === (Set(
                           "a" -> Target("u",new URI("http://eight.internal"), false),
                           "c" -> Target("v",new URI("http://nine.internal"), false)))
 
-    EvenSharding.calculate(i2)(d1).map(_._2).toSet should === (Set(
-                                                                 Target("v",new URI("http://omega.internal"), false),
-                                                                 Target("w",new URI("http://alpha.internal"), false),
-                                                                 Target("r",new URI("http://epsilon.internal"), false),
-                                                                 Target("z",new URI("http://gamma.internal"), false),
-                                                                 Target("u",new URI("http://beta.internal"), false),
-                                                                 Target("z",new URI("http://omicron.internal"), false),
-                                                                 Target("r",new URI("http://kappa.internal"), false),
-                                                                 Target("r",new URI("http://theta.internal"), false),
-                                                                 Target("p",new URI("http://zeta.internal"), false)))
+    val (s2,newdist2) = EvenSharding.distribution(i2)(d1)
+    s2.map(_._2).toSet should === (Set(
+                                     Target("v",new URI("http://omega.internal"), false),
+                                     Target("w",new URI("http://alpha.internal"), false),
+                                     Target("r",new URI("http://epsilon.internal"), false),
+                                     Target("z",new URI("http://gamma.internal"), false),
+                                     Target("u",new URI("http://beta.internal"), false),
+                                     Target("z",new URI("http://omicron.internal"), false),
+                                     Target("r",new URI("http://kappa.internal"), false),
+                                     Target("r",new URI("http://theta.internal"), false),
+                                     Target("p",new URI("http://zeta.internal"), false)))
   }
 }

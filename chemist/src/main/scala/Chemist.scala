@@ -26,7 +26,7 @@ trait Chemist[A <: Platform]{
    * Of all known monitorable services, dispaly the current work assignments
    * of funnel -> flask.
    */
-  def distribution: ChemistK[Map[FlaskID, Map[String, List[URI]]]] =
+  def distribution: ChemistK[Map[FlaskID, Map[ClusterName, List[URI]]]] =
     config.flatMapK(_.repository.distribution.map(Sharding.snapshot))
 
   /**
@@ -78,8 +78,14 @@ trait Chemist[A <: Platform]{
   /**
    * List out the last 100 lifecycle events that this chemist has seen.
    */
-  def history: ChemistK[Seq[RepoEvent]] =
-    config.flatMapK(_.repository.historicalEvents)
+  def platformHistory: ChemistK[Seq[PlatformEvent]] =
+    config.flatMapK(_.repository.historicalPlatformEvents)
+
+  /**
+   * List out the last 100 lifecycle events that this chemist has seen.
+   */
+  def repoHistory: ChemistK[Seq[RepoEvent]] =
+    config.flatMapK(_.repository.historicalRepoEvents)
 
   /**
    * List out the all the known Funnels and the state they are in.
@@ -131,7 +137,7 @@ trait Chemist[A <: Platform]{
     _  = log.debug("read the existing state of assigned work from the remote instances")
 
     // update the distribution accordingly
-    d2 <- cfg.repository.mergeDistribution(d).liftKleisli
+    d2 <- cfg.repository.mergeExistingDistribution(d).liftKleisli
     _  = log.debug("merged the currently assigned work into the current distribution")
 
     _ <- Sharding.distribute(cfg.repository, cfg.sharder, cfg.remoteFlask, d2)(targets.map(_.target).toSet).liftKleisli
