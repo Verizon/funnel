@@ -88,7 +88,7 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
       GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
     case GET(Path("/errors")) =>
-      GetStatus.time(Ok ~> JsonResponse(Chemist.version))
+      GetErrors.time(json(chemist.errors.map(_.toList)))
 
     case GET(Path("/distribution")) =>
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
@@ -96,11 +96,14 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
     case GET(Path("/lifecycle/history")) =>
       GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
 
+    // the URI is needed internally, but does not make sense in the remote
+    // user-facing api, so here we just ditch it and return the states.
+    case GET(Path("/lifecycle/states")) =>
+      GetLifecycleStates.time(json(chemist.states.map(_.toList.map {
+        case (uri,state) => state })))
+
     case GET(Path("/platform/history")) =>
       GetLifecycleHistory.time(json(chemist.platformHistory.map(_.toList)))
-
-    case GET(Path("/lifecycle/states")) =>
-      GetLifecycleStates.time(json(chemist.states.map(_.toList)))
 
     case POST(Path("/distribute")) =>
       PostDistribute.time(NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)"))

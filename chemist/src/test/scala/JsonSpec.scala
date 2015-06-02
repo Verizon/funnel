@@ -8,6 +8,10 @@ import java.net.URI
 class JsonSpec extends FlatSpec with Matchers {
   import JSON._
   import argonaut._, Argonaut._
+  import TargetLifecycle._, TargetState._
+
+  def flask(id: String) =
+    Flask(FlaskID(id),Location.localhost, Location.telemetryLocalhost)
 
   it should "serilizes the clusters into JSON" in {
     val A1 = ("test", List(new URI("foo.tv"), new URI("bar.com")))
@@ -17,4 +21,12 @@ class JsonSpec extends FlatSpec with Matchers {
     A2.asJson.nospaces should equal (
       """[{"urls":["foo.tv","bar.com"],"cluster":"test"},{"urls":["foo.tv","bar.com"],"cluster":"test"}]""")
   }
+
+  it should "serilize a pair of (uri, statechange) into JSON" in {
+    val t1 = Target("testcluster", new URI("http://xxxx:5775/stream/previous"), true)
+    val c1 = RepoEvent.StateChange(Unmonitored, Assigned, Discovery(t1, 123456l))
+    (c1 :: Nil).asJson.nospaces should equal (
+      """[{"to-state":"Assigned","from-state":"Unmonitored","message":{"time":123456,"target":"http://xxxx:5775/stream/previous","type":"Discovery"}}]""")
+  }
+
 }

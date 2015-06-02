@@ -67,6 +67,7 @@ object JSON {
       endTime         = l,
       instanceId      = m
     ))
+
   /**
    * {
    *   "activity-id": "foo",

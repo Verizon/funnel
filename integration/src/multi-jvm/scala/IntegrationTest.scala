@@ -122,10 +122,11 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
     } should be (Some(U2))
   }
 
-  behavior of "chemist"
+  behavior of "chemist kleisli"
 
   it should "list the appropriate flask ids" in {
-    ichemist.shards.exe should equal ( Set(FlaskID("flask1")) )
+    ichemist.shards.exe should equal ( Set(
+      Flask(FlaskID("flask1"),Location.localhost,Location.telemetryLocalhost)) )
   }
 
   it should "show more detailed flask information" in {
@@ -133,11 +134,28 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
   }
 
   it should "show the correct distribution" in {
-    println("===========================")
-    // println(ichemist.states.exe)
-    println(ichemist.distribution.exe)
-    // println(platform.config.statefulRepository.stateMaps)
-    println("===========================")
+    ichemist.distribution.exe should equal ( Map(
+      FlaskID("flask1") -> Map("test" -> List(
+        new URI("http://localhost:2001/stream/now"),
+        new URI("http://localhost:2002/stream/now")))) )
   }
+
+  behavior of "chemist http apis"
+
+  // TIM: Need to actually re-do this
+  // val http = Http()
+
+  // it should "show the correct distribution represented as json" in {
+  //   import dispatch._, Defaults._
+  //   import scala.concurrent.duration._
+
+  //   val svc = url("http://127.0.0.1:64529/shards")
+  //   val json = http(svc OK as.String)
+
+  //   println("-----------------------------")
+  //   println(scala.concurrent.Await.result(json, 1.seconds))
+  //   println("-----------------------------")
+
+  // }
 
 }

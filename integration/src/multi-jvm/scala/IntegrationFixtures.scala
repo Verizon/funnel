@@ -7,7 +7,7 @@ import chemist.{Flask,FlaskID,Location}
 object IntegrationFixtures {
   val flask1 = Flask(
     FlaskID("flask1"),
-    Location.localhost.copy(port = 6775),
+    Location.localhost.copy(port = 5775),
     Location.telemetryLocalhost)
 
   val flask1Options = Options(
