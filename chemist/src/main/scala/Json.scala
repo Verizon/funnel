@@ -19,12 +19,6 @@ object JSON {
 
   ////////////////////// chemist messages //////////////////////
 
-  def encodeClusterPairs[A : EncodeJson]: EncodeJson[(A, Map[ClusterName, List[URI]])] =
-    EncodeJson((m: (A, Map[ClusterName, List[URI]])) =>
-      ("shard"   := m._1) ->:
-      ("targets" := m._2.toList) ->: jEmptyObject
-    )
-
   /**
    * {
    *   "shard": "instance-f1",
@@ -39,6 +33,12 @@ object JSON {
    *   ]
    * }
    */
+  def encodeClusterPairs[A : EncodeJson]: EncodeJson[(A, Map[ClusterName, List[URI]])] =
+    EncodeJson((m: (A, Map[ClusterName, List[URI]])) =>
+      ("shard"   := m._1) ->:
+      ("targets" := m._2.toList) ->: jEmptyObject
+    )
+
   implicit val SnapshotWithFlaskToJson: EncodeJson[(Flask, Map[ClusterName, List[URI]])] =
     encodeClusterPairs[Flask]
 
@@ -98,7 +98,6 @@ object JSON {
     jEmptyObject
   }
 
-
   implicit val targetMessagesToJson: EncodeJson[TargetMessage] =
     EncodeJson {
       case d @ Discovery(_, _) => discoveryJson(d)
@@ -116,14 +115,11 @@ object JSON {
         ("msg" := m) ->: jEmptyObject
     }
 
-
-
-
   implicit val stateChangeToJson: EncodeJson[RepoEvent.StateChange] =
     EncodeJson { sc =>
+      ("message" := sc.msg) ->:
       ("from-state" := sc.from.toString) ->:
       ("to-state" := sc.to.toString) ->:
-      ("message" := sc.msg) ->:
       jEmptyObject
     }
 
