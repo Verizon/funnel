@@ -23,8 +23,6 @@ sealed trait RepoEvent
 object RepoEvent {
   case class StateChange(from: TargetState, to: TargetState, msg: TargetMessage) extends RepoEvent
   case class NewFlask(flask: Flask) extends RepoEvent
-  case class TerminatedFlask(id: FlaskID) extends RepoEvent
-  case class TerminatedTarget(id: URI) extends RepoEvent
 }
 
 trait RepoCommand

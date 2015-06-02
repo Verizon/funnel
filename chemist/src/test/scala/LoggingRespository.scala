@@ -19,8 +19,9 @@ class LoggingRepository extends Repository {
   /////////////// audit operations //////////////////
 
   def addEvent(e: AutoScalingEvent): Task[Unit] = Task.now(())
-  def historicalEvents: Task[Seq[RepoEvent]] = Task.now(Seq())
   def errors: Task[Seq[Error]] = Task.now(Seq())
+  def historicalPlatformEvents: Task[Seq[PlatformEvent]] = Task.now(Seq())
+  def historicalRepoEvents: scalaz.concurrent.Task[Seq[funnel.chemist.RepoEvent]] = Task.now(Seq())
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit] = Task.now(())
   def errorSink(e: Error): Task[Unit] = Task.now(())
   def instances: Task[Seq[(URI, RepoEvent.StateChange)]] = Task.now(Seq())
@@ -48,6 +49,7 @@ class LoggingRepository extends Repository {
   import Sharding.Distribution
   def distribution: Task[Distribution] = countTask(increase, Task.now(Distribution.empty))
   def mergeDistribution(d: Distribution): Task[Distribution] = Task.now(Distribution.empty)
+  def mergeExistingDistribution(d: Distribution): Task[Distribution] = Task.now(Distribution.empty)
   def assignedTargets(flask: Flask): Task[Set[Target]] = Task.now(Set.empty)
 
   def repoCommands: Process[Task, RepoCommand] = ???
