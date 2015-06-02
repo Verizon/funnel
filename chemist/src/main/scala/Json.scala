@@ -57,7 +57,13 @@ object JSON {
       ("location" := f.location) ->: jEmptyObject)
 
   implicit val LocationToJson: EncodeJson[Location] =
-    implicitly[EncodeJson[URI]].contramap[Location](_.asURI(""))
+    EncodeJson { l =>
+      ("host" := l.host) ->:
+      ("port" := l.port) ->:
+      ("datacenter" := l.datacenter) ->:
+      ("protocol" := l.protocol) ->:
+      ("is-private-network" := l.isPrivateNetwork) ->: jEmptyObject
+    }
 
   implicit val ErrorToJson: EncodeJson[Error] =
     EncodeJson(error =>

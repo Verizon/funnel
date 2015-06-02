@@ -11,6 +11,7 @@ import scalaz.syntax.kleisli._
 import scalaz.syntax.traverse._
 import scalaz.syntax.id._
 import scalaz.std.vector._
+import scalaz.std.option._
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,Process0, Sink}
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
@@ -40,11 +41,11 @@ trait Chemist[A <: Platform]{
   /**
    * list all the shards currently known by chemist.
    */
-  def shards: ChemistK[Set[FlaskID]] =
+  def shards: ChemistK[Set[Flask]] =
     for {
       cfg <- config
       a <- cfg.repository.distribution.map(Sharding.shards).liftKleisli
-    } yield a.toSet
+    } yield a.toList.flatMap(id => cfg.repository.flask(id)).toSet
   /**
    * display all known node information about a specific shard
    */
