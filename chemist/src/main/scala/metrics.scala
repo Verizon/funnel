@@ -6,6 +6,7 @@ import funnel.instruments._
 object metrics {
   val GetRoot = timer("http/get/index", "time taken to get the root document")
   val GetStatus = timer("http/get/status", "time taken to get the version of Chemist")
+  val GetErrors = timer("http/get/errors", "time taken to get the list of aggregated errors")
   val GetDistribution = timer("http/get/distribution", "time taken to get current work assignments of funnel -> flask")
   val GetLifecycleHistory = timer("http/get/lifecycle/history", "time taken to get last 100 lifecycle events this Chemist has seen")
   val GetLifecycleStates = timer("http/get/lifecycle/states", "time taken to get all known funnels")

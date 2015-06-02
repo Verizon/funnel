@@ -11,10 +11,10 @@ object JSON {
       javax.xml.bind.DatatypeConverter.parseDateTime(in).getTime
   }
 
-  implicit val encodeFlaskID: EncodeJson[FlaskID] =
+  implicit val FlaskIdToJson: EncodeJson[FlaskID] =
     implicitly[EncodeJson[String]].contramap(_.value)
 
-  implicit val encodeURI: EncodeJson[URI] =
+  implicit val UriToJson: EncodeJson[URI] =
     implicitly[EncodeJson[String]].contramap(_.toString)
 
   ////////////////////// chemist messages //////////////////////
@@ -51,13 +51,21 @@ object JSON {
    *   "location": ...
    * }
    */
-  implicit val flaskToJson: EncodeJson[Flask] =
+  implicit val FlaskToJson: EncodeJson[Flask] =
     EncodeJson((f: Flask) =>
       ("id"       := f.id)       ->:
       ("location" := f.location) ->: jEmptyObject)
 
-  implicit val locationToJson: EncodeJson[Location] =
+  implicit val LocationToJson: EncodeJson[Location] =
     implicitly[EncodeJson[URI]].contramap[Location](_.asURI(""))
+
+  implicit val ErrorToJson: EncodeJson[Error] =
+    EncodeJson(error =>
+      ("kind"   := error.names.kind) ->:
+      ("mine"   := error.names.mine) ->:
+      ("theirs" := error.names.theirs) ->:
+      jEmptyObject
+    )
 
   ////////////////////// flask messages //////////////////////
 
