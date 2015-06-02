@@ -52,15 +52,15 @@ class Instruments(val window: Duration,
         val sliding = B.sliding(window)(identity[O])(O)
         val (nowK, incrNow) =
           monitoring.topic[O,O](
-            s"now/$label", units, nowL(description), kinded)(now)
+            s"now/$label", units, nowL(description), kinded)(now).map(_.run)
         val (prevK, incrPrev) =
           monitoring.topic[O,O](
-            s"previous/$label", units, previousL(description), kinded)(prev)
+            s"previous/$label", units, previousL(description), kinded)(prev).map(_.run)
         val (slidingK, incrSliding) =
           monitoring.topic[O,O](
-            s"sliding/$label", units, slidingL(description), kinded)(sliding)
+            s"sliding/$label", units, slidingL(description), kinded)(sliding).map(_.run)
         def append(n: O): Unit = {
-          incrNow(n); incrPrev(n); incrSliding(n)
+          List(incrNow, incrPrev, incrSliding).traverse_(_(n)).run
         }
         def keys = Periodic[O](nowK, prevK, slidingK)
       }
