@@ -11,10 +11,19 @@ object JSON {
       javax.xml.bind.DatatypeConverter.parseDateTime(in).getTime
   }
 
-  implicit val encodeFlaskID: EncodeJson[FlaskID] = implicitly[EncodeJson[String]].contramap(_.value)
-  implicit val encodeURI: EncodeJson[URI] = implicitly[EncodeJson[String]].contramap(_.toString)
+  implicit val encodeFlaskID: EncodeJson[FlaskID] =
+    implicitly[EncodeJson[String]].contramap(_.value)
+
+  implicit val encodeURI: EncodeJson[URI] =
+    implicitly[EncodeJson[String]].contramap(_.toString)
 
   ////////////////////// chemist messages //////////////////////
+
+  def encodeClusterPairs[A : EncodeJson]: EncodeJson[(A, Map[ClusterName, List[URI]])] =
+    EncodeJson((m: (A, Map[ClusterName, List[URI]])) =>
+      ("shard"   := m._1) ->:
+      ("targets" := m._2.toList) ->: jEmptyObject
+    )
 
   /**
    * {
@@ -30,31 +39,26 @@ object JSON {
    *   ]
    * }
    */
-  implicit val ShardingSnapshotToJson: EncodeJson[(Flask, Map[String, List[URI]])] =
-    EncodeJson((m: (Flask, Map[String, List[URI]])) =>
-      ("shard"   := m._1) ->:
-      ("targets" := m._2.toList) ->: jEmptyObject
-    )
+  implicit val SnapshotWithFlaskToJson: EncodeJson[(Flask, Map[ClusterName, List[URI]])] =
+    encodeClusterPairs[Flask]
 
+  implicit val SnapshotWithFlaskIDToJson: EncodeJson[(FlaskID, Map[ClusterName, List[URI]])] =
+    encodeClusterPairs[FlaskID]
+
+  /**
+   * {
+   *   "id": "flask1",
+   *   "location": ...
+   * }
+   */
   implicit val flaskToJson: EncodeJson[Flask] =
     EncodeJson((f: Flask) =>
       ("id"       := f.id)       ->:
       ("location" := f.location) ->: jEmptyObject)
 
+  implicit val locationToJson: EncodeJson[Location] =
+    implicitly[EncodeJson[URI]].contramap[Location](_.asURI(""))
 
-  implicit val locationToJson: EncodeJson[Location] = implicitly[EncodeJson[URI]].contramap[Location](_.asURI(""))
-
-  /**
-   * {
-   *   "firewalls": [
-   *     "imdev-flask-1-7-118-pbXOvo-WebServiceSecurityGroup-11WVCT4E6GY52",
-   *     "monitor-funnel"
-   *   ],
-   *   "datacenter": "us-east-1a",
-   *   "host": "ec2-54-197-46-246.compute-1.amazonaws.com",
-   *   "id": "i-0c24ede2"
-   * }
-   */
   ////////////////////// flask messages //////////////////////
 
   /**
@@ -105,7 +109,7 @@ object JSON {
       case Unmonitoring(target, f, l) => targetMessage("Unmonitoring", target.uri, Some(f), l)
       case Terminated(target,t) => targetMessage("Terminated", target.uri, None, t)
       case Problem(target,f,m,t) =>
-        ("type" := "Progblem") ->:
+        ("type" := "Problem") ->:
         ("instance" := target.uri) ->:
         ("time" := t) ->:
         ("flask" := f) ->:
@@ -174,7 +178,7 @@ object JSON {
     ("type" := "Problem") ->:
     ("flask" := f.value) ->:
     ("uri" := u) ->:
-    ("msf" := msg) ->:
+    ("message" := msg) ->:
     jEmptyObject
   }
 
