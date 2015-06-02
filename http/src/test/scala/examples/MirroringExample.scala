@@ -6,6 +6,7 @@ import java.net.URL
 import org.scalacheck._
 import Prop._
 import scala.concurrent.duration._
+import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import scalaz.stream.{Process,time}
 

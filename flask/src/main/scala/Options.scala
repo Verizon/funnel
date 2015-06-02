@@ -1,4 +1,5 @@
 package funnel
+package flask
 
 import funnel.elastic.ElasticCfg
 import scala.concurrent.duration._
@@ -17,5 +18,5 @@ case class Options(
   riemann: Option[RiemannCfg] = None,
   funnelPort: Int = 5775,
   metricTTL: Option[Duration] = None,
-  telemetryPort: Int = 7391
+  telemetryPort: Int = 7390
 )

@@ -11,6 +11,7 @@ import scalaz.std.tuple._
 import scalaz.std.list._
 import scalaz.syntax.functor._
 import scalaz.syntax.foldable._
+import scalaz.stream.process1.lift
 
 /**
  * Provider of counters, gauges, and timers, tied to some
@@ -35,35 +36,50 @@ class Instruments(val window: Duration,
     keyMod compose (k => k.copy(attributes = k.attributes + ("kind" -> kind)))
 
   /**
+   * Return a `PeriodicGauge` with the given starting value.
+   * Keys updated by this `PeriodicGauge` are `now/label`,
+   * `previous/label` and `sliding/label`.
+   * See [[funnel.Periodic]].
+   */
+  def periodicGauge[O:Reportable:Group](
+    label: String, units: Units = Units.None, description: String = "", init: O,
+    keyMod: Key[O] => Key[O] = identity[Key[O]] _): PeriodicGauge[O] = {
+      val O = implicitly[Group[O]]
+      val kinded = andKind("periodic", keyMod)
+      val c = new PeriodicGauge[O] {
+        val now = B.resetEvery(window)(B.accum[O,O](init)(O.plus))
+        val prev = B.emitEvery(window)(now)
+        val sliding = B.sliding(window)(identity[O])(O)
+        val (nowK, incrNow) =
+          monitoring.topic[O,O](
+            s"now/$label", units, nowL(description), kinded)(now)
+        val (prevK, incrPrev) =
+          monitoring.topic[O,O](
+            s"previous/$label", units, previousL(description), kinded)(prev)
+        val (slidingK, incrSliding) =
+          monitoring.topic[O,O](
+            s"sliding/$label", units, slidingL(description), kinded)(sliding)
+        def append(n: O): Unit = {
+          incrNow(n); incrPrev(n); incrSliding(n)
+        }
+        def keys = Periodic[O](nowK, prevK, slidingK)
+      }
+      c.buffer(bufferTime) // only publish updates this often
+  }
+
+  /**
    * Return a `Counter` with the given starting count.
    * Keys updated by this `Counter` are `now/label`,
    * `previous/label` and `sliding/label`.
    * See [[funnel.Periodic]].
+   * You should use counters only for metrics that are monotonic.
    */
   def counter(label: String,
               init: Int = 0,
               description: String = "",
-              keyMod: Key[Double] => Key[Double] = identity): Counter[Periodic[Double]] = {
-    val kinded = andKind("counter", keyMod)
-    val c = new Counter[Periodic[Double]] {
-      val count = B.resetEvery(window)(B.counter(init))
-      val previousCount = B.emitEvery(window)(count)
-      val slidingCount = B.sliding(window)((_:Long).toDouble)(Group.doubleGroup)
-      val u: Units = Units.Count
-      val (nowK, incrNow) =
-        monitoring.topic[Long,Double](s"now/$label", u, nowL(description), kinded)(count).map(_.run)
-      val (prevK, incrPrev) =
-        monitoring.topic[Long,Double](s"previous/$label", u, previousL(description), kinded)(previousCount).map(_.run)
-      val (slidingK, incrSliding) =
-        monitoring.topic[Long,Double](s"sliding/$label", u, slidingL(description), kinded)(slidingCount).map(_.run)
-      def incrementBy(n: Int): Unit = runLogging(
-        List(incrNow, incrPrev, incrSliding).traverse_(_(n.toLong)))
-      def keys = Periodic(nowK, prevK, slidingK)
-
-      incrementBy(0)
-    }
-    c.buffer(bufferTime) // only publish updates this often
-  }
+              keyMod: Key[Double] => Key[Double] = identity): Counter =
+    new Counter(periodicGauge[Double](
+      label, Units.Count, description, init, andKind("counter", keyMod)))
 
   // todo: histogramgauge, histogramCount, histogramTimer
   // or maybe we just modify the existing combinators to
@@ -132,7 +148,7 @@ class Instruments(val window: Duration,
   def gauge[A:Reportable](label: String, init: A,
                           units: Units = Units.None,
                           description: String = "",
-                          keyMod: Key[A] => Key[A] = {(k:Key[A]) => k}): Gauge[Continuous[A],A] = {
+                          keyMod: Key[A] => Key[A] = identity[Key[A]] _): Gauge[Continuous[A],A] = {
     val kinded = andKind("gauge",keyMod)
     val g = new Gauge[Continuous[A],A] {
       val (key, snk) = monitoring.topic(s"now/$label", units, description, kinded)(B.resetEvery(window)(B.variable(init))).map(_.run)
@@ -163,18 +179,18 @@ class Instruments(val window: Duration,
   def edge(
     label: String,
     description: String = "",
-    origin: String,
-    destination: String): Edge = {
-      def addEdge[A](k: Key[A]) = k.setAttribute("edge", label)
+    origin: Edge.Origin,
+    destination: Edge.Destination): Edge = {
+      def addEdge[A](k: Key[A]): Key[A] = k.setAttribute("edge", label)
       Edge(
         origin = gauge(
           label  = s"$label/origin",
           init   = origin,
-          keyMod = addEdge),
+          keyMod = addEdge[Edge.Origin]),
         destination = gauge(
           label  = s"$label/destination",
-          init   =  destination,
-          keyMod = addEdge),
+          init   = destination,
+          keyMod = addEdge[Edge.Destination]),
         timer = timer(
           label  = s"$label/timer",
           keyMod = addEdge),

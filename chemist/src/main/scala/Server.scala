@@ -6,6 +6,7 @@ import unfiltered.response._
 import unfiltered.netty._
 import argonaut._, Argonaut._
 import scalaz.concurrent.Task
+import scalaz.stream.Process
 import scalaz.{\/,-\/,\/-}
 import journal.Logger
 
@@ -28,6 +29,16 @@ object Server {
   // there seems to be a bug in Task that makes doing what we previously had here
   // not possible. The server gets into a hang/deadlock situation.
   def unsafeStart[U <: Platform](chemist: Chemist[U], platform: U): Unit = {
+    val repo = platform.config.repository
+
+    (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, EvenSharding, platform.config.remoteFlask) _)).run.runAsync {
+      case -\/(err) =>
+        log.error(s"Error starting processing of Platform events: $err")
+        err.printStackTrace
+
+      case \/-(t)   => log.info(s"result of platform processing $t")
+    }
+
     chemist.bootstrap(platform).runAsync {
       case -\/(err) => log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
       case \/-(_)   => log.info("Sucsessfully bootstrap chemist at startup.")
@@ -71,9 +82,12 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
 
   def intent = {
     case GET(Path("/")) =>
-      GetRoot.time(Redirect("/index.html"))
+      GetRoot.time(Redirect("index.html"))
 
     case GET(Path("/status")) =>
+      GetStatus.time(Ok ~> JsonResponse(Chemist.version))
+
+    case GET(Path("/errors")) =>
       GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
     case GET(Path("/distribution")) =>
@@ -81,6 +95,9 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
 
     case GET(Path("/lifecycle/history")) =>
       GetLifecycleHistory.time(json(chemist.history.map(_.toList)))
+
+    case GET(Path("/lifecycle/states")) =>
+      GetLifecycleStates.time(json(chemist.states.map(_.toList)))
 
     case POST(Path("/distribute")) =>
       PostDistribute.time(NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)"))
@@ -92,13 +109,13 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
       GetShards.time(json(chemist.shards))
 
     case GET(Path(Seg("shards" :: id :: Nil))) =>
-      GetShardById.time(json(chemist.shard(id)))
+      GetShardById.time(json(chemist.shard(FlaskID(id))))
 
     case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
-      PostShardExclude.time(json(chemist.exclude(id)))
+      PostShardExclude.time(json(chemist.exclude(FlaskID(id))))
 
     case POST(Path(Seg("shards" :: id :: "include" :: Nil))) =>
-      PostShardInclude.time(json(chemist.include(id)))
+      PostShardInclude.time(json(chemist.include(FlaskID(id))))
 
   }
 }

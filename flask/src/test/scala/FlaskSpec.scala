@@ -2,7 +2,7 @@ package funnel
 package flask
 
 import scala.concurrent.duration._
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Strategy,Task}
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
@@ -63,9 +63,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   ]
   """
 
-  import scalaz.concurrent.Strategy
-
-  val ready = signalOf[Boolean](false)(Strategy.Sequential)
+  val ready = signalOf(false)(Strategy.Executor(Monitoring.serverPool))
 
   implicit val B = scalaz.std.anyVal.booleanInstance.conjunction
   implicit val s = scalaz.stream.DefaultScheduler

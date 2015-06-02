@@ -27,6 +27,7 @@ object Riemann {
   ): Actor[Pusher] = {
     implicit val S = Strategy.Executor(Monitoring.serverPool)
     implicit val P = Monitoring.schedulingPool
+
     val a = Actor.actor[Pusher] {
       case Hold(e) => store = (e :: store)
       case Flush   => {
@@ -120,8 +121,7 @@ object Riemann {
    */
   def publish(
     M: Monitoring,
-    ttlInSeconds: Float = 20f,
-    retries: Event = Events.every(1 minutes)
+    ttlInSeconds: Float = 20f
   )(c: RiemannClient, a: Actor[Pusher]
   ): Task[Unit] = {
     Monitoring.subscribe(M)(_ => true).flatMap(liftDatapointToStream
@@ -143,13 +143,12 @@ object Riemann {
     M: Monitoring,
     ttlInSeconds: Float = 20f
   )(riemannClient: RiemannClient,
-    riemannName: String,
-    riemannRetries: Names => Event = _ => Monitoring.defaultRetries)(
+    riemannName: String)(
     myName: String = "Funnel Mirror"
   ): Task[Unit] = {
 
     val actor = collector(riemannClient)
 
-    publish(M, ttlInSeconds, riemannRetries(Names("Riemann", myName, riemannName)))(riemannClient, actor)
+    publish(M, ttlInSeconds)(riemannClient, actor)
   }
 }

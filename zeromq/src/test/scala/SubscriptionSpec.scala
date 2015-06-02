@@ -4,7 +4,9 @@ package zeromq
 import java.net.URI
 import org.scalatest.matchers.{Matcher,MatchResult}
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
-import scalaz.stream.async.signalOf
+import scalaz.concurrent.Strategy
+import scalaz.stream.async
+import async.mutable.Queue
 import scala.concurrent.duration._
 import sockets._
 import Publish.transportDatapoint
@@ -14,8 +16,9 @@ class SubscriptionSpec extends FlatSpec
     with Matchers
     with BeforeAndAfterAll {
 
-  lazy val S  = signalOf[Boolean](true)(scalaz.concurrent.Strategy.Executor(Monitoring.defaultPool))
+  lazy val S  = async.signalOf[Boolean](true)(Strategy.Executor(Monitoring.serverPool))
   lazy val W  = 30.seconds
+  lazy val Q: Queue[Telemetry] = async.unboundedQueue(Strategy.Executor(Monitoring.serverPool))
 
   lazy val U1 = new URI("ipc:///tmp/u1.socket")
   lazy val E1 = Endpoint.unsafeApply(publish &&& bind, U1)
@@ -75,7 +78,7 @@ class SubscriptionSpec extends FlatSpec
   }
 
   private def mirror(uri: URI, to: Monitoring, discriminator: List[Array[Byte]]): Unit =
-    to.mirrorAll(Mirror.from(S, discriminator)
+    to.mirrorAll(Mirror.from(S, Q, discriminator)
     )(uri, Map("uri" -> uri.toString)
     ).run.runAsync(_.fold(e => Ø.log.error(
                             s"Error mirroring $uri: ${e.getMessage}"), identity))

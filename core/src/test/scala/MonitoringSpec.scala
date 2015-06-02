@@ -84,6 +84,7 @@ object MonitoringSpec extends Properties("monitoring") {
     ok && out2.length === 2 && out2(0) === xs.sum && out2(1) === xs.sum
   }
 
+
   /* Check that if all events occur at same moment, `sliding` has no effect. */
   property("sliding-id") = forAll(Gen.nonEmptyListOf(Gen.choose(1,10))) { xs =>
     val c = B.sliding(5.minutes)(identity[Int])(Group.intGroup)
@@ -118,6 +119,7 @@ object MonitoringSpec extends Properties("monitoring") {
     true
   }
 
+
   /*
    * Check that subscribing and filtering is the same as
    * filtering and subscribing.
@@ -141,12 +143,11 @@ object MonitoringSpec extends Properties("monitoring") {
       filter(_.key.name.contains("previous/jvm/gc/ParNew/time"))
     val b2 = Monitoring.subscribe(Monitoring.default)(
       _.name.contains("previous/jvm/gc/ParNew/time"))
-    val xs = listenFor(1.minute)(b1)
-    val ys = listenFor(1.minute)(b2)
+    val xs = listenFor(30.seconds)(b1)
+    val ys = listenFor(30.seconds)(b2)
     val d = (xs.length - ys.length).abs
     d <= 2 // Each of xs and ys could gain or lose one tick, for a total of 2
   }
-
 
   /* Check that `distinct` combinator works. */
   property("distinct") = forAll(Gen.nonEmptyListOf(Gen.choose(-10L,10L))) { xs =>
@@ -178,7 +179,7 @@ object MonitoringSpec extends Properties("monitoring") {
    * with concurrent producers.
    */
   property("profiling") = secure {
-    def go: Boolean = {
+    def go: Prop = {
       import instruments._
       val c = counter("uno")
       val ok = gauge("tres", false)
@@ -202,17 +203,20 @@ object MonitoringSpec extends Properties("monitoring") {
       }
       val publishTime = Duration.fromNanos(System.nanoTime - t0) / N.toDouble
       val okResult = Monitoring.default.latest(ok.keys.now).run
+      Thread.sleep(instruments.bufferTime.toMillis * 2)
 
-      // println("update time: " + updateTime.toNanos)
-      // println("publishTime: " + publishTime.toNanos)
+      //println("update time: " + updateTime)
+      //println("publishTime: " + publishTime)
+      //println("OK result:" + okResult)
       // I am seeing about 40.nanoseconds for update times,
       // 100 nanos for publishing
-      updateTime.toNanos < 1000 &&
-      publishTime.toNanos < 2000 &&
+      (s"Gauge latency should be < 1000 ns (was $updateTime)" |: (updateTime.toNanos < 1000)) &&
+      (s"Publish latency should be < 2000 ns (was $publishTime)" |: (publishTime.toNanos < 2000)) &&
       okResult
     }
     go || go || go
   }
+
 
   /* Simple sanity check of a timer. */
   property("timer-ex") = secure {
@@ -301,7 +305,7 @@ object MonitoringSpec extends Properties("monitoring") {
     // this test takes about 45 seconds
     val (a,b) = ab.splitAt(ab.length / 2)
     val M = Monitoring.instance
-    val I = new Instruments(5.minutes, M)
+    val I = new Instruments(30.seconds, M)
     import I._
     val aN = counter("a")
     val bN = counter("b")

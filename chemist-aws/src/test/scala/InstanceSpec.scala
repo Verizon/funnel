@@ -1,12 +1,13 @@
 package funnel
 package chemist
+package aws
 
 import org.scalatest.{FlatSpec,Matchers}
 import scalaz.\/
 
 class InstanceSpec extends FlatSpec with Matchers {
   def inst(tags: (String,String)*): String =
-    Instance("a", firewalls = "f1" :: Nil, tags =
+    AwsInstance("a", firewalls = "f1" :: Nil, tags =
       tags.toSeq.toMap
     ).application.get.toString
 

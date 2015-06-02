@@ -1,4 +1,5 @@
 package funnel
+package telemetry
 
 import scodec._
 import scodec.bits._

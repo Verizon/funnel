@@ -57,7 +57,7 @@ object ASG {
         name      = g.getAutoScalingGroupName,
         instances = g.getInstances.asScala.toSeq,
         tags      = tags(g))
-      ))
+      ))(funnel.chemist.Chemist.serverPool)
   }
 
   def lookupByName(name: String)(asg: AmazonAutoScaling): Task[AutoScalingGroup] = {
@@ -65,7 +65,7 @@ object ASG {
       ).withMaxRecords(1
       ).withAutoScalingGroupNames(name)
 
-    Task(asg.describeAutoScalingGroups(req)).flatMap { r =>
+    Task(asg.describeAutoScalingGroups(req))(funnel.chemist.Chemist.serverPool).flatMap { r =>
       val opt: Option[AutoScalingGroup] = r.getAutoScalingGroups.asScala.toList.headOption
       val fail: Task[AutoScalingGroup] = Task.fail(ASGNotFoundException(name))
       opt.fold(fail)(Task.delay(_))

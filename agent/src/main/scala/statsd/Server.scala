@@ -30,7 +30,8 @@ object Server {
          .sync()
          .channel()
          .closeFuture()
-         .await()
+          .await()
+        ()
       } finally group.shutdownGracefully()
-    }
+    }(Monitoring.serverPool)
 }

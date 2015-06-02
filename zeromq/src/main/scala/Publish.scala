@@ -2,6 +2,7 @@ package funnel
 package zeromq
 
 import argonaut.EncodeJson
+import scalaz.concurrent.Strategy
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.Process
 import scalaz.concurrent.Task

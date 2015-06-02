@@ -15,7 +15,7 @@ sealed trait Reportable[+A] {
 object Reportable {
   /**
    * used to make sure scalacheck is generating all possiblilites, if
-    * you add a new one, please update this
+   * you add a new one, please update this
    */
   def all: Seq[Reportable[Any]] = Seq(B,D,S,Stats)
 

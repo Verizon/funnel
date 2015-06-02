@@ -1,6 +1,8 @@
 package funnel
 package zeromq
 
+import scalaz.concurrent._
+
 object Fixtures {
   def data = large
 

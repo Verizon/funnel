@@ -3,6 +3,7 @@ package elastic
 
 import java.net.URI
 import scala.concurrent.duration._
+import scalaz.concurrent.Strategy
 import scalaz.stream._
 import scalaz._
 import concurrent.Strategy.Executor
