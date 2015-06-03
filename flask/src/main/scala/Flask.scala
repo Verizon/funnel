@@ -123,6 +123,5 @@ class Flask(options: Options, val I: Instruments) {
         I.monitoring, riemann.ttl.toSeconds.toFloat)(
         R, s"${riemann.host}:${riemann.port}")(flaskName))
     }
-    Q.enqueueOne(Error(Names("how about", "this thing", new URI("http://localhost")))).run
   }
 }
