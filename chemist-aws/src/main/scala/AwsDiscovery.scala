@@ -38,7 +38,7 @@ class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
    * verification that Funnel is running on port 5775 and is network accessible.
    */
   def listTargets: Task[Seq[(TargetID, Set[Target])]] =
-    instances(_ => true).map(_.map(in => TargetID(in.id) -> in.targets))
+    instances(!isFlask(_)).map(_.map(in => TargetID(in.id) -> in.targets))
 
   /**
    * List all of the instances in the given AWS account that respond to a rudimentry
