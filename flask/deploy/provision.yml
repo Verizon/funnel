@@ -6,11 +6,11 @@
   roles:
     - application
   tasks:
-  - name: ulimit | copy template file into /etc/security/limits.d/01-oncue.conf
-    sudo: yes
-    copy: src=limits.conf
-          dest=/etc/security/limits.d/01-oncue.conf
-          owner=root group=root mode=0644
+    - name: ulimit | copy template file into /etc/security/limits.d/01-oncue.conf
+      sudo: yes
+      copy: src=limits.conf
+            dest=/etc/security/limits.d/01-oncue.conf
+            owner=root group=root mode=0644
 
     - name: flask | override configuration file
       sudo: yes
