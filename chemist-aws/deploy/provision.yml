@@ -8,7 +8,7 @@
   tasks:
     - name: ulimit | copy template file into /etc/security/limits.d/01-oncue.conf
       sudo: yes
-      copy: src=limits.conf
+      copy: src=files/limits.conf
             dest=/etc/security/limits.d/01-oncue.conf
             owner=root group=root mode=0644
 
