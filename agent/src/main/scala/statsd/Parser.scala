@@ -11,7 +11,7 @@ object Parser {
   // borrowed this from the bsd work here:
   // https://github.com/mojodna/metricsd
   private[statsd] val matcher =
-    new Regex("""([^:]+)(:((-?\d+|delete)?(\|((\w+)(\|@(\d+\.\d+))?)?)?)?)?""")
+    new Regex("""([^:]+)(:((-?\d+(?:\.?\d*)|delete)?(\|((\w+)(\|@(\d+\.\d+))?)?)?)?)?""")
 
   def toRequest(line: String): String => Throwable \/ InstrumentRequest =
     cluster => toMetric(line).map(InstrumentRequest(cluster, _))
@@ -45,7 +45,7 @@ object Parser {
     for {
       a <- \/.fromTryCatchNonFatal(s.trim.toLowerCase)
       _ <- if(a == "delete") \/.left(new Exception("Deletion is not supported.")) else \/.right(a)
-      b <- \/.fromTryCatchNonFatal(a.toLong)
+      b <- \/.fromTryCatchNonFatal(a.toDouble)
     } yield round(b * 1 / rate)
   }
 
