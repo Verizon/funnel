@@ -2,7 +2,6 @@ package funnel
 package agent
 package statsd
 
-import scala.math.round
 import util.matching.Regex
 import scalaz.\/
 
@@ -41,12 +40,12 @@ object Parser {
     }
   }
 
-  private[statsd] def toValue(s: String, rate: Double): Throwable \/ Long = {
+  private[statsd] def toValue(s: String, rate: Double): Throwable \/ Double = {
     for {
       a <- \/.fromTryCatchNonFatal(s.trim.toLowerCase)
       _ <- if(a == "delete") \/.left(new Exception("Deletion is not supported.")) else \/.right(a)
       b <- \/.fromTryCatchNonFatal(a.toDouble)
-    } yield round(b * 1 / rate)
+    } yield BigDecimal(b * 1 / rate).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
   }
 
   private[statsd] def toSampleRate(s: String): Throwable \/ Double =
