@@ -77,9 +77,13 @@ class Flask(options: Options, val I: Instruments) {
 
     val Q = async.unboundedQueue[Telemetry](Strategy.Executor(funnel.Monitoring.serverPool))
 
-    telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
-                           Q.dequeue.wye(I.monitoring.keys.discrete pipe keyChanges)(wye.merge)(Strategy.Executor(Monitoring.serverPool))).runAsync(_ => ())
-
+    // Removing the key merging for now as I suspect this is the thing pegging CPU on the deployments
+    // .wye(I.monitoring.keys.discrete pipe keyChanges)(wye.merge)(Strategy.Executor(Monitoring.serverPool))
+    runAsync {
+      telemetryPublishSocket(
+        URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"),
+          signal, Q.dequeue)
+    }
 
     def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
       httpOrZmtp(alive, Q)(uri) observe countDatapoints
