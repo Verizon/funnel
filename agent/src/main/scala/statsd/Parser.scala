@@ -2,7 +2,6 @@ package funnel
 package agent
 package statsd
 
-import scala.math.round
 import util.matching.Regex
 import scalaz.\/
 
@@ -11,7 +10,7 @@ object Parser {
   // borrowed this from the bsd work here:
   // https://github.com/mojodna/metricsd
   private[statsd] val matcher =
-    new Regex("""([^:]+)(:((-?\d+|delete)?(\|((\w+)(\|@(\d+\.\d+))?)?)?)?)?""")
+    new Regex("""([^:]+)(:((-?\d+(?:\.?\d*)|delete)?(\|((\w+)(\|@(\d+\.\d+))?)?)?)?)?""")
 
   def toRequest(line: String): String => Throwable \/ InstrumentRequest =
     cluster => toMetric(line).map(InstrumentRequest(cluster, _))
@@ -41,12 +40,12 @@ object Parser {
     }
   }
 
-  private[statsd] def toValue(s: String, rate: Double): Throwable \/ Long = {
+  private[statsd] def toValue(s: String, rate: Double): Throwable \/ Double = {
     for {
       a <- \/.fromTryCatchNonFatal(s.trim.toLowerCase)
       _ <- if(a == "delete") \/.left(new Exception("Deletion is not supported.")) else \/.right(a)
-      b <- \/.fromTryCatchNonFatal(a.toLong)
-    } yield round(b * 1 / rate)
+      b <- \/.fromTryCatchNonFatal(a.toDouble)
+    } yield BigDecimal(b * 1 / rate).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
   }
 
   private[statsd] def toSampleRate(s: String): Throwable \/ Double =
