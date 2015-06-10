@@ -19,6 +19,9 @@ trait STMultiNodeSpec extends MultiNodeSpecCallbacks
 //////////////////////// JVM configuration //////////////////////////
 
 import akka.remote.testkit.MultiNodeConfig
+import java.net.URI
+import scalaz.Kleisli
+import scalaz.concurrent.Task
 
 object MultiNodeSampleConfig extends MultiNodeConfig {
   /**
@@ -33,9 +36,20 @@ object MultiNodeSampleConfig extends MultiNodeConfig {
   val target03  = role("target03")
 
   //////// barriers /////////
-  val Startup  = "startup"
-  val Deployed = "deployed"
-  val Finished = "finished"
+  val Startup      = "startup"
+  val Deployed     = "deployed"
+  val Bootstrapped = "bootstrapped"
+  val Finished     = "finished"
+
+  val platform = new IntegrationPlatform {
+    val config = new IntegrationConfig
+  }
+
+  val ichemist = new IntegrationChemist
+
+  implicit class KleisliExeSyntax[A](k: Kleisli[Task,IntegrationPlatform,A]){
+    def exe: A = k.apply(platform).run
+  }
 }
 
 //////////////////////// JVM setup //////////////////////////
@@ -53,6 +67,8 @@ class MultiNodeSampleSpecMultiJvmNode5 extends MultiNodeSample
 //////////////////////// Actual Test //////////////////////////
 
 import akka.remote.testconductor.RoleName
+import concurrent.{Future,ExecutionContext}
+import chemist.Server
 
 class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
   with STMultiNodeSpec
@@ -62,13 +78,13 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
   def deployTarget(role: RoleName, port: Int) =
     runOn(role){
       IntegrationTarget.start(port)
-      enterBarrier(Deployed)
+      enterBarrier(Deployed, Bootstrapped)
     }
 
   def deployFlask(role: RoleName, opts: flask.Options) =
     runOn(role){
       IntegrationFlask.start(opts)
-      enterBarrier(Deployed)
+      enterBarrier(Deployed, Bootstrapped)
     }
 
   def initialParticipants =
@@ -81,10 +97,17 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
   it should "send to and receive from a remote node" in {
     runOn(chemist01) {
       enterBarrier(Deployed)
+      // just fork the shit out of it so it doesnt block our test.
+      Future(Server.unsafeStart(ichemist, platform)
+        )(ExecutionContext.Implicits.global)
 
-      println(">>>>>>>>>>>>>> GO CHEMIST")
+      Thread.sleep(5000)
 
-      true should equal (true)
+      enterBarrier(Bootstrapped)
+
+      println(">>>>>>>> " + ichemist.shards.exe)
+
+      // true should equal (true)
     }
 
     deployTarget(target01, 4001)
