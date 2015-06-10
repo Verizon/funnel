@@ -23,11 +23,10 @@ import scalaz.stream.Process
 """
 
 libraryDependencies ++= Seq(
-  "intelmedia.ws.common"    %% "logging-s3"              % "10.+",
-  "oncue.svc.knobs"         %% "core"                    % V.knobs,
-  "net.databinder.dispatch" %% "dispatch-core"           % V.dispatch,
-  "net.databinder"          %% "unfiltered-filter"       % V.unfiltered,
-  "net.databinder"          %% "unfiltered-netty-server" % V.unfiltered,
-  "oncue.quiver"            %% "core"                    % "3.1.+",
-  "oncue.typelevel"         %% "shapeless-scalacheck"    % "0.4.0" % "test"
+  "intelmedia.ws.common" %% "logging-s3"           % "10.+",
+  "oncue.svc.knobs"      %% "core"                 % V.knobs,
+  "oncue.quiver"         %% "core"                 % "3.1.+",
+  "org.http4s"           %% "http4s-blazeclient"   % "0.8.0-SNAPSHOT",
+  "org.http4s"           %% "http4s-blazeserver"   % "0.8.0-SNAPSHOT",
+  "oncue.typelevel"      %% "shapeless-scalacheck" % "0.4.0" % "test"
 )

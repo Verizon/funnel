@@ -6,6 +6,9 @@ import scalaz.std.string._
 import scalaz.syntax.apply._
 import journal.Logger
 import java.net.URI
+import org.http4s.Http4s._
+import org.http4s.client.Client
+import org.http4s.Uri
 
 object Housekeeping {
   import Sharding._
@@ -17,7 +20,7 @@ object Housekeeping {
    *
    * This function should only really be used startup of chemist.
    */
-  def gatherAssignedTargets(flasks: Seq[Flask])(http: dispatch.Http): Task[Distribution] =
+  def gatherAssignedTargets(flasks: Seq[Flask])(http: Client): Task[Distribution] =
     (for {
        a <- Task.gatherUnordered(flasks.map(
             f => requestAssignedTargets(f.location)(http).map(f -> _)))
@@ -31,14 +34,13 @@ object Housekeeping {
    * Call out to the specific location and grab the list of things the flask
    * is already mirroring.
    */
-  private def requestAssignedTargets(location: Location)(http: dispatch.Http): Task[Set[Target]] = {
+  private def requestAssignedTargets(location: Location)(http: Client): Task[Set[Target]] = {
     import argonaut._, Argonaut._, JSON._, HJSON._
-    import dispatch._, Defaults._
 
-    val a = location.asURI(path = "mirror/sources")
-    val req = Task.delay(url(a.toString)) <* Task.delay(log.debug(s"requesting assigned targets from $a"))
+    val a = location.asURI(path = "mirror/sources").toString
+    val req = Task.delay(Uri.fromString(a)) <* Task.delay(log.debug(s"requesting assigned targets from $a"))
     req flatMap { b =>
-      fromScalaFuture(http(b OK as.String)).map { c =>
+      http(b.as[String]).map { c =>
         Parse.decodeOption[List[Cluster]](c
         ).toList.flatMap(identity
         ).foldLeft(Set.empty[Target]){ (a,b) =>
