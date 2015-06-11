@@ -112,7 +112,7 @@ agent {
 
 #### HTTP
 
-As for the HTTP API, it supports reporting of various types of metrics and the agent HTTP process is always bound to `127.0.0.1:7557`. The structure of the JSON payload is as follows:
+As for the HTTP API, it supports reporting of various types of metrics and the agent HTTP process is always bound to `127.0.0.1:$port`, where `$port` is the `agent.http.port` configuration value. The structure of the JSON payload is defined below, and the body must be `POST`ed to `/metrics` resource on the specified host:port combination:
 
 ```
 {
