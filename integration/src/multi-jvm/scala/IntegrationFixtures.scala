@@ -17,7 +17,7 @@ object IntegrationFixtures {
     funnelPort = flask1.location.port,
     telemetryPort = flask1.telemetry.port)
 
-  val targets =
+  lazy val targets =
     target01 ::
     target02 ::
     target03 :: Nil
