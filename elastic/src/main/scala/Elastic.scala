@@ -132,7 +132,8 @@ case class Elastic(M: Monitoring) {
     await1[ESGroup[A]].flatMap { g =>
       emitAll(g.toSeq.map { case (name, m) =>
         ("uri" := name._2.getOrElse(flaskName)) ->:
-        ("host" := name._2.map(u => (new URI(u)).getHost)) ->:
+        ("host" :=? name._2.flatMap(u => Option((new URI(u)).getHost))
+                           .orElse(Option((new URI(flaskName)).getHost)) ) ->?:
         ("@timestamp" :=
           new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
           m.toList.foldLeft(("group" := name._1) ->: jEmptyObject) {
