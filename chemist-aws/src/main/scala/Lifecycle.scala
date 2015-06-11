@@ -108,7 +108,7 @@ object Lifecycle {
       } yield i.toSeq.map(t => TerminatedTarget(t.uri))
 
     def isFlask: Task[Boolean] = {
-      for {
+      (for {
         n <- e.metadata.get("asg-name").map(Task.now).getOrElse(Task.fail(NotAFlaskException(e)))
         a <- ASG.lookupByName(n)(asg)
         _  = log.debug(s"Found ASG from the EC2 lookup: $a")
@@ -116,7 +116,7 @@ object Lifecycle {
                t.getKey.trim == "type" &&
                t.getValue.trim.startsWith("flask")
              ).fold(Task.now(false))(_ => Task.now(true))
-      } yield r
+      } yield r).or(Task.now(false))
     }
 
     def newFlask(id: FlaskID): Task[Seq[PlatformEvent]] =
