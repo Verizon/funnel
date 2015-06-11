@@ -19,35 +19,25 @@ object AutoScalingEventKind {
 }
 
 case class AutoScalingEvent(
-  activityId: String,
+  eventId: String,
   kind: AutoScalingEventKind,
-  asgName: String,
-  asgARN: String,
-  avalibilityZone: String,
-  description: String,
-  cause: String,
-  progress: Int,
-  accountId: String,
   time: Date,
   startTime: Date,
   endTime: Date,
-  instanceId: String
+  instanceId: String,
+  metadata: Map[String,String] = Map.empty
 )
 object AutoScalingEvent {
   def apply(i: String, k: AutoScalingEventKind): AutoScalingEvent =
     AutoScalingEvent(
-      activityId = "manual",
+      eventId = "manual",
       kind = k,
-      asgName = "unknown",
-      asgARN = "unknown",
-      avalibilityZone = "unknown",
-      description = "unknown",
-      cause = "operator manually triggered lifecycle operation",
-      progress = 50,
-      accountId = "unknown",
       time = new java.util.Date,
       startTime = new java.util.Date,
       endTime = new java.util.Date,
-      instanceId = i
+      instanceId = i,
+      metadata = Map(
+        "cause" -> "operator manually triggered lifecycle operation"
+      )
     )
 }

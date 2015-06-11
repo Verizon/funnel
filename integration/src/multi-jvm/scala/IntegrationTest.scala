@@ -92,8 +92,7 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
   }
 
   it should "have gotten the problem event" in {
-    val history = platform.config.repository.historicalRepoEvents.run
-
+    val history = ichemist.repoHistory.exe
     val unmonitored: Option[Int] = history.collectFirst {
       case RepoEvent.StateChange(_, TargetState.Problematic, TargetLifecycle.Problem(_, _, _, _)) => 1
     }
