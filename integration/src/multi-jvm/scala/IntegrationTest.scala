@@ -38,8 +38,8 @@ object MultiNodeSampleConfig extends MultiNodeConfig {
   //////// barriers /////////
   val Startup      = "startup"
   val Deployed     = "deployed"
-  val Bootstrapped = "bootstrapped"
   val PhaseOne     = "phase-one"
+  val PhaseTwo     = "phase-two"
   val Finished     = "finished"
 
   val platform = new IntegrationPlatform {
@@ -72,6 +72,8 @@ class MultiNodeSampleSpecMultiJvmNode5 extends MultiNodeSample
 import akka.remote.testconductor.{RoleName,Controller}
 import concurrent.{Future,ExecutionContext}
 import chemist.{Server,FlaskID,PlatformEvent,TargetLifecycle,RepoEvent}
+import java.util.concurrent.{CountDownLatch,TimeUnit}
+import concurrent.duration._
 
 class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
   with STMultiNodeSpec
@@ -81,7 +83,6 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
 
   def fetch(path: String) = {
     import dispatch._, Defaults._
-    import concurrent.duration._
 
     val svc = url(s"http://127.0.0.1:64529${path}")
     val json = http(svc OK as.String)
@@ -90,16 +91,25 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
     println("-----------------------------")
   }
 
-  def deployTarget(role: RoleName, port: Int) =
+  def deployTarget(role: RoleName, port: Int, failAfter: Option[Duration] = None) =
     runOn(role){
-      IntegrationTarget.start(port)
-      enterBarrier(Deployed, Bootstrapped)
+      val latch = new CountDownLatch(1)
+      val target = IntegrationTarget.start(port)
+      enterBarrier(Deployed, PhaseOne)
+      failAfter.foreach { d =>
+        println("===== AWAITING LATCH")
+        latch.await(d.toMillis, TimeUnit.MILLISECONDS)
+        println(s"===== STOPPING TARGET ON PORT $port")
+        target.stop()
+        Thread.sleep(15.seconds.toMillis)
+      }
+      enterBarrier(PhaseTwo)
     }
 
   def deployFlask(role: RoleName, opts: flask.Options) =
     runOn(role){
       IntegrationFlask.start(opts)
-      enterBarrier(Deployed, Bootstrapped)
+      enterBarrier(Deployed, PhaseOne, PhaseTwo)
     }
 
   def initialParticipants =
@@ -116,16 +126,16 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
       Future(Server.unsafeStart(ichemist, platform)
         )(ExecutionContext.Implicits.global)
 
-      Thread.sleep(5000) // give the system time to do its thing
+      Thread.sleep(5.seconds.toMillis) // give the system time to do its thing
 
-      enterBarrier(Bootstrapped)
+      enterBarrier(PhaseOne)
     }
 
     deployTarget(target01, 4001)
 
     deployTarget(target02, 4002)
 
-    deployTarget(target03, 4003)
+    deployTarget(target03, 4003, Some(5.seconds))
 
     deployFlask(flask01, IntegrationFixtures.flask1Options)
 
@@ -156,15 +166,6 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
     }
   }
 
-  // TIM: doesnt work yet.
-  // it should "have gotten the problem event" in {
-  //   val history = ichemist.repoHistory.exe
-  //   val unmonitored: Option[Int] = history.collectFirst {
-  //     case RepoEvent.StateChange(_, TargetState.Problematic, TargetLifecycle.Problem(_, _, _, _)) => 1
-  //   }
-  //   unmonitored should be (Some(1))
-  // }
-
   it should "have events in the history" in {
     runOn(chemist01){
       val history = ichemist.platformHistory.exe
@@ -172,16 +173,23 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
     }
   }
 
-  /**
+  it should "have recieved the problem event via the telemetry socket" in {
+    import org.scalatest.OptionValues._
+    runOn(chemist01){
+      enterBarrier(PhaseTwo)
+      println(">>>><<<<>>>>><<<<<>>>>> PHASE TWO")
+      val errors = ichemist.errors.exe
+      val unmonitored: Option[Int] = errors.collectFirst {
+        case Error(Names(flask, mine, uri)) => 1
+      }
 
-  it should "have gotten the problem event" in {
-    val history = ichemist.repoHistory.exe
-    val unmonitored: Option[Int] = history.collectFirst {
-      case RepoEvent.StateChange(_, TargetState.Problematic, TargetLifecycle.Problem(_, _, _, _)) => 1
+      unmonitored should not be >= (1)
     }
-
-    unmonitored should be (Some(1))
   }
+
+
+
+  /**
 
   it should "be monitoring 1 but not 2" in {
     val state = platform.config.statefulRepository.stateMaps.get

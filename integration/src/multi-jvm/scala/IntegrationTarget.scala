@@ -8,7 +8,7 @@ import journal.Logger
 object IntegrationTarget {
   val log = Logger[IntegrationTarget.type]
 
-  def start(port: Int): Unit = {
+  def start(port: Int): http.MonitoringServer = {
     val W = 10.seconds
     val M = Monitoring.instance
     val I = new Instruments(W, M)
