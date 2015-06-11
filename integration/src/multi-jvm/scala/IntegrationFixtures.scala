@@ -17,6 +17,22 @@ object IntegrationFixtures {
     funnelPort = flask1.location.port,
     telemetryPort = flask1.telemetry.port)
 
+  val flaskOptionsWithES = Options(
+    name = Some(flask1.id.value),
+    cluster = Some("cluster1"),
+    elastic = Some(elastic.ElasticCfg(
+      url = "http://localhost:9200",
+      indexName = "funnel",
+      typeName = "metric",
+      dateFormat = "yyyy.MM.dd",
+      templateName = "flask",
+      templateLocation = None,
+      groups = List("previous/jvm", "previous/system", "previous")
+    )),
+    funnelPort = flask1.location.port,
+    telemetryPort = flask1.telemetry.port
+  )
+
   lazy val targets =
     target01 ::
     target02 ::
