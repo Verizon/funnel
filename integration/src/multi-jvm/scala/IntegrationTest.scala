@@ -97,9 +97,7 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
       val target = IntegrationTarget.start(port)
       enterBarrier(Deployed, PhaseOne)
       failAfter.foreach { d =>
-        println("===== AWAITING LATCH")
         latch.await(d.toMillis, TimeUnit.MILLISECONDS)
-        println(s"===== STOPPING TARGET ON PORT $port")
         target.stop()
         Thread.sleep(15.seconds.toMillis)
       }
@@ -179,40 +177,25 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
       enterBarrier(PhaseTwo)
       println(">>>><<<<>>>>><<<<<>>>>> PHASE TWO")
       val errors = ichemist.errors.exe
-      val unmonitored: Option[Int] = errors.collectFirst {
-        case Error(Names(flask, mine, uri)) => 1
-      }
 
-      unmonitored should not be >= (1)
+      errors.size should be > 0
+
+      errors.collectFirst {
+        case Error(Names(_, _, u)) => u
+      } should be (Some(IntegrationFixtures.target03.uri))
     }
   }
 
+  // it should "be monitoring 1 but not 2" in {
+  //   val U2 = IntegrationFixtures.target02.uri
+  //   val U3 = IntegrationFixtures.target03.uri
 
-
-  /**
-
-  it should "be monitoring 1 but not 2" in {
-    val state = platform.config.statefulRepository.stateMaps.get
-    log.debug("repository states: " + state)
-    log.debug("unmonitored: " + state.lookup(TargetState.Problematic))
-    state.lookup(TargetState.Problematic).get.lookup(U2).map(_.msg.target.uri) should be (Some(U2))
-    state.lookup(TargetState.Monitored).get.lookup(U1).map(_.msg.target.uri) should be (Some(U1))
-  }
-
-  it should "have logged errors" in {
-    import funnel._
-    val errors = platform.config.repository.errors.run
-
-    log.debug("errors: " + errors)
-
-    errors.size should be > 0
-
-    errors.collectFirst {
-      case Error(Names(_, _, u)) => u
-    } should be (Some(U2))
-  }
-
-  **/
+  //   val state = platform.config.statefulRepository.stateMaps.get
+  //   log.debug("repository states: " + state)
+  //   log.debug("unmonitored: " + state.lookup(TargetState.Problematic))
+  //   state.lookup(TargetState.Problematic).get.lookup(U3).map(_.msg.target.uri) should be (Some(U3))
+  //   state.lookup(TargetState.Monitored).get.lookup(U2).map(_.msg.target.uri) should be (Some(U2))
+  // }
 
   /// must be the last thing
   it should "complete the testing" in {
