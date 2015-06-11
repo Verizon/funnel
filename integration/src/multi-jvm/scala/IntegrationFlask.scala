@@ -16,13 +16,3 @@ object IntegrationFlask {
     app.run(Array("noretries"))
   }
 }
-
-// class ChemistIntMultiJvmFlask1 extends FlatSpec {
-//   val options = IntegrationFixtures.flask1Options
-
-//   val I = new funnel.Instruments(1.minute)
-//   val app = new funnel.flask.Flask(options, I)
-
-//   Thread.sleep(40000)
-//   log.debug("flask shutting down")
-// }
