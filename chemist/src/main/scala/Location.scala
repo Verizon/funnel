@@ -26,18 +26,4 @@ object Location {
       port = b,
       protocol = c,
       datacenter = dc)
-
-  def localhost: Location =
-    Location(
-      host = "127.0.0.1",
-      port = 5775,
-      datacenter = "local",
-      protocol = "http")
-
-  def telemetryLocalhost: Location =
-    Location(
-      host = "127.0.0.1",
-      port = 7390,
-      datacenter = "local",
-      protocol = "tcp")
 }

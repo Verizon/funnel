@@ -56,20 +56,20 @@ class AwsDiscovery(
    * verification that Funnel is running on port 5775 and is network accessible.
    */
   def listFlasks: Task[Seq[Flask]] =
-    instances(isFlask).map(_.map(in => Flask(FlaskID(in.id), in.location, in.telemetryLocation)))
+    for {
+      a <- instances(isFlask)
+      b  = a.flatMap(i => i.telemetryLocation.map(Flask(FlaskID(i.id), i.location, _)))
+    } yield b
 
   /**
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
-  def lookupFlask(id: FlaskID): Task[Flask] = {
-    lookupMany(Seq(id.value)).flatMap {
-      _.filter(_.id == id.value).headOption match {
-        case None => Task.fail(InstanceNotFoundException(id.value))
-        case Some(i) => Task.now(i.asFlask)
-      }
-    }
-  }
+  def lookupFlask(id: FlaskID): Task[Flask] =
+    for {
+      a <- lookupOne(id.value)
+      b <- a.telemetryLocation.map(Task.now).getOrElse(Task.fail(InstanceNotFoundException(id.value)))
+    } yield Flask(FlaskID(a.id), a.location, b)
 
   /**
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
@@ -183,12 +183,24 @@ class AwsDiscovery(
 
   private val defaultInstanceTemplate = Option("http://{host}:5775")
 
+  /**
+   * The EC2 instance in question should have the following tags:
+   *
+   * 1. `funnel:mirror:uri-template` - should be a qualified uri that denotes the
+   * host that chemist should be able to find the mirroring endpoint. Example would
+   * be `http://{host}:5775`. Supported URI schemes are `http` and `tcp` (where the
+   * latter is a zeromq PUB socket).
+   *
+   * 2. `funnel:telemetry:uri-template` - should be a qualified uri that denotes the
+   * host that chemist should be able to find the admin telemetry socket. Only valid
+   * protocol is `tcp` for a zeromq PUB socket.
+   */
   private def fromAWSInstance(in: AWSInstance): String \/ AwsInstance = {
     def toLocation(template: String)(tags: Map[String,String]): String \/ Location =
       for {
         a <- Option(in.getPrivateDnsName) \/> s"instance had no ip: ${in.getInstanceId}"
         b <- tags.get(template).orElse(defaultInstanceTemplate) \/> s"unable to find template for '$template'"
-        c  = new URI(b.replace("{host}", b))
+        c  = new URI(b.replace("@host", b))
         d <- Location.fromURI(c, in.getPlacement.getAvailabilityZone) \/> s"unable to create a Location from URI '$c'"
       } yield d
 
@@ -197,13 +209,12 @@ class AwsDiscovery(
     for {
       a <- toLocation("funnel:mirror:uri-template")(machineTags)
       _  = log.debug(s"discovered mirrioring template '$a'")
-      b <- toLocation("funnel:telemetry:uri-template")(machineTags)
+      b  = toLocation("funnel:telemetry:uri-template")(machineTags).toOption
       _  = log.debug(s"discovered telemetry template '$b'")
     } yield AwsInstance(
         id = in.getInstanceId,
         location = a,
         telemetryLocation = b,
-        firewalls = in.getSecurityGroups.asScala.toList.map(_.getGroupName),
         tags = machineTags)
   }
 

@@ -25,6 +25,20 @@ object Fixtures {
     instance("i-15807647") ::
     instance("i-flaskAAA", tags = Seq("type" -> "flask")) :: Nil
 
+  val localhost: Location =
+    Location(
+      host = "127.0.0.1",
+      port = 5775,
+      datacenter = "local",
+      protocol = "http")
+
+  val telemetryLocalhost: Location =
+    Location(
+      host = "127.0.0.1",
+      port = 7390,
+      datacenter = "local",
+      protocol = "tcp")
+
   def asgEvent(
     kind: AutoScalingEventKind,
     name: String = "test-group",

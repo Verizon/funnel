@@ -125,7 +125,7 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
 
   it should "list the appropriate flask ids" in {
     ichemist.shards.exe should equal ( Set(
-      Flask(FlaskID("flask1"),Location.localhost,Location.telemetryLocalhost)) )
+      Flask(FlaskID("flask1"),IntegrationFixtures.localhost,IntegrationFixtures.telemetryLocalhost)) )
   }
 
   it should "show more detailed flask information" in {

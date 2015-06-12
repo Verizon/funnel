@@ -10,8 +10,22 @@ class JsonSpec extends FlatSpec with Matchers {
   import argonaut._, Argonaut._
   import TargetLifecycle._, TargetState._
 
+  val localhost: Location =
+    Location(
+      host = "127.0.0.1",
+      port = 5775,
+      datacenter = "local",
+      protocol = "http")
+
+  val telemetryLocalhost: Location =
+    Location(
+      host = "127.0.0.1",
+      port = 7390,
+      datacenter = "local",
+      protocol = "tcp")
+
   def flask(id: String) =
-    Flask(FlaskID(id),Location.localhost, Location.telemetryLocalhost)
+    Flask(FlaskID(id), localhost, telemetryLocalhost)
 
   it should "serilizes the clusters into JSON" in {
     val A1 = ("test", List(new URI("foo.tv"), new URI("bar.com")))

@@ -7,7 +7,7 @@ import scalaz.\/
 
 class InstanceSpec extends FlatSpec with Matchers {
   def inst(tags: (String,String)*): String =
-    AwsInstance("a", firewalls = "f1" :: Nil, tags =
+    AwsInstance("a", location = Fixtures.localhost, tags =
       tags.toSeq.toMap
     ).application.get.toString
 
