@@ -13,3 +13,5 @@ Custom.testing
 Custom.compilation
 
 Publishing.ignore
+
+libraryDependencies += "com.typesafe.akka" %% "akka-multi-node-testkit" % "2.3.11" % "test"
