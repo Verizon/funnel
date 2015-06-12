@@ -33,19 +33,4 @@ object Mirror {
       case Versions.v2 => sys.error("not implemented yet!")
     }
   } ++ fromTransported
-
-  /*
-  // fairly ugly hack, but it works for now
-  private[zeromq] def fromTransported(t: Transported): Process[Task, Datapoint[Any]] = {
-    import http.JSON._, http.SSE
-    t.version match {
-      case Versions.v1 =>
-        try Process.emit(SSE.parseOrThrow[Datapoint[Any]](new String(t.bytes)))
-        catch {
-          case e: Exception => Process.fail(e)
-        }
-      case Versions.v2 => sys.error("not implemented yet!")
-    }
-  }
- */
 }
