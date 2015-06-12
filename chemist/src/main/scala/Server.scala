@@ -40,12 +40,18 @@ object Server {
     }
 
     chemist.bootstrap(platform).runAsync {
-      case -\/(err) => log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
+      case -\/(err) =>
+        log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
+        err.printStackTrace
+
       case \/-(_)   => log.info("Sucsessfully bootstrap chemist at startup.")
     }
 
     chemist.init(platform).runAsync {
-      case -\/(err) => log.error(s"Unable to initilize the chemist service. Failed with error: $err")
+      case -\/(err) =>
+        log.error(s"Unable to initilize the chemist service. Failed with error: $err")
+        err.printStackTrace
+
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
