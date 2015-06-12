@@ -83,9 +83,14 @@ object Lifecycle {
     } yield c
   }
 
-  def lifecycleActor(repo: Repository): Actor[PlatformEvent] = Actor[PlatformEvent](a => repo.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
-  def errorActor(repo: Repository): Actor[Error] = Actor[Error](e => repo.errorSink(e).run)(Strategy.Executor(Chemist.serverPool))
-  def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] = Actor[(URI, Set[Key[Any]])]{ case (fl, keys) => repo.keySink(fl, keys).run }(Strategy.Executor(Chemist.serverPool))
+  def lifecycleActor(repo: Repository): Actor[PlatformEvent] =
+    Actor[PlatformEvent](a => repo.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
+
+  def errorActor(repo: Repository): Actor[Error] =
+    Actor[Error](e => repo.errorSink(e).run)(Strategy.Executor(Chemist.serverPool))
+
+  def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] =
+    Actor[(URI, Set[Key[Any]])]{ case (fl, keys) => repo.keySink(fl, keys).run }(Strategy.Executor(Chemist.serverPool))
 
   def interpreter(e: AutoScalingEvent, resources: Seq[String], signal: Signal[Boolean]
     )(asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery

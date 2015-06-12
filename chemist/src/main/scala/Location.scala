@@ -11,7 +11,8 @@ case class Location(
   protocol: String = "http",
   isPrivateNetwork: Boolean = false
 ) {
-  def asURI(path: String = ""): URI = new URI(protocol, null, host, port, s"/$path", null, null)
+  def asURI(path: String = ""): URI =
+    new URI(protocol, null, host, port, s"/$path", null, null)
 }
 
 object Location {
