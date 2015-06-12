@@ -1,7 +1,7 @@
 package funnel
 package integration
 
-import chemist.{Flask,FlaskID,Location,Target}
+import chemist.{Flask,FlaskID,Location,LocationIntent,Target}
 import flask.Options
 import java.net.URI
 
@@ -11,14 +11,16 @@ object IntegrationFixtures {
       host = "127.0.0.1",
       port = 5775,
       datacenter = "local",
-      protocol = "http")
+      protocol = "http",
+      intent = LocationIntent.Mirroring)
 
   val telemetryLocalhost: Location =
     Location(
       host = "127.0.0.1",
       port = 7390,
       datacenter = "local",
-      protocol = "tcp")
+      protocol = "tcp",
+      intent = LocationIntent.Supervision)
 
   val flask1 = Flask(
     FlaskID("flask1"),

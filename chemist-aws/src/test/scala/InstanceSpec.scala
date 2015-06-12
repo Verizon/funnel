@@ -3,12 +3,14 @@ package chemist
 package aws
 
 import org.scalatest.{FlatSpec,Matchers}
-import scalaz.\/
+import scalaz.{\/,NonEmptyList}
 
 class InstanceSpec extends FlatSpec with Matchers {
   def inst(tags: (String,String)*): String =
-    AwsInstance("a", location = Fixtures.localhost, tags =
-      tags.toSeq.toMap
+    AwsInstance(
+      id = "a",
+      locations = NonEmptyList(Fixtures.localhost),
+      tags = tags.toSeq.toMap
     ).application.get.toString
 
 

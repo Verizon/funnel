@@ -20,14 +20,16 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
       host = "127.0.0.1",
       port = 5775,
       datacenter = "local",
-      protocol = "http")
+      protocol = "http",
+      intent = LocationIntent.Mirroring)
 
   val telemetryLocalhost: Location =
     Location(
       host = "127.0.0.1",
       port = 7390,
       datacenter = "local",
-      protocol = "tcp")
+      protocol = "tcp",
+      intent = LocationIntent.Supervision)
 
   implicit def tuple2target(in: (String,String)): Target =
     Target(in._1, new URI(in._2), false)

@@ -182,14 +182,14 @@ class AwsDiscovery(
     } yield r
 
   // should be overriden at deploy time, but this is just last resort fallback.
-  private val defaultInstanceTemplate = Option("http://{host}:5775")
+  private val defaultInstanceTemplate = Option("http://@host:5775")
 
   /**
    * The EC2 instance in question should have the following tags:
    *
    * 1. `funnel:mirror:uri-template` - should be a qualified uri that denotes the
    * host that chemist should be able to find the mirroring endpoint. Example would
-   * be `http://{host}:5775`. Supported URI schemes are `http` and `tcp` (where the
+   * be `http://@host:5775`. Supported URI schemes are `http` and `tcp` (where the
    * latter is a zeromq PUB socket).
    *
    * 2. `funnel:telemetry:uri-template` - should be a qualified uri that denotes the

@@ -30,14 +30,16 @@ object Fixtures {
       host = "127.0.0.1",
       port = 5775,
       datacenter = "local",
-      protocol = "http")
+      protocol = "http",
+      intent = LocationIntent.Supervision)
 
   val telemetryLocalhost: Location =
     Location(
       host = "127.0.0.1",
       port = 7390,
       datacenter = "local",
-      protocol = "tcp")
+      protocol = "tcp",
+      intent = LocationIntent.Supervision)
 
   def asgEvent(
     kind: AutoScalingEventKind,

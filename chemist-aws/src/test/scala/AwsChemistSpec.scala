@@ -4,6 +4,7 @@ package aws
 
 import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterAll}
 import scala.concurrent.duration._
+import scalaz.NonEmptyList
 import scalaz.stream.async.signalOf
 import scalaz.stream.async.mutable.Signal
 
@@ -24,8 +25,12 @@ class ChemistAwsSpec extends FlatSpec with Matchers {
   val c2 = c1.copy(includeVpcTargets = false)
 
   def instance(isPrivate: Boolean, name: String): AwsInstance = {
-    val l = Location("127.0.0.1", 45698, "dc", isPrivateNetwork = isPrivate)
-    AwsInstance(id = name, location = l, tags = Map("type" -> name, "revision" -> "1.2.3"))
+    val l = Location("127.0.0.1", 45698, "dc", isPrivateNetwork = isPrivate, intent = LocationIntent.Mirroring)
+    AwsInstance(
+      id = name,
+      tags = Map("type" -> name, "revision" -> "1.2.3"),
+      locations = NonEmptyList(l)
+    )
   }
 
   val f1 = instance(false, "foo") ::
