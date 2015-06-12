@@ -84,7 +84,6 @@ class AwsDiscovery(
     }
   }
 
-
   /**
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
@@ -182,28 +181,30 @@ class AwsDiscovery(
       r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))
     } yield r
 
+  private val defaultInstanceTemplate = Option("http://{host}:5775")
+
   private def fromAWSInstance(in: AWSInstance): String \/ AwsInstance = {
-    val sgs: List[String] = in.getSecurityGroups.asScala.toList.map(_.getGroupName)
-    val intdns = Option(in.getPrivateDnsName)
-    val host = intdns \/> s"instance had no ip: ${in.getInstanceId}"
-    log.debug(s"fromAWSInstance, host = $host")
-    host.map { h =>
-      val loc = Location(
-          host = h,
-          port = 5775,
-          datacenter = in.getPlacement.getAvailabilityZone,
-          isPrivateNetwork = intdns.nonEmpty
-      )
-      // TODO, we'll need to do something different in the meesos world where ports are remappped
-      val tloc = loc.copy(port=7390, protocol="tcp")
-      AwsInstance(
+    def toLocation(template: String)(tags: Map[String,String]): String \/ Location =
+      for {
+        a <- Option(in.getPrivateDnsName) \/> s"instance had no ip: ${in.getInstanceId}"
+        b <- tags.get(template).orElse(defaultInstanceTemplate) \/> s"unable to find template for '$template'"
+        c  = new URI(b.replace("{host}", b))
+        d <- Location.fromURI(c, in.getPlacement.getAvailabilityZone) \/> s"unable to create a Location from URI '$c'"
+      } yield d
+
+    val machineTags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
+
+    for {
+      a <- toLocation("funnel:mirror:uri-template")(machineTags)
+      _  = log.debug(s"discovered mirrioring template '$a'")
+      b <- toLocation("funnel:telemetry:uri-template")(machineTags)
+      _  = log.debug(s"discovered telemetry template '$b'")
+    } yield AwsInstance(
         id = in.getInstanceId,
-        location = loc,
-        telemetryLocation = tloc,
-        firewalls = sgs,
-        tags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
-      )
-    }
+        location = a,
+        telemetryLocation = b,
+        firewalls = in.getSecurityGroups.asScala.toList.map(_.getGroupName),
+        tags = machineTags)
   }
 
   import scala.io.Source
