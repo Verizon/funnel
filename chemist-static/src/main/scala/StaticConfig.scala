@@ -46,12 +46,16 @@ object Config {
     port   <- cfg.require[Int]("port")
   } yield NetworkConfig(host, port)
 
-  def readLocation(cfg: Config): Location = {
-    val host = cfg.require[String]("host")
-    val port = cfg.require[Int]("port")
-    val protocol = cfg.require[String]("protocol")
-    Location(host, port, "local", protocol, false)
-  }
+  def readLocation(cfg: Config): Location =
+    Location(
+      host             = cfg.require[String]("host"),
+      port             = cfg.require[Int]("port"),
+      datacenter       = cfg.require[String]("datacenter"),
+      protocol         = cfg.require[String]("protocol"),
+      isPrivateNetwork = true,
+      intent = LocationIntent.fromString(
+        cfg.require[String]("intent")
+        ).getOrElse(LocationIntent.Mirroring))
 
   private[static] def readFlasks(cfg: Config): Map[FlaskID, Flask] = {
     val ids: Vector[String] = cfg.env.keys.map(_.toString.split('.')(0)).toVector

@@ -6,7 +6,7 @@ import java.net.{URI,URL}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
-import scalaz.\/
+import scalaz.{\/,NonEmptyList}
 import scalaz.std.vector._
 import scalaz.stream.Process
 import scalaz.syntax.monadPlus._
@@ -58,7 +58,7 @@ class AwsDiscovery(
   def listFlasks: Task[Seq[Flask]] =
     for {
       a <- instances(isFlask)
-      b  = a.flatMap(i => i.telemetryLocation.map(Flask(FlaskID(i.id), i.location, _)))
+      b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
     } yield b
 
   /**
@@ -68,7 +68,7 @@ class AwsDiscovery(
   def lookupFlask(id: FlaskID): Task[Flask] =
     for {
       a <- lookupOne(id.value)
-      b <- a.telemetryLocation.map(Task.now).getOrElse(Task.fail(InstanceNotFoundException(id.value)))
+      b <- a.supervision.map(Task.now).getOrElse(Task.fail(InstanceNotFoundException(id.value)))
     } yield Flask(FlaskID(a.id), a.location, b)
 
   /**
@@ -181,6 +181,7 @@ class AwsDiscovery(
       r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))
     } yield r
 
+  // should be overriden at deploy time, but this is just last resort fallback.
   private val defaultInstanceTemplate = Option("http://{host}:5775")
 
   /**
@@ -196,26 +197,26 @@ class AwsDiscovery(
    * protocol is `tcp` for a zeromq PUB socket.
    */
   private def fromAWSInstance(in: AWSInstance): String \/ AwsInstance = {
-    def toLocation(template: String)(tags: Map[String,String]): String \/ Location =
+    import LocationIntent._
+    def toLocation(template: String, intent: LocationIntent)(tags: Map[String,String]): String \/ Location =
       for {
         a <- Option(in.getPrivateDnsName) \/> s"instance had no ip: ${in.getInstanceId}"
         b <- tags.get(template).orElse(defaultInstanceTemplate) \/> s"unable to find template for '$template'"
         c  = new URI(b.replace("@host", b))
-        d <- Location.fromURI(c, in.getPlacement.getAvailabilityZone) \/> s"unable to create a Location from URI '$c'"
+        d <- Location.fromURI(c, in.getPlacement.getAvailabilityZone, intent) \/> s"unable to create a Location from URI '$c'"
       } yield d
 
     val machineTags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
 
     for {
-      a <- toLocation("funnel:mirror:uri-template")(machineTags)
+      a <- toLocation("funnel:mirror:uri-template", Mirroring)(machineTags)
       _  = log.debug(s"discovered mirrioring template '$a'")
-      b  = toLocation("funnel:telemetry:uri-template")(machineTags).toOption
+      b  = toLocation("funnel:telemetry:uri-template", Supervision)(machineTags).toOption
       _  = log.debug(s"discovered telemetry template '$b'")
     } yield AwsInstance(
         id = in.getInstanceId,
-        location = a,
-        telemetryLocation = b,
-        tags = machineTags)
+        tags = machineTags,
+        locations = NonEmptyList(a, b.toList:_*))
   }
 
   import scala.io.Source

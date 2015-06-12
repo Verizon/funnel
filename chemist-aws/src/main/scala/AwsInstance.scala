@@ -3,14 +3,36 @@ package chemist
 package aws
 
 import java.net.URI
-import scalaz.{\/,\/-,-\/}
+import scalaz.{\/,\/-,-\/,NonEmptyList}
 
+/**
+ * Represents an EC2 machine in AWS. Every single machine in AWS should
+ * be monitorable, or at least have a monitorable location, even if it
+ * is not ultimatly reachable.
+ *
+ * Tags are used heavily to datamine what kind of intstance we're looking
+ * at, during various parts of the process. Your instances need the following
+ * tags set on the instance (as a minimum):
+ *
+ * - `funnel:target:name`: e.g. myapp
+ * - `funnel:target:version`: e.g. 1.2.3
+ * - `funnel:target:qualifier`: e.g. XdfGeq4 (uniqley identify this deployment)
+ * - `funnel:mirror:uri-template`: e.g. http://@host:5775; lets chemist
+ *                                 know where to connect to for mirroring
+ *
+ * Do be aware that EC2 has a 10 tag limit (so dumb!)
+ */
 case class AwsInstance(
   id: String,
-  location: Location,
-  telemetryLocation: Option[Location] = None,
-  tags: Map[String,String] = Map.empty
+  tags: Map[String,String] = Map.empty,
+  locations: NonEmptyList[Location]
 ){
+  def location: Location =
+    locations.head
+
+  def supervision: Option[Location] =
+    locations.toZipper.findZ(_.intent == LocationIntent.Supervision).map(_.focus)
+
   def application: Option[Application] = {
     for {
       b <- tags.get("funnel:target:name") orElse tags.get("type") orElse tags.get("Name")
