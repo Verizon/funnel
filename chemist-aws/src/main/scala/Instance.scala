@@ -14,13 +14,14 @@ case class AwsInstance(
 ) { // extends Instance {
   def application: Option[Application] = {
     for {
-      b <- tags.get("type").orElse(tags.get("Name"))
-      c <- tags.get("revision").orElse(Some("unknown"))
+      b <- tags.get("funnel:target:name") orElse tags.get("type") orElse tags.get("Name")
+      c <- tags.get("funnel:target:version") orElse tags.get("revision") orElse(Some("unknown"))
+      d  = tags.get("aws:cloudformation:stack-name")
+             .flatMap(_.split('-').lastOption.find(_.length > 3))
     } yield Application(
       name = b,
       version = c,
-      qualifier = tags.get("aws:cloudformation:stack-name")
-        .flatMap(_.split('-').lastOption.find(_.length > 3)))
+      qualifier = tags.get("funnel:target:qualifier") orElse d)
   }
 
   def asURI: URI = location.asURI()
