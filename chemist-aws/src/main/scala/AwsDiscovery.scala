@@ -125,7 +125,7 @@ class AwsDiscovery(
 
     def updateCache(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] =
       Task.delay {
-        log.debug("Updating the cache with ${instances.length} items.")
+        log.debug(s"Updating the cache with ${instances.length} items.")
         instances.foreach(i => cache.put(i.id, i))
         instances
       }
