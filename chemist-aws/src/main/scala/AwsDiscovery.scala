@@ -124,6 +124,7 @@ class AwsDiscovery(
 
     def updateCache(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] =
       Task.delay {
+        log.debug(s"Updating the cache with ${instances.length} items.")
         instances.foreach(i => cache.put(i.id, i))
         instances
       }
@@ -131,14 +132,17 @@ class AwsDiscovery(
     lookInCache match {
       // all found in cache
       case (Nil,found) =>
+        log.debug(s"AwsDiscovery.lookupMany: all ${found.length} instances in the cache.")
         Task.now(found)
 
       // none found in cache
       case (missing,Nil) =>
+        log.debug(s"AwsDiscovery.lookupMany: all ${missing.length} instances are missing in the cache.")
         lookInAws(missing).flatMap(updateCache)
 
       // partially found in cache
       case (missing,found) =>
+        log.debug(s"AwsDiscovery.lookupMany: ${missing.length} missing. ${found.length} found in the cache.")
         lookInAws(missing)
           .flatMap(updateCache)
           .map(_ ++ found)
