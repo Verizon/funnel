@@ -46,6 +46,9 @@ case class AwsInstance(
     )
   }
 
+  /**
+   * Not sure this is sound, given a location could have multiple URIs???
+   */
   def asURI: URI =
     location.asURI()
 
