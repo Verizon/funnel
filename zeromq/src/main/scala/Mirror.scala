@@ -10,7 +10,35 @@ import scalaz.concurrent.Task
 object Mirror {
   import sockets._
 
-  def from(alive: Signal[Boolean], Q: Queue[Telemetry], discriminator: List[Array[Byte]] = Nil)(uri: URI): Process[Task, Datapoint[Any]] = {
+  /**
+   * Given that chemist has no idea what particular version of the funnel suite
+   * protocols the target might be running (and keeping deployment information
+   * and normal source in sync is potentially fragile / human process) we instead
+   * opt for a path where this module will attempt to listen for the specified
+   * path on all ZMTP protocol versions it is aware of.
+   */
+  private[zeromq] def parseURI(u: URI): List[Array[Byte]] = {
+    val (win,top) = u.getPath.split('/') match {
+      case Array(_, w) =>
+        (Windows.fromString(w),None)
+
+      case Array(_, w, topic@_*) =>
+        (Windows.fromString(w), Option(Topic(topic.mkString("/"))))
+    }
+
+    Versions.supported.toList.map { v =>
+      Transported(
+        scheme = Schemes.fsm,
+        version = v,
+        window = win,
+        topic = top,
+        bytes = Array.empty[Byte]
+      ).header.getBytes("ASCII")
+    }
+  }
+
+  def from(alive: Signal[Boolean], Q: Queue[Telemetry])(uri: URI): Process[Task, Datapoint[Any]] = {
+    val discriminator = parseURI(uri)
     val t = if(discriminator.isEmpty) topics.all else topics.specific(discriminator)
     Endpoint(subscribe &&& (connect ~ t), uri).fold({e =>
                                                       Q.enqueueOne(Unmonitored(uri)).run

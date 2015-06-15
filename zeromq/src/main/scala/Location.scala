@@ -27,7 +27,7 @@ object Location {
   def apply(uri: URI): Throwable \/ Location =
     for {
       a <- go(Protocol.fromString(uri.getScheme)
-            )("Unable to infer protocol scheme from URI.")
+            )(s"Unable to infer protocol scheme from URI '$uri'")
       b <- go(hostOrPath(uri))("URI contained no discernible host:port or path.")
     } yield Location(uri, a, b)
 }

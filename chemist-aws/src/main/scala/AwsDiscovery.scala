@@ -225,14 +225,7 @@ class AwsDiscovery(
 
   import scala.io.Source
   import scalaz.\/
-
-  private def fetch(url: URL): Throwable \/ Unit =
-    \/.fromTryCatchThrowable[Unit, Exception] {
-      val c = url.openConnection
-      c.setConnectTimeout(300) // timeout in 300ms to keep the overhead reasonable
-      c.setReadTimeout(300)
-      c.connect()
-    }
+  import java.net.{Socket, InetSocketAddress}
 
   /**
    * Goal of this function is to validate that the machine instances specified
@@ -240,8 +233,25 @@ class AwsDiscovery(
    * ready to start sending metrics if we connect to its `/stream` function.
    */
   private def validate(instance: AwsInstance): Task[AwsInstance] = {
+    /**
+     * Do a naieve check to see if the socket is even network accessible.
+     * Given that funnel is using multiple protocols we can't assume that
+     * any given protocol at this point in time, so we just try to see if
+     * its even avalible on the port the discovery flow said it was.
+     *
+     * This mainly guards against miss-configuration of the network setup,
+     * LAN-ACLs, firewalls etc.
+     */
+    def go(uri: URI): Throwable \/ Unit =
+      \/.fromTryCatchThrowable[Unit, Exception]{
+        val s = new Socket
+        // timeout in 300ms to keep the overhead reasonable
+        try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 300)
+        finally s.close // whatever the outcome, close the socket to prevent leaks.
+      }
+
     for {
-      a <- Task(fetch(instance.asURI.toURL))(Chemist.defaultPool)
+      a <- Task(go(instance.asURI))(Chemist.defaultPool)
       b <- a.fold(e => Task.fail(e), o => Task.now(o))
     } yield instance
   }

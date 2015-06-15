@@ -46,7 +46,8 @@ case class AwsInstance(
     )
   }
 
-  def asURI: URI = location.asURI()
+  def asURI: URI =
+    location.asURI()
 
   def targets: Set[Target] =
     (for {

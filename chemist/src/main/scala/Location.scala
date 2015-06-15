@@ -14,7 +14,7 @@ case class Location(
   intent: LocationIntent
 ){
   def asURI(path: String = ""): URI =
-    new URI(protocol.toString, null, host, port, s"/$path", null, null)
+    URI.create(s"${protocol.toString}://$host:$port/$path")
 }
 
 object Location {
