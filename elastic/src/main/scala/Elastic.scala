@@ -127,13 +127,16 @@ case class Elastic(M: Monitoring) {
    * Once grouped by `elasticGroup`, this process emits one document per
    * URL/window with all the key/value pairs that were seen for that mirror
    * in the group for that period.
+   *
+   * For the fixed fields `uri` and `host`, if we do not have a meaningful
+   * value for this, we fallback to assuming this is coming from the local
+   * monitoring instance, so just use the supplied flask name.
    */
   def elasticUngroup[A](flaskName: String, flaskCluster: String): Process1[ESGroup[A], Json] =
     await1[ESGroup[A]].flatMap { g =>
       emitAll(g.toSeq.map { case (name, m) =>
         ("uri" := name._2.getOrElse(flaskName)) ->:
-        ("host" :=? name._2.flatMap(u => Option((new URI(u)).getHost))
-                           .orElse(Option((new URI(flaskName)).getHost)) ) ->?:
+        ("host" := name._2.map(u => (new URI(u)).getHost).getOrElse(flaskName)) ->:
         ("@timestamp" :=
           new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
           m.toList.foldLeft(("group" := name._1) ->: jEmptyObject) {
