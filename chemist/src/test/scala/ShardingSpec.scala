@@ -13,6 +13,7 @@ import org.scalactic.TypeCheckedTripleEquals
 class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
 
   import Sharding.Distribution
+  import zeromq.TCP
 
   implicit lazy val log: Logger = Logger("chemist-spec")
   val localhost: Location =
@@ -20,7 +21,7 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
       host = "127.0.0.1",
       port = 5775,
       datacenter = "local",
-      protocol = "http",
+      protocol = NetworkScheme.Http,
       intent = LocationIntent.Mirroring)
 
   val telemetryLocalhost: Location =
@@ -28,7 +29,7 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
       host = "127.0.0.1",
       port = 7390,
       datacenter = "local",
-      protocol = "tcp",
+      protocol = NetworkScheme.Zmtp(TCP),
       intent = LocationIntent.Supervision)
 
   implicit def tuple2target(in: (String,String)): Target =

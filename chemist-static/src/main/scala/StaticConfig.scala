@@ -51,7 +51,9 @@ object Config {
       host             = cfg.require[String]("host"),
       port             = cfg.require[Int]("port"),
       datacenter       = cfg.require[String]("datacenter"),
-      protocol         = cfg.require[String]("protocol"),
+      protocol         = cfg.lookup[String]("protocol"
+        ).flatMap(NetworkScheme.fromString
+        ).getOrElse(NetworkScheme.Http),
       isPrivateNetwork = true,
       intent = LocationIntent.fromString(
         cfg.require[String]("intent")

@@ -9,12 +9,12 @@ case class Location(
   host: String,
   port: Int,
   datacenter: String,
-  protocol: String = "http",
+  protocol: NetworkScheme = NetworkScheme.Http,
   isPrivateNetwork: Boolean = false,
   intent: LocationIntent
 ){
   def asURI(path: String = ""): URI =
-    new URI(protocol, null, host, port, s"/$path", null, null)
+    new URI(protocol.toString, null, host, port, s"/$path", null, null)
 }
 
 object Location {
@@ -22,7 +22,7 @@ object Location {
     for {
       a <- Option(uri.getHost)
       b <- Option(uri.getPort)
-      c <- Option(uri.getScheme)
+      c <- NetworkScheme.fromString(uri.getScheme)
     } yield Location(
       host = a,
       port = b,

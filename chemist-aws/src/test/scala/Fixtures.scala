@@ -4,6 +4,7 @@ package aws
 
 import com.amazonaws.services.ec2.model.{Instance => EC2Instance}
 import com.amazonaws.services.ec2.model.{Placement,Tag}
+import zeromq.TCP
 
 object Fixtures {
 
@@ -30,7 +31,7 @@ object Fixtures {
       host = "127.0.0.1",
       port = 5775,
       datacenter = "local",
-      protocol = "http",
+      protocol = NetworkScheme.Http,
       intent = LocationIntent.Supervision)
 
   val telemetryLocalhost: Location =
@@ -38,7 +39,7 @@ object Fixtures {
       host = "127.0.0.1",
       port = 7390,
       datacenter = "local",
-      protocol = "tcp",
+      protocol = NetworkScheme.Zmtp(TCP),
       intent = LocationIntent.Supervision)
 
   def asgEvent(
