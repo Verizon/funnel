@@ -37,10 +37,10 @@ object Housekeeping {
   private def requestAssignedTargets(location: Location)(http: Client): Task[Set[Target]] = {
     import argonaut._, Argonaut._, JSON._, HJSON._
 
-    val a = location.asURI(path = "mirror/sources").toString
-    val req = Task.delay(Uri.fromString(a)) <* Task.delay(log.debug(s"requesting assigned targets from $a"))
-    req flatMap { b =>
-      http(b.as[String]).map { c =>
+    val a = location.asUri(path = "mirror/sources")
+    val req = Task.now(a) <* Task.delay(log.debug(s"requesting assigned targets from $a"))
+    req flatMap { loc =>
+      http(loc).as[String].map { c =>
         Parse.decodeOption[List[Cluster]](c
         ).toList.flatMap(identity
         ).foldLeft(Set.empty[Target]){ (a,b) =>

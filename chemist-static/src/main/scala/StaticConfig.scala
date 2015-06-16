@@ -4,9 +4,9 @@ package static
 
 import java.net.URI
 
-import dispatch.Http
 import knobs._
 
+import org.http4s.client._
 import concurrent.duration.Duration
 import scalaz._, Scalaz._
 import scalaz.concurrent.{Strategy,Task}
@@ -23,9 +23,7 @@ case class StaticConfig(
   val discovery: Discovery = new StaticDiscovery(targets, flasks)
   val repository: Repository = new StatefulRepository
   val sharder = EvenSharding
-  val http: Http = Http.configure(
-    _.setAllowPoolingConnection(true)
-     .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
+  val http: Client = blaze.PooledHttp1Client(commandTimeout.toMillis.toInt)
   val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
   val remoteFlask = new HttpFlask(http, repository, signal)
 }

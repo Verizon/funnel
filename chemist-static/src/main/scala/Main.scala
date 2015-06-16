@@ -31,6 +31,6 @@ object Main {
     // if we reach these then the server process has stopped and we need
     // to cleanup the associated resources.
     monitoring.stop()
-    dispatch.Http.shutdown()
+    s.config.http.shutdown.run
   }
 }

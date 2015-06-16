@@ -42,7 +42,7 @@ object JSON {
       ("location" := f.location) ->: jEmptyObject)
 
 
-  implicit val locationToJson: EncodeJson[Location] = implicitly[EncodeJson[URI]].contramap[Location](_.asURI(""))
+  implicit val locationToJson: EncodeJson[Location] = implicitly[EncodeJson[URI]].contramap[Location](_.asJavaURI(""))
 
   /**
    * {
@@ -136,7 +136,7 @@ object JSON {
     EncodeJson { nf =>
       ("type" := "NewFlask") ->:
       ("flask" := nf.flask.id) ->:
-      ("location" := nf.flask.location.asURI()) ->:
+      ("location" := nf.flask.location.asJavaURI()) ->:
       jEmptyObject
     }
 

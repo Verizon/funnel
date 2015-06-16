@@ -4,7 +4,9 @@ package chemist
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
 import scala.concurrent.{Future,Await}
 import scala.concurrent.duration._
-import dispatch._, Defaults._
+import org.http4s.client._
+import org.http4s.Uri
+import scalaz.concurrent.Task
 
 class ServerSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
@@ -13,17 +15,20 @@ class ServerSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
   val core = new TestChemist
 
-  val http = Http()
+  val http = blaze.defaultClient
 
   private def fetch(path: String): String =
-    Await.result(http(url(s"http://127.0.0.1:64523$path") OK as.String), 5.seconds)
+    http(Uri.fromString(s"http://127.0.0.1:64523$path").fold(
+      e => sys.error(e.sanitized),
+      identity)).flatMap(_.as[String]).runFor(5.seconds)
 
   override def beforeAll(): Unit = {
-    Future(Server.unsafeStart(core,platform))
+    Task(Server.unsafeStart(core,platform)).runAsync(_ => ())
     Thread.sleep(1.seconds.toMillis)
   }
 
   override def afterAll(): Unit = {
+    http.shutdown.run
   }
 
   behavior of "chemist server"

@@ -23,12 +23,12 @@ case class AwsInstance(
         .flatMap(_.split('-').lastOption.find(_.length > 3)))
   }
 
-  def asURI: URI = location.asURI()
+  def asURI: URI = location.asJavaURI()
 
   def targets: Set[Target] =
     (for {
        a <- application
-     } yield Target.defaultResources.map(r => Target(a.toString, location.asURI(r), location.isPrivateNetwork))
+     } yield Target.defaultResources.map(r => Target(a.toString, location.asJavaURI(r), location.isPrivateNetwork))
     ).getOrElse(Set.empty[Target])
 
   def asFlask: Flask = Flask(FlaskID(id), location, telemetryLocation)

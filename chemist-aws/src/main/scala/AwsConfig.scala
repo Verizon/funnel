@@ -9,11 +9,11 @@ import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.regions.{Regions,Region}
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
-import dispatch.Http
 import concurrent.duration.Duration
 import funnel.aws._
 import scalaz.stream.async.signalOf
 import scalaz.concurrent.Strategy
+import org.http4s.client._
 
 case class QueueConfig(
   queueName: String,
@@ -34,9 +34,7 @@ case class AwsConfig(
   val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg)
   val repository: Repository = new StatefulRepository
   val sharder = EvenSharding
-  val http: Http = Http.configure(
-    _.setAllowPoolingConnection(true)
-     .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
+  val http: Client = blaze.PooledHttp1Client(timeout = commandTimeout)
   val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
   val remoteFlask = new HttpFlask(http, repository, signal)
 }

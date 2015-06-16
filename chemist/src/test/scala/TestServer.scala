@@ -15,6 +15,6 @@ object TestServer {
     Server.unsafeStart(core, platform)
 
     monitoring.stop()
-    dispatch.Http.shutdown()
+    platform.config.http.shutdown.run
   }
 }

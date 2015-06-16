@@ -22,11 +22,16 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 """
 
+
+resolvers ++= Seq(Resolver.sonatypeRepo("releases"), Resolver.sonatypeRepo("snapshots"))
+
 libraryDependencies ++= Seq(
   "intelmedia.ws.common" %% "logging-s3"           % "10.+",
   "oncue.svc.knobs"      %% "core"                 % V.knobs,
   "oncue.quiver"         %% "core"                 % "3.1.+",
   "org.http4s"           %% "http4s-blazeclient"   % "0.8.0-SNAPSHOT",
   "org.http4s"           %% "http4s-blazeserver"   % "0.8.0-SNAPSHOT",
+  "org.http4s"           %% "http4s-argonaut"      % "0.8.0-SNAPSHOT",
+  "org.http4s"           %% "http4s-dsl"           % "0.8.0-SNAPSHOT",
   "oncue.typelevel"      %% "shapeless-scalacheck" % "0.4.0" % "test"
 )

@@ -11,12 +11,18 @@ import scalaz.syntax.traverse._
 import scalaz.std.vector._
 import TargetLifecycle._
 import java.net.URI
+import org.http4s.Uri
 
 trait ArbitraryLifecycle {
   import TargetState._
 
+  implicit val arbitraryUri: Arbitrary[Uri] = Arbitrary(Gen.const(Uri.uri("http://localhost/")))
   implicit val arbitraryURI: Arbitrary[URI] = Arbitrary(Gen.const(new URI("http://localhost/")))
-  implicit val arbitraryState: Arbitrary[TargetState] = Arbitrary(Gen.oneOf(Unknown, Unmonitored, Assigned, Monitored, DoubleAssigned, DoubleMonitored, Fin))
+  implicit val arbitraryState: Arbitrary[TargetState] = Arbitrary(Gen.oneOf(
+    Unknown, Unmonitored, Assigned, Monitored, DoubleAssigned, DoubleMonitored, Fin))
+  implicit val arbitraryTarget: Arbitrary[Target] =
+    Arbitrary(implicitly[Arbitrary[(String, URI, Boolean)]].arbitrary.map(
+      p => Target(p._1, p._2, p._3)))
 }
 
 object LifecycleSpec extends Properties("Lifecycle") with ArbitraryLifecycle {
@@ -26,3 +32,4 @@ object LifecycleSpec extends Properties("Lifecycle") with ArbitraryLifecycle {
     (t as true).run
   }
 }
+
