@@ -11,7 +11,7 @@ import scalaz.stream.async.mutable.Signal
 class ChemistAwsSpec extends FlatSpec with Matchers {
 
   val c1 = AwsConfig(
-    resources = Nil,
+    templates = Nil,
     network = NetworkConfig("localhost",12345),
     queue = QueueConfig("test","test"),
     sns = null,

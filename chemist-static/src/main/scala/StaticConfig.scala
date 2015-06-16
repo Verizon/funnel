@@ -14,7 +14,7 @@ import scalaz.stream.Process
 import scalaz.stream.async.signalOf
 
 case class StaticConfig(
-  resources: List[String],
+  templates: List[LocationTemplate],
   network: NetworkConfig,
   commandTimeout: Duration,
   targets: Map[TargetID, Set[Target]],
@@ -32,14 +32,14 @@ case class StaticConfig(
 
 object Config {
   def readConfig(cfg: MutableConfig): Task[StaticConfig] = for {
-    resources   <- cfg.require[List[String]]("chemist.resources-to-monitor")
+    templates   <- cfg.require[List[String]]("chemist.target-resource-templates")
     network     <- readNetwork(cfg.subconfig("chemist.network"))
     timeout     <- cfg.require[Duration]("chemist.command-timeout")
     subi        <- cfg.base.at("chemist.instances")
     subf        <- cfg.base.at("chemist.flasks")
     instances   =  readInstances(subi)
     flasks      =  readFlasks(subf)
-  } yield StaticConfig(resources, network, timeout, instances, flasks)
+  } yield StaticConfig(templates.map(LocationTemplate), network, timeout, instances, flasks)
 
   private[static] def readNetwork(cfg: MutableConfig): Task[NetworkConfig] = for {
     host   <- cfg.require[String]("host")

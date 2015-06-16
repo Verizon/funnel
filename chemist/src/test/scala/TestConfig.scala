@@ -5,7 +5,7 @@ import scalaz.stream.async
 import scalaz.stream.async.mutable.Signal
 
 class TestConfig extends PlatformConfig {
-  val resources: List[LocationTemplate] =
+  val templates: List[LocationTemplate] =
     List(LocationTemplate("http://@host:@port/stream/previous"))
   val network = NetworkConfig("127.0.0.1",64523)
   val discovery: Discovery = new TestDiscovery

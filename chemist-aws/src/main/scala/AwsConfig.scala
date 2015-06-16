@@ -21,7 +21,7 @@ case class QueueConfig(
 )
 
 case class AwsConfig(
-  resources: List[LocationTemplate],
+  templates: List[LocationTemplate],
   network: NetworkConfig,
   queue: QueueConfig,
   sns: AmazonSNS,
@@ -31,7 +31,7 @@ case class AwsConfig(
   commandTimeout: Duration,
   includeVpcTargets: Boolean
 ) extends PlatformConfig {
-  val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, resources)
+  val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, templates)
   val repository: Repository = new StatefulRepository
   val sharder = EvenSharding
   val http: Http = Http.configure(
@@ -51,7 +51,7 @@ object Config {
     val timeout   = cfg.require[Duration]("chemist.command-timeout")
     val usevpc    = cfg.lookup[Boolean]("chemist.include-vpc-targets").getOrElse(false)
     AwsConfig(
-      resources = templates.map(LocationTemplate),
+      templates = templates.map(LocationTemplate),
       network   = readNetwork(network),
       queue     = QueueConfig(topic, queue),
       sns       = readSNS(aws),

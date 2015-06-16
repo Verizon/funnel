@@ -8,7 +8,8 @@ import dispatch.Http
 import scala.concurrent.duration._
 
 class IntegrationConfig extends PlatformConfig {
-  val resources: List[String] = List("stream/previous")
+  val templates: List[LocationTemplate] =
+    List(LocationTemplate("http://@host:@port/stream/previous"))
   val network = NetworkConfig("127.0.0.1",64529)
   val discovery: Discovery = new IntegrationDiscovery
   val statefulRepository: StatefulRepository = new StatefulRepository
