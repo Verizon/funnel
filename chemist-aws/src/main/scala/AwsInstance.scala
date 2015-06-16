@@ -46,16 +46,19 @@ case class AwsInstance(
     )
   }
 
+  def targets: Set[Target] =
+    for {
+      a <- application.toSet[Application]
+      b <- findLocation(_.intent == LocationIntent.Mirroring).toSet[Location]
+      c <- b.templatedPathURIs
+    } yield Target(a.toString, c, b.isPrivateNetwork)
+
+  private def findLocation(f: Location => Boolean): Seq[Location] =
+    locations.list.filter(f)
+
   /**
    * Not sure this is sound, given a location could have multiple URIs???
    */
-  def asURI: URI =
-    location.asURI()
-
-  def targets: Set[Target] =
-    (for {
-       a <- application
-     } yield Target.defaultResources.map(r =>
-        Target(a.toString, location.asURI(r), location.isPrivateNetwork))
-    ).getOrElse(Set.empty[Target])
+  // def asURI: URI =
+  //   location.asURI()
 }

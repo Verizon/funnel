@@ -4,7 +4,7 @@ package chemist
 import dispatch.Http
 
 trait PlatformConfig {
-  def resources: List[String]
+  def resources: List[LocationTemplate]
   def network: NetworkConfig
   def discovery: Discovery
   def repository: Repository

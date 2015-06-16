@@ -31,16 +31,22 @@ import concurrent.duration._
 class AwsDiscovery(
   ec2: AmazonEC2,
   asg: AmazonAutoScaling,
+  resourceTemplates: Seq[LocationTemplate],
   cacheMaxSize: Int = 10000,
   cacheExpiryAfterTTL: Duration = 5.minutes) extends Discovery {
 
-  private val log = Logger[Discovery]
-
   type AwsInstanceId = String
 
-  val cache = Cache[AwsInstanceId, AwsInstance](
+  private val log = Logger[AwsDiscovery]
+
+  private val cache = Cache[AwsInstanceId, AwsInstance](
     maximumSize = Some(cacheMaxSize),
     expireAfterWrite = Some(cacheExpiryAfterTTL))
+
+  private val allTemplates: Map[NetworkScheme, Seq[LocationTemplate]] =
+    NetworkScheme.all.foldLeft(Map.empty[NetworkScheme,Seq[LocationTemplate]]){ (a,b) =>
+      a + (b -> resourceTemplates.filter(_.has(b)))
+    }
 
   ///////////////////////////// public api /////////////////////////////
 
@@ -49,7 +55,7 @@ class AwsDiscovery(
    * verification that Funnel is running on port 5775 and is network accessible.
    */
   def listTargets: Task[Seq[(TargetID, Set[Target])]] =
-    instances(!isFlask(_)).map(_.map(in => TargetID(in.id) -> in.targets))
+    instances(!isFlask(_)).map(_.map(in => TargetID(in.id) -> in.targets ))
 
   /**
    * List all of the instances in the given AWS account that respond to a rudimentry
@@ -204,10 +210,15 @@ class AwsDiscovery(
     import LocationIntent._
     def toLocation(template: String, intent: LocationIntent)(tags: Map[String,String]): String \/ Location =
       for {
-        a <- Option(in.getPrivateDnsName) \/> s"instance had no ip: ${in.getInstanceId}"
-        b <- tags.get(template).orElse(defaultInstanceTemplate) \/> s"unable to find template for '$template'"
-        c  = new URI(b.replace("@host", b))
-        d <- Location.fromURI(c, in.getPlacement.getAvailabilityZone, intent) \/> s"unable to create a Location from URI '$c'"
+        a <- Option(in.getPrivateDnsName
+          ) \/> s"instance had no ip: ${in.getInstanceId}"
+
+        b <- tags.get(template).orElse(defaultInstanceTemplate
+          ) \/> s"unable to find template for '$template'"
+        c  = new URI(LocationTemplate(b).build("@host" -> b))
+
+        d <- Location.fromURI(c, in.getPlacement.getAvailabilityZone, intent, allTemplates
+          ) \/> s"unable to create a Location from URI '$c'"
       } yield d
 
     val machineTags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
@@ -218,9 +229,10 @@ class AwsDiscovery(
       b  = toLocation("funnel:telemetry:uri-template", Supervision)(machineTags).toOption
       _  = log.debug(s"discovered telemetry template '$b'")
     } yield AwsInstance(
-        id = in.getInstanceId,
-        tags = machineTags,
-        locations = NonEmptyList(a, b.toList:_*))
+      id = in.getInstanceId,
+      tags = machineTags,
+      locations = NonEmptyList(a, b.toList:_*)
+    )
   }
 
   import scala.io.Source
@@ -251,7 +263,7 @@ class AwsDiscovery(
       }
 
     for {
-      a <- Task(go(instance.asURI))(Chemist.defaultPool)
+      a <- Task(go(instance.location.uri))(Chemist.defaultPool)
       b <- a.fold(e => Task.fail(e), o => Task.now(o))
     } yield instance
   }

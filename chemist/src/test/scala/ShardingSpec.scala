@@ -22,7 +22,8 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
       port = 5775,
       datacenter = "local",
       protocol = NetworkScheme.Http,
-      intent = LocationIntent.Mirroring)
+      intent = LocationIntent.Mirroring,
+      templates = Seq.empty)
 
   val telemetryLocalhost: Location =
     Location(
@@ -30,7 +31,8 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
       port = 7390,
       datacenter = "local",
       protocol = NetworkScheme.Zmtp(TCP),
-      intent = LocationIntent.Supervision)
+      intent = LocationIntent.Supervision,
+      templates = Seq.empty)
 
   implicit def tuple2target(in: (String,String)): Target =
     Target(in._1, new URI(in._2), false)

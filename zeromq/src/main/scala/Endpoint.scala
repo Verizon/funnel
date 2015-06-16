@@ -21,4 +21,3 @@ object Endpoint {
     apply(m,u).fold(e => sys.error(s"Threw an exception: ${e.getMessage} whilst using unsafeApply for uri: $u. Check your arguments."),
                     x => x)
 }
-

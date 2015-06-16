@@ -25,7 +25,13 @@ class ChemistAwsSpec extends FlatSpec with Matchers {
   val c2 = c1.copy(includeVpcTargets = false)
 
   def instance(isPrivate: Boolean, name: String): AwsInstance = {
-    val l = Location("127.0.0.1", 45698, "dc", isPrivateNetwork = isPrivate, intent = LocationIntent.Mirroring)
+    val l = Location(
+      host = "127.0.0.1",
+      port = 45698,
+      datacenter = "dc",
+      isPrivateNetwork = isPrivate,
+      intent = LocationIntent.Mirroring
+    )
     AwsInstance(
       id = name,
       tags = Map("type" -> name, "revision" -> "1.2.3"),
@@ -36,6 +42,7 @@ class ChemistAwsSpec extends FlatSpec with Matchers {
   val f1 = instance(false, "foo") ::
            instance(false, "bar") ::
            instance(true, "qux") :: Nil
+
   val targets = f1.map(i => TargetID(i.id) -> i.targets)
 
   "findInstances" should "honour the private network config" in {

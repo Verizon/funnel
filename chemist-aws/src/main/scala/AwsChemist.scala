@@ -64,7 +64,7 @@ class AwsChemist extends Chemist[Aws]{
 
       // now the queues are setup with the right permissions,
       // start the lifecycle listener
-      _ <- Lifecycle.run(cfg.queue.topicName, cfg.resources, signalOf(true)
+      _ <- Lifecycle.run(cfg.queue.topicName, signalOf(true)
             )(cfg.repository, cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery).liftKleisli
       _  = log.debug("lifecycle process started")
 

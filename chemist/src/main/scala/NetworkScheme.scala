@@ -23,7 +23,7 @@ sealed trait NetworkScheme {
 }
 
 object NetworkScheme {
-  val all = Protocol.all.map(Zmtp(_)) :+ Http
+  val all: Seq[NetworkScheme] = Protocol.all.map(Zmtp(_)) :+ Http
 
   def fromString(in: String): Option[NetworkScheme] =
     all.find(_.scheme == in.toLowerCase.trim)
