@@ -91,6 +91,8 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
   object TCP {
     def label(s: String) = s"system/tcp/$s"
     def num(s: String, desc: String) = numericGauge(label(s), 0.0, Units.Count, desc)
+    val currEstab = num("curr_estab", "Number of open sockets")
+    val passiveOpens = num("passive_opens", "Number of open server connections")
     val attemptFails = num("attempt_fails", "Number of failed client connections")
   }
 
@@ -146,6 +148,8 @@ class Sigar(I: Instruments, sigar: org.hyperic.sigar.Sigar) {
 
       // Add TCP stats
       val tcp = sigar.getTcp
+      TCP.currEstab.set(tcp.getCurrEstab)
+      TCP.passiveOpens.set(tcp.getPassiveOpens)
       TCP.attemptFails.set(tcp.getAttemptFails)
 
     }.run.attempt.runAsync(_.fold(
