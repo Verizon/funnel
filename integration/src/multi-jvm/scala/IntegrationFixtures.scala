@@ -1,19 +1,23 @@
 package funnel
 package integration
 
-import chemist.{Flask,FlaskID,Location,LocationIntent,Target,NetworkScheme}
+import chemist.{Flask,FlaskID,Location,LocationIntent,LocationTemplate,Target,NetworkScheme}
 import flask.Options
 import java.net.URI
 import zeromq.TCP
 
 object IntegrationFixtures {
+  val defaultTemplates =
+    List(LocationTemplate("http://@host:@port/stream/previous"))
+
   val localhost: Location =
     Location(
       host = "127.0.0.1",
       port = 5775,
       datacenter = "local",
       protocol = NetworkScheme.Http,
-      intent = LocationIntent.Mirroring)
+      intent = LocationIntent.Mirroring,
+      templates = defaultTemplates)
 
   val telemetryLocalhost: Location =
     Location(
@@ -21,7 +25,8 @@ object IntegrationFixtures {
       port = 7390,
       datacenter = "local",
       protocol = NetworkScheme.Zmtp(TCP),
-      intent = LocationIntent.Supervision)
+      intent = LocationIntent.Supervision,
+      templates = defaultTemplates)
 
   val flask1 = Flask(
     FlaskID("flask1"),

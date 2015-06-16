@@ -21,6 +21,8 @@ object Fixtures {
     .withPublicDnsName(publicDns)
     .withTags(tags.map { case (k,v) => new Tag(k,v) }:_*)
 
+  val defaultTemplates = List(LocationTemplate("http://@host:@port/stream/previous"))
+
   val instances: Seq[EC2Instance] =
     instance("i-dx947af7") ::
     instance("i-15807647") ::
@@ -32,7 +34,8 @@ object Fixtures {
       port = 5775,
       datacenter = "local",
       protocol = NetworkScheme.Http,
-      intent = LocationIntent.Supervision)
+      intent = LocationIntent.Supervision,
+      templates = defaultTemplates)
 
   val telemetryLocalhost: Location =
     Location(
@@ -40,7 +43,8 @@ object Fixtures {
       port = 7390,
       datacenter = "local",
       protocol = NetworkScheme.Zmtp(TCP),
-      intent = LocationIntent.Supervision)
+      intent = LocationIntent.Supervision,
+      templates = defaultTemplates)
 
   def asgEvent(
     kind: AutoScalingEventKind,

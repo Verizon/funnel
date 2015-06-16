@@ -30,7 +30,8 @@ class ChemistAwsSpec extends FlatSpec with Matchers {
       port = 45698,
       datacenter = "dc",
       isPrivateNetwork = isPrivate,
-      intent = LocationIntent.Mirroring
+      intent = LocationIntent.Mirroring,
+      templates = Fixtures.defaultTemplates
     )
     AwsInstance(
       id = name,

@@ -14,7 +14,6 @@ import scalaz.stream.Process
 import scalaz.stream.async.signalOf
 
 case class StaticConfig(
-  templates: List[LocationTemplate],
   network: NetworkConfig,
   commandTimeout: Duration,
   targets: Map[TargetID, Set[Target]],
@@ -28,18 +27,18 @@ case class StaticConfig(
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
   val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
   val remoteFlask = new HttpFlask(http, repository, signal)
+  val templates = List.empty
 }
 
 object Config {
   def readConfig(cfg: MutableConfig): Task[StaticConfig] = for {
-    templates   <- cfg.require[List[String]]("chemist.target-resource-templates")
     network     <- readNetwork(cfg.subconfig("chemist.network"))
     timeout     <- cfg.require[Duration]("chemist.command-timeout")
     subi        <- cfg.base.at("chemist.instances")
     subf        <- cfg.base.at("chemist.flasks")
     instances   =  readInstances(subi)
     flasks      =  readFlasks(subf)
-  } yield StaticConfig(templates.map(LocationTemplate), network, timeout, instances, flasks)
+  } yield StaticConfig(network, timeout, instances, flasks)
 
   private[static] def readNetwork(cfg: MutableConfig): Task[NetworkConfig] = for {
     host   <- cfg.require[String]("host")
@@ -57,7 +56,9 @@ object Config {
       isPrivateNetwork = true,
       intent = LocationIntent.fromString(
         cfg.require[String]("intent")
-        ).getOrElse(LocationIntent.Mirroring))
+        ).getOrElse(LocationIntent.Mirroring),
+      templates        = cfg.require[List[String]]("target-resource-templates").map(LocationTemplate)
+    )
 
   private[static] def readFlasks(cfg: Config): Map[FlaskID, Flask] = {
     val ids: Vector[String] = cfg.env.keys.map(_.toString.split('.')(0)).toVector

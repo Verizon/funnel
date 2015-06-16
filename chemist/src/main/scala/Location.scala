@@ -22,7 +22,7 @@ case class Location(
   protocol: NetworkScheme = NetworkScheme.Http,
   isPrivateNetwork: Boolean = true,
   intent: LocationIntent,
-  templates: Seq[LocationTemplate] = Seq.empty
+  templates: Seq[LocationTemplate]
 ){
   def templatedPathURIs: Seq[URI] =
     templates.map(uriFromTemplate)
