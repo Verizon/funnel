@@ -45,7 +45,7 @@ object Config {
   def readConfig(cfg: Config): AwsConfig = {
     val topic     = cfg.require[String]("chemist.sns-topic-name")
     val queue     = cfg.require[String]("chemist.sqs-queue-name")
-    val templates = cfg.require[List[String]]("chemist.resources-to-monitor")
+    val templates = cfg.require[List[String]]("chemist.target-resource-templates")
     val aws       = cfg.subconfig("aws")
     val network   = cfg.subconfig("chemist.network")
     val timeout   = cfg.require[Duration]("chemist.command-timeout")
