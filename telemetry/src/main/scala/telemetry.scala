@@ -105,6 +105,8 @@ object Telemetry extends TelemetryCodecs {
     }
   }
 
+  import annotation.tailrec
+
   val keyChanges: Process1[Set[Key[Any]], NewKey] = {
     import Process._
     def go(old: Option[Set[Key[Any]]]): Process1[Set[Key[Any]], NewKey] = receive1 { current =>

@@ -1,45 +1,46 @@
 package funnel
 package integration
 
-import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
-import scala.concurrent.duration._
-import journal.Logger
+import org.scalatest.{BeforeAndAfterAll,FlatSpecLike,Matchers}
+import akka.remote.testkit.MultiNodeSpecCallbacks
 
-class ChemistIntMultiJvmTarget1 extends IntegrationTarget(
-  port = 2001, delay = 40.seconds)
+/**
+ * Hooks up MultiNodeSpec with ScalaTest
+ */
+trait STMultiNodeSpec extends MultiNodeSpecCallbacks
+  with FlatSpecLike
+  with Matchers
+  with BeforeAndAfterAll {
 
-// this one dies after 20 seconds, so it should be detected and unmonitored
-class ChemistIntMultiJvmTarget2 extends IntegrationTarget(
-  port = 2002, delay = 20.seconds)
-
-class ChemistIntMultiJvmFlask1 extends FlatSpec {
-  import funnel.http._
-  import funnel.flask._
-  import java.io.File
-  import scalaz.concurrent.{Task,Strategy}
-
-  val log = Logger[this.type]
-
-  val options = IntegrationFixtures.flask1Options
-
-  val I = new funnel.Instruments(1.minute)
-  val app = new funnel.flask.Flask(options, I)
-
-  app.run(Array("noretries"))
-  Thread.sleep(40000)
-  log.debug("flask shutting down")
+  override def beforeAll() = multiNodeSpecBeforeAll()
+  override def afterAll() = multiNodeSpecAfterAll()
 }
 
-class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAfterAll {
-  import java.net.URI
-  import scalaz.Kleisli
-  import scalaz.concurrent.{Actor,Strategy,Task}
-  import scalaz.stream.{Process, async}
-  import funnel.chemist._, PlatformEvent._, TargetLifecycle._
-  import dispatch._
-  import IntegrationFixtures._
+//////////////////////// JVM configuration //////////////////////////
 
-  val log = Logger[ChemistIntMultiJvmChemist]
+import akka.remote.testkit.MultiNodeConfig
+import java.net.URI
+import scalaz.Kleisli
+import scalaz.concurrent.Task
+
+object MultiNodeSampleConfig extends MultiNodeConfig {
+  /**
+   * important thing to note here is that each role needs to be assigned
+   * to a specific jvm. If its not, the test will complain there is not
+   * enough nodes to run the test suite.
+   */
+  val chemist01 = role("chemist01")
+  val flask01   = role("flask01")
+  val target01  = role("target01")
+  val target02  = role("target02")
+  val target03  = role("target03")
+
+  //////// barriers /////////
+  val Startup      = "startup"
+  val Deployed     = "deployed"
+  val PhaseOne     = "phase-one"
+  val PhaseTwo     = "phase-two"
+  val Finished     = "finished"
 
   val platform = new IntegrationPlatform {
     val config = new IntegrationConfig
@@ -47,88 +48,158 @@ class ChemistIntMultiJvmChemist extends FlatSpec with Matchers with BeforeAndAft
 
   val ichemist = new IntegrationChemist
 
-  val U1 = new URI("http://localhost:2001/stream/now")
-  val U2 = new URI("http://localhost:2002/stream/now")
+  val http = dispatch.Http()
 
   implicit class KleisliExeSyntax[A](k: Kleisli[Task,IntegrationPlatform,A]){
     def exe: A = k.apply(platform).run
   }
+}
 
-  override def beforeAll(): Unit = {
-    log.info("initializing Chemist")
+//////////////////////// JVM setup //////////////////////////
 
-    // just fucking fork the shit out of it.
-    Future(Server.unsafeStart(ichemist, platform))(scala.concurrent.ExecutionContext.Implicits.global)
+import akka.remote.testkit.MultiNodeSpec
+import akka.testkit.ImplicitSender
+import akka.actor.{Props,Actor}
 
-    val lifecycleActor: Actor[PlatformEvent] = Actor[PlatformEvent](
-      a => platform.config.repository.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
+class MultiNodeSampleSpecMultiJvmNode1 extends MultiNodeSample
+class MultiNodeSampleSpecMultiJvmNode2 extends MultiNodeSample
+class MultiNodeSampleSpecMultiJvmNode3 extends MultiNodeSample
+class MultiNodeSampleSpecMultiJvmNode4 extends MultiNodeSample
+class MultiNodeSampleSpecMultiJvmNode5 extends MultiNodeSample
 
-    Thread.sleep(6000)
+//////////////////////// Actual Test //////////////////////////
 
-    lifecycleActor ! NewFlask(Flask(FlaskID("flask1"), flask1.location, flask1.telemetry))
-    lifecycleActor ! NewTarget(Target("test", U1, false))
-    lifecycleActor ! NewTarget(Target("test", U2, false))
+import akka.remote.testconductor.{RoleName,Controller}
+import concurrent.{Future,ExecutionContext}
+import chemist.{Server,FlaskID,PlatformEvent,TargetLifecycle,RepoEvent}
+import java.util.concurrent.{CountDownLatch,TimeUnit}
+import concurrent.duration._
 
-    Thread.sleep(40000)
+class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
+  with STMultiNodeSpec
+  with ImplicitSender {
+  import MultiNodeSampleConfig._
+  import PlatformEvent._, TargetLifecycle._
+
+  def fetch(path: String) = {
+    import dispatch._, Defaults._
+
+    val svc = url(s"http://127.0.0.1:64529${path}")
+    val json = http(svc OK as.String)
+    println("-----------------------------")
+    println(scala.concurrent.Await.result(json, 1.seconds))
+    println("-----------------------------")
   }
 
-  override def afterAll(): Unit = {
-    platform.config.signal.set(false).run
-  }
-
-  behavior of "repository"
-
-  it should "have events in the history" in {
-    val history = platform.config.repository.historicalEvents.run
-    log.info("history : " + history.toString)
-    history.size should be > 0
-
-    val confirmed: Option[Int] = history.collectFirst {
-      case RepoEvent.StateChange(_, TargetState.Monitored, Confirmation(_, _, _)) => 1
+  def deployTarget(role: RoleName, port: Int, failAfter: Option[Duration] = None) =
+    runOn(role){
+      val latch = new CountDownLatch(1)
+      val target = IntegrationTarget.start(port)
+      enterBarrier(Deployed, PhaseOne)
+      failAfter.foreach { d =>
+        latch.await(d.toMillis, TimeUnit.MILLISECONDS)
+        target.stop()
+        Thread.sleep(15.seconds.toMillis)
+      }
+      enterBarrier(PhaseTwo)
     }
 
-    confirmed should be (Some(1))
-  }
-
-  it should "have gotten the problem event" in {
-    val history = platform.config.repository.historicalEvents.run
-
-    val unmonitored: Option[Int] = history.collectFirst {
-      case RepoEvent.StateChange(_, TargetState.Problematic, TargetLifecycle.Problem(_, _, _, _)) => 1
+  def deployFlask(role: RoleName, opts: flask.Options) =
+    runOn(role){
+      IntegrationFlask.start(opts)
+      enterBarrier(Deployed, PhaseOne, PhaseTwo)
     }
 
-    unmonitored should be (Some(1))
+  def initialParticipants =
+    roles.size
+
+  it should "wait for all nodes to enter startup barrier" in {
+    enterBarrier(Startup)
   }
 
-  it should "be monitoring 1 but not 2" in {
-    val state = platform.config.statefulRepository.stateMaps.get
-    log.debug("repository states: " + state)
-    log.debug("unmonitored: " + state.lookup(TargetState.Problematic))
-    state.lookup(TargetState.Problematic).get.lookup(U2).map(_.msg.target.uri) should be (Some(U2))
-    state.lookup(TargetState.Monitored).get.lookup(U1).map(_.msg.target.uri) should be (Some(U1))
+  it should "setup the world" in {
+    runOn(chemist01){
+      enterBarrier(Deployed)
+      // just fork the shit out of it so it doesnt block our test.
+      Future(Server.unsafeStart(ichemist, platform)
+        )(ExecutionContext.Implicits.global)
+
+      Thread.sleep(5.seconds.toMillis) // give the system time to do its thing
+
+      enterBarrier(PhaseOne)
+    }
+
+    deployTarget(target01, 4001)
+
+    deployTarget(target02, 4002)
+
+    deployTarget(target03, 4003, Some(5.seconds))
+
+    deployFlask(flask01, IntegrationFixtures.flask1Options)
+
   }
-
-  it should "have logged errors" in {
-    import funnel._
-    val errors = platform.config.repository.errors.run
-
-    log.debug("errors: " + errors)
-
-    errors.size should be > 0
-
-    errors.collectFirst {
-      case Error(Names(_, _, u)) => u
-    } should be (Some(U2))
-  }
-
-  behavior of "chemist"
 
   it should "list the appropriate flask ids" in {
-    ichemist.shards.exe should equal ( Set(FlaskID("flask1")) )
+    runOn(chemist01){
+      ichemist.shard(FlaskID("flask1")).exe should equal (
+        Some(IntegrationFixtures.flask1) )
+    }
   }
 
   it should "show more detailed flask information" in {
-    ichemist.shard(FlaskID("flask1")).exe should equal ( Some(flask1) )
+    runOn(chemist01){
+      ichemist.shard(FlaskID("flask1")).exe should equal (
+        Some(IntegrationFixtures.flask1) )
+    }
+  }
+
+  it should "show the correct distribution" in {
+    runOn(chemist01){
+      ichemist.distribution.exe.toList.sortBy(_._1.value).toMap should equal (
+        Map(FlaskID("flask1") -> Map(
+          "target01" -> List(new URI("http://localhost:4001/stream/now")),
+          "target03" -> List(new URI("http://localhost:4003/stream/now")),
+          "target02" -> List(new URI("http://localhost:4002/stream/now"))))
+      )
+    }
+  }
+
+  it should "have events in the history" in {
+    runOn(chemist01){
+      val history = ichemist.platformHistory.exe
+      history.size should be > 0
+    }
+  }
+
+  it should "have recieved the problem event via the telemetry socket" in {
+    import org.scalatest.OptionValues._
+    runOn(chemist01){
+      enterBarrier(PhaseTwo)
+      println(">>>><<<<>>>>><<<<<>>>>> PHASE TWO")
+      val errors = ichemist.errors.exe
+
+      errors.size should be > 0
+
+      errors.collectFirst {
+        case Error(Names(_, _, u)) => u
+      } should be (Some(IntegrationFixtures.target03.uri))
+    }
+  }
+
+  // it should "be monitoring 1 but not 2" in {
+  //   val U2 = IntegrationFixtures.target02.uri
+  //   val U3 = IntegrationFixtures.target03.uri
+
+  //   val state = platform.config.statefulRepository.stateMaps.get
+  //   log.debug("repository states: " + state)
+  //   log.debug("unmonitored: " + state.lookup(TargetState.Problematic))
+  //   state.lookup(TargetState.Problematic).get.lookup(U3).map(_.msg.target.uri) should be (Some(U3))
+  //   state.lookup(TargetState.Monitored).get.lookup(U2).map(_.msg.target.uri) should be (Some(U2))
+  // }
+
+  /// must be the last thing
+  it should "complete the testing" in {
+    enterBarrier(Finished)
   }
 
 }

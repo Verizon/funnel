@@ -26,12 +26,18 @@ object Server {
     }
 
     chemist.bootstrap(platform).runAsync {
-      case -\/(err) => log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
+      case -\/(err) =>
+        log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
+        err.printStackTrace
+
       case \/-(_)   => log.info("Sucsessfully bootstrap chemist at startup.")
     }
 
     chemist.init(platform).runAsync {
-      case -\/(err) => log.error(s"Unable to initilize the chemist service. Failed with error: $err")
+      case -\/(err) =>
+        log.error(s"Unable to initilize the chemist service. Failed with error: $err")
+        err.printStackTrace
+
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
@@ -78,16 +84,21 @@ object Server {
         GetStatus.time(Ok(Chemist.version.asJson))
 
       case GET -> Root / "errors" =>
-        GetStatus.time(Ok(Chemist.version.asJson))
+        GetStatus.time(json(chemist.errors.map(_.toList)))
 
       case GET -> Root / "distribution" =>
         GetDistribution.time(json(chemist.distribution.map(_.toList)))
 
       case GET -> Root / "lifecycle" / "history" =>
-        GetLifecycleHistory.time(json(chemist.history.map(_.toList)))
+        GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
 
+      // the URI is needed internally, but does not make sense in the remote
+      // user-facing api, so here we just ditch it and return the states.
       case GET -> Root / "lifecycle" / "states" =>
-        GetLifecycleStates.time(json(chemist.states.map(_.toList)))
+        GetLifecycleStates.time(json(chemist.states.map(_.toList.map(_._2))))
+
+      case GET -> Root / "platform" / "history" =>
+        GetLifecycleHistory.time(json(chemist.platformHistory.map(_.toList)))
 
       case POST -> Root / "distribute" =>
         PostDistribute.time(

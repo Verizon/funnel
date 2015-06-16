@@ -16,6 +16,7 @@ import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
 import journal.Logger
 import funnel.aws._
+import concurrent.duration._
 
 /**
  * This module contains functions for describing the deployed world as the caller
@@ -27,9 +28,19 @@ import funnel.aws._
  * 2. They are running a Funnel server on port 5775 - this is used to validate that
  *    the instance is in fact a useful server for the sake of work sharding.
  */
-class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
+class AwsDiscovery(
+  ec2: AmazonEC2,
+  asg: AmazonAutoScaling,
+  cacheMaxSize: Int = 10000,
+  cacheExpiryAfterTTL: Duration = 5.minutes) extends Discovery {
 
   private val log = Logger[Discovery]
+
+  type AwsInstanceId = String
+
+  val cache = Cache[AwsInstanceId, AwsInstance](
+    maximumSize = Some(cacheMaxSize),
+    expireAfterWrite = Some(cacheExpiryAfterTTL))
 
   ///////////////////////////// public api /////////////////////////////
 
@@ -38,7 +49,7 @@ class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
    * verification that Funnel is running on port 5775 and is network accessible.
    */
   def listTargets: Task[Seq[(TargetID, Set[Target])]] =
-    instances(_ => true).map(_.map(in => TargetID(in.id) -> in.targets))
+    instances(!isFlask(_)).map(_.map(in => TargetID(in.id) -> in.targets))
 
   /**
    * List all of the instances in the given AWS account that respond to a rudimentry
@@ -67,7 +78,7 @@ class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
   def lookupTargets(id: TargetID): Task[Set[Target]] = {
     lookupMany(Seq(id.value)).flatMap {
       _.filter(_.id == id.value).headOption match {
-        case None => Task.fail(InstanceNotFoundException(id.value))
+        case None    => Task.fail(InstanceNotFoundException(id.value))
         case Some(i) => Task.now(i.targets)
       }
     }
@@ -89,18 +100,55 @@ class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
 
   /**
    * Lookup the `Instance` metadata for a set of `InstanceID`.
-   * @see funnel.chemist.Deployed.lookupOne
+   * @see funnel.chemist.AwsDiscovery.lookupOne
    */
-  private def lookupMany(ids: Seq[String]): Task[Seq[AwsInstance]] =
-    for {
-      a <- EC2.reservations(ids)(ec2)
-      _  = log.debug(s"Deployed.lookupMany, a = ${a.length}")
-      b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
-      (fails,successes) = b.toVector.separate
-      _  = log.debug(s"Deployed.lookupMany b = ${b.length}")
-      _  = fails.foreach(x => log.error(x))
-    } yield successes
+  private def lookupMany(ids: Seq[String]): Task[Seq[AwsInstance]] = {
+    def lookInCache: (Seq[String],Seq[AwsInstance]) =
+      ids.map(id => id -> cache.get(id)
+        ).foldLeft[(Seq[String],Seq[AwsInstance])]((Seq.empty, Seq.empty)){ (a,b) =>
+          val (ids,instances) = a
+          b match {
+            case (id,Some(instance)) => (ids, instances :+ instance)
+            case (id,None) => (ids :+ id, instances)
+          }
+        }
 
+    def lookInAws(specificIds: Seq[String]): Task[Seq[AwsInstance]] =
+      for {
+        a <- EC2.reservations(specificIds)(ec2)
+        _  = log.debug(s"AwsDiscovery.lookupMany, a = ${a.length}")
+        b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
+        (fails,successes) = b.toVector.separate
+        _  = log.debug(s"AwsDiscovery.lookupMany b = ${b.length}")
+        _  = fails.foreach(x => log.error(x))
+      } yield successes
+
+    def updateCache(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] =
+      Task.delay {
+        log.debug(s"Updating the cache with ${instances.length} items.")
+        instances.foreach(i => cache.put(i.id, i))
+        instances
+      }
+
+    lookInCache match {
+      // all found in cache
+      case (Nil,found) =>
+        log.debug(s"AwsDiscovery.lookupMany: all ${found.length} instances in the cache.")
+        Task.now(found)
+
+      // none found in cache
+      case (missing,Nil) =>
+        log.debug(s"AwsDiscovery.lookupMany: all ${missing.length} instances are missing in the cache.")
+        lookInAws(missing).flatMap(updateCache)
+
+      // partially found in cache
+      case (missing,found) =>
+        log.debug(s"AwsDiscovery.lookupMany: ${missing.length} missing. ${found.length} found in the cache.")
+        lookInAws(missing)
+          .flatMap(updateCache)
+          .map(_ ++ found)
+    }
+  }
 
   ///////////////////////////// filters /////////////////////////////
 
@@ -111,7 +159,6 @@ class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
 
   def isFlask(i: AwsInstance): Boolean =
     i.application.map(_.name.startsWith("flask")).getOrElse(false)
-
 
   ///////////////////////////// internal api /////////////////////////////
 
@@ -141,17 +188,15 @@ class AwsDiscovery(ec2: AmazonEC2, asg: AmazonAutoScaling) extends Discovery {
 
   private def fromAWSInstance(in: AWSInstance): String \/ AwsInstance = {
     val sgs: List[String] = in.getSecurityGroups.asScala.toList.map(_.getGroupName)
-    val extdns: Option[String] =
-      if(in.getPublicDnsName.nonEmpty) Option(in.getPublicDnsName) else None
     val intdns = Option(in.getPrivateDnsName)
-
-    val host = (extdns orElse intdns) \/> s"instance had no ip: ${in.getInstanceId}"
-    host map { h =>
+    val host = intdns \/> s"instance had no ip: ${in.getInstanceId}"
+    log.debug(s"fromAWSInstance, host = $host")
+    host.map { h =>
       val loc = Location(
           host = h,
           port = 5775,
           datacenter = in.getPlacement.getAvailabilityZone,
-          isPrivateNetwork = (extdns.isEmpty && intdns.nonEmpty)
+          isPrivateNetwork = intdns.nonEmpty
       )
       // TODO, we'll need to do something different in the meesos world where ports are remappped
       val tloc = loc.copy(port=7390, protocol="tcp")

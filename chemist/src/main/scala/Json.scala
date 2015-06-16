@@ -11,8 +11,11 @@ object JSON {
       javax.xml.bind.DatatypeConverter.parseDateTime(in).getTime
   }
 
-  implicit val encodeFlaskID: EncodeJson[FlaskID] = implicitly[EncodeJson[String]].contramap(_.value)
-  implicit val encodeURI: EncodeJson[URI] = implicitly[EncodeJson[String]].contramap(_.toString)
+  implicit val FlaskIdToJson: EncodeJson[FlaskID] =
+    implicitly[EncodeJson[String]].contramap(_.value)
+
+  implicit val UriToJson: EncodeJson[URI] =
+    implicitly[EncodeJson[String]].contramap(_.toString)
 
   ////////////////////// chemist messages //////////////////////
 
@@ -30,42 +33,46 @@ object JSON {
    *   ]
    * }
    */
-  implicit val ShardingSnapshotToJson: EncodeJson[(Flask, Map[String, List[URI]])] =
-    EncodeJson((m: (Flask, Map[String, List[URI]])) =>
+  def encodeClusterPairs[A : EncodeJson]: EncodeJson[(A, Map[ClusterName, List[URI]])] =
+    EncodeJson((m: (A, Map[ClusterName, List[URI]])) =>
       ("shard"   := m._1) ->:
       ("targets" := m._2.toList) ->: jEmptyObject
     )
 
-  implicit val flaskToJson: EncodeJson[Flask] =
+  implicit val SnapshotWithFlaskToJson: EncodeJson[(Flask, Map[ClusterName, List[URI]])] =
+    encodeClusterPairs[Flask]
+
+  implicit val SnapshotWithFlaskIDToJson: EncodeJson[(FlaskID, Map[ClusterName, List[URI]])] =
+    encodeClusterPairs[FlaskID]
+
+  /**
+   * {
+   *   "id": "flask1",
+   *   "location": ...
+   * }
+   */
+  implicit val FlaskToJson: EncodeJson[Flask] =
     EncodeJson((f: Flask) =>
       ("id"       := f.id)       ->:
       ("location" := f.location) ->: jEmptyObject)
 
+  implicit val LocationToJson: EncodeJson[Location] =
+    EncodeJson { l =>
+      ("host" := l.host) ->:
+      ("port" := l.port) ->:
+      ("datacenter" := l.datacenter) ->:
+      ("protocol" := l.protocol) ->:
+      ("is-private-network" := l.isPrivateNetwork) ->: jEmptyObject
+    }
 
-  implicit val locationToJson: EncodeJson[Location] = implicitly[EncodeJson[URI]].contramap[Location](_.asJavaURI(""))
-
-  /**
-   * {
-   *   "firewalls": [
-   *     "imdev-flask-1-7-118-pbXOvo-WebServiceSecurityGroup-11WVCT4E6GY52",
-   *     "monitor-funnel"
-   *   ],
-   *   "datacenter": "us-east-1a",
-   *   "host": "ec2-54-197-46-246.compute-1.amazonaws.com",
-   *   "id": "i-0c24ede2"
-   * }
-   */
-/*
-  implicit val InstanceToJson: EncodeJson[Instance] =
-    EncodeJson((i: Instance) =>
-      ("id"         := i.id) ->:
-      ("host"       := i.location.host) ->:
-      ("version"    := i.application.map(_.version)) ->:
-      ("datacenter" := i.location.datacenter) ->:
-      ("firewalls"  := i.firewalls.toList) ->:
-      ("tags"       := i.tags) ->: jEmptyObject
+  implicit val ErrorToJson: EncodeJson[Error] =
+    EncodeJson(error =>
+      ("kind"   := error.names.kind) ->:
+      ("mine"   := error.names.mine) ->:
+      ("theirs" := error.names.theirs) ->:
+      jEmptyObject
     )
- */
+
   ////////////////////// flask messages //////////////////////
 
   /**
@@ -105,7 +112,6 @@ object JSON {
     jEmptyObject
   }
 
-
   implicit val targetMessagesToJson: EncodeJson[TargetMessage] =
     EncodeJson {
       case d @ Discovery(_, _) => discoveryJson(d)
@@ -116,19 +122,18 @@ object JSON {
       case Unmonitoring(target, f, l) => targetMessage("Unmonitoring", target.uri, Some(f), l)
       case Terminated(target,t) => targetMessage("Terminated", target.uri, None, t)
       case Problem(target,f,m,t) =>
-        ("type" := "Progblem") ->:
+        ("type" := "Problem") ->:
         ("instance" := target.uri) ->:
         ("time" := t) ->:
         ("flask" := f) ->:
         ("msg" := m) ->: jEmptyObject
     }
 
-
   implicit val stateChangeToJson: EncodeJson[RepoEvent.StateChange] =
     EncodeJson { sc =>
+      ("message" := sc.msg) ->:
       ("from-state" := sc.from.toString) ->:
       ("to-state" := sc.to.toString) ->:
-      ("message" := sc.msg) ->:
       jEmptyObject
     }
 
@@ -140,25 +145,78 @@ object JSON {
       jEmptyObject
     }
 
-  implicit val terminatedFlaskToJson: EncodeJson[RepoEvent.TerminatedFlask] =
-    EncodeJson { t =>
-      ("type" := "TerminatedFlask") ->:
-      ("instance" := t.id) ->:
-      jEmptyObject
-    }
-
-  implicit val terminatedTargetToJson: EncodeJson[RepoEvent.TerminatedTarget] =
-    EncodeJson { t =>
-      ("type" := "TerminatedTarget") ->:
-      ("instance" := t.id) ->:
-      jEmptyObject
-    }
-
   implicit val repoEventToJson: EncodeJson[RepoEvent] =
     EncodeJson {
       case sc@RepoEvent.StateChange(_,_,_) => stateChangeToJson.encode(sc)
       case nf@RepoEvent.NewFlask(_) => newFlaskToJson.encode(nf)
-      case t@RepoEvent.TerminatedFlask(_) => terminatedFlaskToJson.encode(t)
-      case t@RepoEvent.TerminatedTarget(_) => terminatedTargetToJson.encode(t)
+    }
+
+  def encodeNewTarget(t: Target): Json = {
+    ("type" := "NewTarget") ->:
+    ("cluster" := t.cluster) ->:
+    ("uri" := t.uri) ->:
+    jEmptyObject
+  }
+
+  def encodeNewFlask(f: Flask): Json = {
+    ("type" := "NewFlask") ->:
+    ("flask" := f.id) ->:
+    ("location" := f.location) ->:
+    jEmptyObject
+  }
+
+  def encodeTerminatedTarget(u: URI): Json = {
+    ("type" := "TerminatedTarget") ->:
+    ("uri" := "u") ->:
+    jEmptyObject
+  }
+
+  def encodeTerminatedFlask(f: FlaskID): Json = {
+    ("type" := "TerminatedFlask") ->:
+    ("flask" := f.value) ->:
+    jEmptyObject
+  }
+
+  def encodeMonitored(f: FlaskID, u: URI): Json = {
+    ("type" := "Monitored") ->:
+    ("flask" := f.value) ->:
+    ("uri" := u) ->:
+    jEmptyObject
+  }
+
+  def encodeProblem(f: FlaskID, u: URI, msg: String): Json = {
+    ("type" := "Problem") ->:
+    ("flask" := f.value) ->:
+    ("uri" := u) ->:
+    ("message" := msg) ->:
+    jEmptyObject
+  }
+
+  def encodeUnmonitored(f: FlaskID, u: URI): Json = {
+    ("type" := "Unmonitored") ->:
+    ("flask" := f.value) ->:
+    ("uri" := u) ->:
+    jEmptyObject
+  }
+
+  def encodeAssigned(f: FlaskID, t: Target): Json = {
+    ("type" := "Assigned") ->:
+    ("flask" := f.value) ->:
+    ("cluster" := t.cluster) ->:
+    ("uri" := t.uri) ->:
+    jEmptyObject
+  }
+
+  implicit val platformEventToJson: EncodeJson[PlatformEvent] =
+    EncodeJson {
+      case PlatformEvent.NewTarget(t) => encodeNewTarget(t)
+      case PlatformEvent.NewFlask(f) => encodeNewFlask(f)
+      case PlatformEvent.TerminatedTarget(u) => encodeTerminatedTarget(u)
+      case PlatformEvent.TerminatedFlask(f) => encodeTerminatedFlask(f)
+      case PlatformEvent.Monitored(f, u) => encodeMonitored(f, u)
+      case PlatformEvent.Problem(f, u, msg) => encodeProblem(f, u, msg)
+      case PlatformEvent.Unmonitored(f, u) => encodeUnmonitored(f, u)
+      case PlatformEvent.Assigned(f, t) => encodeAssigned(f, t)
+      case PlatformEvent.NoOp => ("type" := "NoOp") ->: jEmptyObject
     }
 }

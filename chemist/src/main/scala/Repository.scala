@@ -34,7 +34,8 @@ trait Repository {
   /**
    * The most recent state changes
    */
-  def historicalEvents: Task[Seq[RepoEvent]]
+  def historicalPlatformEvents: Task[Seq[PlatformEvent]]
+  def historicalRepoEvents: Task[Seq[RepoEvent]]
 
   /**
    * the most recent mirroring errors
@@ -55,6 +56,7 @@ trait Repository {
 
   def distribution: Task[Distribution]
   def mergeDistribution(d: Distribution): Task[Distribution]
+  def mergeExistingDistribution(d: Distribution): Task[Distribution]
   def assignedTargets(flask: FlaskID): Task[Set[Target]]
   def unassignedTargets: Task[Set[Target]]
 
@@ -95,7 +97,8 @@ class StatefulRepository extends Repository {
    * stores lifecycle events to serve as an audit log that
    * retains the last 100 scalling events
    */
-  private[chemist] val historyStack = new BoundedStack[RepoEvent](100)
+  private[chemist] val historyStack = new BoundedStack[PlatformEvent](100)
+  private[chemist] val repoHistoryStack = new BoundedStack[RepoEvent](100)
 
   /**
    * stores the list of errors we have gotten from flasks, most recent
@@ -105,13 +108,11 @@ class StatefulRepository extends Repository {
 
   /////////////// audit operations //////////////////
 
-  /*  def addEvent(e: AutoScalingEvent): Task[Unit] = {
-   log.info(s"Adding auto-scalling event to the historical events: $e")
-   Q.push(e)
-   }
-   */
-  def historicalEvents: Task[Seq[RepoEvent]] =
+  def historicalPlatformEvents: Task[Seq[PlatformEvent]] =
     Task.delay(historyStack.toSeq.toList)
+
+  def historicalRepoEvents: Task[Seq[RepoEvent]] =
+    Task.delay(repoHistoryStack.toSeq.toList)
 
   def errors: Task[Seq[Error]] =
     Task.delay(errorStack.toSeq.toList)
@@ -139,71 +140,73 @@ class StatefulRepository extends Repository {
    * Handle the Actions emitted from the Platform
    */
   def platformHandler(a: PlatformEvent): Task[Unit] = {
-    val lifecycle = TargetLifecycle.process(this) _
-    a match {
-      case PlatformEvent.NewTarget(target) =>
-        Task.delay(log.info("platformHandler -- new target: " + target)) >>
-        lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), targetState(target.uri))
+    historyStack.push(a).flatMap{ _ =>
+      val lifecycle = TargetLifecycle.process(this) _
+      a match {
+        case PlatformEvent.NewTarget(target) =>
+          Task.delay(log.info("platformHandler -- new target: " + target)) >>
+          lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), targetState(target.uri))
 
-      case PlatformEvent.NewFlask(f) =>
-        Task.delay(log.info("platformHandler -- new task: " + f)) >>
-        Task {
-          D.update(_.insert(f.id, Set.empty))
-          flasks.update(_.insert(f.id, f))
-        }(Chemist.serverPool) >>
-        repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f)) >>
-        repoCommandsQ.enqueueOne(RepoCommand.AssignWork(f))
-
-      case PlatformEvent.TerminatedFlask(i) =>
-        // This one is a little weird, we are enqueueing this to ourseles
-        // we should probably eliminate this re-enqueing
-        Task.delay(log.info("platformHandler -- terminated flask: " + i)) >>
-        repoCommandsQ.enqueueOne(RepoCommand.ReassignWork(i))
-
-      case PlatformEvent.TerminatedTarget(i) => {
-        val target = targets.get.lookup(i)
-        target.map { t =>
+        case PlatformEvent.NewFlask(f) =>
+          Task.delay(log.info("platformHandler -- new task: " + f)) >>
           Task {
-            targets.update(_.delete(i))
-            stateMaps.update(_.update(t.to, m => Some(m.delete(i))))
-            ()
-          }(Chemist.serverPool)
-        }.getOrElse(Task.now(()))
-      }
-      case PlatformEvent.Monitored(f, i) =>
-        // TODO: what is this was unexpected? then the lifecycle call will result in nothing
-        log.info(s"platformHandler -- $i monitored by $f")
-        val target = targets.get.lookup(i)
-        target.map { t =>
-          lifecycle(TargetLifecycle.Confirmation(t.msg.target, f, System.currentTimeMillis), t.to)
-        } getOrElse Task.now(())
+            D.update(_.insert(f.id, Set.empty))
+            flasks.update(_.insert(f.id, f))
+          }(Chemist.serverPool) >>
+          repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f)) >>
+          repoCommandsQ.enqueueOne(RepoCommand.AssignWork(f))
 
-      case PlatformEvent.Unmonitored(f, i) => {
-        log.info(s"platformHandler -- $i no longer monitored by by $f")
-        val target = targets.get.lookup(i)
-        target.map { t =>
-          // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
-          lifecycle(TargetLifecycle.Unmonitoring(t.msg.target, f, System.currentTimeMillis), t.to)
-        } getOrElse {
-          // if we didn't even know about the target, what do we do? start monitoring it? nothing?
-          Task.now(())
+        case PlatformEvent.TerminatedFlask(i) =>
+          // This one is a little weird, we are enqueueing this to ourseles
+          // we should probably eliminate this re-enqueing
+          Task.delay(log.info("platformHandler -- terminated flask: " + i)) >>
+          repoCommandsQ.enqueueOne(RepoCommand.ReassignWork(i))
+
+        case PlatformEvent.TerminatedTarget(i) => {
+          val target = targets.get.lookup(i)
+          target.map { t =>
+            Task {
+              targets.update(_.delete(i))
+              stateMaps.update(_.update(t.to, m => Some(m.delete(i))))
+              ()
+            }(Chemist.serverPool)
+          }.getOrElse(Task.now(()))
         }
-      }
-      case PlatformEvent.Problem(f, i, msg) => {
-        log.error(s"platformHandler -- $i no exception from  $f: $msg")
-        val target = targets.get.lookup(i)
-        target.map { t =>
-          // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
-          lifecycle(TargetLifecycle.Problem(t.msg.target, f, msg, System.currentTimeMillis), t.to)
-        } getOrElse {
-          // if we didn't even know about the target, what do we do? start monitoring it? nothing?
-          Task.now(())
+        case PlatformEvent.Monitored(f, i) =>
+          // TODO: what is this was unexpected? then the lifecycle call will result in nothing
+          log.info(s"platformHandler -- $i monitored by $f")
+          val target = targets.get.lookup(i)
+          target.map { t =>
+            lifecycle(TargetLifecycle.Confirmation(t.msg.target, f, System.currentTimeMillis), t.to)
+          } getOrElse Task.now(())
+
+        case PlatformEvent.Unmonitored(f, i) => {
+          log.info(s"platformHandler -- $i no longer monitored by by $f")
+          val target = targets.get.lookup(i)
+          target.map { t =>
+            // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
+            lifecycle(TargetLifecycle.Unmonitoring(t.msg.target, f, System.currentTimeMillis), t.to)
+          } getOrElse {
+            // if we didn't even know about the target, what do we do? start monitoring it? nothing?
+            Task.now(())
+          }
         }
+        case PlatformEvent.Problem(f, i, msg) => {
+          log.error(s"platformHandler -- $i no exception from  $f: $msg")
+          val target = targets.get.lookup(i)
+          target.map { t =>
+            // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
+            lifecycle(TargetLifecycle.Problem(t.msg.target, f, msg, System.currentTimeMillis), t.to)
+          } getOrElse {
+            // if we didn't even know about the target, what do we do? start monitoring it? nothing?
+            Task.now(())
+          }
+        }
+        case PlatformEvent.Assigned(fl, t) =>
+          Task.delay(log.info(s"platformHandler -- $t assigned to $fl")) >>
+          lifecycle(TargetLifecycle.Assignment(t, fl, System.currentTimeMillis), targetState(t.uri))
+        case PlatformEvent.NoOp => Task.now(())
       }
-      case PlatformEvent.Assigned(fl, t) =>
-        Task.delay(log.info(s"platformHandler -- $t assigned to $fl")) >>
-        lifecycle(TargetLifecycle.Assignment(t, fl, System.currentTimeMillis), targetState(t.uri))
-      case PlatformEvent.NoOp => Task.now(())
     }
   }
 
@@ -216,8 +219,8 @@ class StatefulRepository extends Repository {
 
   def lifecycle(): Unit =  {
     val go: RepoEvent => Process[Task, RepoCommand] = { re =>
-      log.info(s"lifecycle: $re")
-      Process.eval(historyStack.push(re)).flatMap{ _ =>
+      Process.eval(repoHistoryStack.push(re)).flatMap{ _ =>
+        log.info(s"lifecycle: $re")
         re match {
           case sc @ StateChange(from,to,msg) =>
             val id = msg.target.uri
@@ -232,28 +235,8 @@ class StatefulRepository extends Repository {
               case _ => Process.halt
             }
           case NewFlask(flask) =>
-
             flasks.update(_ + (flask.id -> flask))
             Process.halt
-
-          case RepoEvent.TerminatedFlask(id) =>
-
-            flasks.get.lookup(id) match {
-              case Some(_) =>
-                flasks.update(_.delete(id))
-
-                Process.emit(RepoCommand.ReassignWork(id))
-              case None => Process.halt
-            }
-
-          case RepoEvent.TerminatedTarget(id) =>
-            targets.get.lookup(id) match {
-              case Some(i) =>
-                targets.update(_.delete(id))
-                stateMaps.update(_.update(i.to, (m => Some(m.delete(i.msg.target.uri)))))
-                Process.halt
-              case None => Process.halt
-            }
         }
       }
     }
@@ -280,15 +263,18 @@ class StatefulRepository extends Repository {
   def distribution: Task[Distribution] = Task.now(D.get)
 
   def mergeDistribution(d: Distribution): Task[Distribution] = Task {
+    D.update(_.unionWith(d)(_ ++ _))
+  } (Chemist.serverPool)
+
+  def mergeExistingDistribution(d: Distribution): Task[Distribution] = Task {
     d.toList.foreach {
-      case (fl, targets) =>
-        targets.foreach { t =>
+      case (fl, ts) =>
+        ts.foreach { t =>
           val sc = StateChange(TargetState.Unknown, TargetState.Monitored, Confirmation(t, fl, System.currentTimeMillis))
           stateMaps.update(_.map(_.delete(t.uri)))
           stateMaps.update(_.update(TargetState.Monitored, m => Some(m.insert(t.uri, sc))))
-          this.targets.update(_.insert(t.uri, sc))
+          targets.update(_.insert(t.uri, sc))
         }
     }
-    D.update(_.unionWith(d)(_ ++ _))
-  } (Chemist.serverPool)
+  } (Chemist.serverPool) >> mergeDistribution(d)
 }

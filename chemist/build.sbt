@@ -33,5 +33,7 @@ libraryDependencies ++= Seq(
   "org.http4s"           %% "http4s-blazeserver"   % "0.8.0-SNAPSHOT",
   "org.http4s"           %% "http4s-argonaut"      % "0.8.0-SNAPSHOT",
   "org.http4s"           %% "http4s-dsl"           % "0.8.0-SNAPSHOT",
+  "com.google.guava"         % "guava"                   % "18.0",
+  "com.google.code.findbugs" % "jsr305"                  % "1.3.+", // needed to provide class javax.annotation.Nullable
   "oncue.typelevel"      %% "shapeless-scalacheck" % "0.4.0" % "test"
 )

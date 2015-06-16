@@ -60,34 +60,37 @@ object Lifecycle {
         parseMessage(m).traverseU(interpreter(_, resources, signal)(asg, ec2, dsc)).handle {
           case MessageParseException(err) =>
             log.warn(s"Unexpected recoverable error when parsing lifecycle message: $err")
-           noop
+            noop
 
           case InstanceNotFoundException(id,kind) =>
             log.warn(s"Unexpected recoverable error locating $kind id '$id' specified on lifecycle message.")
             noop
 
-          case _ =>
-            log.warn(s"Failed to handle error state when recieving lifecycle event: ${m.getBody}")
+          case e =>
+            log.warn(s"Failed to handle error state when recieving lifecycle event. event = ${m.getBody}, error = $e")
+            e.printStackTrace
             noop
         }
 
     for {
       a <- SQS.subscribe(queueName)(sqs)(Chemist.defaultPool, Chemist.schedulingPool)
-      _ <- Process.eval(Task(log.debug(s"stream, number messages recieved: ${a.length}")))
-
+      // _ <- Process.eval(Task(log.debug(s"stream, number messages recieved: ${a.length}")))
       b <- Process.emitAll(a)
       _ <- Process.eval(Task(log.debug(s"stream, raw message recieved: $b")))
-
       c <- Process.eval(go(b))
       _ <- Process.eval(Task(log.debug(s"stream, computed action: $c")))
-
       _ <- SQS.deleteMessages(queueName, a)(sqs)
     } yield c
   }
 
-  def lifecycleActor(repo: Repository): Actor[PlatformEvent] = Actor[PlatformEvent](a => repo.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
-  def errorActor(repo: Repository): Actor[Error] = Actor[Error](e => repo.errorSink(e).run)(Strategy.Executor(Chemist.serverPool))
-  def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] = Actor[(URI, Set[Key[Any]])]{ case (fl, keys) => repo.keySink(fl, keys).run }(Strategy.Executor(Chemist.serverPool))
+  def lifecycleActor(repo: Repository): Actor[PlatformEvent] =
+    Actor[PlatformEvent](a => repo.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
+
+  def errorActor(repo: Repository): Actor[Error] =
+    Actor[Error](e => repo.errorSink(e).run)(Strategy.Executor(Chemist.serverPool))
+
+  def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] =
+    Actor[(URI, Set[Key[Any]])]{ case (fl, keys) => repo.keySink(fl, keys).run }(Strategy.Executor(Chemist.serverPool))
 
   def interpreter(e: AutoScalingEvent, resources: Seq[String], signal: Signal[Boolean]
     )(asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
@@ -109,15 +112,17 @@ object Lifecycle {
         i <- dsc.lookupTargets(id)
       } yield i.toSeq.map(t => TerminatedTarget(t.uri))
 
-    def isFlask: Task[Boolean] =
-      ASG.lookupByName(e.asgName)(asg).flatMap { a =>
-        log.debug(s"Found ASG from the EC2 lookup: $a")
-
-        a.getTags.asScala.find(t =>
-          t.getKey.trim == "type" &&
-          t.getValue.trim.startsWith("flask")
-        ).fold(Task.now(false))(_ => Task.now(true))
-      }
+    def isFlask: Task[Boolean] = {
+      (for {
+        n <- e.metadata.get("asg-name").map(Task.now).getOrElse(Task.fail(NotAFlaskException(e)))
+        a <- ASG.lookupByName(n)(asg)
+        _  = log.debug(s"Found ASG from the EC2 lookup: $a")
+        r <- a.getTags.asScala.find(t =>
+               t.getKey.trim == "type" &&
+               t.getValue.trim.startsWith("flask")
+             ).fold(Task.now(false))(_ => Task.now(true))
+      } yield r).or(Task.now(false))
+    }
 
     def newFlask(id: FlaskID): Task[Seq[PlatformEvent]] =
       for {
@@ -125,9 +130,10 @@ object Lifecycle {
       } yield Seq(NewFlask(flask))
 
     e match {
-      case AutoScalingEvent(_,Launch,_,_,_,_,_,_,_,_,_,_,id) =>
+      case AutoScalingEvent(_,Launch,_,_,_,id,_) =>
         isFlask.ifM(newFlask(FlaskID(id)), targetsFromId(TargetID(id)))
-      case AutoScalingEvent(_,Terminate,_,_,_,_,_,_,_,_,_,_,id) =>
+
+      case AutoScalingEvent(_,Terminate,_,_,_,id,_) =>
         isFlask.ifM(Task.now(Seq(TerminatedFlask(FlaskID(id)))), terminatedTargetsFromId(TargetID(id)))
 
       case _ => Task.now(Seq(NoOp))

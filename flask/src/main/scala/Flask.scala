@@ -77,9 +77,12 @@ class Flask(options: Options, val I: Instruments) {
 
     val Q = async.unboundedQueue[Telemetry](Strategy.Executor(funnel.Monitoring.serverPool))
 
-    telemetryPublishSocket(URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
-                           Q.dequeue.wye(I.monitoring.keys.discrete pipe keyChanges)(wye.merge)(Strategy.Executor(Monitoring.serverPool))).runAsync(_ => ())
-
+    log.info("Booting the key mirroring process...")
+    runAsync(
+      telemetryPublishSocket(
+        URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
+        Q.dequeue.wye(I.monitoring.keys.discrete pipe keyChanges)(wye.merge)(Strategy.Executor(Monitoring.serverPool)))
+    )
 
     def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
       httpOrZmtp(alive, Q)(uri) observe countDatapoints
@@ -96,9 +99,10 @@ class Flask(options: Options, val I: Instruments) {
     val flaskName = options.name.getOrElse(InetAddress.getLocalHost.getHostName)
     val flaskCluster = options.cluster.getOrElse(s"flask-${oncue.svc.funnel.BuildInfo.version}")
 
-
-    log.info("Booting the key senescence...")
-    options.metricTTL.foreach(t => runAsync(I.monitoring.keySenescence(Events.every(t)).run))
+    options.metricTTL.foreach { t =>
+      log.info("Booting the key senescence...")
+      runAsync(I.monitoring.keySenescence(Events.every(t)).run)
+    }
 
     log.info("Booting the mirroring process...")
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName, retries))
@@ -123,6 +127,5 @@ class Flask(options: Options, val I: Instruments) {
         I.monitoring, riemann.ttl.toSeconds.toFloat)(
         R, s"${riemann.host}:${riemann.port}")(flaskName))
     }
-    Q.enqueueOne(Error(Names("how about", "this thing", new URI("http://localhost")))).run
   }
 }

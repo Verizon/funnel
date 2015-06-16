@@ -20,21 +20,6 @@ import java.util.concurrent.{ExecutorService,ScheduledExecutorService}
 import funnel.chemist.Chemist
 
 object SQS {
-  // hard-coded for now as these are so slow moving.
-  private val accounts =
-    List(
-      "447570741169",
-      "460423777025",
-      "465404450664",
-      "573879536903",
-      "596986430194",
-      "653211152919",
-      "807520270390",
-      "825665186404",
-      "907213898261",
-      "987980579136"
-    )
-
   private val permissions = List(
     "SendMessage",
     "ReceiveMessage",
@@ -88,16 +73,7 @@ object SQS {
         .withPrincipals(Principal.AllUsers)
         .withActions(SQSActions.SendMessage)
         .withResources(new Resource(sqsArn))
-        .withConditions(ConditionFactory.newSourceArnCondition(snsArn))//,
-      // new Statement(Effect.Allow)
-      //   .withPrincipals(accounts.sorted.map(new Principal(_)):_*)
-      //   .withActions(
-      //     SQSActions.SendMessage,
-      //     SQSActions.ReceiveMessage,
-      //     SQSActions.DeleteMessage,
-      //     SQSActions.ChangeMessageVisibility,
-      //     SQSActions.GetQueueAttributes,
-      //     SQSActions.GetQueueUrl)
+        .withConditions(ConditionFactory.newSourceArnCondition(snsArn))
     )
 
   // http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-long-polling.html

@@ -53,43 +53,39 @@ object JSON {
       l <- JsonToJavaDate("EndTime")(input)
       m <- (input --\ "EC2InstanceId").as[String]
     } yield AutoScalingEvent(
-      activityId      = a,
-      kind            = b,
-      asgName         = c,
-      asgARN          = d,
-      avalibilityZone = e,
-      description     = f,
-      cause           = g,
-      progress        = h,
-      accountId       = i,
-      time            = j,
-      startTime       = k,
-      endTime         = l,
-      instanceId      = m
+      eventId    = a,
+      kind       = b,
+      time       = j,
+      startTime  = k,
+      endTime    = l,
+      instanceId = m,
+      metadata = Map(
+        "asg-arn"  -> d,
+        "asg-name" -> c,
+        "description" -> f,
+        "cause" -> g,
+        "account-id" -> i,
+        "datacenter" -> e
+      )
     ))
+
   /**
    * {
    *   "activity-id": "foo",
    *   "instance-id": "i-353534",
-   *   "datetime": "2014....",
+   *   "start-time": "2014....",
+   *   "end-time": "2014....",
+   *   "date-time": "2014....",
    *   "kind": "launch",
-   *   "datacenter": "us-east-1a",
-   *   "description": "sdfsdfdssdfs",
-   *   "cause": "s sdf sdf sdfsd fsd",
-   *   "asg-name": "sodfso sdfs",
-   *   "asg-arn": "sdf sdfs "
    * }
    */
   implicit val AutoScalingEventToJson: EncodeJson[AutoScalingEvent] =
     EncodeJson((e: AutoScalingEvent) =>
-      ("activity-id" := e.activityId) ->:
-        ("instance-id" := e.instanceId) ->:
-        ("date-time"   := e.time.toString) ->:
-        ("kind"        := e.kind.notification) ->:
-        ("datacenter"  := e.avalibilityZone) ->:
-        ("description" := e.description) ->:
-        ("cause"       := e.cause) ->:
-        ("asg-name"    := e.asgName) ->:
-        ("asg-arn"     := e.asgARN) ->: jEmptyObject
+      ("activity-id" := e.eventId) ->:
+      ("instance-id" := e.instanceId) ->:
+      ("start-time"  := e.startTime.toString) ->:
+      ("end-time"    := e.endTime.toString) ->:
+      ("date-time"   := e.time.toString) ->:
+      ("kind"        := e.kind.notification) ->: jEmptyObject
     )
 }

@@ -11,7 +11,6 @@ object Mirror {
   import sockets._
 
   def from(alive: Signal[Boolean], Q: Queue[Telemetry], discriminator: List[Array[Byte]] = Nil)(uri: URI): Process[Task, Datapoint[Any]] = {
-    Q.enqueueOne(Error(Names("does this ever", "work", new URI("http://localhost")))).run
     val t = if(discriminator.isEmpty) topics.all else topics.specific(discriminator)
     Endpoint(subscribe &&& (connect ~ t), uri).fold({e =>
                                                       Q.enqueueOne(Unmonitored(uri)).run

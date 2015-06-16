@@ -14,7 +14,8 @@ case class Location(
   protocol: String = "http",
   isPrivateNetwork: Boolean = false
 ) {
-  def asJavaURI(path: String = ""): URI = new URI(protocol, null, host, port, s"/$path", null, null)
+  def asJavaURI(path: String = ""): URI =
+    new URI(protocol, null, host, port, s"/$path", null, null)
   def asUri(path: String = ""): Uri =
     Uri(scheme    = Some(CaseInsensitiveString(protocol)),
         authority = Some(Authority(host = RegName(host),

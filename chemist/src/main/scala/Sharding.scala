@@ -81,13 +81,13 @@ object Sharding {
   ///////////////////////// IO functions ///////////////////////////
 
   def distribute(repo: Repository, sharder: Sharder, remote: RemoteFlask, dist: Distribution)(ts: Set[Target]): Task[Unit] = {
-    val s = sharder.calculate(ts)(dist)
+    val (s,newdist) = sharder.distribution(ts)(dist)
     s.toVector.traverse_ { x =>
       val flask = repo.flask(x._1)
       flask.fold(Task.delay(log.error("asked to assign to an unknown flask: " + x._1))){ f =>
         remote.command(FlaskCommand.Monitor(f,Seq(x._2))) >> repo.platformHandler(PlatformEvent.Assigned(x._1, x._2))
       }
-    }
+    } <* repo.mergeDistribution(newdist)
   }
 
   def handleRepoCommand(repo: Repository, sharder: Sharder, remote: RemoteFlask)(c: RepoCommand): Task[Unit] = {
@@ -112,12 +112,6 @@ object Sharding {
 trait Sharder {
   import Sharding._
   /**
-   * Given the new set of urls to monitor, compute how said urls
-   * should be distributed over the known flask instances
-   */
-  def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)]
-
-  /**
    * provide the new distribution based on the result of calculating
    * how the new set should actually be distributed. main benifit here
    * is simply making the operations opaque (handling missing key cases)
@@ -134,24 +128,20 @@ object EvenSharding extends Sharder {
   import Sharding._
   private lazy val log = Logger[EvenSharding.type]
 
-  def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)] = {
-    val servers = shards(d)
-    val ss      = servers.size
-    val input   = deduplicate(s)(d)
-    val is      = input.size // caching operation as its O(n)
-    val foo = if(is < ss) servers.take(is) else servers
+  private def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)] = {
+    val servers: Seq[FlaskID] = shards(d)
+    val ss                    = servers.size
+    val input: Set[Target]    = deduplicate(s)(d)
 
     log.debug(s"calculating the target distribution: servers=$servers, input=$input")
 
-    if(ss == 0){
+    if(ss == 0) {
       log.warn("there are no flask servers currently registered to distribute work too.")
       Nil // needed for when there are no Flask's in-memory; causes SOE.
     } else {
       // interleave the input with the known flask servers ordered by the
       // flask that currently has the least amount of work assigned.
-      Stream.continually(input).flatten.zip(
-        Stream.continually(foo).flatten).take(is.max(foo.size)
-          ).toList.map(t => (t._2, t._1))
+      input.toStream.zip(Stream.continually(servers).flatten).toList.map(t => (t._2, t._1))
     }
   }
 
