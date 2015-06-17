@@ -7,6 +7,7 @@
   </appender>
 
   <logger name="funnel" level="WARN" />
+  <logger name="com.ning.http.client" level="OFF" />
 
   <root level="OFF">
     <appender-ref ref="STDOUT" />

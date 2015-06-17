@@ -65,9 +65,10 @@ class Flask(options: Options, val I: Instruments) {
 
   private def httpOrZmtp(alive: Signal[Boolean], Q: Queue[Telemetry])(uri: URI): Process[Task,Datapoint[Any]] =
     Option(uri.getScheme).map(_.toLowerCase) match {
-      case Some("http") => SSE.readEvents(uri, Q)
-      case Some("tcp")  => Mirror.from(alive, Q)(uri)
-      case _            => Process.fail(new RuntimeException("Unknown URI scheme submitted."))
+      case Some("http")       => SSE.readEvents(uri, Q)
+      case Some("zeromq+tcp") => Mirror.from(alive, Q)(uri)
+      case unknown            => Process.fail(
+        new RuntimeException("Unknown URI scheme submitted. scheme = $unknown"))
     }
 
   def run(args: Array[String]): Unit = {
@@ -80,7 +81,7 @@ class Flask(options: Options, val I: Instruments) {
     log.info("Booting the key mirroring process...")
     runAsync(
       telemetryPublishSocket(
-        URI.create(s"tcp://0.0.0.0:${options.telemetryPort}"), signal,
+        URI.create(s"zeromq+tcp://0.0.0.0:${options.telemetryPort}"), signal,
         Q.dequeue.wye(I.monitoring.keys.discrete pipe keyChanges)(wye.merge)(Strategy.Executor(Monitoring.serverPool)))
     )
 

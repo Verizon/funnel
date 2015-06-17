@@ -8,10 +8,25 @@ import java.net.URI
 
 case class TargetID(value: String) extends AnyVal
 
-case class Target(cluster: ClusterName, uri: URI, isPrivateNetwork: Boolean)
+/**
+ * A target is a physical thing we would like to monitor in the
+ * system. It must have a URI representing its location.
+ */
+case class Target(
+  /* cluster represents the phyiscal deployment. It must be unique
+     even if the same software is already deployed (e.g. A-B testing) */
+  cluster: ClusterName,
+  /* the location this target can be reached. follow the RFC spec for
+     guidence on how to properly encode schemes and paths. */
+  uri: URI,
+  /* This can probally go away, but is a simple indicator if this
+     `Target` instance is on a private or public network */
+  isPrivateNetwork: Boolean
+)
 
 object Target {
   val defaultResources = Set("stream/previous")
 
-  implicit val orderTarget: Order[Target] = Order[(String,String)].contramap(t => (t.cluster, t.uri.toString))
+  implicit val orderTarget: Order[Target] =
+    Order[(String,String)].contramap(t => (t.cluster, t.uri.toString))
 }

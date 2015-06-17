@@ -61,8 +61,9 @@ object JSON {
       ("host" := l.host) ->:
       ("port" := l.port) ->:
       ("datacenter" := l.datacenter) ->:
-      ("protocol" := l.protocol) ->:
-      ("is-private-network" := l.isPrivateNetwork) ->: jEmptyObject
+      ("protocol" := l.protocol.toString) ->:
+      ("is-private-network" := l.isPrivateNetwork) ->:
+      jEmptyObject
     }
 
   implicit val ErrorToJson: EncodeJson[Error] =
@@ -141,7 +142,7 @@ object JSON {
     EncodeJson { nf =>
       ("type" := "NewFlask") ->:
       ("flask" := nf.flask.id) ->:
-      ("location" := nf.flask.location.asURI()) ->:
+      ("location" := nf.flask.location.uri) ->:
       jEmptyObject
     }
 

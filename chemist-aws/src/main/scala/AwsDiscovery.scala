@@ -6,7 +6,7 @@ import java.net.{URI,URL}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
-import scalaz.\/
+import scalaz.{\/,NonEmptyList}
 import scalaz.std.vector._
 import scalaz.stream.Process
 import scalaz.syntax.monadPlus._
@@ -31,16 +31,22 @@ import concurrent.duration._
 class AwsDiscovery(
   ec2: AmazonEC2,
   asg: AmazonAutoScaling,
+  resourceTemplates: Seq[LocationTemplate],
   cacheMaxSize: Int = 10000,
   cacheExpiryAfterTTL: Duration = 5.minutes) extends Discovery {
 
-  private val log = Logger[Discovery]
-
   type AwsInstanceId = String
 
-  val cache = Cache[AwsInstanceId, AwsInstance](
+  private val log = Logger[AwsDiscovery]
+
+  private val cache = Cache[AwsInstanceId, AwsInstance](
     maximumSize = Some(cacheMaxSize),
     expireAfterWrite = Some(cacheExpiryAfterTTL))
+
+  private val allTemplates: Map[NetworkScheme, Seq[LocationTemplate]] =
+    NetworkScheme.all.foldLeft(Map.empty[NetworkScheme,Seq[LocationTemplate]]){ (a,b) =>
+      a + (b -> resourceTemplates.filter(_.has(b)))
+    }
 
   ///////////////////////////// public api /////////////////////////////
 
@@ -49,27 +55,27 @@ class AwsDiscovery(
    * verification that Funnel is running on port 5775 and is network accessible.
    */
   def listTargets: Task[Seq[(TargetID, Set[Target])]] =
-    instances(!isFlask(_)).map(_.map(in => TargetID(in.id) -> in.targets))
+    instances(!isFlask(_)).map(_.map(in => TargetID(in.id) -> in.targets ))
 
   /**
    * List all of the instances in the given AWS account that respond to a rudimentry
    * verification that Funnel is running on port 5775 and is network accessible.
    */
   def listFlasks: Task[Seq[Flask]] =
-    instances(isFlask).map(_.map(in => Flask(FlaskID(in.id), in.location, in.telemetryLocation)))
+    for {
+      a <- instances(isFlask)
+      b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
+    } yield b
 
   /**
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
-  def lookupFlask(id: FlaskID): Task[Flask] = {
-    lookupMany(Seq(id.value)).flatMap {
-      _.filter(_.id == id.value).headOption match {
-        case None => Task.fail(InstanceNotFoundException(id.value))
-        case Some(i) => Task.now(i.asFlask)
-      }
-    }
-  }
+  def lookupFlask(id: FlaskID): Task[Flask] =
+    for {
+      a <- lookupOne(id.value)
+      b <- a.supervision.map(Task.now).getOrElse(Task.fail(InstanceNotFoundException(id.value)))
+    } yield Flask(FlaskID(a.id), a.location, b)
 
   /**
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
@@ -83,7 +89,6 @@ class AwsDiscovery(
       }
     }
   }
-
 
   /**
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
@@ -186,40 +191,53 @@ class AwsDiscovery(
       r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))
     } yield r
 
+  // should be overriden at deploy time, but this is just last resort fallback.
+  private val defaultInstanceTemplate = Option("http://@host:5775")
+
+  /**
+   * The EC2 instance in question should have the following tags:
+   *
+   * 1. `funnel:mirror:uri-template` - should be a qualified uri that denotes the
+   * host that chemist should be able to find the mirroring endpoint. Example would
+   * be `http://@host:5775`. Supported URI schemes are `http` and `tcp` (where the
+   * latter is a zeromq PUB socket).
+   *
+   * 2. `funnel:telemetry:uri-template` - should be a qualified uri that denotes the
+   * host that chemist should be able to find the admin telemetry socket. Only valid
+   * protocol is `tcp` for a zeromq PUB socket.
+   */
   private def fromAWSInstance(in: AWSInstance): String \/ AwsInstance = {
-    val sgs: List[String] = in.getSecurityGroups.asScala.toList.map(_.getGroupName)
-    val intdns = Option(in.getPrivateDnsName)
-    val host = intdns \/> s"instance had no ip: ${in.getInstanceId}"
-    log.debug(s"fromAWSInstance, host = $host")
-    host.map { h =>
-      val loc = Location(
-          host = h,
-          port = 5775,
-          datacenter = in.getPlacement.getAvailabilityZone,
-          isPrivateNetwork = intdns.nonEmpty
-      )
-      // TODO, we'll need to do something different in the meesos world where ports are remappped
-      val tloc = loc.copy(port=7390, protocol="tcp")
-      AwsInstance(
-        id = in.getInstanceId,
-        location = loc,
-        telemetryLocation = tloc,
-        firewalls = sgs,
-        tags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
-      )
-    }
+    import LocationIntent._
+    def toLocation(template: String, intent: LocationIntent)(tags: Map[String,String]): String \/ Location =
+      for {
+        a <- Option(in.getPrivateDnsName
+          ) \/> s"instance had no ip: ${in.getInstanceId}"
+
+        b <- tags.get(template).orElse(defaultInstanceTemplate
+          ) \/> s"unable to find template for '$template'"
+        c  = new URI(LocationTemplate(b).build("@host" -> b))
+
+        d <- Location.fromURI(c, in.getPlacement.getAvailabilityZone, intent, allTemplates
+          ) \/> s"unable to create a Location from URI '$c'"
+      } yield d
+
+    val machineTags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
+
+    for {
+      a <- toLocation("funnel:mirror:uri-template", Mirroring)(machineTags)
+      _  = log.debug(s"discovered mirrioring template '$a'")
+      b  = toLocation("funnel:telemetry:uri-template", Supervision)(machineTags).toOption
+      _  = log.debug(s"discovered telemetry template '$b'")
+    } yield AwsInstance(
+      id = in.getInstanceId,
+      tags = machineTags,
+      locations = NonEmptyList(a, b.toList:_*)
+    )
   }
 
   import scala.io.Source
   import scalaz.\/
-
-  private def fetch(url: URL): Throwable \/ Unit =
-    \/.fromTryCatchThrowable[Unit, Exception] {
-      val c = url.openConnection
-      c.setConnectTimeout(300) // timeout in 300ms to keep the overhead reasonable
-      c.setReadTimeout(300)
-      c.connect()
-    }
+  import java.net.{Socket, InetSocketAddress}
 
   /**
    * Goal of this function is to validate that the machine instances specified
@@ -227,8 +245,25 @@ class AwsDiscovery(
    * ready to start sending metrics if we connect to its `/stream` function.
    */
   private def validate(instance: AwsInstance): Task[AwsInstance] = {
+    /**
+     * Do a naieve check to see if the socket is even network accessible.
+     * Given that funnel is using multiple protocols we can't assume that
+     * any given protocol at this point in time, so we just try to see if
+     * its even avalible on the port the discovery flow said it was.
+     *
+     * This mainly guards against miss-configuration of the network setup,
+     * LAN-ACLs, firewalls etc.
+     */
+    def go(uri: URI): Throwable \/ Unit =
+      \/.fromTryCatchThrowable[Unit, Exception]{
+        val s = new Socket
+        // timeout in 300ms to keep the overhead reasonable
+        try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 300)
+        finally s.close // whatever the outcome, close the socket to prevent leaks.
+      }
+
     for {
-      a <- Task(fetch(instance.asURI.toURL))(Chemist.defaultPool)
+      a <- Task(go(instance.location.uri))(Chemist.defaultPool)
       b <- a.fold(e => Task.fail(e), o => Task.now(o))
     } yield instance
   }
