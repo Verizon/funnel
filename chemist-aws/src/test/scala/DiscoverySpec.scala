@@ -3,42 +3,42 @@ package chemist
 package aws
 
 import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterAll}
-import funnel.Monitoring
-import funnel.http.MonitoringServer
+import scalaz._, Scalaz._
 
 class DiscoverySpec extends FlatSpec with Matchers with BeforeAndAfterAll {
+  val allTemplates = Seq(
+      "http://@host:5555/stream/previous",
+      "http://@host:@port/stream/now?type='String'"
+    ).map(LocationTemplate)
 
-  // val S1 = MonitoringServer.start(Monitoring.default, 5775)
+  val D = new AwsDiscovery(null, null, allTemplates)
 
-  // val I1 = Instance(
-  //   id = "foo1",
-  //   zone = "us-east-1a",
-  //   externalHostname = Some("localhost"))
+  private def make(template: String): String \/ Location =
+    D.toLocation(
+      Fixtures.instances.head,
+      "funnel:mirror:uri-template",
+      LocationIntent.Mirroring)(Map("funnel:mirror:uri-template" -> template)
+    )
 
-  // val I2 = Instance(
-  //   id = "foo2",
-  //   zone = "us-east-1b",
-  //   externalHostname = Some("localhost"))
+  private def expct(host: String, port: Int): String \/ Location =
+    Location(
+      host = host,
+      port = port,
+      datacenter = "us-east-1b",
+      protocol = NetworkScheme.Http,
+      isPrivateNetwork = true,
+      intent = LocationIntent.Mirroring,
+      templates = allTemplates).right
 
-  // val G1 = Group(
-  //   name = "test",
-  //   instances = Seq(I1,I2)
-  // )
-
-  // val G2 = Group(
-  //   name = "test",
-  //   instances = Seq(I1,I2.copy(externalHostname = Some("qndsfoindsfonsidf.com")))
-  // )
-
-  // override def afterAll(){
-  //   S1.stop()
-  // }
-
-  // it must "return two instances if 2/2 can be reached" in {
-  //   Deployed.checkGroupInstances(G1).run.sortBy(_.id) should equal (List(I1,I2))
-  // }
-  // it must "return one instance if 1/2 cannot be reached reached" in {
-  //   Deployed.checkGroupInstances(G2).run.sortBy(_.id) should equal (List(I1))
-  // }
+  it should s"prove '${allTemplates.head.template}' can be turned into a Location" in {
+    make(allTemplates.head.template) should equal (
+      expct("foo.internal", 5555))
+  }
+  // this will fail because `toLocation` delibritly does not specifiy @port
+  // and java.net.URI will get conffused about the @ in the string, so we
+  // just fail fast here.
+  it should s"prove '${allTemplates(1)}' cannot be turned into a location" in {
+    make(allTemplates(1).template).isLeft should equal (true)
+  }
 
 }
