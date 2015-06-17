@@ -4,6 +4,7 @@ package aws
 
 import com.amazonaws.services.ec2.model.{Instance => EC2Instance}
 import com.amazonaws.services.ec2.model.{Placement,Tag}
+import zeromq.TCP
 
 object Fixtures {
 
@@ -20,10 +21,30 @@ object Fixtures {
     .withPublicDnsName(publicDns)
     .withTags(tags.map { case (k,v) => new Tag(k,v) }:_*)
 
+  val defaultTemplates = List(LocationTemplate("http://@host:@port/stream/previous"))
+
   val instances: Seq[EC2Instance] =
     instance("i-dx947af7") ::
     instance("i-15807647") ::
     instance("i-flaskAAA", tags = Seq("type" -> "flask")) :: Nil
+
+  val localhost: Location =
+    Location(
+      host = "127.0.0.1",
+      port = 5775,
+      datacenter = "local",
+      protocol = NetworkScheme.Http,
+      intent = LocationIntent.Supervision,
+      templates = defaultTemplates)
+
+  val telemetryLocalhost: Location =
+    Location(
+      host = "127.0.0.1",
+      port = 7390,
+      datacenter = "local",
+      protocol = NetworkScheme.Zmtp(TCP),
+      intent = LocationIntent.Supervision,
+      templates = defaultTemplates)
 
   def asgEvent(
     kind: AutoScalingEventKind,

@@ -28,8 +28,8 @@ object Sharding {
    * obtain a list of flasks ordered by flasks with the least
    * assigned work first.
    */
-  def shards(d: Distribution): Seq[FlaskID] =
-    sorted(d).map(_._1)
+  def shards(d: Distribution): IndexedSeq[FlaskID] =
+    sorted(d).map(_._1).toIndexedSeq
 
   /**
    * sort the current distribution by the size of the url

@@ -21,7 +21,7 @@ case class QueueConfig(
 )
 
 case class AwsConfig(
-  resources: List[String],
+  templates: List[LocationTemplate],
   network: NetworkConfig,
   queue: QueueConfig,
   sns: AmazonSNS,
@@ -32,7 +32,7 @@ case class AwsConfig(
   includeVpcTargets: Boolean,
   sharder: Sharder
 ) extends PlatformConfig {
-  val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg)
+  val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, templates)
   val repository: Repository = new StatefulRepository
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
@@ -45,14 +45,14 @@ object Config {
   def readConfig(cfg: Config): AwsConfig = {
     val topic     = cfg.require[String]("chemist.sns-topic-name")
     val queue     = cfg.require[String]("chemist.sqs-queue-name")
-    val resources = cfg.require[List[String]]("chemist.resources-to-monitor")
+    val templates = cfg.require[List[String]]("chemist.target-resource-templates")
     val aws       = cfg.subconfig("aws")
     val network   = cfg.subconfig("chemist.network")
     val timeout   = cfg.require[Duration]("chemist.command-timeout")
     val usevpc    = cfg.lookup[Boolean]("chemist.include-vpc-targets").getOrElse(false)
     val sharding  = cfg.lookup[String]("chemist.sharding-strategy")
     AwsConfig(
-      resources,
+      templates 		= templates.map(LocationTemplate),
       network           = readNetwork(network),
       queue             = QueueConfig(topic, queue),
       sns               = readSNS(aws),

@@ -10,9 +10,6 @@ class JsonSpec extends FlatSpec with Matchers {
   import argonaut._, Argonaut._
   import TargetLifecycle._, TargetState._
 
-  def flask(id: String) =
-    Flask(FlaskID(id),Location.localhost, Location.telemetryLocalhost)
-
   it should "serilizes the clusters into JSON" in {
     val A1 = ("test", List(new URI("foo.tv"), new URI("bar.com")))
     A1.asJson.nospaces should equal ("""{"urls":["foo.tv","bar.com"],"cluster":"test"}""")

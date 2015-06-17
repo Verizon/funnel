@@ -22,12 +22,11 @@ class LifecycleSpec extends FlatSpec with Matchers {
   val sqs1 = TestAmazonSQS(Fixtures.asgEvent(Launch, name = uuid, instanceId = "i-flaskAAA"))
   val sqs2 = TestAmazonSQS(Fixtures.asgEvent(Terminate, name = uuid, instanceId = "i-flaskAAA"))
   val sqs3 = TestAmazonSQS("invalid-message")
-  val resources = List("stream/previous")
+  val templates = List(LocationTemplate("http://@host:@port/stream/previous"))
 
   val asg1 = TestAmazonASG.single(_ => uuid)
-  // val asg1 = TestAmazonASG.single(_ => "test-group")
 
-  val dsc = new AwsDiscovery(ec2, asg1)
+  val dsc = new AwsDiscovery(ec2, asg1, templates)
 
   val k1 = "i-dx947af7"
   val k2 = "i-15807647"
@@ -36,7 +35,7 @@ class LifecycleSpec extends FlatSpec with Matchers {
   val signal: Signal[Boolean] = signalOf(true)(Strategy.Executor(Chemist.serverPool))
 
   private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): Throwable \/ Seq[PlatformEvent] =
-    Lifecycle.stream("name-of-queue", "stream/previous" :: Nil, signal)(sqs, asg, ec2, dsc
+    Lifecycle.stream("name-of-queue", signal)(sqs, asg, ec2, dsc
       ).until(Process.emit(false)).runLast.run.get // never do this anywhere but tests
 
   behavior of "Lifecycle.stream"
@@ -62,7 +61,7 @@ class LifecycleSpec extends FlatSpec with Matchers {
 
   def check(json: String): Task[Throwable \/ Seq[PlatformEvent]] =
     Lifecycle.parseMessage(TestMessage(json)
-      ).traverse(Lifecycle.interpreter(_, resources, signal)(asg1, ec2, dsc))
+      ).traverse(Lifecycle.interpreter(_, signal)(asg1, ec2, dsc))
 
 
   it should "parse messages and produce the right action" in {

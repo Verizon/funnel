@@ -35,7 +35,8 @@ object Housekeeping {
     import argonaut._, Argonaut._, JSON._, HJSON._
     import dispatch._, Defaults._
 
-    val a = location.asURI(path = "mirror/sources")
+    val a = location.uriFromTemplate(LocationTemplate(s"http://@host:@port/mirror/sources"))
+
     val req = Task.delay(url(a.toString)) <* Task.delay(log.debug(s"requesting assigned targets from $a"))
     req flatMap { b =>
       fromScalaFuture(http(b OK as.String)).map { c =>

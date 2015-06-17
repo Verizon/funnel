@@ -136,7 +136,6 @@ object ZeroMQ {
 
   /**
    *
-
    */
   private[zeromq] def resource[F[_],R,O](
     acquire: F[R])(
