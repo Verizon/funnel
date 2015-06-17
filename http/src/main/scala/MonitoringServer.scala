@@ -189,7 +189,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
     val q = getQuery(uri)
     def attr[T:DecodeJson](a: String, v: T) =
       q.get(a).flatMap(Parse.decodeOption[T]).map(_ == v).getOrElse(true)
-    val p = attr("units", k.units) && attr("type", k.typeOf)
+    val p = attr("units", k.units) && attr("type", k.typeOf)(DecodeReportableT)
     (q - "units" - "type").foldLeft(p) {
       case (p, (a, v)) => p && (k.attributes.get(a) == Some(v))
     }
