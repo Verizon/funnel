@@ -34,7 +34,6 @@ case class AwsConfig(
 ) extends PlatformConfig {
   val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg)
   val repository: Repository = new StatefulRepository
-  // val sharder = EvenSharding
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
