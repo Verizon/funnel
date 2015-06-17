@@ -18,7 +18,8 @@ class ChemistAwsSpec extends FlatSpec with Matchers {
     ec2 = null,
     asg = null,
     commandTimeout = 2.seconds,
-    includeVpcTargets = true
+    includeVpcTargets = true,
+    sharder = RandomSharding
   )
 
   val c2 = c1.copy(includeVpcTargets = false)

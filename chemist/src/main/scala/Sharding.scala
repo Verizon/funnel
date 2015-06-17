@@ -163,9 +163,19 @@ object RandomSharding extends Sharder {
   }
 }
 
-object EvenSharding extends Sharder {
+/**
+ * Implements a "least-first" round-robin sharding. The flasks are ordered
+ * by the amount of work they currently have assigned, with the least
+ * amount of work is ordered first, and then we round-robin the nodes in the
+ * hope that most sharding calls happen when instances come online in small
+ * groups.
+ *
+ * Downside of this sharder is that it often leads to "heaping" where over all
+ * flask shards, the work is "heaped" to one end of the distribution curve.
+ */
+object LFRRSharding extends Sharder {
   import Sharding._
-  private lazy val log = Logger[EvenSharding.type]
+  private lazy val log = Logger[LFRRSharding.type]
 
   private def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)] = {
     val servers: Seq[FlaskID] = shards(d)
@@ -189,10 +199,10 @@ object EvenSharding extends Sharder {
     // infinate loop, and this function never completes.
     if(s.isEmpty) (Seq.empty,d)
     else {
-      log.debug(s"EvenSharding.distribution: attempting to distribute targets '${s.mkString(",")}'")
+      log.debug(s"LFRRSharding.distribution: attempting to distribute targets '${s.mkString(",")}'")
       val work = calculate(s)(d)
 
-      log.debug(s"EvenSharding.distribution: work = $work")
+      log.debug(s"LFRRSharding.distribution: work = $work")
 
       val dist = work.foldLeft(Distribution.empty){ (a,b) =>
         a.alter(b._1, _ match {

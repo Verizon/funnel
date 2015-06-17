@@ -50,7 +50,7 @@ object Config {
     val network   = cfg.subconfig("chemist.network")
     val timeout   = cfg.require[Duration]("chemist.command-timeout")
     val usevpc    = cfg.lookup[Boolean]("chemist.include-vpc-targets").getOrElse(false)
-    val sharding  = cfg.lookup[String]("chemist.sharder")
+    val sharding  = cfg.lookup[String]("chemist.sharding-strategy")
     AwsConfig(
       resources,
       network           = readNetwork(network),
@@ -67,9 +67,9 @@ object Config {
 
   private def readSharder(c: Option[String]): Sharder =
     c match {
-      case Some("even-sharding")   => EvenSharding
-      case Some("random-sharding") => RandomSharding
-      case _                       => EvenSharding
+      case Some("least-first-round-robin") => LFRRSharding
+      case Some("random")                  => RandomSharding
+      case _                               => RandomSharding
     }
 
   private def readNetwork(cfg: Config): NetworkConfig =

@@ -30,8 +30,9 @@ object Server {
   // not possible. The server gets into a hang/deadlock situation.
   def unsafeStart[U <: Platform](chemist: Chemist[U], platform: U): Unit = {
     val repo = platform.config.repository
+    val sharder = platform.config.sharder
 
-    (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, EvenSharding, platform.config.remoteFlask) _)).run.runAsync {
+    (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _)).run.runAsync {
       case -\/(err) =>
         log.error(s"Error starting processing of Platform events: $err")
         err.printStackTrace
