@@ -124,6 +124,47 @@ trait Sharder {
   def distribution(s: Set[Target])(d: Distribution): (Seq[(FlaskID,Target)], Distribution)
 }
 
+object RandomSharding extends Sharder {
+  import Sharding._
+
+  private lazy val log = Logger[RandomSharding.type]
+  private val rnd = new scala.util.Random
+
+  // private def randomShard(s: Seq[FlaskID])(d: Distribution): FlaskID =
+
+  private def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)] = {
+    val flasks = shards(d)
+    val range = flasks.indices
+    if(flasks.size == 0) Nil
+    else {
+      s.toList.map { t =>
+        flasks(rnd.nextInt(range.length)) -> t
+      }
+    }
+  }
+
+  def distribution(s: Set[Target])(d: Distribution): (Seq[(FlaskID,Target)], Distribution) = {
+    if(s.isEmpty) (Seq.empty,d)
+    else {
+      log.debug(s"RandomSharding.distribution: attempting to distribute targets '${s.mkString(",")}'")
+      val work = calculate(s)(d)
+
+      log.debug(s"RandomSharding.distribution: work = $work")
+
+      val dist = work.foldLeft(Distribution.empty){ (a,b) =>
+        a.alter(b._1, _ match {
+          case Some(s) => Option(s + b._2)
+          case None    => Option(Set(b._2))
+        })
+      }
+
+      log.debug(s"work = $work, dist = $dist")
+
+      (work, dist)
+    }
+  }
+}
+
 object EvenSharding extends Sharder {
   import Sharding._
   private lazy val log = Logger[EvenSharding.type]
@@ -150,10 +191,10 @@ object EvenSharding extends Sharder {
     // infinate loop, and this function never completes.
     if(s.isEmpty) (Seq.empty,d)
     else {
-      log.debug(s"Sharding.distribution: attempting to distribute targets '${s.mkString(",")}'")
+      log.debug(s"EvenSharding.distribution: attempting to distribute targets '${s.mkString(",")}'")
       val work = calculate(s)(d)
 
-      log.debug(s"Sharding.distribution: work = $work")
+      log.debug(s"EvenSharding.distribution: work = $work")
 
       val dist = work.foldLeft(Distribution.empty){ (a,b) =>
         a.alter(b._1, _ match {
@@ -167,6 +208,4 @@ object EvenSharding extends Sharder {
       (work, dist)
     }
   }
-
-
 }

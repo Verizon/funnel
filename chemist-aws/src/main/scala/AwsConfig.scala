@@ -29,11 +29,12 @@ case class AwsConfig(
   ec2: AmazonEC2,
   asg: AmazonAutoScaling,
   commandTimeout: Duration,
-  includeVpcTargets: Boolean
+  includeVpcTargets: Boolean,
+  sharder: Sharder
 ) extends PlatformConfig {
   val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg)
   val repository: Repository = new StatefulRepository
-  val sharder = EvenSharding
+  // val sharder = EvenSharding
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
@@ -50,18 +51,27 @@ object Config {
     val network   = cfg.subconfig("chemist.network")
     val timeout   = cfg.require[Duration]("chemist.command-timeout")
     val usevpc    = cfg.lookup[Boolean]("chemist.include-vpc-targets").getOrElse(false)
+    val sharding  = cfg.lookup[String]("chemist.sharder")
     AwsConfig(
       resources,
-      network   = readNetwork(network),
-      queue     = QueueConfig(topic, queue),
-      sns       = readSNS(aws),
-      sqs       = readSQS(aws),
-      ec2       = readEC2(aws),
-      asg       = readASG(aws),
-      timeout,
-      usevpc
+      network           = readNetwork(network),
+      queue             = QueueConfig(topic, queue),
+      sns               = readSNS(aws),
+      sqs               = readSQS(aws),
+      ec2               = readEC2(aws),
+      asg               = readASG(aws),
+      sharder           = readSharder(sharding),
+      commandTimeout    = timeout,
+      includeVpcTargets = usevpc
     )
   }
+
+  private def readSharder(c: Option[String]): Sharder =
+    c match {
+      case Some("even-sharding")   => EvenSharding
+      case Some("random-sharding") => RandomSharding
+      case _                       => EvenSharding
+    }
 
   private def readNetwork(cfg: Config): NetworkConfig =
     NetworkConfig(cfg.require[String]("host"), cfg.require[Int]("port"))
