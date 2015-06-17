@@ -47,7 +47,7 @@ object Location {
   ): Option[Location] =
     for {
       a <- Option(uri.getHost)
-      b <- Option(uri.getPort)
+      b <- Option(uri.getPort) if b > -1
       c <- NetworkScheme.fromString(uri.getScheme)
       d <- tmp.get(c).orElse(Some(Seq.empty[LocationTemplate]))
     } yield Location(
