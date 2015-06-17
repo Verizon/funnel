@@ -82,4 +82,12 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
                                      Target("r",new URI("http://theta.internal"), false),
                                      Target("p",new URI("http://zeta.internal"), false)))
   }
+
+  it should "assign all the work when using random sharding" in {
+    // this is a lame test, but because the assignment is random,
+    // its not possible to write a test due to the non-deterministic nature
+    val (s, newdist) = RandomSharding.distribution(i2)(d1)
+    newdist.values.flatten.size should equal (i2.size)
+  }
+
 }
