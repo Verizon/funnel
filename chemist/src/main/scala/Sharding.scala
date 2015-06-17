@@ -130,8 +130,6 @@ object RandomSharding extends Sharder {
   private lazy val log = Logger[RandomSharding.type]
   private val rnd = new scala.util.Random
 
-  // private def randomShard(s: Seq[FlaskID])(d: Distribution): FlaskID =
-
   private def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)] = {
     val flasks = shards(d)
     val range = flasks.indices
