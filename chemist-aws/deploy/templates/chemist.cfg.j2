@@ -5,6 +5,9 @@ chemist {
     port = 9000
   }
 
+  # sharding-strategy = "least-first-round-robin"
+  sharding-strategy = "random"
+
   include-vpc-targets = true
 
   command-timeout = 2 seconds

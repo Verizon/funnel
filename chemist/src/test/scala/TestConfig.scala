@@ -12,5 +12,5 @@ class TestConfig extends PlatformConfig {
   val repository: Repository = new StatefulRepository
   val remoteFlask: RemoteFlask = LoggingRemote
   def http: dispatch.Http = ???
-  val sharder: funnel.chemist.Sharder = EvenSharding
+  val sharder: funnel.chemist.Sharder = RandomSharding
 }

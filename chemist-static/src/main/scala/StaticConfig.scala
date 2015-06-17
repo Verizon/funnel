@@ -21,7 +21,7 @@ case class StaticConfig(
 ) extends PlatformConfig {
   val discovery: Discovery = new StaticDiscovery(targets, flasks)
   val repository: Repository = new StatefulRepository
-  val sharder = EvenSharding
+  val sharder = RandomSharding
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))

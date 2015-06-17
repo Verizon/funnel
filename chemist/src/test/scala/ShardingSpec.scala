@@ -81,14 +81,14 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
   }
 
   it should "correctly calculate how the new request should be sharded over known flasks" in {
-    val (s, newdist) = EvenSharding.distribution(i1)(d1)
+    val (s, newdist) = LFRRSharding.distribution(i1)(d1)
     s.map {
       case (x,y) => x.value -> y
     }.toSet should === (Set(
                           "a" -> Target("u",new URI("http://eight.internal"), false),
                           "c" -> Target("v",new URI("http://nine.internal"), false)))
 
-    val (s2,newdist2) = EvenSharding.distribution(i2)(d1)
+    val (s2,newdist2) = LFRRSharding.distribution(i2)(d1)
     s2.map(_._2).toSet should === (Set(
                                      Target("v",new URI("http://omega.internal"), false),
                                      Target("w",new URI("http://alpha.internal"), false),
@@ -100,4 +100,12 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
                                      Target("r",new URI("http://theta.internal"), false),
                                      Target("p",new URI("http://zeta.internal"), false)))
   }
+
+  it should "assign all the work when using random sharding" in {
+    // this is a lame test, but because the assignment is random,
+    // its not possible to write a test due to the non-deterministic nature
+    val (s, newdist) = RandomSharding.distribution(i2)(d1)
+    newdist.values.flatten.size should equal (i2.size)
+  }
+
 }
