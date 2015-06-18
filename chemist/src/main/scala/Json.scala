@@ -193,10 +193,11 @@ object JSON {
     jEmptyObject
   }
 
-  def encodeUnmonitored(f: FlaskID, u: URI): Json = {
+  def encodeUnmonitored(f: FlaskID, t: Target): Json = {
     ("type" := "Unmonitored") ->:
     ("flask" := f.value) ->:
-    ("uri" := u) ->:
+    ("cluster" := t.cluster) ->:
+    ("uri" := t.uri) ->:
     jEmptyObject
   }
 
