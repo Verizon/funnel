@@ -121,13 +121,18 @@ trait Chemist[A <: Platform]{
 
     // filter out all the instances that are in private networks
     // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
-    z  <- filterTargets(l)
+    x  <- filterTargets(l)
+    z  = x._1
+    y  = x._2
     _  = log.info(s"located ${z.length} instances that appear to be monitorable")
 
     // set the result to an in-memory list of "the world"
     targets = z.flatMap { case (id,targets) => targets.toSeq.map(PlatformEvent.NewTarget) } //the fact that I'm throwing ID away here is suspect
     _ <- targets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
     _  = log.info("added instances to the repository...")
+    nontargets = y.flatMap { case (id, nontargets) => nontargets.toSeq.map(nt => PlatformEvent.Unmonitored(FlaskID("N/A"), nt.uri)) }
+    _ <- nontargets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
+    _  = log.info("added unmonitored instances to the repository...")
 
     // ask those flasks for their current work and yield a `Distribution`
     d <- Housekeeping.gatherAssignedTargets(f)(cfg.http).liftKleisli
@@ -146,7 +151,7 @@ trait Chemist[A <: Platform]{
   /**
    * Platform specific way of filtering instances we can discover but we might not want to monitor
    */
-  def filterTargets(targets: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]]
+  def filterTargets(targets: Seq[(TargetID, Set[Target])]): ChemistK[(Seq[(TargetID, Set[Target])], Seq[(TargetID, Set[Target])])]
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources

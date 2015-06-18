@@ -188,7 +188,7 @@ class StatefulRepository extends Repository {
             lifecycle(TargetLifecycle.Unmonitoring(t.msg.target, f, System.currentTimeMillis), t.to)
           } getOrElse {
             // if we didn't even know about the target, what do we do? start monitoring it? nothing?
-            Task.now(())
+            Task(stateMaps.update(_.update(Unmonitored, (m => Some(m.insert(i, StateChange(Unknown, Unmonitored, Discovery(i, System.currentTimeMillis))))))))
           }
         }
         case PlatformEvent.Problem(f, i, msg) => {

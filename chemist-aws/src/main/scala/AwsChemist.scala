@@ -31,7 +31,7 @@ class AwsChemist extends Chemist[Aws]{
    * if the target is on a public network address, include it
    * otherwise, wtf, how did we arrive here - dont monitor it.
    */
-  def filterTargets(instances: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]] =
+  def filterTargets(instances: Seq[(TargetID, Set[Target])]): ChemistK[(Seq[(TargetID, Set[Target])], Seq[(TargetID, Set[Target])])] =
     config.map { cfg =>
       instances.map {
         case (id, targets) =>
@@ -40,7 +40,7 @@ class AwsChemist extends Chemist[Aws]{
             case b if (!b.isPrivateNetwork) => b
 
           }
-      }.filter(_._2.nonEmpty)
+      }.partition(_._2.nonEmpty)
     }
 
   /**
