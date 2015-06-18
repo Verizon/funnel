@@ -116,11 +116,12 @@ object Lifecycle {
       (for {
         n <- e.metadata.get("asg-name").map(Task.now).getOrElse(Task.fail(NotAFlaskException(e)))
         a <- ASG.lookupByName(n)(asg)
-        _  = log.debug(s"Found ASG from the EC2 lookup: $a")
+        _  = log.debug(s"Lifecycle.isFlask: found ASG from the EC2 lookup: $a")
         r <- a.getTags.asScala.find(t =>
-               t.getKey.trim == "type" &&
+               t.getKey.trim == AwsTagKeys.name &&
                t.getValue.trim.startsWith("flask")
              ).fold(Task.now(false))(_ => Task.now(true))
+        _  = log.debug(s"Lifecycle.isFlask, r = $r")
       } yield r).or(Task.now(false))
     }
 

@@ -35,14 +35,14 @@ case class AwsInstance(
 
   def application: Option[Application] = {
     for {
-      b <- tags.get("funnel:target:name") orElse tags.get("type") orElse tags.get("Name")
-      c <- tags.get("funnel:target:version") orElse tags.get("revision") orElse(Some("unknown"))
+      b <- tags.get(AwsTagKeys.name) orElse tags.get("type") orElse tags.get("Name")
+      c <- tags.get(AwsTagKeys.version) orElse tags.get("revision") orElse(Some("unknown"))
       d  = tags.get("aws:cloudformation:stack-name")
             .flatMap(_.split('-').lastOption.find(_.length > 3))
     } yield Application(
       name = b,
       version = c,
-      qualifier = tags.get("funnel:target:qualifier") orElse d
+      qualifier = tags.get(AwsTagKeys.qualifier) orElse d
     )
   }
 
@@ -56,9 +56,4 @@ case class AwsInstance(
   private def findLocation(f: Location => Boolean): Seq[Location] =
     locations.list.filter(f)
 
-  /**
-   * Not sure this is sound, given a location could have multiple URIs???
-   */
-  // def asURI: URI =
-  //   location.asURI()
 }

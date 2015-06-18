@@ -31,14 +31,13 @@ class LifecycleSpec extends FlatSpec with Matchers {
   val k1 = "i-dx947af7"
   val k2 = "i-15807647"
 
-
   val signal: Signal[Boolean] = signalOf(true)(Strategy.Executor(Chemist.serverPool))
 
   private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): Throwable \/ Seq[PlatformEvent] =
     Lifecycle.stream("name-of-queue", signal)(sqs, asg, ec2, dsc
       ).until(Process.emit(false)).runLast.run.get // never do this anywhere but tests
 
-  behavior of "Lifecycle.stream"
+  behavior of "the stream"
 
   it should "side-effect and update the repository when a new flask is launched" in {
     val \/-(Seq(NewFlask(f))) = fromStream(sqs1, asg1)
@@ -46,7 +45,8 @@ class LifecycleSpec extends FlatSpec with Matchers {
   }
 
   it should "side-effect and update the repository when a flask is terminated" in {
-    fromStream(sqs2, asg1) should equal ( \/-(Seq(TerminatedFlask(FlaskID("i-flaskAAA"))))) // empty because there is no work
+    fromStream(sqs2, asg1) should equal (
+      \/-(Seq(TerminatedFlask(FlaskID("i-flaskAAA"))))) // empty because there is no work
   }
 
   it should "produce a parse exception in the event the message on SQS cannot be parsed" in {
@@ -62,7 +62,6 @@ class LifecycleSpec extends FlatSpec with Matchers {
   def check(json: String): Task[Throwable \/ Seq[PlatformEvent]] =
     Lifecycle.parseMessage(TestMessage(json)
       ).traverse(Lifecycle.interpreter(_, signal)(asg1, ec2, dsc))
-
 
   it should "parse messages and produce the right action" in {
     val \/-(Seq(NewFlask(f))) = check(Fixtures.asgEvent(Launch, instanceId = "i-flaskAAA")).run

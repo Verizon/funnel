@@ -74,7 +74,7 @@ class AwsDiscovery(
   def lookupFlask(id: FlaskID): Task[Flask] =
     for {
       a <- lookupOne(id.value)
-      b <- a.supervision.map(Task.now).getOrElse(Task.fail(InstanceNotFoundException(id.value)))
+      b <- a.supervision.map(Task.now).getOrElse(Task.fail(FlaskMissingSupervision(a)))
     } yield Flask(FlaskID(a.id), a.location, b)
 
   /**
@@ -125,7 +125,7 @@ class AwsDiscovery(
         b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
         (fails,successes) = b.toVector.separate
         _  = log.warn(s"AwsDiscovery.lookupMany failed to validate ${fails.length} instances.")
-        _  = log.debug(s"AwsDiscovery.lookupMany b = ${b.length}")
+        _  = log.debug(s"AwsDiscovery.lookupMany b = ${b}")
         _  = fails.foreach(x => log.error(x))
       } yield successes
 
@@ -159,9 +159,7 @@ class AwsDiscovery(
   ///////////////////////////// filters /////////////////////////////
 
   def isFlask(id: String): Task[Boolean] =
-    lookupOne(id).map { i =>
-      i.application.map(_.name.startsWith("flask")).getOrElse(false)
-    }
+    lookupOne(id).map(isFlask)
 
   def isFlask(i: AwsInstance): Boolean =
     i.application.map(_.name.startsWith("flask")).getOrElse(false)
@@ -234,16 +232,16 @@ class AwsDiscovery(
     val datacenter = in.getPlacement.getAvailabilityZone
 
     val mirrorTemplate: Option[String] =
-      machineTags.get("funnel:mirror:uri-template") orElse defaultInstanceTemplate
+      machineTags.get(AwsTagKeys.mirrorTemplate) orElse defaultInstanceTemplate
 
-    val adminTemplate: Option[String] =
-      machineTags.get("funnel:telemetry:uri-template")
+    val supervisionTemplate: Option[String] =
+      machineTags.get(AwsTagKeys.supervisionTemplate)
 
     for {
       a <- toLocation(dns, datacenter, mirrorTemplate, Mirroring)
       _  = log.debug(s"discovered mirrioring template '$a'")
 
-      b  = toLocation(dns, datacenter, adminTemplate, Supervision).toOption
+      b  = toLocation(dns, datacenter, supervisionTemplate, Supervision)
       _  = b.foreach(t => log.debug(s"discovered telemetry template '$t'"))
     } yield AwsInstance(
       id = in.getInstanceId,
