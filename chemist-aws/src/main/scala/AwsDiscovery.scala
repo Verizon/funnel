@@ -124,7 +124,7 @@ class AwsDiscovery(
         _  = log.debug(s"AwsDiscovery.lookupMany, a = ${a.length}")
         b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
         (fails,successes) = b.toVector.separate
-        _  = log.warn("Failed to validate ${fails.length} instances.")
+        _  = log.warn(s"AwsDiscovery.lookupMany failed to validate ${fails.length} instances.")
         _  = log.debug(s"AwsDiscovery.lookupMany b = ${b.length}")
         _  = fails.foreach(x => log.error(x))
       } yield successes
@@ -192,21 +192,25 @@ class AwsDiscovery(
       r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))
     } yield r
 
-  // should be overriden at deploy time, but this is just last resort fallback.
-  private val defaultInstanceTemplate = Option("http://@host:5775")
-
-  private[aws] def toLocation(in: AWSInstance, template: String, intent: LocationIntent)(tags: Map[String,String]): String \/ Location =
+  private[aws] def toLocation(
+    dns: String,
+    datacenter: String,
+    template: Option[String],
+    intent: LocationIntent): String \/ Location =
     for {
-      a <- Option(in.getPrivateDnsName
-        ) \/> s"instance had no ip: ${in.getInstanceId}"
+      a <- Option(dns).filter(_.nonEmpty
+        ) \/> s"instance had no address: $dns"
 
-      b <- tags.get(template).orElse(defaultInstanceTemplate
-        ) \/> s"unable to find template for '$template'"
+      b <- template \/> s"supplied template was invalid. template = '$template'"
+
       c  = new URI(LocationTemplate(b).build("@host" -> a))
 
-      d <- Location.fromURI(c, in.getPlacement.getAvailabilityZone, intent, allTemplates
-        ) \/> s"unable to create a Location from URI '$c'"
+      d <- Location.fromURI(c, datacenter, intent, allTemplates
+        ) \/> s"unable to create a location from uri '$c'"
     } yield d
+
+  // should be overriden at deploy time, but this is just last resort fallback.
+  private val defaultInstanceTemplate = Option("http://@host:5775")
 
   /**
    * The EC2 instance in question should have the following tags:
@@ -225,11 +229,22 @@ class AwsDiscovery(
 
     val machineTags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
 
+    val dns = in.getPrivateDnsName
+
+    val datacenter = in.getPlacement.getAvailabilityZone
+
+    val mirrorTemplate: Option[String] =
+      machineTags.get("funnel:mirror:uri-template") orElse defaultInstanceTemplate
+
+    val adminTemplate: Option[String] =
+      machineTags.get("funnel:telemetry:uri-template")
+
     for {
-      a <- toLocation(in, "funnel:mirror:uri-template", Mirroring)(machineTags)
+      a <- toLocation(dns, datacenter, mirrorTemplate, Mirroring)
       _  = log.debug(s"discovered mirrioring template '$a'")
-      b  = toLocation(in, "funnel:telemetry:uri-template", Supervision)(machineTags).toOption
-      _  = log.debug(s"discovered telemetry template '$b'")
+
+      b  = toLocation(dns, datacenter, adminTemplate, Supervision).toOption
+      _  = b.foreach(t => log.debug(s"discovered telemetry template '$t'"))
     } yield AwsInstance(
       id = in.getInstanceId,
       tags = machineTags,

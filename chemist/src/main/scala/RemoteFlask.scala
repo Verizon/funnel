@@ -114,7 +114,7 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
 
     import telemetry.Telemetry.telemetrySubscribeSocket
 
-    log.info(s"attempting to monitor telemetry on ${flask.telemetry.uri}")
+    log.info(s"attempting to connect to 0mq telemetry channel ${flask.telemetry.uri}")
     val lc: Actor[Either3[URI, URI, (URI,String)]] = lifecycle.contramap(actionsFromLifecycle(flask.id))
     telemetrySubscribeSocket(flask.telemetry.uri, signal, keys, errors, lc)
   }
