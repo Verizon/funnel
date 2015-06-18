@@ -130,7 +130,7 @@ trait Chemist[A <: Platform]{
     targets = z.flatMap { case (id,targets) => targets.toSeq.map(PlatformEvent.NewTarget) } //the fact that I'm throwing ID away here is suspect
     _ <- targets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
     _  = log.info("added instances to the repository...")
-    nontargets = y.flatMap { case (id, nontargets) => nontargets.toSeq.map(nt => PlatformEvent.Unmonitored(FlaskID("N/A"), nt.uri)) }
+    nontargets = y.flatMap { case (id, nontargets) => nontargets.toSeq.map(nt => PlatformEvent.Unmonitored(FlaskID("N/A"), nt)) }
     _ <- nontargets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
     _  = log.info("added unmonitored instances to the repository...")
 

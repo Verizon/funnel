@@ -182,13 +182,13 @@ class StatefulRepository extends Repository {
 
         case PlatformEvent.Unmonitored(f, i) => {
           log.info(s"platformHandler -- $i no longer monitored by by $f")
-          val target = targets.get.lookup(i)
+          val target = targets.get.lookup(i.uri)
           target.map { t =>
             // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
             lifecycle(TargetLifecycle.Unmonitoring(t.msg.target, f, System.currentTimeMillis), t.to)
           } getOrElse {
             // if we didn't even know about the target, what do we do? start monitoring it? nothing?
-            Task(stateMaps.update(_.update(Unmonitored, (m => Some(m.insert(i, StateChange(Unknown, Unmonitored, Discovery(i, System.currentTimeMillis))))))))
+            Task(stateMaps.update(_.update(Unmonitored, (m => Some(m.insert(i.uri, StateChange(Unknown, Unmonitored, Discovery(i, System.currentTimeMillis))))))))
           }
         }
         case PlatformEvent.Problem(f, i, msg) => {
