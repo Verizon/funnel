@@ -33,7 +33,7 @@ class AwsDiscovery(
   asg: AmazonAutoScaling,
   resourceTemplates: Seq[LocationTemplate],
   cacheMaxSize: Int = 10000,
-  cacheExpiryAfterTTL: Duration = 5.minutes) extends Discovery {
+  cacheExpiryAfterTTL: Duration = 30.minutes) extends Discovery {
 
   type AwsInstanceId = String
 

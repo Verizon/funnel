@@ -19,7 +19,7 @@ libraryDependencies ++= Seq(
 )
 
 /* this is basically a hack so that the windows agent can be compiled against jeromq */
-scalaSource in Compile := baseDirectory.value / ".." / "agent" / "src" / "main" / "scala"
+scalaSource in Compile := baseDirectory.value / ".." / ".." / "agent" / "src" / "main" / "scala"
 
 mappings in Universal ++= Seq(
   file("agent/deploy/etc/agent.cfg") -> "etc/agent.cfg"

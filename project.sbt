@@ -8,7 +8,7 @@ Publishing.ignore
 
 organization in Global  := "oncue.svc.funnel"
 
-scalaVersion in Global  := "2.10.4"
+scalaVersion in Global  := "2.10.5"
 
 lazy val funnel = project.in(file(".")).aggregate(
   core,
@@ -21,15 +21,18 @@ lazy val funnel = project.in(file(".")).aggregate(
   zeromq,
   agent,
   `zeromq-java`,
-  `agent-windows`,
   flask,
   chemist,
   `chemist-aws`,
-  `chemist-static`)
+  `chemist-static`,
+  `agent-package`,
+  `agent-windows-package`,
+  `flask-package`,
+  `chemist-aws-package`,
+  `chemist-static-package`
+)
 
 lazy val agent = project.dependsOn(zeromq % "test->test;compile->compile", http, nginx).configs(MultiJvm)
-
-lazy val `agent-windows` = project.dependsOn(`zeromq-java`, http, nginx).configs(MultiJvm)
 
 lazy val chemist = project.dependsOn(core, http, telemetry)
 
@@ -39,9 +42,7 @@ lazy val `chemist-static` = project.dependsOn(chemist % "test->test;compile->com
 
 lazy val core = project
 
-lazy val docs = project
-//  .settings(unidocProjectFilter in (ScalaUnidoc, unidoc) := inProjects(core))
-  .dependsOn(core)
+lazy val docs = project.dependsOn(core)
 
 lazy val elastic = project.dependsOn(core, http)
 
@@ -65,6 +66,9 @@ lazy val `zeromq-java` = project.dependsOn(http).configs(MultiJvm)
 
 lazy val `agent-package` = project.in(
   file("packages/agent")).dependsOn(agent)
+
+lazy val `agent-windows-package` = project.in(
+  file("packages/agent-windows")).dependsOn(`zeromq-java`, http, nginx).configs(MultiJvm)
 
 lazy val `flask-package` = project.in(
   file("packages/flask")).dependsOn(flask)
