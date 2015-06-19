@@ -1,0 +1,29 @@
+
+chemist {
+  network {
+    host = "127.0.0.1"
+    port = 9000
+  }
+
+  # sharding-strategy = "least-first-round-robin"
+  sharding-strategy = "random"
+
+  include-vpc-targets = true
+
+  command-timeout = 2 seconds
+
+  sns-topic-name = "ops-chemist"
+  sqs-queue-name = "ops-chemist"
+
+  target-resource-templates = [
+    "http://@host:@port/stream/previous",
+    "http://@host:@port/stream/now?type='String'",
+    "zeromq+tcp://@host:@port/previous"
+  ]
+}
+
+aws {
+  region = "us-east-1"
+  access-key = "$(AWS_ACCESS_KEY)"
+  secret-key = "$(AWS_SECRET_KEY)"
+}

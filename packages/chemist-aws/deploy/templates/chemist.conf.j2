@@ -1,0 +1,42 @@
+server {
+  listen    8443;
+  ssl       on;
+  ssl_certificate       /opt/certificates/cert_with_chain_internal.pem;
+  ssl_certificate_key   /opt/certificates/hsm_key.pem;
+  ssl_session_cache shared:SSL:10m;
+  ssl_session_timeout  10m;
+  ssl_protocols TLSv1.2 TLSv1.1 TLSv1;
+  ssl_ciphers ECDHE-RSA-AES256-SHA384:AES256-SHA256:RC4:HIGH:!MD5:!aNULL:!eNULL:!NULL:!DH:!EDH:!AESGCM;
+  ssl_prefer_server_ciphers   on;
+  gzip  on;
+  gzip_types application/json text/plain text/javascript application/javascript application/x-javascript text/css text/xml application/font-woff;
+  gzip_min_length 1024;
+
+  location = /nginx_status {
+    stub_status on;
+    access_log   off;
+  }
+
+  location / {
+    proxy_pass  http://backend_9000;
+    proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_redirect     off;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_buffering on;
+  }
+
+  ### engineering recommendations
+  # these are a pre-emptive way to shed malicious traffic, as any
+  # incoming requset that has these headers could circumvent some
+  # application level security, so we reject them at the dor.
+  if ($http_im_cname) {
+      return 401;
+  }
+  if ($http_X_SSL_Issuer) {
+      return 401;
+  }
+}
