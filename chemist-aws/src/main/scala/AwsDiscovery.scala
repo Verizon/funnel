@@ -32,7 +32,7 @@ class AwsDiscovery(
   ec2: AmazonEC2,
   asg: AmazonAutoScaling,
   resourceTemplates: Seq[LocationTemplate],
-  cacheMaxSize: Int = 10000
+  cacheMaxSize: Int = 2000
 ) extends Discovery {
 
   type AwsInstanceId = String
