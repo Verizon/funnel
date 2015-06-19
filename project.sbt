@@ -1,8 +1,10 @@
 
 import oncue.build._
-
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
-//import sbtunidoc.Plugin.UnidocKeys._
+
+OnCue.baseSettings
+
+Publishing.ignore
 
 organization in Global  := "oncue.svc.funnel"
 
@@ -59,6 +61,16 @@ lazy val zeromq = project.dependsOn(core, http).configs(MultiJvm) // http? this 
 
 lazy val `zeromq-java` = project.dependsOn(http).configs(MultiJvm)
 
-OnCue.baseSettings
+//////////////////////////// packages for service deployables ////////////////////////////
 
-Publishing.ignore
+lazy val `agent-package` = project.in(
+  file("packages/agent")).dependsOn(agent)
+
+lazy val `flask-package` = project.in(
+  file("packages/flask")).dependsOn(flask)
+
+lazy val `chemist-aws-package` = project.in(
+  file("packages/chemist-aws")).dependsOn(`chemist-aws`)
+
+lazy val `chemist-static-package` = project.in(
+  file("packages/chemist-static")).dependsOn(`chemist-static`)
