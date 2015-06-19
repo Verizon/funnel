@@ -32,16 +32,15 @@ class AwsDiscovery(
   ec2: AmazonEC2,
   asg: AmazonAutoScaling,
   resourceTemplates: Seq[LocationTemplate],
-  cacheMaxSize: Int = 10000,
-  cacheExpiryAfterTTL: Duration = 30.minutes) extends Discovery {
+  cacheMaxSize: Int = 10000
+) extends Discovery {
 
   type AwsInstanceId = String
 
   private val log = Logger[AwsDiscovery]
 
   private val cache = Cache[AwsInstanceId, AwsInstance](
-    maximumSize = Some(cacheMaxSize),
-    expireAfterWrite = Some(cacheExpiryAfterTTL))
+    maximumSize = Some(cacheMaxSize))
 
   private val allTemplates: Map[NetworkScheme, Seq[LocationTemplate]] =
     NetworkScheme.all.foldLeft(Map.empty[NetworkScheme,Seq[LocationTemplate]]){ (a,b) =>
