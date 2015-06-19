@@ -87,6 +87,8 @@ object RespositorySpec extends Properties("StaticRepository") with ArbitraryLife
         Confirmation(i, FlaskID(""), System.currentTimeMillis)
       case Fin =>
         Terminated(i, System.currentTimeMillis)
+      case Unmonitorable =>
+        Terminated(i, System.currentTimeMillis)
     }
   }
 

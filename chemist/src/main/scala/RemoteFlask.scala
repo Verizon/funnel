@@ -101,7 +101,7 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
    * Either3[Monitored, Unmonitored,Problem], I promise
    */
   private def actionsFromLifecycle(flask: FlaskID): Either3[URI, URI, (URI, String)] => PlatformEvent = {
-    case Left3(id) => PlatformEvent.Unmonitored(flask, Target(cluster, id, false))
+    case Left3(id) => PlatformEvent.Unmonitored(flask, id)
     case Middle3(id) => PlatformEvent.Monitored(flask, id)
     case Right3((id,msg)) => PlatformEvent.Problem(flask, id, msg)
   }

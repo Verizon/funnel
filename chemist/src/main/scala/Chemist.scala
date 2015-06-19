@@ -130,9 +130,10 @@ trait Chemist[A <: Platform]{
     targets = z.flatMap { case (id,targets) => targets.toSeq.map(PlatformEvent.NewTarget) } //the fact that I'm throwing ID away here is suspect
     _ <- targets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
     _  = log.info("added instances to the repository...")
-    nontargets = y.flatMap { case (id, nontargets) => nontargets.toSeq.map(nt => PlatformEvent.Unmonitored(FlaskID("N/A"), nt)) }
-    _ <- nontargets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
-    _  = log.info("added unmonitored instances to the repository...")
+
+    um = y.flatMap { case (id,um) => um.toSeq.map(PlatformEvent.Unmonitorable) }
+    _ <- um.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
+    _  = log.info("added unmonitorables to the repository...")
 
     // ask those flasks for their current work and yield a `Distribution`
     d <- Housekeeping.gatherAssignedTargets(f)(cfg.http).liftKleisli
