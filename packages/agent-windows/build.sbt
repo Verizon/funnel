@@ -22,7 +22,7 @@ libraryDependencies ++= Seq(
 scalaSource in Compile := baseDirectory.value / ".." / ".." / "agent" / "src" / "main" / "scala"
 
 mappings in Universal ++= Seq(
-  file("agent/deploy/etc/agent.cfg") -> "etc/agent.cfg"
+  file("packages/agent/deploy/etc/agent.cfg") -> "etc/agent.cfg"
 )
 
 unmanagedClasspath in Compile ++= Custom.toolsJar
