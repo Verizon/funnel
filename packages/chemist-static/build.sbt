@@ -7,4 +7,6 @@ OnCue.baseSettings
 
 Bundle.settings
 
-name in Universal := "chemist-static"
+name := "chemist-static"
+
+name in Universal := name.value

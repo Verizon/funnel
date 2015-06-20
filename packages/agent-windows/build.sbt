@@ -9,6 +9,8 @@ Custom.testing
 
 Custom.compilation
 
+name := "agent-windows"
+
 libraryDependencies ++= Seq(
   "net.databinder"  %% "unfiltered-filter"       % V.unfiltered,
   "net.databinder"  %% "unfiltered-netty-server" % V.unfiltered,

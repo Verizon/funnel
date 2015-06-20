@@ -7,4 +7,6 @@ OnCue.baseSettings
 
 Bundle.settings
 
-name in Universal := "flask"
+name := "flask"
+
+name in Universal := name.value
