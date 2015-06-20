@@ -48,9 +48,9 @@ class ChemistAwsSpec extends FlatSpec with Matchers {
   val targets = f1.map(i => TargetID(i.id) -> i.targets)
 
   "findInstances" should "honour the private network config" in {
-    val c = new AwsChemist
-    val p1 = new Aws { val config = c1 }
-    val p2 = new Aws { val config = c2 }
+    val c = new AwsChemist[DefaultAws]
+    val p1 = new DefaultAws { val config = c1 }
+    val p2 = new DefaultAws { val config = c2 }
     c.filterTargets(targets).run(p1).run.length should equal (3)
     c.filterTargets(targets).run(p2).run.length should equal (2)
   }
