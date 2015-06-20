@@ -7,4 +7,6 @@ OnCue.baseSettings
 
 Bundle.settings
 
-name in Universal := "chemist-aws"
+name := "chemist-aws"
+
+name in Universal := name.value
