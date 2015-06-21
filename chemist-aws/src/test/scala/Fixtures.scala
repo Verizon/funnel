@@ -26,7 +26,11 @@ object Fixtures {
   val instances: Seq[EC2Instance] =
     instance("i-dx947af7") ::
     instance("i-15807647") ::
-    instance("i-flaskAAA", tags = Seq("type" -> "flask")) :: Nil
+    instance("i-flaskAAA",
+      tags = Vector(
+        AwsTagKeys.name -> "flask",
+        AwsTagKeys.supervisionTemplate -> "zeromq+tcp://localhost:7390/")
+    ) :: Nil
 
   val localhost: Location =
     Location(

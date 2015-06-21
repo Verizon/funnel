@@ -9,6 +9,8 @@ Custom.testing
 
 Custom.compilation
 
+name := "agent-windows"
+
 libraryDependencies ++= Seq(
   "net.databinder"  %% "unfiltered-filter"       % V.unfiltered,
   "net.databinder"  %% "unfiltered-netty-server" % V.unfiltered,
@@ -19,10 +21,10 @@ libraryDependencies ++= Seq(
 )
 
 /* this is basically a hack so that the windows agent can be compiled against jeromq */
-scalaSource in Compile := baseDirectory.value / ".." / "agent" / "src" / "main" / "scala"
+scalaSource in Compile := baseDirectory.value / ".." / ".." / "agent" / "src" / "main" / "scala"
 
 mappings in Universal ++= Seq(
-  file("agent/deploy/etc/agent.cfg") -> "etc/agent.cfg"
+  file("packages/agent/deploy/etc/agent.cfg") -> "etc/agent.cfg"
 )
 
 unmanagedClasspath in Compile ++= Custom.toolsJar

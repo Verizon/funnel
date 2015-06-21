@@ -6,12 +6,6 @@
   roles:
     - application
   tasks:
-    - name: ulimit | copy template file into /etc/security/limits.d/01-oncue.conf
-      sudo: yes
-      copy: src=files/limits.conf
-            dest=/etc/security/limits.d/01-oncue.conf
-            owner=root group=root mode=0644
-
     - name: chemist | override configuration file
       sudo: yes
       template: >
@@ -35,16 +29,6 @@
       - { path: '/etc/nginx/conf.d/internal.conf' }
       - { path: '/etc/nginx/conf.d/monitoring.conf' }
 
-    - name: chemist | restart chemist service
+    - name: chemist | restart nginx service
       sudo: yes
       service: name=nginx state=restarted
-
-    - name: chemist | install jq during development
-      sudo: yes
-      yum: name=jq state=latest
-      when: application_environment == "imdev"
-
-    - name: chemist | install httpie during development
-      sudo: yes
-      pip: name=httpie
-      when: application_environment == "imdev"

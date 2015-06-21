@@ -29,7 +29,11 @@ object TestAmazonASG {
       .withMinSize(1)
       .withInstances()
       .withLaunchConfigurationName(s"lc-$uuid")
-      .withTags(tags("type" -> "flask"))
+      .withTags(tags(
+        AwsTagKeys.name -> "flask",
+        AwsTagKeys.version -> oncue.svc.funnel.BuildInfo.version,
+        AwsTagKeys.qualifier -> "testing"
+      ))
   }
 
   def multiple: TestAmazonASG =

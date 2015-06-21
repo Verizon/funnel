@@ -10,9 +10,9 @@ import zeromq.Protocol
  * '+' character. Subsequently, we encode the ZMTP "mode" specilization
  * in this manner. Examples are:
  *
- * `zmtp+tcp`
  * `http`
- * `zmtp+ipc`
+ * `zeromq+tcp`
+ * `zeromq+ipc`
  *
  * Doing this ensures that if we add a different transport system at a later
  * date we did not totally occupy the TCP namespace w/r/t URI declerations.
@@ -29,7 +29,7 @@ object NetworkScheme {
     all.find(_.scheme == in.toLowerCase.trim)
 
   case class Zmtp(p: Protocol) extends NetworkScheme {
-    val scheme = s"zmtp+${p.toString}"
+    val scheme = s"zeromq+${p.toString}"
   }
   case object Http extends NetworkScheme {
     val scheme = "http"
