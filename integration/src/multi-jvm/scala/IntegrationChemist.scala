@@ -10,8 +10,8 @@ class IntegrationChemist extends Chemist[IntegrationPlatform]{
   import Scalaz._
   val log = Logger[IntegrationChemist]
 
-  def filterTargets(instances: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]] =
-    Applicative[ChemistK].point(instances)
+  def filterTargets(instances: Seq[(TargetID, Set[Target])]): ChemistK[(Seq[(TargetID, Set[Target])], Seq[(TargetID, Set[Target])])] =
+    Applicative[ChemistK].point((instances, Seq()))
 
   def init: ChemistK[Unit] = {
     log.info("Initilizing Chemist....")

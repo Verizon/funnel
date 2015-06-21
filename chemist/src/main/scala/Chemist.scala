@@ -83,6 +83,12 @@ trait Chemist[A <: Platform]{
     config.flatMapK(_.repository.historicalPlatformEvents)
 
   /**
+    * List the unmonitorable targets.
+    */
+  def unmonitorable: ChemistK[List[URI]] =
+    config.flatMapK(_.repository.unmonitorableTargets)
+
+  /**
    * List out the last 100 lifecycle events that this chemist has seen.
    */
   def repoHistory: ChemistK[Seq[RepoEvent]] =

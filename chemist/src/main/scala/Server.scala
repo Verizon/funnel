@@ -75,6 +75,8 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
   import Server._
   import metrics._
 
+  val repo = platform.config.repository
+
   private def json[A : EncodeJson](a: ChemistK[A]) =
     a(platform).attemptRun.fold(
       e => {
@@ -99,6 +101,9 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
 
     case GET(Path("/distribution")) =>
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
+
+    case GET(Path("/unmonitorable")) =>
+      json(chemist.unmonitorable)
 
     case GET(Path("/lifecycle/history")) =>
       GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
