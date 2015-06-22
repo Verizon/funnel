@@ -20,7 +20,7 @@ object Main {
     val monitoring = MonitoringServer.start(Monitoring.default, 5775)
 
     // this is the edge of the world and will just block until its stopped
-    Server.unsafeStart(chemist, aws)
+    Server.unsafeStart(new Server(chemist, aws))
 
     // if we reach these then the server process has stopped and we need
     // to cleanup the associated resources.
