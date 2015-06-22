@@ -75,8 +75,6 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
   import Server._
   import metrics._
 
-  val repo = platform.config.repository
-
   private def json[A : EncodeJson](a: ChemistK[A]) =
     a(platform).attemptRun.fold(
       e => {

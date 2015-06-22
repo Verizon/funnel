@@ -87,8 +87,8 @@ class StatefulRepository extends Repository {
   private val emptyMap: InstanceM = ==>>.empty
   val stateMaps = new Ref[StateM](==>>(Unknown -> emptyMap,
                                        Unmonitored -> emptyMap,
-    				       Unmonitorable -> emptyMap,
-    				       Assigned -> emptyMap,
+                                       Unmonitorable -> emptyMap,
+                                       Assigned -> emptyMap,
                                        Monitored -> emptyMap,
                                        Problematic -> emptyMap,
                                        DoubleAssigned -> emptyMap,
@@ -198,7 +198,10 @@ class StatefulRepository extends Repository {
         }
 
         case PlatformEvent.Unmonitorable(t) => {
-          Task(stateMaps.update(_.update(Unmonitorable, m => Some(m.insert(t.uri, StateChange(Problematic, Problematic, Terminated(t, System.currentTimeMillis)))))))
+          val msg = Terminated(t, System.currentTimeMillis)
+          val sc = StateChange(Problematic, Problematic, msg)
+          Task { stateMaps.update(_.update(Unmonitorable, m =>
+            Some(m.insert(t.uri, sc)))); () }(Chemist.serverPool)
         }
 
         case PlatformEvent.Problem(f, i, msg) => {

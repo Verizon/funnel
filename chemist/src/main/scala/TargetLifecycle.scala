@@ -68,31 +68,31 @@ object TargetLifecycle {
       override def toString = "Unmonitored"
     }
 
-    case object Unmonitorable extends TargetState(2) {
+    case object Unmonitorable extends TargetState(8) {
       override def toString = "Unmonitorable"
     }
 
-    case object Assigned extends TargetState(3) {
+    case object Assigned extends TargetState(2) {
       override def toString = "Assigned"
     }
 
-    case object Monitored extends TargetState(4) {
+    case object Monitored extends TargetState(3) {
       override def toString = "Monitored"
     }
 
-    case object DoubleAssigned extends TargetState(5) {
+    case object DoubleAssigned extends TargetState(4) {
       override def toString = "DoubleAssigned"
     }
 
-    case object Problematic extends TargetState(6) {
+    case object Problematic extends TargetState(7) {
       override def toString = "Exception"
     }
 
-    case object DoubleMonitored extends TargetState(7) {
+    case object DoubleMonitored extends TargetState(5) {
       override def toString = "DoubleMonitored"
     }
 
-    case object Fin extends TargetState(8) {
+    case object Fin extends TargetState(6) {
       override def toString = "Fin"
     }
 

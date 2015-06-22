@@ -128,8 +128,7 @@ trait Chemist[A <: Platform]{
     // filter out all the instances that are in private networks
     // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
     x  <- filterTargets(l)
-    z  = x._1
-    y  = x._2
+    (z, y)  = x
     _  = log.info(s"located ${z.length} instances that appear to be monitorable")
 
     // set the result to an in-memory list of "the world"
