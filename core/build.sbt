@@ -15,8 +15,6 @@ Custom.compilation
 
 scalacOptions += "-language:postfixOps"
 
-oncue.build.SieveKeys.sieves := Seq.empty
-
 libraryDependencies ++= Seq(
   "oncue.typelevel"   %% "shapeless-scalacheck" % "0.4.0" % "test",
   "org.scalaz.stream" %% "scalaz-stream"        % "0.7.1a",
