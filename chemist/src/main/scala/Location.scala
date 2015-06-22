@@ -3,9 +3,6 @@ package chemist
 
 import scalaz.{\/,-\/,\/-}
 import java.net.URI
-import org.http4s.Uri
-import org.http4s.Uri._
-import org.http4s.util.CaseInsensitiveString
 
 case class Location(
   host: String,
@@ -14,13 +11,7 @@ case class Location(
   protocol: String = "http",
   isPrivateNetwork: Boolean = false
 ) {
-  def asJavaURI(path: String = ""): URI =
-    new URI(protocol, null, host, port, s"/$path", null, null)
-  def asUri(path: String = ""): Uri =
-    Uri(scheme    = Some(CaseInsensitiveString(protocol)),
-        authority = Some(Authority(host = RegName(host),
-                                   port = Some(port))),
-        path      = s"/$path")
+  def asURI(path: String = ""): URI = new URI(protocol, null, host, port, s"/$path", null, null)
 }
 
 object Location {

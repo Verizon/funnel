@@ -1,13 +1,27 @@
 package funnel
 package chemist
 
+import unfiltered.request._
+import unfiltered.response._
+import unfiltered.netty._
 import argonaut._, Argonaut._
-import org.http4s._
-import org.http4s.argonaut._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scalaz.{\/,-\/,\/-}
 import journal.Logger
+
+object JsonRequest {
+  def apply[T](r: HttpRequest[T]) =
+    new ParseWrap(r, new Parse[HttpRequest[T]] {
+      def parse(req: HttpRequest[T]) = JsonParser.parse(Body.string(req))
+    })
+}
+
+object JsonResponse {
+  def apply[A: EncodeJson](a: A, params: PrettyParams = PrettyParams.nospace) =
+    JsonContent ~>
+      ResponseString(a.jencode.pretty(params))
+}
 
 object Server {
   private val log = Logger[Server.type]
@@ -41,83 +55,73 @@ object Server {
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
-    import org.http4s.server.staticcontent._
-    import org.http4s.server.blaze._
+    val p = this.getClass.getResource("/oncue/www/")
+    log.info(s"Setting web resource path to '$p'")
 
-    val p = resourceService(ResourceService.Config(
-      basePath = "/oncue/www",
-      executor = Chemist.serverPool,
-      // (sic)
-      cacheStartegy = MemoryCache()
-    ))
-    log.info(s"Setting web resource path to '${this.getClass.getResource("/oncue/www")}'")
-
-    BlazeBuilder.bindHttp(platform.config.network.port)
-      .mountService(Server(chemist, platform))
-      .mountService(p)
+    unfiltered.netty.Server
+      .http(platform.config.network.port, platform.config.network.host)
+      .resources(p, cacheSeconds = 3600)
+      .handler(Server(chemist, platform))
       .run
-      .awaitShutdown
   }
+}
 
-  def apply[U <: Platform](chemist: Chemist[U], platform: U) = {
-    import JSON._
-    import concurrent.duration._
-    import chemist.ChemistK
-    import metrics._
-    import org.http4s.server._
-    import org.http4s.dsl._
+@io.netty.channel.ChannelHandler.Sharable
+case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
+  import JSON._
+  import concurrent.duration._
+  import chemist.ChemistK
+  import Server._
+  import metrics._
 
-    def json[A : EncodeJson](a: ChemistK[A]) =
-      a(platform).attemptRun.fold(
-        e => {
-          log.error(s"Unable to process response: ${e.toString} - ${e.getMessage}")
-          e.printStackTrace
-          InternalServerError(e.getMessage.asJson)
-        },
-        o => Ok(o.asJson))
+  private def json[A : EncodeJson](a: ChemistK[A]) =
+    a(platform).attemptRun.fold(
+      e => {
+        log.error(s"Unable to process response: ${e.toString} - ${e.getMessage}")
+        e.printStackTrace
+        InternalServerError ~> JsonResponse(e.toString)
+      },
+      o => Ok ~> JsonResponse(o))
 
-    HttpService {
-      case GET -> Root =>
-        GetRoot.time(PermanentRedirect(Uri.uri("index.html")))
+  private def decode[A : DecodeJson](req: HttpRequest[Any])(f: A => ResponseFunction[Any]) =
+    JsonRequest(req).decodeEither[A].map(f).fold(fail => BadRequest ~> ResponseString(fail), identity)
 
-      case GET -> Root / "status" =>
-        GetStatus.time(Ok(Chemist.version.asJson))
+  def intent = {
+    case GET(Path("/")) =>
+      GetRoot.time(Redirect("index.html"))
 
-      case GET -> Root / "errors" =>
-        GetStatus.time(json(chemist.errors.map(_.toList)))
+    case GET(Path("/status")) =>
+      GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
-      case GET -> Root / "distribution" =>
-        GetDistribution.time(json(chemist.distribution.map(_.toList)))
+    case GET(Path("/errors")) =>
+      GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
-      case GET -> Root / "lifecycle" / "history" =>
-        GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
+    case GET(Path("/distribution")) =>
+      GetDistribution.time(json(chemist.distribution.map(_.toList)))
 
-      // the URI is needed internally, but does not make sense in the remote
-      // user-facing api, so here we just ditch it and return the states.
-      case GET -> Root / "lifecycle" / "states" =>
-        GetLifecycleStates.time(json(chemist.states.map(_.toList.map(_._2))))
+    case GET(Path("/lifecycle/history")) =>
+      GetLifecycleHistory.time(json(chemist.history.map(_.toList)))
 
-      case GET -> Root / "platform" / "history" =>
-        GetLifecycleHistory.time(json(chemist.platformHistory.map(_.toList)))
+    case GET(Path("/lifecycle/states")) =>
+      GetLifecycleStates.time(json(chemist.states.map(_.toList)))
 
-      case POST -> Root / "distribute" =>
-        PostDistribute.time(
-          NotImplemented("This feature is not avalible in this build. Sorry :-)".asJson))
+    case POST(Path("/distribute")) =>
+      PostDistribute.time(NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)"))
 
-      case POST -> Root / "bootstrap" =>
-        PostBootstrap.time(json(chemist.bootstrap))
+    case POST(Path("/bootstrap")) =>
+      PostBootstrap.time(json(chemist.bootstrap))
 
-      case GET -> Root / "shards" =>
-        GetShards.time(json(chemist.shards))
+    case GET(Path(Seg("shards" :: Nil))) =>
+      GetShards.time(json(chemist.shards))
 
-      case GET -> Root / "shards" / id =>
-        GetShardById.time(json(chemist.shard(FlaskID(id))))
+    case GET(Path(Seg("shards" :: id :: Nil))) =>
+      GetShardById.time(json(chemist.shard(FlaskID(id))))
 
-      case POST -> Root / "shards" / id / "exclude" =>
-        PostShardExclude.time(json(chemist.exclude(FlaskID(id))))
+    case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
+      PostShardExclude.time(json(chemist.exclude(FlaskID(id))))
 
-      case POST -> Root / "shards" / id / "include" =>
-        PostShardInclude.time(json(chemist.include(FlaskID(id))))
-    }
+    case POST(Path(Seg("shards" :: id :: "include" :: Nil))) =>
+      PostShardInclude.time(json(chemist.include(FlaskID(id))))
+
   }
 }

@@ -24,12 +24,12 @@ case class AwsInstance(
       qualifier = tags.get("funnel:target:qualifier") orElse d)
   }
 
-  def asURI: URI = location.asJavaURI()
+  def asURI: URI = location.asURI()
 
   def targets: Set[Target] =
     (for {
        a <- application
-     } yield Target.defaultResources.map(r => Target(a.toString, location.asJavaURI(r), location.isPrivateNetwork))
+     } yield Target.defaultResources.map(r => Target(a.toString, location.asURI(r), location.isPrivateNetwork))
     ).getOrElse(Set.empty[Target])
 
   def asFlask: Flask = Flask(FlaskID(id), location, telemetryLocation)

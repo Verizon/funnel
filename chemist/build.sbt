@@ -22,9 +22,6 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 """
 
-
-resolvers ++= Seq(Resolver.sonatypeRepo("releases"), Resolver.sonatypeRepo("snapshots"))
-
 libraryDependencies ++= Seq(
   "intelmedia.ws.common"    %% "logging-s3"              % "10.+",
   "oncue.svc.knobs"         %% "core"                    % V.knobs,

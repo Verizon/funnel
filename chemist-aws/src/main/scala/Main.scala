@@ -25,6 +25,6 @@ object Main {
     // if we reach these then the server process has stopped and we need
     // to cleanup the associated resources.
     monitoring.stop()
-    aws.config.http.shutdown.run
+    dispatch.Http.shutdown()
   }
 }

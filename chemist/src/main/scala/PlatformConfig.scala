@@ -1,7 +1,7 @@
 package funnel
 package chemist
 
-import org.http4s.client.Client
+import dispatch.Http
 
 trait PlatformConfig {
   def resources: List[String]
@@ -10,5 +10,5 @@ trait PlatformConfig {
   def repository: Repository
   def sharder: Sharder
   def remoteFlask: RemoteFlask
-  def http: Client
+  def http: Http
 }

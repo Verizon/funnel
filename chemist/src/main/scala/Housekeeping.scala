@@ -35,10 +35,10 @@ object Housekeeping {
     import argonaut._, Argonaut._, JSON._, HJSON._
     import dispatch._, Defaults._
 
-    val a = location.asURI(path = "mirror/sources")
-    val req = Task.delay(url(a.toString)) <* Task.delay(log.debug(s"requesting assigned targets from $a"))
+    val a = location.asURI(path = "mirror/sources").toString
+    val req = Task.delay(Uri.fromString(a)) <* Task.delay(log.debug(s"requesting assigned targets from $a"))
     req flatMap { b =>
-      fromScalaFuture(http(b OK as.String)).map { c =>
+      http(b.as[String]).map { c =>
         Parse.decodeOption[List[Cluster]](c
         ).toList.flatMap(identity
         ).foldLeft(Set.empty[Target]){ (a,b) =>

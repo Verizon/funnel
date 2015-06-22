@@ -42,8 +42,7 @@ object JSON {
   implicit val SnapshotWithFlaskToJson: EncodeJson[(Flask, Map[ClusterName, List[URI]])] =
     encodeClusterPairs[Flask]
 
-  implicit val SnapshotWithFlaskIDToJson: EncodeJson[(FlaskID, Map[ClusterName, List[URI]])] =
-    encodeClusterPairs[FlaskID]
+  implicit val locationToJson: EncodeJson[Location] = implicitly[EncodeJson[URI]].contramap[Location](_.asURI(""))
 
   /**
    * {
@@ -141,7 +140,7 @@ object JSON {
     EncodeJson { nf =>
       ("type" := "NewFlask") ->:
       ("flask" := nf.flask.id) ->:
-      ("location" := nf.flask.location.asJavaURI()) ->:
+      ("location" := nf.flask.location.asURI()) ->:
       jEmptyObject
     }
 

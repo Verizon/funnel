@@ -3,7 +3,6 @@ package chemist
 
 import scalaz.stream.async
 import scalaz.stream.async.mutable.Signal
-import org.http4s.client._
 
 class TestConfig extends PlatformConfig {
   val resources: List[String] = List("stream/previous")
@@ -11,6 +10,6 @@ class TestConfig extends PlatformConfig {
   val discovery: Discovery = new TestDiscovery
   val repository: Repository = new StatefulRepository
   val remoteFlask: RemoteFlask = LoggingRemote
-  def http: Client = ???
+  def http: dispatch.Http = ???
   val sharder: funnel.chemist.Sharder = EvenSharding
 }

@@ -16,6 +16,7 @@ trait ArbitraryLifecycle {
   import TargetState._
 
   implicit val arbitraryURI: Arbitrary[URI] = Arbitrary(Gen.const(new URI("http://localhost/")))
+
   implicit val arbitraryState: Arbitrary[TargetState] = Arbitrary(Gen.oneOf(
     Unknown, Unmonitored, Assigned, Monitored, DoubleAssigned, DoubleMonitored, Fin))
 
@@ -46,4 +47,3 @@ object LifecycleSpec extends Properties("Lifecycle") with ArbitraryLifecycle {
     (t as true).run
   }
 }
-

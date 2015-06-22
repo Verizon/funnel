@@ -26,9 +26,7 @@ object LoggingRemote extends RemoteFlask {
 
 }
 
-import org.http4s.client.Client
-
-class HttpFlask(http: Client, repo: Repository, signal: Signal[Boolean]) extends RemoteFlask {
+class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) extends RemoteFlask {
   import FlaskCommand._
 
   private lazy val log = Logger[HttpFlask]
@@ -60,15 +58,11 @@ class HttpFlask(http: Client, repo: Repository, signal: Signal[Boolean]) extends
       unmonitor(flask.location, targets).void
   }
 
-  import org.http4s.argonaut._
-  import org.http4s.Request
-  import org.http4s.Method
-
-
   /**
-   * Touch the network and do the I/O using HTTP.
+   * Touch the network and do the I/O using Dispatch.
    */
   private def monitor(to: Location, targets: Seq[Target]): Task[String] = {
+    import dispatch._, Defaults._
     import argonaut._, Argonaut._
     import JSON.ClustersToJSON
 
@@ -77,19 +71,17 @@ class HttpFlask(http: Client, repo: Repository, signal: Signal[Boolean]) extends
     val payload: Map[ClusterName, List[URI]] =
       targets.groupBy(_.cluster).mapValues(_.map(_.uri).toList)
 
-    val uri = to.asUri(path = "mirror")
+    val uri = to.asURI(path = "mirror")
 
-    for {
-      req <- Request(uri = uri, method = Method.POST) withBody payload.toList.asJson
-      _   <- Task.delay(log.debug(s"submitting to $uri: ${payload.toList.asJson.nospaces}"))
-      res <- http.prepAs[String](req)
-    } yield res
+    val req = Task.delay(url(uri.toString) << payload.toList.asJson.nospaces) <* Task.delay(log.debug(s"submitting to $uri: $payload"))
+    req.flatMap(r => fromScalaFuture(http(r OK as.String)))
   }
 
   /**
-   * Touch the network and do the I/O using HTTP.
+   * Touch the network and do the I/O using Dispatch.
    */
   private def unmonitor(to: Location, targets: Seq[Target]): Task[String] = {
+    import dispatch._, Defaults._
     import argonaut._, Argonaut._
     import JSON.ClustersToJSON
 
@@ -98,13 +90,10 @@ class HttpFlask(http: Client, repo: Repository, signal: Signal[Boolean]) extends
     val payload: Map[ClusterName, List[URI]] =
       targets.groupBy(_.cluster).mapValues(_.map(_.uri).toList)
 
-    val uri = to.asUri(path = "discard")
+    val uri = to.asURI(path = "discard")
 
-    for {
-      req <- Request(uri = uri, method = Method.POST) withBody payload.toList.asJson
-      _   <- Task.delay(log.debug(s"submitting to $uri: ${payload.toList.asJson.nospaces}"))
-      res <- http.prepAs[String](req)
-    } yield res
+    val req = Task.delay(url(uri.toString) << payload.toList.asJson.nospaces) <* Task.delay(log.debug(s"submitting to $uri: $payload"))
+    req.flatMap(r => fromScalaFuture(http(r OK as.String)))
   }
 
   /**
@@ -127,9 +116,9 @@ class HttpFlask(http: Client, repo: Repository, signal: Signal[Boolean]) extends
 
     import telemetry.Telemetry.telemetrySubscribeSocket
 
-    log.info(s"attempting to monitor telemetry on ${flask.telemetry.asJavaURI()}")
+    log.info(s"attempting to monitor telemetry on ${flask.telemetry.asURI()}")
     val lc: Actor[Either3[URI, URI, (URI,String)]] = lifecycle.contramap(actionsFromLifecycle(flask.id))
-    telemetrySubscribeSocket(flask.telemetry.asJavaURI(), signal, keys, errors, lc)
+    telemetrySubscribeSocket(flask.telemetry.asURI(), signal, keys, errors, lc)
   }
 
 }
