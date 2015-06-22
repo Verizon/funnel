@@ -93,7 +93,7 @@ class AwsDiscovery(
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
-  private def lookupOne(id: String): Task[AwsInstance] = {
+  protected def lookupOne(id: String): Task[AwsInstance] = {
     lookupMany(Seq(id)).flatMap {
       _.filter(_.id == id).headOption match {
         case None => Task.fail(InstanceNotFoundException(id))
@@ -106,7 +106,7 @@ class AwsDiscovery(
    * Lookup the `Instance` metadata for a set of `InstanceID`.
    * @see funnel.chemist.AwsDiscovery.lookupOne
    */
-  private def lookupMany(ids: Seq[String]): Task[Seq[AwsInstance]] = {
+  protected def lookupMany(ids: Seq[String]): Task[Seq[AwsInstance]] = {
     def lookInCache: (Seq[String],Seq[AwsInstance]) =
       ids.map(id => id -> cache.get(id)
         ).foldLeft[(Seq[String],Seq[AwsInstance])]((Seq.empty, Seq.empty)){ (a,b) =>

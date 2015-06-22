@@ -16,9 +16,9 @@ import scalaz.stream.async.mutable.Signal
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 import funnel.aws._
 
-class AwsChemist extends Chemist[Aws]{
+class AwsChemist[A <: Aws] extends Chemist[A]{
 
-  val log = Logger[this.type]
+  private val log = Logger[AwsChemist[_]]
 
   /**
    * used to stop our sockets listening to telemetry on all the flasks

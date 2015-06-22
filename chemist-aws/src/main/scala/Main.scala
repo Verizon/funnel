@@ -8,13 +8,13 @@ import http.MonitoringServer
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val chemist = new AwsChemist
+    val chemist = new AwsChemist[DefaultAws]
 
-    val aws = new Aws {
+    val aws = new DefaultAws {
       val config = (for {
         a <- defaultKnobs
         b <- knobs.aws.config
-      } yield Config.readConfig(a ++ b)).run
+      } yield AwsConfig.readConfig(a ++ b)).run
     }
 
     val monitoring = MonitoringServer.start(Monitoring.default, 5775)
