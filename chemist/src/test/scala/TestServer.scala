@@ -12,7 +12,7 @@ object TestServer {
 
     val monitoring = http.MonitoringServer.start(Monitoring.default, 5775)
 
-    Server.unsafeStart(core, platform)
+    Server.unsafeStart(new Server(core, platform))
 
     monitoring.stop()
     dispatch.Http.shutdown()
