@@ -6,7 +6,6 @@ section: "getting-started"
 
 # Getting Started: Visualization
 
-Funnel metrics are visible from the Kibana dashboards. These can be accessed here from [funnel.ops.svc.oncue.com](https://funnel.ops.svc.oncue.com). You will require a DEV 2-way SSL certificate installed and configured in your browser. All environments should use the DEV certificate for accessing their metrics (this will be revised in future to use a specilized tooling CA).
+*Funnel* metrics are visible from the Kibana dashboards, and alerts can be set using *Gong*. These can be accessed via the on-premmis portal from [funnel.oncue.verizon.net](https://funnel.oncue.verizon.net). 
 
-If you are new to Kibana, please review the [Getting Started](http://www.elasticsearch.org/guide/en/kibana/3.0/) guide on the ElasticSearch site.
-
+If you are new to Kibana, please review the [Getting Started](https://www.elastic.co/guide/en/kibana/) guide on the ElasticSearch site.

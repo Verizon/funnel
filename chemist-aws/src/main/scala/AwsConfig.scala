@@ -41,7 +41,7 @@ case class AwsConfig(
   val remoteFlask = new HttpFlask(http, repository, signal)
 }
 
-object Config {
+object AwsConfig {
   def readConfig(cfg: Config): AwsConfig = {
     val topic     = cfg.require[String]("chemist.sns-topic-name")
     val queue     = cfg.require[String]("chemist.sqs-queue-name")
