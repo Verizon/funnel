@@ -59,6 +59,7 @@ trait Repository {
   def mergeExistingDistribution(d: Distribution): Task[Distribution]
   def assignedTargets(flask: FlaskID): Task[Set[Target]]
   def unassignedTargets: Task[Set[Target]]
+  def unmonitorableTargets: Task[List[URI]]
 
   def repoCommands: Process[Task, RepoCommand]
 }
@@ -86,6 +87,7 @@ class StatefulRepository extends Repository {
   private val emptyMap: InstanceM = ==>>.empty
   val stateMaps = new Ref[StateM](==>>(Unknown -> emptyMap,
                                        Unmonitored -> emptyMap,
+                                       Unmonitorable -> emptyMap,
                                        Assigned -> emptyMap,
                                        Monitored -> emptyMap,
                                        Problematic -> emptyMap,
@@ -127,6 +129,9 @@ class StatefulRepository extends Repository {
 
   def unassignedTargets: Task[Set[Target]] =
     Task(stateMaps.get.lookup(TargetState.Unmonitored).fold(Set.empty[Target])(m => m.values.map(_.msg.target).toSet))(Chemist.serverPool)
+
+  def unmonitorableTargets: Task[List[URI]] =
+    Task(stateMaps.get.lookup(TargetState.Unmonitorable).fold(List.empty[URI])(m => m.values.map(_.msg.target.uri)))(Chemist.serverPool)
 
   def assignedTargets(flask: FlaskID): Task[Set[Target]] =
     D.get.lookup(flask) match {
@@ -191,6 +196,14 @@ class StatefulRepository extends Repository {
             Task.now(())
           }
         }
+
+        case PlatformEvent.Unmonitorable(t) => {
+          val msg = Terminated(t, System.currentTimeMillis)
+          val sc = StateChange(Problematic, Problematic, msg)
+          Task { stateMaps.update(_.update(Unmonitorable, m =>
+            Some(m.insert(t.uri, sc)))); () }(Chemist.serverPool)
+        }
+
         case PlatformEvent.Problem(f, i, msg) => {
           log.error(s"platformHandler -- $i no exception from  $f: $msg")
           val target = targets.get.lookup(i)

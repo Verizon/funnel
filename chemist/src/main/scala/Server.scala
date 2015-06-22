@@ -101,6 +101,9 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
     case GET(Path("/distribution")) =>
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
 
+    case GET(Path("/unmonitorable")) =>
+      json(chemist.unmonitorable)
+
     case GET(Path("/lifecycle/history")) =>
       GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
 
