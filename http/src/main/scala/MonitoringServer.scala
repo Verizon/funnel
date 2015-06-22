@@ -103,18 +103,25 @@ class MonitoringServer(M: Monitoring, port: Int) {
   protected def handleAddMirroringURLs(M: Monitoring, req: HttpExchange): Unit = {
     import JSON._; import argonaut.Parse;
 
+    M.log.debug(s"handleAddMirroringURLs($M, $req)")
+
     post(req){ json =>
+      M.log.debug(s"POST: $json")
       Parse.decodeEither[List[Cluster]](json).fold(
-        error => flush(400, error.toString, req),
+        error => {
+          M.log.error(s"Error 400: $error")
+          flush(400, error.toString, req)
+        },
         blist => {
-          val cs: List[Command] = blist.flatMap(b => b.urls.map(u => Mirror(new URI(u), b.label)))
+          val cs: List[Command] =
+            blist.flatMap(b => b.urls.map(u => Mirror(new URI(u), b.label)))
 
           M.log.debug(s"recieved instruction to mirror '${cs.mkString(",")}'")
 
           val p0: Process[Task, Command] = Process.emitAll(cs)
           val p: Process[Task, Unit] = p0.to(M.mirroringQueue.enqueue)
           p.run.run
-
+          M.log.debug(s"added to mirroring queue")
           flush(202, Array.empty[Byte], req)
         }
       )
@@ -161,7 +168,10 @@ class MonitoringServer(M: Monitoring, port: Int) {
       // as the payloads here will be small, lets just turn it into a string
       val json = Source.fromInputStream(req.getRequestBody).mkString
       f(json)
-    } else flush(405, "Request method not allowed.", req)
+    } else {
+      M.log.error("405 - Request method not allowed.")
+      flush(405, "Request method not allowed.", req)
+    }
   }
 
   private def flush(status: Int, body: String, req: HttpExchange): Unit =

@@ -48,7 +48,12 @@ class HttpFlask(http: Client, repo: Repository, signal: Signal[Boolean]) extends
   def command(c: FlaskCommand): Task[Unit] = c match {
     case Telemetry(flask) =>
       val t = monitorTelemetry(flask, keys, errors, lifecycle, signal)
-      Task.delay(t.runAsync(_ => ()))
+      Task.delay(t.runAsync(_.fold(
+        e => {
+          log.error(e.getMessage)
+          e.printStackTrace
+        },
+        _ => log.info("Telemetry terminated"))))
     case Monitor(flask, targets) =>
       monitor(flask.location, targets).void
     case Unmonitor(flask, targets) =>
@@ -57,6 +62,8 @@ class HttpFlask(http: Client, repo: Repository, signal: Signal[Boolean]) extends
 
   import org.http4s.argonaut._
   import org.http4s.Request
+  import org.http4s.Method
+
 
   /**
    * Touch the network and do the I/O using HTTP.
@@ -73,8 +80,8 @@ class HttpFlask(http: Client, repo: Repository, signal: Signal[Boolean]) extends
     val uri = to.asUri(path = "mirror")
 
     for {
-      req <- Request(uri = uri) withBody payload.toList.asJson
-      _   <- Task.delay(log.debug(s"submitting to $uri: $payload"))
+      req <- Request(uri = uri, method = Method.POST) withBody payload.toList.asJson
+      _   <- Task.delay(log.debug(s"submitting to $uri: ${payload.toList.asJson.nospaces}"))
       res <- http.prepAs[String](req)
     } yield res
   }
@@ -94,8 +101,8 @@ class HttpFlask(http: Client, repo: Repository, signal: Signal[Boolean]) extends
     val uri = to.asUri(path = "discard")
 
     for {
-      req <- Request(uri = uri) withBody payload.toList.asJson
-      _   <- Task.delay(log.debug(s"submitting to $uri: $payload"))
+      req <- Request(uri = uri, method = Method.POST) withBody payload.toList.asJson
+      _   <- Task.delay(log.debug(s"submitting to $uri: ${payload.toList.asJson.nospaces}"))
       res <- http.prepAs[String](req)
     } yield res
   }

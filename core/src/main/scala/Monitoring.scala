@@ -74,7 +74,7 @@ trait Monitoring {
     for {
       _ <- proc.evalMap((o: O) => for {
         b <- exists(key)
-        _ <- if (b) Task.fork(update(key, o))(defaultPool)
+        _ <- if (b) Task.delay(Task.fork(update(key, o))(defaultPool).runAsync(_ => ()))
              else Task(topic[O,O](key)(Buffers.ignoreTime(process1.id)))(defaultPool)
       } yield ()).run
     } yield key
@@ -175,12 +175,21 @@ trait Monitoring {
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
-            if (urls.contains(source)) Process.halt // skip it, alread running
-            else Process.eval_(modifyActive(cluster, _ + source) >> Q.enqueueOne(Monitored(source))
-              ) ++ received.onComplete(Process.eval_(Q.enqueueOne(Problem(source, ""))))
+            if (urls.contains(source)) {
+              log.info(s"Skipping $source, already mirrored")
+              Process.halt
+            }
+            else Process.eval_ {
+              modifyActive(cluster, _ + source) >>
+              Q.enqueueOne(Monitored(source)) >>
+              Task.delay(log.info(s"Enqueued monitored $source on telemetry queue"))
+            } ++ received.onComplete(Process.eval_ {
+              Q.enqueueOne(Problem(source, "")) >>
+              Task.delay(log.info(s"Enqueued problem with $source on telemetry queue"))
+            })
           }
 
-          logErrors(Task.fork(receivedIdempotent.run)(defaultPool))
+          Task.delay(logErrors(Task.fork(receivedIdempotent.run)(defaultPool)).runAsync(_ => ()))
         }
         case Discard(source) => for {
           _ <- Task.delay { log.info(s"Attempting to stop monitoring $source...") }

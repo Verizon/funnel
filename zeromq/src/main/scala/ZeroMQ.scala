@@ -129,14 +129,13 @@ object ZeroMQ {
    *
    */
   private[zeromq] def haltWhen[O](
-    kill: Process[Task,Boolean])(
+    alive: Process[Task,Boolean])(
     input: Process[Task,O]
   ): Process[Task,O] =
-    kill.zip(input).takeWhile(_._1).map(_._2)
+    alive.zip(input).takeWhile(_._1).map(_._2)
 
   /**
    *
-
    */
   private[zeromq] def resource[F[_],R,O](
     acquire: F[R])(
