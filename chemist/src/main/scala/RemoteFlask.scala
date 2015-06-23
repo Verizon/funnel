@@ -58,6 +58,9 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
       unmonitor(flask.location, targets).void
   }
 
+  private def flaskTemplate(path: String) =
+    LocationTemplate(s"http://@host:@port/$path")
+
   /**
    * Touch the network and do the I/O using Dispatch.
    */
@@ -71,7 +74,7 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
     val payload: Map[ClusterName, List[URI]] =
       targets.groupBy(_.cluster).mapValues(_.map(_.uri).toList)
 
-    val uri = to.asURI(path = "mirror")
+    val uri = to.uriFromTemplate(flaskTemplate(path = "mirror"))
 
     val req = Task.delay(url(uri.toString) << payload.toList.asJson.nospaces) <* Task.delay(log.debug(s"submitting to $uri: $payload"))
     req.flatMap(r => fromScalaFuture(http(r OK as.String)))
@@ -90,7 +93,7 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
     val payload: Map[ClusterName, List[URI]] =
       targets.groupBy(_.cluster).mapValues(_.map(_.uri).toList)
 
-    val uri = to.asURI(path = "discard")
+    val uri = to.uriFromTemplate(flaskTemplate(path = "discard"))
 
     val req = Task.delay(url(uri.toString) << payload.toList.asJson.nospaces) <* Task.delay(log.debug(s"submitting to $uri: $payload"))
     req.flatMap(r => fromScalaFuture(http(r OK as.String)))
@@ -116,9 +119,9 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
 
     import telemetry.Telemetry.telemetrySubscribeSocket
 
-    log.info(s"attempting to monitor telemetry on ${flask.telemetry.asURI()}")
+    log.info(s"attempting to connect to 0mq telemetry channel ${flask.telemetry.uri}")
     val lc: Actor[Either3[URI, URI, (URI,String)]] = lifecycle.contramap(actionsFromLifecycle(flask.id))
-    telemetrySubscribeSocket(flask.telemetry.asURI(), signal, keys, errors, lc)
+    telemetrySubscribeSocket(flask.telemetry.uri, signal, keys, errors, lc)
   }
 
 }

@@ -46,6 +46,7 @@ trait Chemist[A <: Platform]{
       cfg <- config
       a <- cfg.repository.distribution.map(Sharding.shards).liftKleisli
     } yield a.toList.flatMap(id => cfg.repository.flask(id)).toSet
+
   /**
    * display all known node information about a specific shard
    */
@@ -56,12 +57,11 @@ trait Chemist[A <: Platform]{
    * Instruct flask to specifcally take a given shard out of service and
    * repartiion its given load to the rest of the system.
    */
-  def exclude(shard: FlaskID): ChemistK[Unit] = {
-      for {
-        cfg <- config
-        _ <- cfg.repository.platformHandler(PlatformEvent.TerminatedFlask(shard)).liftKleisli
-      } yield ()
-    }
+  def exclude(shard: FlaskID): ChemistK[Unit] =
+    for {
+      cfg <- config
+      _ <- cfg.repository.platformHandler(PlatformEvent.TerminatedFlask(shard)).liftKleisli
+    } yield ()
 
   /**
    * Instruct flask to specifcally "launch" a given shard and
@@ -83,6 +83,12 @@ trait Chemist[A <: Platform]{
     config.flatMapK(_.repository.historicalPlatformEvents)
 
   /**
+    * List the unmonitorable targets.
+    */
+  def unmonitorable: ChemistK[List[URI]] =
+    config.flatMapK(_.repository.unmonitorableTargets)
+
+  /**
    * List out the last 100 lifecycle events that this chemist has seen.
    */
   def repoHistory: ChemistK[Seq[RepoEvent]] =
@@ -100,10 +106,6 @@ trait Chemist[A <: Platform]{
   def errors: ChemistK[Seq[Error]] =
     config.flatMapK(_.repository.errors)
 
-  /**
-   * Force chemist to re-read the world. Useful if for some reason
-   * Chemist gets into a weird state at runtime.
-   */
   /**
    * Force chemist to re-read the world from AWS. Useful if for some reason
    * Chemist gets into a weird state at runtime.
@@ -125,13 +127,18 @@ trait Chemist[A <: Platform]{
 
     // filter out all the instances that are in private networks
     // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
-    z  <- filterTargets(l)
+    x  <- filterTargets(l)
+    (z, y)  = x
     _  = log.info(s"located ${z.length} instances that appear to be monitorable")
 
     // set the result to an in-memory list of "the world"
     targets = z.flatMap { case (id,targets) => targets.toSeq.map(PlatformEvent.NewTarget) } //the fact that I'm throwing ID away here is suspect
     _ <- targets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
     _  = log.info("added instances to the repository...")
+
+    um = y.flatMap { case (id,um) => um.toSeq.map(PlatformEvent.Unmonitorable) }
+    _ <- um.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
+    _  = log.info("added unmonitorables to the repository...")
 
     // ask those flasks for their current work and yield a `Distribution`
     d <- Housekeeping.gatherAssignedTargets(f)(cfg.http).liftKleisli
@@ -150,7 +157,7 @@ trait Chemist[A <: Platform]{
   /**
    * Platform specific way of filtering instances we can discover but we might not want to monitor
    */
-  def filterTargets(targets: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]]
+  def filterTargets(targets: Seq[(TargetID, Set[Target])]): ChemistK[(Seq[(TargetID, Set[Target])], Seq[(TargetID, Set[Target])])]
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources

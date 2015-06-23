@@ -68,6 +68,10 @@ object TargetLifecycle {
       override def toString = "Unmonitored"
     }
 
+    case object Unmonitorable extends TargetState(8) {
+      override def toString = "Unmonitorable"
+    }
+
     case object Assigned extends TargetState(2) {
       override def toString = "Assigned"
     }

@@ -3,29 +3,58 @@ package chemist
 
 import scalaz.{\/,-\/,\/-}
 import java.net.URI
+import LocationIntent._
 
+/**
+ * Represents the combination of scheme, host and port
+ * as a single unit. It is entirely feasible that a single
+ * machine host has multiple `Location` instances. Moreover,
+ * a `Location` has a minimum of one URI, which represents
+ * the canonical network location of this specific scheme/host/port
+ * which can be used for network validation etc. In addition,
+ * a `Location` might have a selection of templated path URIs, but
+ * this is entirely optional.
+ */
 case class Location(
   host: String,
   port: Int,
   datacenter: String,
-  protocol: String = "http",
-  isPrivateNetwork: Boolean = false
-) {
-  def asURI(path: String = ""): URI = new URI(protocol, null, host, port, s"/$path", null, null)
+  protocol: NetworkScheme = NetworkScheme.Http,
+  isPrivateNetwork: Boolean = true,
+  intent: LocationIntent,
+  templates: Seq[LocationTemplate]
+){
+  def templatedPathURIs: Seq[URI] =
+    templates.map(uriFromTemplate)
+
+  def uri: URI =
+    URI.create(s"${protocol.toString}://$host:$port")
+
+  def uriFromTemplate(t: LocationTemplate): URI =
+    URI.create(t.build(
+      "@protocol" -> protocol.scheme,
+      "@host"     -> host,
+      "@port"     -> port.toString
+    ))
 }
 
 object Location {
-  def localhost: Location =
-    Location(
-      host = "127.0.0.1",
-      port = 5775,
-      datacenter = "local",
-      protocol = "http")
-
-  def telemetryLocalhost: Location =
-    Location(
-      host = "127.0.0.1",
-      port = 7390,
-      datacenter = "local",
-      protocol = "tcp")
+  def fromURI(
+    uri: URI,
+    dc: String,
+    int: LocationIntent,
+    tmp: Map[NetworkScheme, Seq[LocationTemplate]]
+  ): Option[Location] =
+    for {
+      a <- Option(uri.getHost)
+      b <- Option(uri.getPort) if b > -1
+      c <- NetworkScheme.fromString(uri.getScheme)
+      d <- tmp.get(c).orElse(Some(Seq.empty[LocationTemplate]))
+    } yield Location(
+      host = a,
+      port = b,
+      protocol = c,
+      datacenter = dc,
+      intent = int,
+      templates = d)
 }

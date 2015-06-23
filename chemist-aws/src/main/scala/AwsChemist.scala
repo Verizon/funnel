@@ -16,9 +16,9 @@ import scalaz.stream.async.mutable.Signal
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 import funnel.aws._
 
-class AwsChemist extends Chemist[Aws]{
+class AwsChemist[A <: Aws] extends Chemist[A]{
 
-  val log = Logger[this.type]
+  private val log = Logger[AwsChemist[_]]
 
   /**
    * used to stop our sockets listening to telemetry on all the flasks
@@ -31,7 +31,7 @@ class AwsChemist extends Chemist[Aws]{
    * if the target is on a public network address, include it
    * otherwise, wtf, how did we arrive here - dont monitor it.
    */
-  def filterTargets(instances: Seq[(TargetID, Set[Target])]): ChemistK[Seq[(TargetID, Set[Target])]] =
+  def filterTargets(instances: Seq[(TargetID, Set[Target])]): ChemistK[(Seq[(TargetID, Set[Target])], Seq[(TargetID, Set[Target])])] =
     config.map { cfg =>
       instances.map {
         case (id, targets) =>
@@ -40,7 +40,7 @@ class AwsChemist extends Chemist[Aws]{
             case b if (!b.isPrivateNetwork) => b
 
           }
-      }.filter(_._2.nonEmpty)
+      }.partition(_._2.nonEmpty)
     }
 
   /**
@@ -64,7 +64,7 @@ class AwsChemist extends Chemist[Aws]{
 
       // now the queues are setup with the right permissions,
       // start the lifecycle listener
-      _ <- Lifecycle.run(cfg.queue.topicName, cfg.resources, signalOf(true)
+      _ <- Lifecycle.run(cfg.queue.topicName, signalOf(true)
             )(cfg.repository, cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery).liftKleisli
       _  = log.debug("lifecycle process started")
 

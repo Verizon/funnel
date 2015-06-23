@@ -51,13 +51,13 @@ object Publish {
     host: String = defaultTcpSocket,
     signal: Signal[Boolean] = alive,
     instance: Monitoring = Monitoring.default
-  ): Unit = use(Endpoint(push &&& connect, new URI(s"tcp://$host")))(signal)(instance)
+  ): Unit = use(Endpoint(push &&& connect, new URI(s"zeromq+tcp://$host")))(signal)(instance)
 
   def toUnixSocket(
     path: String = defaultUnixSocket,
     signal: Signal[Boolean] = alive,
     instance: Monitoring = Monitoring.default
-  ): Unit = use(Endpoint(push &&& connect, new URI(s"ipc://$path")))(signal)(instance)
+  ): Unit = use(Endpoint(push &&& connect, new URI(s"zeromq+ipc://$path")))(signal)(instance)
 
   /////////////////////////////// INTERNALS ///////////////////////////////////
 
@@ -67,7 +67,6 @@ object Publish {
 
   def fromMonitoring(M: Monitoring)(implicit log: String => Unit): Process[Task, Datapoint[Any]] =
     Monitoring.subscribe(M)(Key.StartsWith("previous"))
-
 
   implicit val transportDatapoint: Transportable[Datapoint[Any]] = Transportable { d =>
     val window = d.key.name.takeWhile(_ != '/')

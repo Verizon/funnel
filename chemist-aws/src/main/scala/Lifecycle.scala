@@ -50,14 +50,14 @@ object Lifecycle {
    * we then pass the `AutoScalingEvent` to the `interpreter` function for further processing.
    * In the event the message does not parse to an `AutoScalingEvent`,
    */
-  def stream(queueName: String, resources: Seq[String], signal: Signal[Boolean]
+  def stream(queueName: String, signal: Signal[Boolean]
     )(sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Process[Task, Throwable \/ Seq[PlatformEvent]] = {
       // adding this function to ensure that parse errors do not get
       // lifted into errors that will later fail the stream, and that
       // any errors in the interpreter are properly handled.
       def go(m: Message): Task[Throwable \/ Seq[PlatformEvent]] =
-        parseMessage(m).traverseU(interpreter(_, resources, signal)(asg, ec2, dsc)).handle {
+        parseMessage(m).traverseU(interpreter(_, signal)(asg, ec2, dsc)).handle {
           case MessageParseException(err) =>
             log.warn(s"Unexpected recoverable error when parsing lifecycle message: $err")
             noop
@@ -92,7 +92,7 @@ object Lifecycle {
   def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] =
     Actor[(URI, Set[Key[Any]])]{ case (fl, keys) => repo.keySink(fl, keys).run }(Strategy.Executor(Chemist.serverPool))
 
-  def interpreter(e: AutoScalingEvent, resources: Seq[String], signal: Signal[Boolean]
+  def interpreter(e: AutoScalingEvent, signal: Signal[Boolean]
     )(asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Seq[PlatformEvent]] = {
 
@@ -116,11 +116,12 @@ object Lifecycle {
       (for {
         n <- e.metadata.get("asg-name").map(Task.now).getOrElse(Task.fail(NotAFlaskException(e)))
         a <- ASG.lookupByName(n)(asg)
-        _  = log.debug(s"Found ASG from the EC2 lookup: $a")
+        _  = log.debug(s"Lifecycle.isFlask: found ASG from the EC2 lookup: $a")
         r <- a.getTags.asScala.find(t =>
-               t.getKey.trim == "type" &&
+               t.getKey.trim == AwsTagKeys.name &&
                t.getValue.trim.startsWith("flask")
              ).fold(Task.now(false))(_ => Task.now(true))
+        _  = log.debug(s"Lifecycle.isFlask, r = $r")
       } yield r).or(Task.now(false))
     }
 
@@ -154,10 +155,10 @@ object Lifecycle {
    * init method for chemist so that the SQS/SNS lifecycle is started from the edge of
    * the world.
    */
-  def run(queueName: String, resources: Seq[String], signal: Signal[Boolean]
+  def run(queueName: String, signal: Signal[Boolean]
     )(repo: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
   ): Task[Unit] = {
-    val ourWorld = stream(queueName, resources, signal)(sqs,asg,ec2,dsc) flatMap logErrors to Process.constant(repo.platformHandler _)
+    val ourWorld = stream(queueName, signal)(sqs,asg,ec2,dsc) flatMap logErrors to Process.constant(repo.platformHandler _)
     ourWorld.run.onFinish(_ => signal.set(false))
   }
 }

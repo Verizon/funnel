@@ -15,10 +15,11 @@ trait ArbitraryLifecycle {
   import shapeless.contrib.scalacheck._
   import TargetState._
 
-  implicit val arbitraryURI: Arbitrary[URI] = Arbitrary(Gen.const(new URI("http://localhost/")))
+  implicit val arbitraryURI: Arbitrary[URI] =
+    Arbitrary(Gen.const(new URI("http://localhost/")))
 
-  implicit val arbitraryState: Arbitrary[TargetState] = Arbitrary(Gen.oneOf(
-    Unknown, Unmonitored, Assigned, Monitored, DoubleAssigned, DoubleMonitored, Fin))
+  implicit val arbitraryState: Arbitrary[TargetState] =
+    Arbitrary(Gen.oneOf(Unknown, Unmonitored, Assigned, Monitored, DoubleAssigned, DoubleMonitored, Fin))
 
   // Why does Shapeless not figure this out?
   implicit val target =

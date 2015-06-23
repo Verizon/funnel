@@ -40,6 +40,7 @@ class LoggingRepository extends Repository {
   def assignedTargets(flask: funnel.chemist.FlaskID): scalaz.concurrent.Task[Set[funnel.chemist.Target]] = ???
   def flask(id: funnel.chemist.FlaskID): Option[funnel.chemist.Flask] = ???
   def unassignedTargets: scalaz.concurrent.Task[Set[funnel.chemist.Target]] = ???
+  def unmonitorableTargets: scalaz.concurrent.Task[List[URI]] = ???
 
   val increase = new AtomicInteger(0)
 

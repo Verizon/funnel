@@ -344,8 +344,6 @@ SIGAR gathers a large set of metrics for the local machine:
 * Load averages for 5, 10, and 15 minute intervals.
 * Operating system uptime.
 
-
-
 <a name="chemist"></a>
 
 # Chemist
@@ -392,4 +390,45 @@ For deployment to AWS, *Chemist* leverages the fact that auto-scalling groups ca
 
 ### Chemist Static
 
-More information to come later.
+For deployment to on-premis, or fixed-capacity infrastructure, *Funnel* provides "chemist-static" which can orchestrate your *Flask* instances by way of a simple static file-based configuration. The configuration options are the same as the regular *Chemist*, with a few key additions:
+
+```
+chemist {
+  ...
+
+  targets {
+    instance1 {
+      cluster-name = "one"
+      uris = [ "http://alpha:1234" ]
+    }
+    instance2 {
+      cluster-name = "two"
+      uris = [ "http://beta:5678" ]
+    }
+    instance3 {
+      cluster-name = "three"
+      uris = [ "http://delta:9012" ]
+    }
+  }
+
+  flasks {
+    flask1 {
+      location {
+        host = "ay"
+	     port = 1111
+        protocol = "http"
+      }
+      telemetry {
+        host = "bee"
+        port = 2222
+        protocol = "tcp"
+      }
+    }
+  }
+}
+
+```
+
+As you can see, the `targets` section denotes the *Funnel* endpoints *Chemist* should try to monitor, whilst the `flasks` section denotes those nodes which should do the monitoring. The primary differentiator between the `chemist-static` module from other chemist implementations is that the configuration file will be dynamically reloaded if changes are made at runtime. The reason for this is that in fixed infrastructure, machines are typically mutated in-place using IT automation tools such as [Ansible](http://www.ansible.com/) or [Chef](https://www.chef.io/).
+
+  
