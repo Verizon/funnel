@@ -42,8 +42,6 @@ object JSON {
   implicit val SnapshotWithFlaskToJson: EncodeJson[(Flask, Map[ClusterName, List[URI]])] =
     encodeClusterPairs[Flask]
 
-  implicit val locationToJson: EncodeJson[Location] = implicitly[EncodeJson[URI]].contramap[Location](_.asURI(""))
-
   /**
    * {
    *   "id": "flask1",

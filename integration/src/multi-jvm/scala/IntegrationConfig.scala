@@ -4,7 +4,7 @@ package integration
 import scalaz.concurrent.Strategy
 import scalaz.stream.async.signalOf
 import chemist._
-import org.http4s.client._
+import dispatch.Http
 import scala.concurrent.duration._
 
 class IntegrationConfig extends PlatformConfig {
@@ -13,7 +13,7 @@ class IntegrationConfig extends PlatformConfig {
   val discovery: Discovery = new IntegrationDiscovery
   val statefulRepository: StatefulRepository = new StatefulRepository
   val repository: Repository = statefulRepository
-  val http: Client = blaze.PooledHttp1Client(timeout = 50.milliseconds)
+  val http = Http.configure(_.setAllowPoolingConnection(true).setConnectionTimeoutInMs(30000))
   val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
   val sharder: funnel.chemist.Sharder = EvenSharding
   val remoteFlask: RemoteFlask = new HttpFlask(http, repository, signal)

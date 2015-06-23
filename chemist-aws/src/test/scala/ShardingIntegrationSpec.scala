@@ -9,7 +9,7 @@ import scalaz.==>>
 import concurrent.duration._
 import java.net.URI
 import scalaz.concurrent.Strategy
-import org.http4s.client._
+import dispatch.Http
 
 class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   import Sharding.Distribution
@@ -42,7 +42,7 @@ class ShardingIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter
     Target("test1",new URI("http://127.0.0.1:8081/stream/now"), false)
   )
 
-  val H = blaze.PooledHttp1Client(timeout = 5000.milliseconds)
+  val H = Http.configure(_.setAllowPoolingConnection(true).setConnectionTimeoutInMs(5000))
 
   override def beforeAll(){
     addInstruments(I3)
