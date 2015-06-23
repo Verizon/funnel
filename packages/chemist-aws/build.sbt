@@ -10,3 +10,5 @@ Bundle.settings
 name := "chemist-aws"
 
 name in Universal := name.value
+
+mainClass in Compile := Some("funnel.chemist.aws.Main")
