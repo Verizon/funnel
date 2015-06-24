@@ -38,7 +38,7 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
         case (id, targets) =>
           (id -> targets.filter(monitorable), id -> targets.filterNot(monitorable))
       }
-      split.map(_._1) -> split.map(_._2)
+      split.unzip
     }
 
   /**
