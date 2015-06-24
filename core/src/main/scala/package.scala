@@ -24,6 +24,7 @@ package object funnel {
     val zero = G.zero
     def append(a: A, b: => A) = G.plus(a, b)
   }
+
   implicit val dontUseTheDefaultStrategy: scalaz.concurrent.Strategy = null
   implicit val theDefaultStrategyCausesProblems: scalaz.concurrent.Strategy = null
 }

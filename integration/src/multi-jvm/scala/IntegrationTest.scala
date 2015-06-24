@@ -121,7 +121,7 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
     runOn(chemist01){
       enterBarrier(Deployed)
       // just fork the shit out of it so it doesnt block our test.
-      Future(Server.unsafeStart(ichemist, platform)
+      Future(Server.unsafeStart(new Server(ichemist, platform))
         )(ExecutionContext.Implicits.global)
 
       Thread.sleep(5.seconds.toMillis) // give the system time to do its thing

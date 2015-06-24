@@ -3,7 +3,7 @@ package zeromq
 
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.async.signalOf
-import scalaz.stream.Process
+import scalaz.stream.{Process,time}
 import java.net.URI
 
 abstract class Pusher(name: String, uri: URI = Settings.uri, size: Int = 1000000) {
@@ -45,7 +45,7 @@ abstract class ApplicationPusher(name: String, aliveFor: FiniteDuration = 12.sec
 
     Publish.toUnixSocket(Settings.uri.toString, Fixtures.signal)
 
-    Process.sleep(aliveFor)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
+    time.sleep(aliveFor)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
       .onComplete(Process.eval_(Fixtures.signal.get)).run.run
 
     Ø.log.info(s"Stopping the '$name' process...")
