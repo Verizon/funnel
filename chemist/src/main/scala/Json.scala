@@ -42,9 +42,6 @@ object JSON {
   implicit val SnapshotWithFlaskToJson: EncodeJson[(Flask, Map[ClusterName, List[URI]])] =
     encodeClusterPairs[Flask]
 
-  implicit val SnapshotWithFlaskIDToJson: EncodeJson[(FlaskID, Map[ClusterName, List[URI]])] =
-    encodeClusterPairs[FlaskID]
-
   /**
    * {
    *   "id": "flask1",

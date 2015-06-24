@@ -10,3 +10,5 @@ Bundle.settings
 name := "flask"
 
 name in Universal := name.value
+
+mainClass in Compile := Some("funnel.flask.Main")

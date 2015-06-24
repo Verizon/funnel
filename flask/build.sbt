@@ -15,5 +15,3 @@ libraryDependencies ++= Seq (
 )
 
 fork in Test := true
-
-mainClass in Revolver.reStart := Some("funnel.flask.Main")

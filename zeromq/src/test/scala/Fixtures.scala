@@ -15,5 +15,7 @@ object Fixtures {
   val large: Array[Byte] = makeBytes(1500)
   val megabitInBytes = 125000D
 
-  val signal = scalaz.stream.async.signalOf[Boolean](true)(Strategy.Executor(Monitoring.serverPool))
+  val S = scalaz.concurrent.Strategy.Executor(Monitoring.defaultPool)
+
+  val signal = scalaz.stream.async.signalOf[Boolean](true)(S)
 }

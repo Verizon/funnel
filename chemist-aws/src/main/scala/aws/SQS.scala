@@ -97,7 +97,7 @@ object SQS {
     } yield a
   }
 
-  import scalaz.stream.Process
+  import scalaz.stream.{Process,time}
 
   def subscribe(
     url: String,
@@ -107,7 +107,7 @@ object SQS {
     pool: ExecutorService,
     schedulingPool: ScheduledExecutorService
   ): Process[Task, List[Message]] = {
-    Process.awakeEvery(tick)(Strategy.Executor(pool), schedulingPool).evalMap { _ =>
+    time.awakeEvery(tick)(Strategy.Executor(pool), schedulingPool).evalMap { _ =>
       Task {
         val req = (new ReceiveMessageRequest
           ).withQueueUrl(url

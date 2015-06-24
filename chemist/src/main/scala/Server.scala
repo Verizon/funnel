@@ -28,8 +28,9 @@ object Server {
 
   // there seems to be a bug in Task that makes doing what we previously had here
   // not possible. The server gets into a hang/deadlock situation.
-  def unsafeStart[U <: Platform](chemist: Chemist[U], platform: U): Unit = {
-    val repo = platform.config.repository
+  def unsafeStart[U <: Platform](server: Server[U]): Unit = {
+    import server.{platform,chemist}
+    val repo    = platform.config.repository
     val sharder = platform.config.sharder
 
     (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _)).run.runAsync {
@@ -62,20 +63,20 @@ object Server {
     unfiltered.netty.Server
       .http(platform.config.network.port, platform.config.network.host)
       .resources(p, cacheSeconds = 3600)
-      .handler(Server(chemist, platform))
+      .handler(server)
       .run
   }
 }
 
 @io.netty.channel.ChannelHandler.Sharable
-case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
+class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
+  import chemist.ChemistK
   import JSON._
   import concurrent.duration._
-  import chemist.ChemistK
   import Server._
   import metrics._
 
-  private def json[A : EncodeJson](a: ChemistK[A]) =
+  protected def json[A : EncodeJson](a: ChemistK[A]) =
     a(platform).attemptRun.fold(
       e => {
         log.error(s"Unable to process response: ${e.toString} - ${e.getMessage}")
@@ -84,10 +85,10 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
       },
       o => Ok ~> JsonResponse(o))
 
-  private def decode[A : DecodeJson](req: HttpRequest[Any])(f: A => ResponseFunction[Any]) =
+  protected def decode[A : DecodeJson](req: HttpRequest[Any])(f: A => ResponseFunction[Any]) =
     JsonRequest(req).decodeEither[A].map(f).fold(fail => BadRequest ~> ResponseString(fail), identity)
 
-  def intent = {
+  def intent: cycle.Plan.Intent = {
     case GET(Path("/")) =>
       GetRoot.time(Redirect("index.html"))
 
@@ -95,7 +96,7 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
       GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
     case GET(Path("/errors")) =>
-      GetErrors.time(json(chemist.errors.map(_.toList)))
+      GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
     case GET(Path("/distribution")) =>
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
@@ -106,14 +107,8 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
     case GET(Path("/lifecycle/history")) =>
       GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
 
-    // the URI is needed internally, but does not make sense in the remote
-    // user-facing api, so here we just ditch it and return the states.
     case GET(Path("/lifecycle/states")) =>
-      GetLifecycleStates.time(json(chemist.states.map(_.toList.map {
-        case (uri,state) => state })))
-
-    case GET(Path("/platform/history")) =>
-      GetLifecycleHistory.time(json(chemist.platformHistory.map(_.toList)))
+      GetLifecycleStates.time(json(chemist.states.map(_.toList)))
 
     case POST(Path("/distribute")) =>
       PostDistribute.time(NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)"))

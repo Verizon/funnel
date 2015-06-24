@@ -108,7 +108,7 @@ object JSON {
 
   implicit def DecodeKey: DecodeJson[Key[Any]] = DecodeJson { c => for {
     name   <- (c --\ "name").as[String]
-    typeOf <- (c --\ "type").as[Reportable[Any]]
+    typeOf <- (c --\ "type").as[Reportable[Any]](DecodeReportableT)
     u      <- (c --\ "units").as[Units]
     desc   <- (c --\ "description").as[String].option
     attrs  <- c.as[Map[String, String]].map(_ - "name" - "type" - "units" - "description")
@@ -163,7 +163,7 @@ object JSON {
     jencode2L((d: Datapoint[A]) => (d.key, EncodeReportable(d.key.typeOf)(d.value)))("key", "value")
 
   implicit def DecodeDatapoint: DecodeJson[Datapoint[Any]] = DecodeJson { c => for {
-    k <- (c --\ "key").as[Key[Any]]
+    k <- (c --\ "key").as[Key[Any]](DecodeKey)
     v <- (c --\ "value").as[Any](DecodeReportable(k.typeOf))
   } yield Datapoint(k, v) }
 

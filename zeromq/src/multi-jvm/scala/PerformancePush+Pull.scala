@@ -2,7 +2,7 @@ package funnel
 package zeromq
 
 import scalaz.concurrent.Task
-import scalaz.stream.{io,Channel,Process}
+import scalaz.stream.{channel,Channel,Process}
 import scala.concurrent.duration._
 import java.net.URI
 
@@ -25,7 +25,7 @@ object PerfMultiJvmPuller {
     val start = System.currentTimeMillis
     val E = Endpoint.unsafeApply(pull &&& bind, Settings.uri)
 
-    val ledger: Channel[Task, String, Unit] = io.channel(
+    val ledger: Channel[Task, String, Unit] = channel.lift(
       _ => Task {
         val i = received.incrementAndGet
         val time = FiniteDuration(System.currentTimeMillis - start, "milliseconds").toSeconds
