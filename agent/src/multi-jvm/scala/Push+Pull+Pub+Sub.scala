@@ -3,7 +3,7 @@ package agent
 
 import funnel.zeromq._, sockets._
 import scalaz.concurrent.{Task,Strategy}
-import scalaz.stream.Process
+import scalaz.stream.{Process,time}
 import scala.concurrent.duration._
 
 object TestingMultiJvmPusher1 extends ApplicationPusher("push-1")
@@ -32,7 +32,7 @@ object TestingMultiJvmSubscriber {
 
     Ø.link(E)(Fixtures.signal)(Ø.receive).map(t => new String(t.bytes)).to(io.stdOut).run.runAsync(_ => ())
 
-    Process.sleep(10.seconds)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
+    time.sleep(10.seconds)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
       .onComplete(Process.eval_(Fixtures.signal.get)).run.run
 
     println("Subscriber - Stopping the task...")

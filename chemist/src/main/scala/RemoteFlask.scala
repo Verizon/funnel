@@ -46,7 +46,12 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
   def command(c: FlaskCommand): Task[Unit] = c match {
     case Telemetry(flask) =>
       val t = monitorTelemetry(flask, keys, errors, lifecycle, signal)
-      Task.delay(t.runAsync(_ => ()))
+      Task.delay(t.runAsync(_.fold(
+        e => {
+          log.error(e.getMessage)
+          e.printStackTrace
+        },
+        _ => log.info("Telemetry terminated"))))
     case Monitor(flask, targets) =>
       monitor(flask.location, targets).void
     case Unmonitor(flask, targets) =>

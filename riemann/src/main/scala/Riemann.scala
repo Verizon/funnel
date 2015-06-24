@@ -7,7 +7,7 @@ import Events.Event
 import scala.concurrent.duration._
 import scalaz.\/
 import scalaz.concurrent.{Strategy,Task,Actor}
-import scalaz.stream.{async,Process}
+import scalaz.stream.{async,Process,time}
 import scala.collection.JavaConverters._
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.signal
@@ -37,7 +37,7 @@ object Riemann {
       }
     }(S)
 
-    Process.awakeEvery(1.minute)(S,P).evalMap {_ =>
+    time.awakeEvery(1.minute)(S, P).evalMap {_ =>
       Task(a(Flush))
     }.run.runAsync(_ => ())
 

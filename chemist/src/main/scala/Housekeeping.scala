@@ -36,10 +36,9 @@ object Housekeeping {
     import dispatch._, Defaults._
 
     val a = location.uriFromTemplate(LocationTemplate(s"http://@host:@port/mirror/sources"))
-
     val req = Task.delay(url(a.toString)) <* Task.delay(log.debug(s"requesting assigned targets from $a"))
     req flatMap { b =>
-      fromScalaFuture(http(b OK as.String)).map { c =>
+      http(b OK as.String).map { c =>
         Parse.decodeOption[List[Cluster]](c
         ).toList.flatMap(identity
         ).foldLeft(Set.empty[Target]){ (a,b) =>

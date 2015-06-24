@@ -14,8 +14,9 @@ object Publish {
   import ZeroMQ.{link,log,write}
   import scalaz.stream.async.signalOf
 
+  val S = scalaz.concurrent.Strategy.Executor(Monitoring.defaultPool)
   private[zeromq] val UTF8 = java.nio.charset.Charset.forName("UTF-8")
-  private[zeromq] val alive: Signal[Boolean] = signalOf[Boolean](true)(Strategy.Executor(Monitoring.serverPool))
+  private[zeromq] val alive: Signal[Boolean] = signalOf[Boolean](true)(S)
   val defaultUnixSocket = "/var/run/funnel.socket"
   val defaultTcpSocket  = "127.0.0.1:7390"
 

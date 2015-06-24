@@ -3,7 +3,7 @@ package zeromq
 
 import java.net.URI
 import scalaz.concurrent.Task
-import scalaz.stream.{Channel,Process,io}
+import scalaz.stream.{Channel,Process,channel}
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
 import sockets._
 import java.util.concurrent.atomic.AtomicLong
@@ -13,7 +13,7 @@ class SpecMultiJvmNodeA extends FlatSpec with Matchers {
   val E = Endpoint.unsafeApply(pull &&& bind, Settings.uri)
   val received = new AtomicLong(0L)
   val ledger: Channel[Task, String, Unit] =
-    io.channel(_ => Task(received.incrementAndGet))
+    channel.lift(_ => Task(received.incrementAndGet))
 
   implicit val batransport: Transportable[Array[Byte]] = Transportable { ba =>
     Transported(Schemes.unknown, Versions.unknown, None, None, ba)
