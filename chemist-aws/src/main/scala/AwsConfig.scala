@@ -30,14 +30,21 @@ case class AwsConfig(
   asg: AmazonAutoScaling,
   commandTimeout: Duration,
   includeVpcTargets: Boolean,
-  sharder: Sharder
+  sharder: Sharder,
+  deployedAt: Location // this is the location of the chemist itself
 ) extends PlatformConfig {
   val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, templates)
+
   val repository: Repository = new StatefulRepository
+
+  val election: ElectionStrategy = ForegoneConclusion(discovery, deployedAt)
+
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
+
   val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
+
   val remoteFlask = new HttpFlask(http, repository, signal)
 }
 
@@ -61,7 +68,18 @@ object AwsConfig {
       asg               = readASG(aws),
       sharder           = readSharder(sharding),
       commandTimeout    = timeout,
-      includeVpcTargets = usevpc
+      includeVpcTargets = usevpc,
+      deployedAt        = readDeployedAt(cfg)
+    )
+  }
+
+  private def readDeployedAt(cfg: Config): Location = {
+    Location(
+      host = cfg.require[String]("aws.meta-data.local-ipv4"),
+      port = cfg.require[Int]("chemist.network.funnel-port"),
+      datacenter = cfg.require[String]("aws.meta-data.placement.region"),
+      intent = LocationIntent.Mirroring,
+      templates = Nil
     )
   }
 
