@@ -136,7 +136,7 @@ trait Chemist[A <: Platform]{
     _ <- targets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
     _  = log.info("added instances to the repository...")
 
-    um = y.filter(_._2.nonEmpty).flatMap { case (id,um) => um.toSeq.map(PlatformEvent.Unmonitorable) }
+    um = y.flatMap { case (id,um) => um.toSeq.map(PlatformEvent.Unmonitorable) }
     _ <- um.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
     _  = log.info("added unmonitorables to the repository...")
 

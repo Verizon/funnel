@@ -34,11 +34,17 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
   def filterTargets(instances: Seq[(TargetID, Set[Target])]): ChemistK[(Seq[(TargetID, Set[Target])], Seq[(TargetID, Set[Target])])] =
     config.map { cfg =>
       def monitorable(t: Target): Boolean = cfg.includeVpcTargets || !t.isPrivateNetwork
-      val split = instances.collect {
+      val split = instances.map {
         case (id, targets) =>
-          (id -> targets.filter(monitorable), id -> targets.filterNot(monitorable))
+          id -> targets.partition(monitorable)
       }
-      split.unzip
+      val in = split.collect {
+        case (id, (good, bad)) if good.nonEmpty => id -> good
+      }
+      val out = split.collect {
+        case (id, (good, bad)) if bad.nonEmpty => id -> bad
+      }
+      (in, out)
     }
 
   /**
