@@ -10,6 +10,8 @@ Bundle.settings
 
 normalizedName := "funnel-agent"
 
+mainClass in Compile := Some("funnel.agent.Main")
+
 artifact in makePom := Artifact.pom("funnel-agent").copy(classifier = Some(name.value))
 
 mappings in Universal ++= Seq(

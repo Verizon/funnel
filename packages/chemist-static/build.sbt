@@ -10,3 +10,5 @@ Bundle.settings
 name := "chemist-static"
 
 name in Universal := name.value
+
+mainClass in Compile := Some("funnel.chemist.static.Main")
