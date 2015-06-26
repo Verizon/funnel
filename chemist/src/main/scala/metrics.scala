@@ -10,6 +10,7 @@ object metrics {
   val GetDistribution = timer("http/get/distribution", "time taken to get current work assignments of funnel -> flask")
   val GetLifecycleHistory = timer("http/get/lifecycle/history", "time taken to get last 100 lifecycle events this Chemist has seen")
   val GetLifecycleStates = timer("http/get/lifecycle/states", "time taken to get all known funnels")
+  val GetPlatformHistory = timer("http/get/platform/history", "time taken to get all the historical platform events")
   val PostDistribute = timer("http/post/distribute", "time taken to not implement this feature")
   val PostBootstrap = timer("http/post/bootstrap", "time taken to re-read the world from AWS")
   val GetShards = timer("http/get/shards", "time taken to list all the shards currently known by Chemist")

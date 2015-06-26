@@ -53,6 +53,8 @@ class ChemistAwsSpec extends FlatSpec with Matchers {
     val p1 = new DefaultAws { val config = c1 }
     val p2 = new DefaultAws { val config = c2 }
     c.filterTargets(targets).run(p1).run._1.length should equal (3)
-    c.filterTargets(targets).run(p2).run._1.length should equal (2)
+    val r1 = c.filterTargets(targets).run(p2).run
+    r1._1.length should equal (2)
+    r1._2.length should equal (1)
   }
 }
