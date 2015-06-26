@@ -5,6 +5,8 @@ object JSON {
   import argonaut._, Argonaut._
   import javax.xml.bind.DatatypeConverter // hacky, but saves the extra dependencies
   import java.net.URI
+  import java.text.SimpleDateFormat
+  import java.util.Date
 
   implicit class AsDate(in: String){
     def asDate: java.util.Date =
@@ -17,7 +19,12 @@ object JSON {
   implicit val UriToJson: EncodeJson[URI] =
     implicitly[EncodeJson[String]].contramap(_.toString)
 
-  ////////////////////// chemist messages //////////////////////
+  implicit val DateToJson: EncodeJson[Date] =
+    implicitly[EncodeJson[String]].contramap {
+      new SimpleDateFormat().format(_)
+    }
+
+  ////////////////////// Chemist messages //////////////////////
 
   /**
    * {
@@ -149,80 +156,89 @@ object JSON {
       case nf@RepoEvent.NewFlask(_) => newFlaskToJson.encode(nf)
     }
 
-  def encodeNewTarget(t: Target): Json = {
+  def encodeNewTarget(t: Target, time: Date): Json = {
     ("type" := "NewTarget") ->:
     ("cluster" := t.cluster) ->:
     ("uri" := t.uri) ->:
+    ("time" := time) ->:
     jEmptyObject
   }
 
-  def encodeNewFlask(f: Flask): Json = {
+  def encodeNewFlask(f: Flask, time: Date): Json = {
     ("type" := "NewFlask") ->:
     ("flask" := f.id) ->:
     ("location" := f.location) ->:
+    ("time" := time) ->:
     jEmptyObject
   }
 
-  def encodeTerminatedTarget(u: URI): Json = {
+  def encodeTerminatedTarget(u: URI, time: Date): Json = {
     ("type" := "TerminatedTarget") ->:
-    ("uri"  := u) ->:
+    ("uri" := u) ->:
+    ("time" := time) ->:
     jEmptyObject
   }
 
-  def encodeTerminatedFlask(f: FlaskID): Json = {
+  def encodeTerminatedFlask(f: FlaskID, time: Date): Json = {
     ("type" := "TerminatedFlask") ->:
     ("flask" := f.value) ->:
+    ("time" := time) ->:
     jEmptyObject
   }
 
-  def encodeMonitored(f: FlaskID, u: URI): Json = {
+  def encodeMonitored(f: FlaskID, u: URI, time: Date): Json = {
     ("type" := "Monitored") ->:
     ("flask" := f.value) ->:
     ("uri" := u) ->:
+    ("time" := time) ->:
     jEmptyObject
   }
 
-  def encodeProblem(f: FlaskID, u: URI, msg: String): Json = {
+  def encodeProblem(f: FlaskID, u: URI, msg: String, time: Date): Json = {
     ("type" := "Problem") ->:
     ("flask" := f.value) ->:
     ("uri" := u) ->:
     ("message" := msg) ->:
+    ("time" := time) ->:
     jEmptyObject
   }
 
-  def encodeUnmonitored(f: FlaskID, u: URI): Json = {
+  def encodeUnmonitored(f: FlaskID, u: URI, time: Date): Json = {
     ("type" := "Unmonitored") ->:
     ("flask" := f.value) ->:
     ("uri" := u) ->:
+    ("time" := time) ->:
     jEmptyObject
   }
 
-  def encodeUnmonitorable(t: Target): Json = {
+  def encodeUnmonitorable(t: Target, time: Date): Json = {
     ("type" := "Unmonitorable") ->:
     ("cluster" := t.cluster) ->:
     ("uri" := t.uri) ->:
+    ("time" := time) ->:
     jEmptyObject
   }
 
-  def encodeAssigned(f: FlaskID, t: Target): Json = {
+  def encodeAssigned(f: FlaskID, t: Target, time: Date): Json = {
     ("type" := "Assigned") ->:
     ("flask" := f.value) ->:
     ("cluster" := t.cluster) ->:
     ("uri" := t.uri) ->:
+    ("time" := time) ->:
     jEmptyObject
   }
 
   implicit val platformEventToJson: EncodeJson[PlatformEvent] =
     EncodeJson {
-      case PlatformEvent.NewTarget(t) => encodeNewTarget(t)
-      case PlatformEvent.NewFlask(f) => encodeNewFlask(f)
-      case PlatformEvent.TerminatedTarget(u) => encodeTerminatedTarget(u)
-      case PlatformEvent.TerminatedFlask(f) => encodeTerminatedFlask(f)
-      case PlatformEvent.Monitored(f, u) => encodeMonitored(f, u)
-      case PlatformEvent.Problem(f, u, msg) => encodeProblem(f, u, msg)
-      case PlatformEvent.Unmonitored(f, u) => encodeUnmonitored(f, u)
-      case PlatformEvent.Unmonitorable(t) => encodeUnmonitorable(t)
-      case PlatformEvent.Assigned(f, t) => encodeAssigned(f, t)
-      case PlatformEvent.NoOp => ("type" := "NoOp") ->: jEmptyObject
+      case e @ PlatformEvent.NewTarget(t) => encodeNewTarget(t, e.time)
+      case e @ PlatformEvent.NewFlask(f) => encodeNewFlask(f, e.time)
+      case e @ PlatformEvent.TerminatedTarget(u) => encodeTerminatedTarget(u, e.time)
+      case e @ PlatformEvent.TerminatedFlask(f) => encodeTerminatedFlask(f, e.time)
+      case e @ PlatformEvent.Monitored(f, u) => encodeMonitored(f, u, e.time)
+      case e @ PlatformEvent.Problem(f, u, msg) => encodeProblem(f, u, msg, e.time)
+      case e @ PlatformEvent.Unmonitored(f, u) => encodeUnmonitored(f, u, e.time)
+      case e @ PlatformEvent.Unmonitorable(t) => encodeUnmonitorable(t, e.time)
+      case e @ PlatformEvent.Assigned(f, t) => encodeAssigned(f, t, e.time)
+      case e @ PlatformEvent.NoOp => ("type" := "NoOp") ->: ("time" := e.time) ->: jEmptyObject
     }
 }
