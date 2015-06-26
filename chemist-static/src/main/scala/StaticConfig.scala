@@ -28,6 +28,9 @@ case class StaticConfig(
   val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
   val remoteFlask = new HttpFlask(http, repository, signal)
   val templates = List.empty
+  val election = ForegoneConclusion(discovery,
+    Location(network.host, network.port, "local",
+      intent = LocationIntent.Mirroring, templates = Nil))
 }
 
 object Config {
