@@ -205,7 +205,7 @@ class StatefulRepository extends Repository {
         }
 
         case PlatformEvent.Problem(f, i, msg) => {
-          log.error(s"platformHandler -- $i no exception from  $f: $msg")
+          log.warn(s"platformHandler -- $i no exception from  $f: $msg")
           val target = targets.get.lookup(i)
           target.map { t =>
             // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)

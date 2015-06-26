@@ -54,7 +54,7 @@ class AwsDiscovery(
    * verification that Funnel is running on port 5775 and is network accessible.
    */
   def listTargets: Task[Seq[(TargetID, Set[Target])]] =
-    instances(!isFlask(_)).map(_.map(in => TargetID(in.id) -> in.targets ))
+    instances(notFlask).map(_.map(in => TargetID(in.id) -> in.targets ))
 
   /**
    * List all of the instances in the given AWS account that respond to a rudimentry
@@ -124,7 +124,7 @@ class AwsDiscovery(
         b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
         (fails,successes) = b.toVector.separate
         _  = log.warn(s"AwsDiscovery.lookupMany failed to validate ${fails.length} instances.")
-        _  = log.debug(s"AwsDiscovery.lookupMany b = ${b}")
+        _  = log.debug(s"AwsDiscovery.lookupMany validated = ${b}")
         _  = fails.foreach(x => log.error(x))
       } yield successes
 
@@ -157,19 +157,31 @@ class AwsDiscovery(
 
   ///////////////////////////// filters /////////////////////////////
 
-  def isFlask(id: String): Task[Boolean] =
-    lookupOne(id).map(isFlask)
+  def isFlask: Task[AwsInstance => Boolean] =
+    Task.delay(_.application.map(_.name.startsWith("flask")).getOrElse(false))
 
-  def isFlask(i: AwsInstance): Boolean =
-    i.application.map(_.name.startsWith("flask")).getOrElse(false)
+  def notFlask: Task[AwsInstance => Boolean] =
+    isFlask.map(f => i => !f(i))
+
+  /**
+   * This is intended primiarly as a point of extension. There are a set
+   * of upgrade scenarios where you do not want to mirror from an existing
+   * flask cluster, so they are not targets, nor are they active flasks.
+   * As such we provide the `isIrrelevant` function to allow dynamic filtering
+   * of instances which should be considered ok to drop (for whatever reason)
+   */
+  def isIrrelevant: Task[AwsInstance => Boolean] =
+    Task.delay(i => false)
 
   ///////////////////////////// internal api /////////////////////////////
 
-  private def instances(f: AwsInstance => Boolean): Task[Seq[AwsInstance]] =
+  private def instances(predicate: Task[AwsInstance => Boolean]): Task[Seq[AwsInstance]] =
     for {
       a <- readAutoScallingGroups
+      f1 <- predicate
+      f2 <- isIrrelevant
       // apply the specified filter if we want to remove specific groups for a reason
-      x  = a.filter(f)
+      x  = a.filter(i => f1(i) || f2(i))
       // actually reach out to all the discovered hosts and check that their port is reachable
       y  = x.map(g => validate(g).attempt)
       // run the tasks on the specified thread pool (Server.defaultPool)
