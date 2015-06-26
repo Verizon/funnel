@@ -111,7 +111,7 @@ class StatefulRepository extends Repository {
   /////////////// audit operations //////////////////
 
   def historicalPlatformEvents: Task[Seq[PlatformEvent]] =
-    Task.delay(historyStack.toSeq.toList.sortWith(_.time < _.time))
+    Task.delay(historyStack.toSeq.toList.sortWith { case(x, y) => x.time.compareTo(y.time) < 0 })
 
   def historicalRepoEvents: Task[Seq[RepoEvent]] =
     Task.delay(repoHistoryStack.toSeq.toList)

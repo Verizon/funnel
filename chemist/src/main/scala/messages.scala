@@ -6,7 +6,7 @@ import scalaz.concurrent.Task
 import TargetLifecycle._
 
 sealed trait PlatformEvent {
-  val time = System.currentTimeMillis
+  val time = new java.util.Date()
 }
 
 object PlatformEvent {

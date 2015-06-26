@@ -5,6 +5,9 @@ object JSON {
   import argonaut._, Argonaut._
   import javax.xml.bind.DatatypeConverter // hacky, but saves the extra dependencies
   import java.net.URI
+  import java.util.Date
+
+  val df = new java.text.SimpleDateFormat()
 
   implicit class AsDate(in: String){
     def asDate: java.util.Date =
@@ -16,6 +19,9 @@ object JSON {
 
   implicit val UriToJson: EncodeJson[URI] =
     implicitly[EncodeJson[String]].contramap(_.toString)
+
+  implicit val DateToJson: EncodeJson[Date] =
+    implicitly[EncodeJson[String]].contramap(df.format(_))
 
   ////////////////////// chemist messages //////////////////////
 
@@ -149,7 +155,7 @@ object JSON {
       case nf@RepoEvent.NewFlask(_) => newFlaskToJson.encode(nf)
     }
 
-  def encodeNewTarget(t: Target, time: Long): Json = {
+  def encodeNewTarget(t: Target, time: Date): Json = {
     ("type" := "NewTarget") ->:
     ("cluster" := t.cluster) ->:
     ("uri" := t.uri) ->:
@@ -157,7 +163,7 @@ object JSON {
     jEmptyObject
   }
 
-  def encodeNewFlask(f: Flask, time: Long): Json = {
+  def encodeNewFlask(f: Flask, time: Date): Json = {
     ("type" := "NewFlask") ->:
     ("flask" := f.id) ->:
     ("location" := f.location) ->:
@@ -165,21 +171,21 @@ object JSON {
     jEmptyObject
   }
 
-  def encodeTerminatedTarget(u: URI, time: Long): Json = {
+  def encodeTerminatedTarget(u: URI, time: Date): Json = {
     ("type" := "TerminatedTarget") ->:
     ("uri" := u) ->:
     ("time" := time) ->:
     jEmptyObject
   }
 
-  def encodeTerminatedFlask(f: FlaskID, time: Long): Json = {
+  def encodeTerminatedFlask(f: FlaskID, time: Date): Json = {
     ("type" := "TerminatedFlask") ->:
     ("flask" := f.value) ->:
     ("time" := time) ->:
     jEmptyObject
   }
 
-  def encodeMonitored(f: FlaskID, u: URI, time: Long): Json = {
+  def encodeMonitored(f: FlaskID, u: URI, time: Date): Json = {
     ("type" := "Monitored") ->:
     ("flask" := f.value) ->:
     ("uri" := u) ->:
@@ -187,7 +193,7 @@ object JSON {
     jEmptyObject
   }
 
-  def encodeProblem(f: FlaskID, u: URI, msg: String, time: Long): Json = {
+  def encodeProblem(f: FlaskID, u: URI, msg: String, time: Date): Json = {
     ("type" := "Problem") ->:
     ("flask" := f.value) ->:
     ("uri" := u) ->:
@@ -196,7 +202,7 @@ object JSON {
     jEmptyObject
   }
 
-  def encodeUnmonitored(f: FlaskID, u: URI, time: Long): Json = {
+  def encodeUnmonitored(f: FlaskID, u: URI, time: Date): Json = {
     ("type" := "Unmonitored") ->:
     ("flask" := f.value) ->:
     ("uri" := u) ->:
@@ -204,7 +210,7 @@ object JSON {
     jEmptyObject
   }
 
-  def encodeUnmonitorable(t: Target, time: Long): Json = {
+  def encodeUnmonitorable(t: Target, time: Date): Json = {
     ("type" := "Unmonitorable") ->:
     ("cluster" := t.cluster) ->:
     ("uri" := t.uri) ->:
@@ -212,7 +218,7 @@ object JSON {
     jEmptyObject
   }
 
-  def encodeAssigned(f: FlaskID, t: Target, time: Long): Json = {
+  def encodeAssigned(f: FlaskID, t: Target, time: Date): Json = {
     ("type" := "Assigned") ->:
     ("flask" := f.value) ->:
     ("cluster" := t.cluster) ->:
