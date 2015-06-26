@@ -5,9 +5,8 @@ object JSON {
   import argonaut._, Argonaut._
   import javax.xml.bind.DatatypeConverter // hacky, but saves the extra dependencies
   import java.net.URI
+  import java.text.SimpleDateFormat
   import java.util.Date
-
-  val df = new java.text.SimpleDateFormat()
 
   implicit class AsDate(in: String){
     def asDate: java.util.Date =
@@ -21,9 +20,11 @@ object JSON {
     implicitly[EncodeJson[String]].contramap(_.toString)
 
   implicit val DateToJson: EncodeJson[Date] =
-    implicitly[EncodeJson[String]].contramap(df.format(_))
+    implicitly[EncodeJson[String]].contramap {
+      new SimpleDateFormat().format(_)
+    }
 
-  ////////////////////// chemist messages //////////////////////
+  ////////////////////// Chemist messages //////////////////////
 
   /**
    * {
