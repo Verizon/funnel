@@ -6,9 +6,7 @@ flask {
   # uses that instead.
   # name = "flask"
 
-  # currently disable key senenance because there's a bug with
-  # `mergeN` in scalaz-stream 0.6.
-  # metric-ttl = 24 hours
+  metric-ttl = 24 hours
 
   collect-local-metrics = true
 

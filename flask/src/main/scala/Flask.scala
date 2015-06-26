@@ -102,7 +102,7 @@ class Flask(options: Options, val I: Instruments) {
 
     options.metricTTL.foreach { t =>
       log.info("Booting the key senescence...")
-      runAsync(I.monitoring.keySenescence(Events.every(t)).run)
+      runAsync(I.monitoring.keySenescence(Events.every(t), I.monitoring.distinctKeys).run)
     }
 
     log.info("Booting the mirroring process...")
