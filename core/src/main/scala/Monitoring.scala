@@ -302,23 +302,28 @@ trait Monitoring {
    * Remove keys from this `Monitoring` instance for which no updates are seen
    * between two triggerings of the event `e`.
    */
-  def keySenescence(e: Event): Process[Task, Unit] = mergeN(distinctKeys.map { k =>
+  def keySenescence(e: Event, ks: Process[Task, Key[Any]]): Process[Task, Unit] = mergeN(ks.map { k =>
     val alive = signalOf[Unit](())(Strategy.Sequential)
-    val pts = Monitoring.subscribe(this)(_ == k).onComplete {
+    val pts = get(k).discrete.onComplete {
       Process.eval_ { alive.close flatMap { _ =>
-        log.debug(s"TTL: no more data points for '$k', removing...")
+        log.debug(s"Key senescence: no more data points for '${k.name}', removing...")
         remove(k)
       }}
     }
     e(this).zip(alive.continuous).map(_._1).either(pts)
       .scan(Vector(false,false)) {
         (acc, a) => acc.tail :+ a.isLeft
-      }.filter { _ forall (identity) }
-      .evalMap { _ =>
-        log.debug(s"TTL: no activity for '$k' removing...")
-        alive.close >> remove(k)
+      }.evalMap { v =>
+        if (v.forall(identity)) {
+          log.debug(s"Key senescence: no activity for '${k.name}' removing...")
+          alive.close >> remove(k)
+        } else {
+          Task.now(())
+        }
       }
-  })
+  }.onComplete {
+    Process.eval_(Task.delay(log.debug(s"Key senescence: keys exhausted.")))
+  }).onComplete(Process.eval(Task.delay(log.debug(s"Key senescence terminated."))))
 
   /** Return the elapsed time since this instance was started. */
   def elapsed: Duration

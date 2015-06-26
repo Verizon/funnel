@@ -210,13 +210,44 @@ object MonitoringSpec extends Properties("monitoring") {
       //println("OK result:" + okResult)
       // I am seeing about 40.nanoseconds for update times,
       // 100 nanos for publishing
-      (s"Gauge latency should be < 1000 ns (was $updateTime)" |: (updateTime.toNanos < 1000)) &&
-      (s"Publish latency should be < 2000 ns (was $publishTime)" |: (publishTime.toNanos < 2000)) &&
+      (s"Gauge latency should be < 1 μs (was $updateTime)" |: (updateTime.toNanos < 1000)) &&
+      (s"Publish latency should be < 2 μs (was $publishTime)" |: (publishTime.toNanos < 2000)) &&
       okResult
     }
     go || go || go
   }
 
+  /* Make sure key senesence doesn't have quadratic complexity */
+  property("key-senesence") = secure {
+    import scalaz.std.function._
+    import scalaz.syntax.functor._
+    def go: Boolean = {
+      val ranges = List(4, 8, 16, 32, 64, 128).map(Range(0, _))
+      val times = ranges map { r =>
+        val M = Monitoring.instance
+        val I = new Instruments(30.seconds, M)
+        import I._
+        val counters = r.toList.map(n => counter(s"test$n"))
+        val t0 = System.nanoTime
+        val ks = M.keys.discrete.dropWhile(_.isEmpty).evalMap(x =>
+          if (x.isEmpty)
+            M.keys.close
+          else
+            Task.now(())
+        )
+        M.keySenescence(Events.every(100.milliseconds), M.distinctKeys).zip(ks).run.run
+        val t = System.nanoTime - t0
+        t
+      }
+      times.zip(times.tail).foldLeft(true) {
+        case (b, (t1, t2)) =>
+          val dt = t2.toDouble / t1.toDouble
+          // Doubling input size should have complexity closer to 2x than 4x
+          b && (Math.abs(2-dt) < Math.abs(4-dt))
+      }
+    }
+    go || go || go
+  }
 
   /* Simple sanity check of a timer. */
   property("timer-ex") = secure {
