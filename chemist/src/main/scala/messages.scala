@@ -5,7 +5,9 @@ import java.net.URI
 import scalaz.concurrent.Task
 import TargetLifecycle._
 
-sealed trait PlatformEvent
+sealed trait PlatformEvent {
+  val time = System.currentTimeMillis
+}
 
 object PlatformEvent {
   final case class NewTarget(target: Target) extends PlatformEvent
