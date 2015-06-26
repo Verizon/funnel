@@ -165,7 +165,7 @@ object JSON {
 
   def encodeTerminatedTarget(u: URI): Json = {
     ("type" := "TerminatedTarget") ->:
-    ("uri" := "u") ->:
+    ("uri"  := u) ->:
     jEmptyObject
   }
 
