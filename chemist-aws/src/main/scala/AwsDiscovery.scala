@@ -57,12 +57,12 @@ class AwsDiscovery(
     instances(notFlask).map(_.map(in => TargetID(in.id) -> in.targets ))
 
   /**
-   * List all of the instances in the given AWS account that respond to a rudimentry
-   * verification that Funnel is running on port 5775 and is network accessible.
+   * List all of the instances in the given AWS account and figure out which ones of
+   * those instances meets the classification criterion for being considered a flask.
    */
-  def listFlasks: Task[Seq[Flask]] =
+  def listActiveFlasks: Task[Seq[Flask]] =
     for {
-      a <- instances(isFlask)
+      a <- instances(isActiveFlask)
       b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
     } yield b
 
@@ -159,26 +159,39 @@ class AwsDiscovery(
 
   import InstanceClassifier._
 
-  def isFlask(c: InstanceClassifier): Boolean =
-    c == ActiveFlask || c == InactiveFlask
-
-  def notFlask(c: InstanceClassifier): Boolean =
-    !isFlask(c)
+  /**
+   * Find all the flasks that are currently classified as active.
+   * @see funnel.chemist.AwsDiscovery.classify
+   */
+  def isActiveFlask(c: InstanceClassifier): Boolean =
+    c == ActiveFlask
 
   /**
-  This default implementation does not properly handle the various upgrade
-  cases that you might encounter when migrating from one flask cluster to
-  another, but it instead provided as a default where all avalible flasks
-  are "active". It is highly recomended you override this with your own
-  classification logic.
+   * The reason this is not simply the inverted version of `isActiveFlask`
+   * is that when asking for targets, we specifically do not want any
+   * Flasks, active or otherwise, because mirroring a Flask from another
+   * Flask risks a cascading failure due to key amplication (essentially
+   * mirroring the mirrorer whilst its mirroring etc).
+   *
+   * To mittigate this, we specifically call out anything that is not
+   * classified as an `ActiveTarget`
+   */
+  def notFlask(c: InstanceClassifier): Boolean =
+    c == ActiveFlask || c == InactiveFlask || c == Unknown
 
-  There are a set
-   * of upgrade scenarios where you do not want to mirror from an existing
-   * flask cluster, so they are not targets, nor are they active flasks.
-
-  Providing this with a task return type so that extensions can do I/O
-  if they need too (clearly a cache locally would be needed in that case)
-  */
+  /**
+   * This default implementation does not properly handle the various upgrade
+   * cases that you might encounter when migrating from one flask cluster to
+   * another, but it instead provided as a default where all avalible flasks
+   * are "active". There are a set of upgrade scenarios where you do not want
+   * to mirror from an existing flask cluster, so they are not targets, nor are
+   * they active flasks.
+   *
+   * Providing this with a task return type so that extensions can do I/O
+   * if they need too (clearly a cache locally would be needed in that case)
+   *
+   * It is highly recomended you override this with your own classification logic.
+   */
   val classify: Task[AwsInstance => InstanceClassifier] = {
     def isFlask(i: AwsInstance): Boolean =
       i.application.map(_.name.startsWith("flask")).getOrElse(false)

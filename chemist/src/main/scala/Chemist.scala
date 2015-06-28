@@ -114,7 +114,7 @@ trait Chemist[A <: Platform]{
     cfg <- config
 
     // from the whole world, figure out which are flask instances
-    f  <- cfg.discovery.listFlasks.liftKleisli
+    f  <- cfg.discovery.listActiveFlasks.liftKleisli
     _  = log.info(s"found ${f.length} flasks in the running instance list...")
 
     // update the distribution with new capacity seeds

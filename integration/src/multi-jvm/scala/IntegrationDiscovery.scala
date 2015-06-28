@@ -6,7 +6,7 @@ import chemist.{FlaskID,Flask,TargetID,Target,Discovery,Location}
 import java.util.UUID.randomUUID
 
 class IntegrationDiscovery extends Discovery {
-  def listFlasks: Task[Seq[Flask]] =
+  def listActiveFlasks: Task[Seq[Flask]] =
     Task.now(IntegrationFixtures.flask1 :: Nil)
 
   private val randomids: Map[TargetID, Set[Target]] =
@@ -19,7 +19,7 @@ class IntegrationDiscovery extends Discovery {
 
   def lookupFlask(id: FlaskID): Task[Flask] =
     for {
-      a <- listFlasks
+      a <- listActiveFlasks
     } yield a.find(_.id == id).getOrElse(sys.error("No flask found with that ID."))
 
   def lookupTarget(id: TargetID): Task[Seq[Target]] =
