@@ -1,6 +1,8 @@
 package funnel
 package chemist
 
+import scalaz.concurrent.Task
+
 /**
  * Chemist is typically consuming event notificaitons about the state of
  * the external world (e.g. from messages queues, or a 3rd party stream),
@@ -21,7 +23,7 @@ package chemist
  */
 trait ElectionStrategy {
   def discovery: Discovery
-  def leader: Option[Location]
+  def leader: Task[Option[Location]]
   def isLeader(l: Location): Boolean
 }
 
@@ -35,6 +37,6 @@ case class ForegoneConclusion(
   discovery: Discovery,
   nominee: Location
 ) extends ElectionStrategy {
-  val leader: Option[Location] = Some(nominee)
+  val leader: Task[Option[Location]] = Task.now(Some(nominee))
   def isLeader(l: Location): Boolean = true
 }

@@ -6,6 +6,9 @@ import chemist.{FlaskID,Flask,TargetID,Target,Discovery,Location}
 import java.util.UUID.randomUUID
 
 class IntegrationDiscovery extends Discovery {
+  def listActiveChemists: Task[Seq[Location]] =
+    Task.now(IntegrationFixtures.localhost :: Nil)
+
   def listActiveFlasks: Task[Seq[Flask]] =
     Task.now(IntegrationFixtures.flask1 :: Nil)
 

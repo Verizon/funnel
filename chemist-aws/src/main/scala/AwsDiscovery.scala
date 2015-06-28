@@ -67,6 +67,15 @@ class AwsDiscovery(
     } yield b
 
   /**
+   * List all of the instances in the given AWS account and figure out which ones of
+   * those instances meets the classification criterion for being considered a chemist.
+   */
+  def listActiveChemists: Task[Seq[Location]] =
+    for {
+      a <- instances(isActiveChemist)
+    } yield a.flatMap(_.locations.list)
+
+  /**
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
@@ -167,6 +176,13 @@ class AwsDiscovery(
     c == ActiveFlask
 
   /**
+   * Find all chemist instances that are currently classified as active.
+   * @see funnel.chemist.AwsDiscovery.classify
+   */
+  def isActiveChemist(c: InstanceClassifier): Boolean =
+    c == ActiveChemist
+
+  /**
    * The reason this is not simply the inverted version of `isActiveFlask`
    * is that when asking for targets, we specifically do not want any
    * Flasks, active or otherwise, because mirroring a Flask from another
@@ -177,17 +193,19 @@ class AwsDiscovery(
    * classified as an `ActiveTarget`
    */
   def notFlask(c: InstanceClassifier): Boolean =
-    c == ActiveFlask || c == InactiveFlask || c == Unknown
+    c == ActiveFlask ||
+    c == InactiveFlask ||
+    c == Unknown
 
   /**
    * This default implementation does not properly handle the various upgrade
-   * cases that you might encounter when migrating from one flask cluster to
+   * cases that you might encounter when migrating from one set of clusters to
    * another, but it instead provided as a default where all avalible flasks
-   * are "active". There are a set of upgrade scenarios where you do not want
-   * to mirror from an existing flask cluster, so they are not targets, nor are
-   * they active flasks.
+   * and chemists are are "active". There are a set of upgrade scenarios where
+   * you do not want to mirror from an existing flask cluster, so they are not
+   * targets, nor are they active flasks.
    *
-   * Providing this with a task return type so that extensions can do I/O
+   * Providing this function with a task return type so that extensions can do I/O
    * if they need too (clearly a cache locally would be needed in that case)
    *
    * It is highly recomended you override this with your own classification logic.
@@ -196,9 +214,13 @@ class AwsDiscovery(
     def isFlask(i: AwsInstance): Boolean =
       i.application.map(_.name.startsWith("flask")).getOrElse(false)
 
+    def isChemist(i: AwsInstance): Boolean =
+      i.application.map(_.name.startsWith("chemist")).getOrElse(false)
+
     Task.delay {
       instance =>
         if(isFlask(instance)) ActiveFlask
+        else if(isChemist(instance)) ActiveChemist
         else ActiveTarget
     }
   }
