@@ -157,31 +157,48 @@ class AwsDiscovery(
 
   ///////////////////////////// filters /////////////////////////////
 
-  def isFlask: Task[AwsInstance => Boolean] =
-    Task.delay(_.application.map(_.name.startsWith("flask")).getOrElse(false))
+  import InstanceClassifier._
 
-  def notFlask: Task[AwsInstance => Boolean] =
-    isFlask.map(f => i => !f(i))
+  def isFlask(c: InstanceClassifier): Boolean =
+    c == ActiveFlask || c == InactiveFlask
+
+  def notFlask(c: InstanceClassifier): Boolean =
+    !isFlask(c)
 
   /**
-   * This is intended primiarly as a point of extension. There are a set
+  This default implementation does not properly handle the various upgrade
+  cases that you might encounter when migrating from one flask cluster to
+  another, but it instead provided as a default where all avalible flasks
+  are "active". It is highly recomended you override this with your own
+  classification logic.
+
+  There are a set
    * of upgrade scenarios where you do not want to mirror from an existing
    * flask cluster, so they are not targets, nor are they active flasks.
-   * As such we provide the `isIrrelevant` function to allow dynamic filtering
-   * of instances which should be considered ok to drop (for whatever reason)
-   */
-  def isIrrelevant: Task[AwsInstance => Boolean] =
-    Task.delay(i => false)
+
+  Providing this with a task return type so that extensions can do I/O
+  if they need too (clearly a cache locally would be needed in that case)
+  */
+  val classify: Task[AwsInstance => InstanceClassifier] = {
+    def isFlask(i: AwsInstance): Boolean =
+      i.application.map(_.name.startsWith("flask")).getOrElse(false)
+
+    Task.delay {
+      instance =>
+        if(isFlask(instance)) ActiveFlask
+        else ActiveTarget
+    }
+  }
 
   ///////////////////////////// internal api /////////////////////////////
 
-  private def instances(predicate: Task[AwsInstance => Boolean]): Task[Seq[AwsInstance]] =
+  private def instances(g: InstanceClassifier => Boolean): Task[Seq[AwsInstance]] =
     for {
       a <- readAutoScallingGroups
-      f1 <- predicate
-      f2 <- isIrrelevant
+      b <- classify
+      c  = b andThen g
       // apply the specified filter if we want to remove specific groups for a reason
-      x  = a.filter(i => f1(i) || f2(i))
+      x  = a.filter(c(_))
       // actually reach out to all the discovered hosts and check that their port is reachable
       y  = x.map(g => validate(g).attempt)
       // run the tasks on the specified thread pool (Server.defaultPool)
