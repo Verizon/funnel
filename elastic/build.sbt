@@ -9,9 +9,11 @@ ScalaTest.settings
 
 fork in (run in Test) := true
 
+resolvers += "oncue" at "http://dl.bintray.com/oncue/releases"
+
 libraryDependencies ++= Seq(
   "net.databinder.dispatch" %% "dispatch-core" % V.dispatch,
-  "oncue.svc.knobs"         %% "core"          % V.knobs
+  "oncue.knobs"             %% "core"          % V.knobs
 )
 
 scalacOptions += "-language:postfixOps"
