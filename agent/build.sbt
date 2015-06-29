@@ -15,8 +15,6 @@ Custom.testing
 
 Custom.compilation
 
-resolvers += "oncue" at "http://dl.bintray.com/oncue/releases"
-
 libraryDependencies ++= Seq(
   "net.databinder"  %% "unfiltered-filter"       % V.unfiltered,
   "net.databinder"  %% "unfiltered-netty-server" % V.unfiltered,

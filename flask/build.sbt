@@ -9,8 +9,6 @@ Revolver.settings
 
 ScalaTest.settings
 
-resolvers += "oncue" at "http://dl.bintray.com/oncue/releases"
-
 libraryDependencies += "oncue.knobs" %% "core" % V.knobs
 
 fork in Test := true

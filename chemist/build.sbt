@@ -13,8 +13,6 @@ ContinuousIntegration.produceCoverageReport := false
 
 fork in test := true
 
-resolvers += "oncue" at "http://dl.bintray.com/oncue/releases"
-
 initialCommands in console := """
 import funnel._
 import chemist._
