@@ -24,6 +24,7 @@ trait TestAmazonSQS extends AmazonSQS {
   }
 
   // erroneous methods
+
   def addPermission(x$1: String,x$2: String,x$3: java.util.List[String],x$4: java.util.List[String]): Unit = ???
   def addPermission(x$1: com.amazonaws.services.sqs.model.AddPermissionRequest): Unit = ???
   def changeMessageVisibility(x$1: String,x$2: String,x$3: Integer): Unit = ???
@@ -46,6 +47,7 @@ trait TestAmazonSQS extends AmazonSQS {
   def listQueues(x$1: String): com.amazonaws.services.sqs.model.ListQueuesResult = ???
   def listQueues(): com.amazonaws.services.sqs.model.ListQueuesResult = ???
   def listQueues(x$1: com.amazonaws.services.sqs.model.ListQueuesRequest): com.amazonaws.services.sqs.model.ListQueuesResult = ???
+  def purgeQueue(x$1: com.amazonaws.services.sqs.model.PurgeQueueRequest): Unit = ???
   def receiveMessage(x$1: String): com.amazonaws.services.sqs.model.ReceiveMessageResult = ???
   def removePermission(x$1: String,x$2: String): Unit = ???
   def removePermission(x$1: com.amazonaws.services.sqs.model.RemovePermissionRequest): Unit = ???
@@ -56,6 +58,7 @@ trait TestAmazonSQS extends AmazonSQS {
   def setEndpoint(x$1: String): Unit = ???
   def setQueueAttributes(x$1: String,x$2: java.util.Map[String,String]): Unit = ???
   def setQueueAttributes(x$1: com.amazonaws.services.sqs.model.SetQueueAttributesRequest): Unit = ???
-  def setRegion(x$1: com.amazonaws.regions.Region): Unit = ()
-  def shutdown(): Unit = ()
+  def setRegion(x$1: com.amazonaws.regions.Region): Unit = ???
+  def shutdown(): Unit = ???
+
 }

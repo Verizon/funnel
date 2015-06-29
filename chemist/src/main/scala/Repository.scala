@@ -64,7 +64,6 @@ trait Repository {
   def repoCommands: Process[Task, RepoCommand]
 }
 
-import com.amazonaws.services.ec2.AmazonEC2
 import funnel.internals._
 import journal.Logger
 

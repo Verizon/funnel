@@ -32,6 +32,7 @@ class TestAmazonEC2 extends AmazonEC2 {
   def associateAddress(x$1: com.amazonaws.services.ec2.model.AssociateAddressRequest): com.amazonaws.services.ec2.model.AssociateAddressResult = ???
   def associateDhcpOptions(x$1: com.amazonaws.services.ec2.model.AssociateDhcpOptionsRequest): Unit = ???
   def associateRouteTable(x$1: com.amazonaws.services.ec2.model.AssociateRouteTableRequest): com.amazonaws.services.ec2.model.AssociateRouteTableResult = ???
+  def attachClassicLinkVpc(x$1: com.amazonaws.services.ec2.model.AttachClassicLinkVpcRequest): com.amazonaws.services.ec2.model.AttachClassicLinkVpcResult = ???
   def attachInternetGateway(x$1: com.amazonaws.services.ec2.model.AttachInternetGatewayRequest): Unit = ???
   def attachNetworkInterface(x$1: com.amazonaws.services.ec2.model.AttachNetworkInterfaceRequest): com.amazonaws.services.ec2.model.AttachNetworkInterfaceResult = ???
   def attachVolume(x$1: com.amazonaws.services.ec2.model.AttachVolumeRequest): com.amazonaws.services.ec2.model.AttachVolumeResult = ???
@@ -42,13 +43,17 @@ class TestAmazonEC2 extends AmazonEC2 {
   def cancelBundleTask(x$1: com.amazonaws.services.ec2.model.CancelBundleTaskRequest): com.amazonaws.services.ec2.model.CancelBundleTaskResult = ???
   def cancelConversionTask(x$1: com.amazonaws.services.ec2.model.CancelConversionTaskRequest): Unit = ???
   def cancelExportTask(x$1: com.amazonaws.services.ec2.model.CancelExportTaskRequest): Unit = ???
+  def cancelImportTask(): com.amazonaws.services.ec2.model.CancelImportTaskResult = ???
+  def cancelImportTask(x$1: com.amazonaws.services.ec2.model.CancelImportTaskRequest): com.amazonaws.services.ec2.model.CancelImportTaskResult = ???
   def cancelReservedInstancesListing(x$1: com.amazonaws.services.ec2.model.CancelReservedInstancesListingRequest): com.amazonaws.services.ec2.model.CancelReservedInstancesListingResult = ???
+  def cancelSpotFleetRequests(x$1: com.amazonaws.services.ec2.model.CancelSpotFleetRequestsRequest): com.amazonaws.services.ec2.model.CancelSpotFleetRequestsResult = ???
   def cancelSpotInstanceRequests(x$1: com.amazonaws.services.ec2.model.CancelSpotInstanceRequestsRequest): com.amazonaws.services.ec2.model.CancelSpotInstanceRequestsResult = ???
   def confirmProductInstance(x$1: com.amazonaws.services.ec2.model.ConfirmProductInstanceRequest): com.amazonaws.services.ec2.model.ConfirmProductInstanceResult = ???
   def copyImage(x$1: com.amazonaws.services.ec2.model.CopyImageRequest): com.amazonaws.services.ec2.model.CopyImageResult = ???
   def copySnapshot(x$1: com.amazonaws.services.ec2.model.CopySnapshotRequest): com.amazonaws.services.ec2.model.CopySnapshotResult = ???
   def createCustomerGateway(x$1: com.amazonaws.services.ec2.model.CreateCustomerGatewayRequest): com.amazonaws.services.ec2.model.CreateCustomerGatewayResult = ???
   def createDhcpOptions(x$1: com.amazonaws.services.ec2.model.CreateDhcpOptionsRequest): com.amazonaws.services.ec2.model.CreateDhcpOptionsResult = ???
+  def createFlowLogs(x$1: com.amazonaws.services.ec2.model.CreateFlowLogsRequest): com.amazonaws.services.ec2.model.CreateFlowLogsResult = ???
   def createImage(x$1: com.amazonaws.services.ec2.model.CreateImageRequest): com.amazonaws.services.ec2.model.CreateImageResult = ???
   def createInstanceExportTask(x$1: com.amazonaws.services.ec2.model.CreateInstanceExportTaskRequest): com.amazonaws.services.ec2.model.CreateInstanceExportTaskResult = ???
   def createInternetGateway(): com.amazonaws.services.ec2.model.CreateInternetGatewayResult = ???
@@ -59,7 +64,7 @@ class TestAmazonEC2 extends AmazonEC2 {
   def createNetworkInterface(x$1: com.amazonaws.services.ec2.model.CreateNetworkInterfaceRequest): com.amazonaws.services.ec2.model.CreateNetworkInterfaceResult = ???
   def createPlacementGroup(x$1: com.amazonaws.services.ec2.model.CreatePlacementGroupRequest): Unit = ???
   def createReservedInstancesListing(x$1: com.amazonaws.services.ec2.model.CreateReservedInstancesListingRequest): com.amazonaws.services.ec2.model.CreateReservedInstancesListingResult = ???
-  def createRoute(x$1: com.amazonaws.services.ec2.model.CreateRouteRequest): Unit = ???
+  def createRoute(x$1: com.amazonaws.services.ec2.model.CreateRouteRequest): com.amazonaws.services.ec2.model.CreateRouteResult = ???
   def createRouteTable(x$1: com.amazonaws.services.ec2.model.CreateRouteTableRequest): com.amazonaws.services.ec2.model.CreateRouteTableResult = ???
   def createSecurityGroup(x$1: com.amazonaws.services.ec2.model.CreateSecurityGroupRequest): com.amazonaws.services.ec2.model.CreateSecurityGroupResult = ???
   def createSnapshot(x$1: com.amazonaws.services.ec2.model.CreateSnapshotRequest): com.amazonaws.services.ec2.model.CreateSnapshotResult = ???
@@ -68,6 +73,7 @@ class TestAmazonEC2 extends AmazonEC2 {
   def createTags(x$1: com.amazonaws.services.ec2.model.CreateTagsRequest): Unit = ???
   def createVolume(x$1: com.amazonaws.services.ec2.model.CreateVolumeRequest): com.amazonaws.services.ec2.model.CreateVolumeResult = ???
   def createVpc(x$1: com.amazonaws.services.ec2.model.CreateVpcRequest): com.amazonaws.services.ec2.model.CreateVpcResult = ???
+  def createVpcEndpoint(x$1: com.amazonaws.services.ec2.model.CreateVpcEndpointRequest): com.amazonaws.services.ec2.model.CreateVpcEndpointResult = ???
   def createVpcPeeringConnection(): com.amazonaws.services.ec2.model.CreateVpcPeeringConnectionResult = ???
   def createVpcPeeringConnection(x$1: com.amazonaws.services.ec2.model.CreateVpcPeeringConnectionRequest): com.amazonaws.services.ec2.model.CreateVpcPeeringConnectionResult = ???
   def createVpnConnection(x$1: com.amazonaws.services.ec2.model.CreateVpnConnectionRequest): com.amazonaws.services.ec2.model.CreateVpnConnectionResult = ???
@@ -75,6 +81,7 @@ class TestAmazonEC2 extends AmazonEC2 {
   def createVpnGateway(x$1: com.amazonaws.services.ec2.model.CreateVpnGatewayRequest): com.amazonaws.services.ec2.model.CreateVpnGatewayResult = ???
   def deleteCustomerGateway(x$1: com.amazonaws.services.ec2.model.DeleteCustomerGatewayRequest): Unit = ???
   def deleteDhcpOptions(x$1: com.amazonaws.services.ec2.model.DeleteDhcpOptionsRequest): Unit = ???
+  def deleteFlowLogs(x$1: com.amazonaws.services.ec2.model.DeleteFlowLogsRequest): com.amazonaws.services.ec2.model.DeleteFlowLogsResult = ???
   def deleteInternetGateway(x$1: com.amazonaws.services.ec2.model.DeleteInternetGatewayRequest): Unit = ???
   def deleteKeyPair(x$1: com.amazonaws.services.ec2.model.DeleteKeyPairRequest): Unit = ???
   def deleteNetworkAcl(x$1: com.amazonaws.services.ec2.model.DeleteNetworkAclRequest): Unit = ???
@@ -91,6 +98,7 @@ class TestAmazonEC2 extends AmazonEC2 {
   def deleteTags(x$1: com.amazonaws.services.ec2.model.DeleteTagsRequest): Unit = ???
   def deleteVolume(x$1: com.amazonaws.services.ec2.model.DeleteVolumeRequest): Unit = ???
   def deleteVpc(x$1: com.amazonaws.services.ec2.model.DeleteVpcRequest): Unit = ???
+  def deleteVpcEndpoints(x$1: com.amazonaws.services.ec2.model.DeleteVpcEndpointsRequest): com.amazonaws.services.ec2.model.DeleteVpcEndpointsResult = ???
   def deleteVpcPeeringConnection(x$1: com.amazonaws.services.ec2.model.DeleteVpcPeeringConnectionRequest): com.amazonaws.services.ec2.model.DeleteVpcPeeringConnectionResult = ???
   def deleteVpnConnection(x$1: com.amazonaws.services.ec2.model.DeleteVpnConnectionRequest): Unit = ???
   def deleteVpnConnectionRoute(x$1: com.amazonaws.services.ec2.model.DeleteVpnConnectionRouteRequest): Unit = ???
@@ -104,6 +112,8 @@ class TestAmazonEC2 extends AmazonEC2 {
   def describeAvailabilityZones(x$1: com.amazonaws.services.ec2.model.DescribeAvailabilityZonesRequest): com.amazonaws.services.ec2.model.DescribeAvailabilityZonesResult = ???
   def describeBundleTasks(): com.amazonaws.services.ec2.model.DescribeBundleTasksResult = ???
   def describeBundleTasks(x$1: com.amazonaws.services.ec2.model.DescribeBundleTasksRequest): com.amazonaws.services.ec2.model.DescribeBundleTasksResult = ???
+  def describeClassicLinkInstances(): com.amazonaws.services.ec2.model.DescribeClassicLinkInstancesResult = ???
+  def describeClassicLinkInstances(x$1: com.amazonaws.services.ec2.model.DescribeClassicLinkInstancesRequest): com.amazonaws.services.ec2.model.DescribeClassicLinkInstancesResult = ???
   def describeConversionTasks(): com.amazonaws.services.ec2.model.DescribeConversionTasksResult = ???
   def describeConversionTasks(x$1: com.amazonaws.services.ec2.model.DescribeConversionTasksRequest): com.amazonaws.services.ec2.model.DescribeConversionTasksResult = ???
   def describeCustomerGateways(): com.amazonaws.services.ec2.model.DescribeCustomerGatewaysResult = ???
@@ -112,9 +122,15 @@ class TestAmazonEC2 extends AmazonEC2 {
   def describeDhcpOptions(x$1: com.amazonaws.services.ec2.model.DescribeDhcpOptionsRequest): com.amazonaws.services.ec2.model.DescribeDhcpOptionsResult = ???
   def describeExportTasks(): com.amazonaws.services.ec2.model.DescribeExportTasksResult = ???
   def describeExportTasks(x$1: com.amazonaws.services.ec2.model.DescribeExportTasksRequest): com.amazonaws.services.ec2.model.DescribeExportTasksResult = ???
+  def describeFlowLogs(): com.amazonaws.services.ec2.model.DescribeFlowLogsResult = ???
+  def describeFlowLogs(x$1: com.amazonaws.services.ec2.model.DescribeFlowLogsRequest): com.amazonaws.services.ec2.model.DescribeFlowLogsResult = ???
   def describeImageAttribute(x$1: com.amazonaws.services.ec2.model.DescribeImageAttributeRequest): com.amazonaws.services.ec2.model.DescribeImageAttributeResult = ???
   def describeImages(): com.amazonaws.services.ec2.model.DescribeImagesResult = ???
   def describeImages(x$1: com.amazonaws.services.ec2.model.DescribeImagesRequest): com.amazonaws.services.ec2.model.DescribeImagesResult = ???
+  def describeImportImageTasks(): com.amazonaws.services.ec2.model.DescribeImportImageTasksResult = ???
+  def describeImportImageTasks(x$1: com.amazonaws.services.ec2.model.DescribeImportImageTasksRequest): com.amazonaws.services.ec2.model.DescribeImportImageTasksResult = ???
+  def describeImportSnapshotTasks(): com.amazonaws.services.ec2.model.DescribeImportSnapshotTasksResult = ???
+  def describeImportSnapshotTasks(x$1: com.amazonaws.services.ec2.model.DescribeImportSnapshotTasksRequest): com.amazonaws.services.ec2.model.DescribeImportSnapshotTasksResult = ???
   def describeInstanceAttribute(x$1: com.amazonaws.services.ec2.model.DescribeInstanceAttributeRequest): com.amazonaws.services.ec2.model.DescribeInstanceAttributeResult = ???
   def describeInstanceStatus(): com.amazonaws.services.ec2.model.DescribeInstanceStatusResult = ???
   def describeInstanceStatus(x$1: com.amazonaws.services.ec2.model.DescribeInstanceStatusRequest): com.amazonaws.services.ec2.model.DescribeInstanceStatusResult = ???
@@ -123,6 +139,8 @@ class TestAmazonEC2 extends AmazonEC2 {
   def describeInternetGateways(x$1: com.amazonaws.services.ec2.model.DescribeInternetGatewaysRequest): com.amazonaws.services.ec2.model.DescribeInternetGatewaysResult = ???
   def describeKeyPairs(): com.amazonaws.services.ec2.model.DescribeKeyPairsResult = ???
   def describeKeyPairs(x$1: com.amazonaws.services.ec2.model.DescribeKeyPairsRequest): com.amazonaws.services.ec2.model.DescribeKeyPairsResult = ???
+  def describeMovingAddresses(): com.amazonaws.services.ec2.model.DescribeMovingAddressesResult = ???
+  def describeMovingAddresses(x$1: com.amazonaws.services.ec2.model.DescribeMovingAddressesRequest): com.amazonaws.services.ec2.model.DescribeMovingAddressesResult = ???
   def describeNetworkAcls(): com.amazonaws.services.ec2.model.DescribeNetworkAclsResult = ???
   def describeNetworkAcls(x$1: com.amazonaws.services.ec2.model.DescribeNetworkAclsRequest): com.amazonaws.services.ec2.model.DescribeNetworkAclsResult = ???
   def describeNetworkInterfaceAttribute(x$1: com.amazonaws.services.ec2.model.DescribeNetworkInterfaceAttributeRequest): com.amazonaws.services.ec2.model.DescribeNetworkInterfaceAttributeResult = ???
@@ -130,6 +148,8 @@ class TestAmazonEC2 extends AmazonEC2 {
   def describeNetworkInterfaces(x$1: com.amazonaws.services.ec2.model.DescribeNetworkInterfacesRequest): com.amazonaws.services.ec2.model.DescribeNetworkInterfacesResult = ???
   def describePlacementGroups(): com.amazonaws.services.ec2.model.DescribePlacementGroupsResult = ???
   def describePlacementGroups(x$1: com.amazonaws.services.ec2.model.DescribePlacementGroupsRequest): com.amazonaws.services.ec2.model.DescribePlacementGroupsResult = ???
+  def describePrefixLists(): com.amazonaws.services.ec2.model.DescribePrefixListsResult = ???
+  def describePrefixLists(x$1: com.amazonaws.services.ec2.model.DescribePrefixListsRequest): com.amazonaws.services.ec2.model.DescribePrefixListsResult = ???
   def describeRegions(): com.amazonaws.services.ec2.model.DescribeRegionsResult = ???
   def describeRegions(x$1: com.amazonaws.services.ec2.model.DescribeRegionsRequest): com.amazonaws.services.ec2.model.DescribeRegionsResult = ???
   def describeReservedInstances(): com.amazonaws.services.ec2.model.DescribeReservedInstancesResult = ???
@@ -149,6 +169,10 @@ class TestAmazonEC2 extends AmazonEC2 {
   def describeSnapshots(x$1: com.amazonaws.services.ec2.model.DescribeSnapshotsRequest): com.amazonaws.services.ec2.model.DescribeSnapshotsResult = ???
   def describeSpotDatafeedSubscription(): com.amazonaws.services.ec2.model.DescribeSpotDatafeedSubscriptionResult = ???
   def describeSpotDatafeedSubscription(x$1: com.amazonaws.services.ec2.model.DescribeSpotDatafeedSubscriptionRequest): com.amazonaws.services.ec2.model.DescribeSpotDatafeedSubscriptionResult = ???
+  def describeSpotFleetInstances(x$1: com.amazonaws.services.ec2.model.DescribeSpotFleetInstancesRequest): com.amazonaws.services.ec2.model.DescribeSpotFleetInstancesResult = ???
+  def describeSpotFleetRequestHistory(x$1: com.amazonaws.services.ec2.model.DescribeSpotFleetRequestHistoryRequest): com.amazonaws.services.ec2.model.DescribeSpotFleetRequestHistoryResult = ???
+  def describeSpotFleetRequests(): com.amazonaws.services.ec2.model.DescribeSpotFleetRequestsResult = ???
+  def describeSpotFleetRequests(x$1: com.amazonaws.services.ec2.model.DescribeSpotFleetRequestsRequest): com.amazonaws.services.ec2.model.DescribeSpotFleetRequestsResult = ???
   def describeSpotInstanceRequests(): com.amazonaws.services.ec2.model.DescribeSpotInstanceRequestsResult = ???
   def describeSpotInstanceRequests(x$1: com.amazonaws.services.ec2.model.DescribeSpotInstanceRequestsRequest): com.amazonaws.services.ec2.model.DescribeSpotInstanceRequestsResult = ???
   def describeSpotPriceHistory(): com.amazonaws.services.ec2.model.DescribeSpotPriceHistoryResult = ???
@@ -163,6 +187,12 @@ class TestAmazonEC2 extends AmazonEC2 {
   def describeVolumes(): com.amazonaws.services.ec2.model.DescribeVolumesResult = ???
   def describeVolumes(x$1: com.amazonaws.services.ec2.model.DescribeVolumesRequest): com.amazonaws.services.ec2.model.DescribeVolumesResult = ???
   def describeVpcAttribute(x$1: com.amazonaws.services.ec2.model.DescribeVpcAttributeRequest): com.amazonaws.services.ec2.model.DescribeVpcAttributeResult = ???
+  def describeVpcClassicLink(): com.amazonaws.services.ec2.model.DescribeVpcClassicLinkResult = ???
+  def describeVpcClassicLink(x$1: com.amazonaws.services.ec2.model.DescribeVpcClassicLinkRequest): com.amazonaws.services.ec2.model.DescribeVpcClassicLinkResult = ???
+  def describeVpcEndpointServices(): com.amazonaws.services.ec2.model.DescribeVpcEndpointServicesResult = ???
+  def describeVpcEndpointServices(x$1: com.amazonaws.services.ec2.model.DescribeVpcEndpointServicesRequest): com.amazonaws.services.ec2.model.DescribeVpcEndpointServicesResult = ???
+  def describeVpcEndpoints(): com.amazonaws.services.ec2.model.DescribeVpcEndpointsResult = ???
+  def describeVpcEndpoints(x$1: com.amazonaws.services.ec2.model.DescribeVpcEndpointsRequest): com.amazonaws.services.ec2.model.DescribeVpcEndpointsResult = ???
   def describeVpcPeeringConnections(): com.amazonaws.services.ec2.model.DescribeVpcPeeringConnectionsResult = ???
   def describeVpcPeeringConnections(x$1: com.amazonaws.services.ec2.model.DescribeVpcPeeringConnectionsRequest): com.amazonaws.services.ec2.model.DescribeVpcPeeringConnectionsResult = ???
   def describeVpcs(): com.amazonaws.services.ec2.model.DescribeVpcsResult = ???
@@ -171,21 +201,28 @@ class TestAmazonEC2 extends AmazonEC2 {
   def describeVpnConnections(x$1: com.amazonaws.services.ec2.model.DescribeVpnConnectionsRequest): com.amazonaws.services.ec2.model.DescribeVpnConnectionsResult = ???
   def describeVpnGateways(): com.amazonaws.services.ec2.model.DescribeVpnGatewaysResult = ???
   def describeVpnGateways(x$1: com.amazonaws.services.ec2.model.DescribeVpnGatewaysRequest): com.amazonaws.services.ec2.model.DescribeVpnGatewaysResult = ???
+  def detachClassicLinkVpc(x$1: com.amazonaws.services.ec2.model.DetachClassicLinkVpcRequest): com.amazonaws.services.ec2.model.DetachClassicLinkVpcResult = ???
   def detachInternetGateway(x$1: com.amazonaws.services.ec2.model.DetachInternetGatewayRequest): Unit = ???
   def detachNetworkInterface(x$1: com.amazonaws.services.ec2.model.DetachNetworkInterfaceRequest): Unit = ???
   def detachVolume(x$1: com.amazonaws.services.ec2.model.DetachVolumeRequest): com.amazonaws.services.ec2.model.DetachVolumeResult = ???
   def detachVpnGateway(x$1: com.amazonaws.services.ec2.model.DetachVpnGatewayRequest): Unit = ???
   def disableVgwRoutePropagation(x$1: com.amazonaws.services.ec2.model.DisableVgwRoutePropagationRequest): Unit = ???
+  def disableVpcClassicLink(x$1: com.amazonaws.services.ec2.model.DisableVpcClassicLinkRequest): com.amazonaws.services.ec2.model.DisableVpcClassicLinkResult = ???
   def disassociateAddress(x$1: com.amazonaws.services.ec2.model.DisassociateAddressRequest): Unit = ???
   def disassociateRouteTable(x$1: com.amazonaws.services.ec2.model.DisassociateRouteTableRequest): Unit = ???
   def dryRun[X <: com.amazonaws.AmazonWebServiceRequest](x$1: com.amazonaws.services.ec2.model.DryRunSupportedRequest[X]): com.amazonaws.services.ec2.model.DryRunResult[X] = ???
   def enableVgwRoutePropagation(x$1: com.amazonaws.services.ec2.model.EnableVgwRoutePropagationRequest): Unit = ???
   def enableVolumeIO(x$1: com.amazonaws.services.ec2.model.EnableVolumeIORequest): Unit = ???
+  def enableVpcClassicLink(x$1: com.amazonaws.services.ec2.model.EnableVpcClassicLinkRequest): com.amazonaws.services.ec2.model.EnableVpcClassicLinkResult = ???
   def getCachedResponseMetadata(x$1: com.amazonaws.AmazonWebServiceRequest): com.amazonaws.ResponseMetadata = ???
   def getConsoleOutput(x$1: com.amazonaws.services.ec2.model.GetConsoleOutputRequest): com.amazonaws.services.ec2.model.GetConsoleOutputResult = ???
   def getPasswordData(x$1: com.amazonaws.services.ec2.model.GetPasswordDataRequest): com.amazonaws.services.ec2.model.GetPasswordDataResult = ???
+  def importImage(): com.amazonaws.services.ec2.model.ImportImageResult = ???
+  def importImage(x$1: com.amazonaws.services.ec2.model.ImportImageRequest): com.amazonaws.services.ec2.model.ImportImageResult = ???
   def importInstance(x$1: com.amazonaws.services.ec2.model.ImportInstanceRequest): com.amazonaws.services.ec2.model.ImportInstanceResult = ???
   def importKeyPair(x$1: com.amazonaws.services.ec2.model.ImportKeyPairRequest): com.amazonaws.services.ec2.model.ImportKeyPairResult = ???
+  def importSnapshot(): com.amazonaws.services.ec2.model.ImportSnapshotResult = ???
+  def importSnapshot(x$1: com.amazonaws.services.ec2.model.ImportSnapshotRequest): com.amazonaws.services.ec2.model.ImportSnapshotResult = ???
   def importVolume(x$1: com.amazonaws.services.ec2.model.ImportVolumeRequest): com.amazonaws.services.ec2.model.ImportVolumeResult = ???
   def modifyImageAttribute(x$1: com.amazonaws.services.ec2.model.ModifyImageAttributeRequest): Unit = ???
   def modifyInstanceAttribute(x$1: com.amazonaws.services.ec2.model.ModifyInstanceAttributeRequest): Unit = ???
@@ -195,7 +232,9 @@ class TestAmazonEC2 extends AmazonEC2 {
   def modifySubnetAttribute(x$1: com.amazonaws.services.ec2.model.ModifySubnetAttributeRequest): Unit = ???
   def modifyVolumeAttribute(x$1: com.amazonaws.services.ec2.model.ModifyVolumeAttributeRequest): Unit = ???
   def modifyVpcAttribute(x$1: com.amazonaws.services.ec2.model.ModifyVpcAttributeRequest): Unit = ???
+  def modifyVpcEndpoint(x$1: com.amazonaws.services.ec2.model.ModifyVpcEndpointRequest): com.amazonaws.services.ec2.model.ModifyVpcEndpointResult = ???
   def monitorInstances(x$1: com.amazonaws.services.ec2.model.MonitorInstancesRequest): com.amazonaws.services.ec2.model.MonitorInstancesResult = ???
+  def moveAddressToVpc(x$1: com.amazonaws.services.ec2.model.MoveAddressToVpcRequest): com.amazonaws.services.ec2.model.MoveAddressToVpcResult = ???
   def purchaseReservedInstancesOffering(x$1: com.amazonaws.services.ec2.model.PurchaseReservedInstancesOfferingRequest): com.amazonaws.services.ec2.model.PurchaseReservedInstancesOfferingResult = ???
   def rebootInstances(x$1: com.amazonaws.services.ec2.model.RebootInstancesRequest): Unit = ???
   def registerImage(x$1: com.amazonaws.services.ec2.model.RegisterImageRequest): com.amazonaws.services.ec2.model.RegisterImageResult = ???
@@ -206,11 +245,13 @@ class TestAmazonEC2 extends AmazonEC2 {
   def replaceRoute(x$1: com.amazonaws.services.ec2.model.ReplaceRouteRequest): Unit = ???
   def replaceRouteTableAssociation(x$1: com.amazonaws.services.ec2.model.ReplaceRouteTableAssociationRequest): com.amazonaws.services.ec2.model.ReplaceRouteTableAssociationResult = ???
   def reportInstanceStatus(x$1: com.amazonaws.services.ec2.model.ReportInstanceStatusRequest): Unit = ???
+  def requestSpotFleet(x$1: com.amazonaws.services.ec2.model.RequestSpotFleetRequest): com.amazonaws.services.ec2.model.RequestSpotFleetResult = ???
   def requestSpotInstances(x$1: com.amazonaws.services.ec2.model.RequestSpotInstancesRequest): com.amazonaws.services.ec2.model.RequestSpotInstancesResult = ???
   def resetImageAttribute(x$1: com.amazonaws.services.ec2.model.ResetImageAttributeRequest): Unit = ???
   def resetInstanceAttribute(x$1: com.amazonaws.services.ec2.model.ResetInstanceAttributeRequest): Unit = ???
   def resetNetworkInterfaceAttribute(x$1: com.amazonaws.services.ec2.model.ResetNetworkInterfaceAttributeRequest): Unit = ???
   def resetSnapshotAttribute(x$1: com.amazonaws.services.ec2.model.ResetSnapshotAttributeRequest): Unit = ???
+  def restoreAddressToClassic(x$1: com.amazonaws.services.ec2.model.RestoreAddressToClassicRequest): com.amazonaws.services.ec2.model.RestoreAddressToClassicResult = ???
   def revokeSecurityGroupEgress(x$1: com.amazonaws.services.ec2.model.RevokeSecurityGroupEgressRequest): Unit = ???
   def revokeSecurityGroupIngress(): Unit = ???
   def revokeSecurityGroupIngress(x$1: com.amazonaws.services.ec2.model.RevokeSecurityGroupIngressRequest): Unit = ???
@@ -223,4 +264,5 @@ class TestAmazonEC2 extends AmazonEC2 {
   def terminateInstances(x$1: com.amazonaws.services.ec2.model.TerminateInstancesRequest): com.amazonaws.services.ec2.model.TerminateInstancesResult = ???
   def unassignPrivateIpAddresses(x$1: com.amazonaws.services.ec2.model.UnassignPrivateIpAddressesRequest): Unit = ???
   def unmonitorInstances(x$1: com.amazonaws.services.ec2.model.UnmonitorInstancesRequest): com.amazonaws.services.ec2.model.UnmonitorInstancesResult = ???
+
 }

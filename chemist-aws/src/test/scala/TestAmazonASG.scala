@@ -60,13 +60,19 @@ object TestAmazonASG {
 
 trait TestAmazonASG extends AmazonAutoScaling {
 
-  // def describeAutoScalingGroups(x$1: DescribeAutoScalingGroupsRequest): com.amazonaws.services.autoscaling.model.DescribeAutoScalingGroupsResult =
+  //// not needed methods ////
+
+  def describeAutoScalingGroups(): com.amazonaws.services.autoscaling.model.DescribeAutoScalingGroupsResult = ???
   def attachInstances(x$1: com.amazonaws.services.autoscaling.model.AttachInstancesRequest): Unit = ???
+  def attachLoadBalancers(): com.amazonaws.services.autoscaling.model.AttachLoadBalancersResult = ???
+  def attachLoadBalancers(x$1: com.amazonaws.services.autoscaling.model.AttachLoadBalancersRequest): com.amazonaws.services.autoscaling.model.AttachLoadBalancersResult = ???
+  def completeLifecycleAction(x$1: com.amazonaws.services.autoscaling.model.CompleteLifecycleActionRequest): com.amazonaws.services.autoscaling.model.CompleteLifecycleActionResult = ???
   def createAutoScalingGroup(x$1: com.amazonaws.services.autoscaling.model.CreateAutoScalingGroupRequest): Unit = ???
   def createLaunchConfiguration(x$1: com.amazonaws.services.autoscaling.model.CreateLaunchConfigurationRequest): Unit = ???
   def createOrUpdateTags(x$1: com.amazonaws.services.autoscaling.model.CreateOrUpdateTagsRequest): Unit = ???
   def deleteAutoScalingGroup(x$1: com.amazonaws.services.autoscaling.model.DeleteAutoScalingGroupRequest): Unit = ???
   def deleteLaunchConfiguration(x$1: com.amazonaws.services.autoscaling.model.DeleteLaunchConfigurationRequest): Unit = ???
+  def deleteLifecycleHook(x$1: com.amazonaws.services.autoscaling.model.DeleteLifecycleHookRequest): com.amazonaws.services.autoscaling.model.DeleteLifecycleHookResult = ???
   def deleteNotificationConfiguration(x$1: com.amazonaws.services.autoscaling.model.DeleteNotificationConfigurationRequest): Unit = ???
   def deletePolicy(x$1: com.amazonaws.services.autoscaling.model.DeletePolicyRequest): Unit = ???
   def deleteScheduledAction(x$1: com.amazonaws.services.autoscaling.model.DeleteScheduledActionRequest): Unit = ???
@@ -75,13 +81,16 @@ trait TestAmazonASG extends AmazonAutoScaling {
   def describeAccountLimits(x$1: com.amazonaws.services.autoscaling.model.DescribeAccountLimitsRequest): com.amazonaws.services.autoscaling.model.DescribeAccountLimitsResult = ???
   def describeAdjustmentTypes(): com.amazonaws.services.autoscaling.model.DescribeAdjustmentTypesResult = ???
   def describeAdjustmentTypes(x$1: com.amazonaws.services.autoscaling.model.DescribeAdjustmentTypesRequest): com.amazonaws.services.autoscaling.model.DescribeAdjustmentTypesResult = ???
-  def describeAutoScalingGroups(): com.amazonaws.services.autoscaling.model.DescribeAutoScalingGroupsResult = ???
   def describeAutoScalingInstances(): com.amazonaws.services.autoscaling.model.DescribeAutoScalingInstancesResult = ???
   def describeAutoScalingInstances(x$1: com.amazonaws.services.autoscaling.model.DescribeAutoScalingInstancesRequest): com.amazonaws.services.autoscaling.model.DescribeAutoScalingInstancesResult = ???
   def describeAutoScalingNotificationTypes(): com.amazonaws.services.autoscaling.model.DescribeAutoScalingNotificationTypesResult = ???
   def describeAutoScalingNotificationTypes(x$1: com.amazonaws.services.autoscaling.model.DescribeAutoScalingNotificationTypesRequest): com.amazonaws.services.autoscaling.model.DescribeAutoScalingNotificationTypesResult = ???
   def describeLaunchConfigurations(): com.amazonaws.services.autoscaling.model.DescribeLaunchConfigurationsResult = ???
   def describeLaunchConfigurations(x$1: com.amazonaws.services.autoscaling.model.DescribeLaunchConfigurationsRequest): com.amazonaws.services.autoscaling.model.DescribeLaunchConfigurationsResult = ???
+  def describeLifecycleHookTypes(): com.amazonaws.services.autoscaling.model.DescribeLifecycleHookTypesResult = ???
+  def describeLifecycleHookTypes(x$1: com.amazonaws.services.autoscaling.model.DescribeLifecycleHookTypesRequest): com.amazonaws.services.autoscaling.model.DescribeLifecycleHookTypesResult = ???
+  def describeLifecycleHooks(x$1: com.amazonaws.services.autoscaling.model.DescribeLifecycleHooksRequest): com.amazonaws.services.autoscaling.model.DescribeLifecycleHooksResult = ???
+  def describeLoadBalancers(x$1: com.amazonaws.services.autoscaling.model.DescribeLoadBalancersRequest): com.amazonaws.services.autoscaling.model.DescribeLoadBalancersResult = ???
   def describeMetricCollectionTypes(): com.amazonaws.services.autoscaling.model.DescribeMetricCollectionTypesResult = ???
   def describeMetricCollectionTypes(x$1: com.amazonaws.services.autoscaling.model.DescribeMetricCollectionTypesRequest): com.amazonaws.services.autoscaling.model.DescribeMetricCollectionTypesResult = ???
   def describeNotificationConfigurations(): com.amazonaws.services.autoscaling.model.DescribeNotificationConfigurationsResult = ???
@@ -98,13 +107,20 @@ trait TestAmazonASG extends AmazonAutoScaling {
   def describeTags(x$1: com.amazonaws.services.autoscaling.model.DescribeTagsRequest): com.amazonaws.services.autoscaling.model.DescribeTagsResult = ???
   def describeTerminationPolicyTypes(): com.amazonaws.services.autoscaling.model.DescribeTerminationPolicyTypesResult = ???
   def describeTerminationPolicyTypes(x$1: com.amazonaws.services.autoscaling.model.DescribeTerminationPolicyTypesRequest): com.amazonaws.services.autoscaling.model.DescribeTerminationPolicyTypesResult = ???
+  def detachInstances(x$1: com.amazonaws.services.autoscaling.model.DetachInstancesRequest): com.amazonaws.services.autoscaling.model.DetachInstancesResult = ???
+  def detachLoadBalancers(): com.amazonaws.services.autoscaling.model.DetachLoadBalancersResult = ???
+  def detachLoadBalancers(x$1: com.amazonaws.services.autoscaling.model.DetachLoadBalancersRequest): com.amazonaws.services.autoscaling.model.DetachLoadBalancersResult = ???
   def disableMetricsCollection(x$1: com.amazonaws.services.autoscaling.model.DisableMetricsCollectionRequest): Unit = ???
   def enableMetricsCollection(x$1: com.amazonaws.services.autoscaling.model.EnableMetricsCollectionRequest): Unit = ???
+  def enterStandby(x$1: com.amazonaws.services.autoscaling.model.EnterStandbyRequest): com.amazonaws.services.autoscaling.model.EnterStandbyResult = ???
   def executePolicy(x$1: com.amazonaws.services.autoscaling.model.ExecutePolicyRequest): Unit = ???
+  def exitStandby(x$1: com.amazonaws.services.autoscaling.model.ExitStandbyRequest): com.amazonaws.services.autoscaling.model.ExitStandbyResult = ???
   def getCachedResponseMetadata(x$1: com.amazonaws.AmazonWebServiceRequest): com.amazonaws.ResponseMetadata = ???
+  def putLifecycleHook(x$1: com.amazonaws.services.autoscaling.model.PutLifecycleHookRequest): com.amazonaws.services.autoscaling.model.PutLifecycleHookResult = ???
   def putNotificationConfiguration(x$1: com.amazonaws.services.autoscaling.model.PutNotificationConfigurationRequest): Unit = ???
   def putScalingPolicy(x$1: com.amazonaws.services.autoscaling.model.PutScalingPolicyRequest): com.amazonaws.services.autoscaling.model.PutScalingPolicyResult = ???
   def putScheduledUpdateGroupAction(x$1: com.amazonaws.services.autoscaling.model.PutScheduledUpdateGroupActionRequest): Unit = ???
+  def recordLifecycleActionHeartbeat(x$1: com.amazonaws.services.autoscaling.model.RecordLifecycleActionHeartbeatRequest): com.amazonaws.services.autoscaling.model.RecordLifecycleActionHeartbeatResult = ???
   def resumeProcesses(x$1: com.amazonaws.services.autoscaling.model.ResumeProcessesRequest): Unit = ???
   def setDesiredCapacity(x$1: com.amazonaws.services.autoscaling.model.SetDesiredCapacityRequest): Unit = ???
   def setEndpoint(x$1: String): Unit = ???
