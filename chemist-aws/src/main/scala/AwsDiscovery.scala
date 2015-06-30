@@ -102,7 +102,7 @@ class AwsDiscovery(
    * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
-  protected def lookupOne(id: String): Task[AwsInstance] = {
+  def lookupOne(id: String): Task[AwsInstance] = {
     lookupMany(Seq(id)).flatMap {
       _.filter(_.id == id).headOption match {
         case None => Task.fail(InstanceNotFoundException(id))

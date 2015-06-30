@@ -9,6 +9,7 @@ import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.regions.{Regions,Region}
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
+import com.amazonaws.services.cloudformation.AmazonCloudFormation
 import dispatch.Http
 import concurrent.duration.Duration
 import funnel.aws._
@@ -20,24 +21,30 @@ case class QueueConfig(
   topicName: String
 )
 
+case class MachineConfig(
+  id: String,
+  location: Location
+)
+
 case class AwsConfig(
   templates: List[LocationTemplate],
   network: NetworkConfig,
+  machine: MachineConfig,
   queue: QueueConfig,
   sns: AmazonSNS,
   sqs: AmazonSQS,
   ec2: AmazonEC2,
   asg: AmazonAutoScaling,
+  cfn: AmazonCloudFormation,
   commandTimeout: Duration,
   includeVpcTargets: Boolean,
-  sharder: Sharder,
-  deployedAt: Location // this is the location of the chemist itself
+  sharder: Sharder
 ) extends PlatformConfig {
   val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, templates)
 
   val repository: Repository = new StatefulRepository
 
-  val election: ElectionStrategy = ForegoneConclusion(discovery, deployedAt)
+  val election: ElectionStrategy = ForegoneConclusion(discovery, machine.location)
 
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
@@ -66,22 +73,25 @@ object AwsConfig {
       sqs               = readSQS(aws),
       ec2               = readEC2(aws),
       asg               = readASG(aws),
+      cfn               = readCFN(aws),
       sharder           = readSharder(sharding),
       commandTimeout    = timeout,
       includeVpcTargets = usevpc,
-      deployedAt        = readDeployedAt(cfg)
+      machine           = readMachineConfig(cfg)
     )
   }
 
-  private def readDeployedAt(cfg: Config): Location = {
-    Location(
-      host = cfg.require[String]("aws.meta-data.local-ipv4"),
-      port = cfg.require[Int]("chemist.network.funnel-port"),
-      datacenter = cfg.require[String]("aws.meta-data.placement.region"),
-      intent = LocationIntent.Mirroring,
-      templates = Nil
+  private def readMachineConfig(cfg: Config): MachineConfig =
+    MachineConfig(
+      id = cfg.lookup[String]("aws.instance-id").getOrElse("local"),
+      location = Location(
+        host = cfg.require[String]("aws.meta-data.local-ipv4"),
+        port = cfg.require[Int]("chemist.network.funnel-port"),
+        datacenter = cfg.require[String]("aws.meta-data.placement.region"),
+        intent = LocationIntent.Mirroring,
+        templates = Nil
+      )
     )
-  }
 
   private def readSharder(c: Option[String]): Sharder =
     c match {
@@ -92,6 +102,17 @@ object AwsConfig {
 
   private def readNetwork(cfg: Config): NetworkConfig =
     NetworkConfig(cfg.require[String]("host"), cfg.require[Int]("port"))
+
+  private def readCFN(cfg: Config): AmazonCloudFormation =
+    CFN.client(
+      new BasicAWSCredentials(
+        cfg.require[String]("access-key"),
+        cfg.require[String]("secret-key")),
+      cfg.lookup[String]("proxy-host"),
+      cfg.lookup[Int]("proxy-port"),
+      cfg.lookup[String]("proxy-protocol"),
+      Region.getRegion(Regions.fromName(cfg.require[String]("region")))
+    )
 
   private def readSNS(cfg: Config): AmazonSNS =
     SNS.client(

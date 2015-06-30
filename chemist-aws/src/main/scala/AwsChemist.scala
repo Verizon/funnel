@@ -60,10 +60,15 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
       a <- SNS.create(cfg.queue.topicName)(cfg.sns).liftKleisli
       _  = log.debug(s"created sns topic with arn = $a")
 
-      b <- SQS.create(cfg.queue.topicName, a)(cfg.sqs).liftKleisli
-      _  = log.debug(s"created sqs queue with arn = $b")
+      b <- cfg.discovery.lookupOne(cfg.machine.id).liftKleisli
+      b1 = b.tags.get("aws:cloudformation:stack-name").getOrElse("unknown")
+      _  = log.debug(s"discovered stack name for this running instance to be '$b1'")
 
-      c <- SNS.subscribe(a, b)(cfg.sns).liftKleisli
+      c <- CFN.getStackOutputs(b1)(cfg.cfn).liftKleisli
+      c1 = c.get("ServiceQueueARN").getOrElse("unknown")
+      _  = log.debug(s"discovered sqs queue with name '$c1'")
+
+      _ <- SNS.subscribe(a, c1)(cfg.sns).liftKleisli
       _  = log.debug(s"subscribed sqs queue to the sns topic")
 
       // now the queues are setup with the right permissions,
