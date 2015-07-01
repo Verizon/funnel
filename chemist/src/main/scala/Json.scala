@@ -46,8 +46,8 @@ object JSON {
       ("targets" := m._2.toList) ->: jEmptyObject
     )
 
-  implicit val SnapshotWithFlaskToJson: EncodeJson[(Flask, Map[ClusterName, List[URI]])] =
-    encodeClusterPairs[Flask]
+  implicit val SnapshotWithFlaskToJson: EncodeJson[(FlaskID, Map[ClusterName, List[URI]])] =
+    encodeClusterPairs[FlaskID]
 
   /**
    * {
