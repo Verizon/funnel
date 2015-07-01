@@ -193,8 +193,12 @@ object TargetLifecycle {
 
     targetLifecycle decomp state match {
       case Decomp(Some(Context(_, _, _, out)), _) =>
-        findTrans(msg, state, out).fold(Task.now(()))(s => repo.lifecycleQ.enqueueOne(s))
-      case _ => Task.now(())
+        findTrans(msg, state, out).fold(
+          Task.now(log.error(s"found context but failed: msg=$msg, state=$state, out=$out"))
+            )(s => repo.lifecycleQ.enqueueOne(s))
+
+      case other => Task.now(log.error(
+        s"transistion process failed: msg=$msg, state=$state, other=$other"))
     }
   }
 }
