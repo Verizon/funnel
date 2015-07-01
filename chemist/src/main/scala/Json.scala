@@ -21,7 +21,7 @@ object JSON {
 
   implicit val DateToJson: EncodeJson[Date] =
     implicitly[EncodeJson[String]].contramap {
-      new SimpleDateFormat().format(_)
+      new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ",java.util.Locale.US).format(_)
     }
 
   ////////////////////// Chemist messages //////////////////////
@@ -46,8 +46,8 @@ object JSON {
       ("targets" := m._2.toList) ->: jEmptyObject
     )
 
-  implicit val SnapshotWithFlaskToJson: EncodeJson[(Flask, Map[ClusterName, List[URI]])] =
-    encodeClusterPairs[Flask]
+  implicit val SnapshotWithFlaskToJson: EncodeJson[(FlaskID, Map[ClusterName, List[URI]])] =
+    encodeClusterPairs[FlaskID]
 
   /**
    * {

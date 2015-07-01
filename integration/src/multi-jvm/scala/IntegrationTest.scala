@@ -86,9 +86,7 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
 
     val svc = url(s"http://127.0.0.1:64529${path}")
     val json = http(svc OK as.String)
-    println("-----------------------------")
-    println(scala.concurrent.Await.result(json, 1.seconds))
-    println("-----------------------------")
+    scala.concurrent.Await.result(json, 1.seconds)
   }
 
   def deployTarget(role: RoleName, port: Int, failAfter: Option[Duration] = None) =
@@ -155,6 +153,9 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
 
   it should "show the correct distribution" in {
     runOn(chemist01){
+      // just adding this to make sure that in future, the json does not get fubared.
+      fetch("/distribution") should equal ("""[{"targets":[{"urls":["http://localhost:4001/stream/now"],"cluster":"target01"},{"urls":["http://localhost:4003/stream/now"],"cluster":"target03"},{"urls":["http://localhost:4002/stream/now"],"cluster":"target02"}],"shard":"flask1"}]""")
+
       ichemist.distribution.exe.toList.sortBy(_._1.value).toMap should equal (
         Map(FlaskID("flask1") -> Map(
           "target01" -> List(new URI("http://localhost:4001/stream/now")),
@@ -175,7 +176,7 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
     import org.scalatest.OptionValues._
     runOn(chemist01){
       enterBarrier(PhaseTwo)
-      println(">>>><<<<>>>>><<<<<>>>>> PHASE TWO")
+
       val errors = ichemist.errors.exe
 
       errors.size should be > 0

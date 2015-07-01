@@ -96,7 +96,7 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
       GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
     case GET(Path("/errors")) =>
-      GetStatus.time(Ok ~> JsonResponse(Chemist.version))
+      GetErrors.time(json(chemist.errors.map(_.toList)))
 
     case GET(Path("/distribution")) =>
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
