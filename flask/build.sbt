@@ -9,6 +9,6 @@ Revolver.settings
 
 ScalaTest.settings
 
-libraryDependencies ++= "oncue.svc.knobs" %% "core" % V.knobs
+libraryDependencies += "oncue.svc.knobs" %% "core" % V.knobs
 
 fork in Test := true
