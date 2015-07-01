@@ -21,7 +21,7 @@ object JSON {
 
   implicit val DateToJson: EncodeJson[Date] =
     implicitly[EncodeJson[String]].contramap {
-      new SimpleDateFormat().format(_)
+      new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ",java.util.Locale.US).format(_)
     }
 
   ////////////////////// Chemist messages //////////////////////
