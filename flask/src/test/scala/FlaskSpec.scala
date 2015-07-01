@@ -8,7 +8,6 @@ import scalaz.syntax.applicative._
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
 import scalaz.stream.Process
 import scalaz.stream.async.signalOf
-import com.amazonaws.auth.BasicAWSCredentials
 import argonaut._, Argonaut._
 import journal.Logger
 import funnel.elastic._

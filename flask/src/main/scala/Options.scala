@@ -3,7 +3,6 @@ package flask
 
 import funnel.elastic.ElasticCfg
 import scala.concurrent.duration._
-import com.amazonaws.auth.BasicAWSCredentials
 
 case class RiemannCfg(
   host: String,
