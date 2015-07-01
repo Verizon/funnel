@@ -31,6 +31,7 @@ import concurrent.duration._
 class AwsDiscovery(
   ec2: AmazonEC2,
   asg: AmazonAutoScaling,
+  classifier: Classifier[AwsInstance],
   resourceTemplates: Seq[LocationTemplate],
   cacheMaxSize: Int = 2000
 ) extends Discovery {
@@ -76,7 +77,7 @@ class AwsDiscovery(
     } yield a.flatMap(_.locations.list)
 
   /**
-   * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
+   * Lookup the `AwsInstance` for a given `InstanceID`; `AwsInstance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
   def lookupFlask(id: FlaskID): Task[Flask] =
@@ -86,7 +87,7 @@ class AwsDiscovery(
     } yield Flask(FlaskID(a.id), a.location, b)
 
   /**
-   * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
+   * Lookup the `AwsInstance` for a given `InstanceID`; `AwsInstance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
   def lookupTargets(id: TargetID): Task[Set[Target]] = {
@@ -99,7 +100,7 @@ class AwsDiscovery(
   }
 
   /**
-   * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
+   * Lookup the `AwsInstance` for a given `InstanceID`; `AwsInstance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
   def lookupOne(id: String): Task[AwsInstance] = {
@@ -112,7 +113,7 @@ class AwsDiscovery(
   }
 
   /**
-   * Lookup the `Instance` metadata for a set of `InstanceID`.
+   * Lookup the `AwsInstance` metadata for a set of `InstanceID`.
    * @see funnel.chemist.AwsDiscovery.lookupOne
    */
   protected def lookupMany(ids: Seq[String]): Task[Seq[AwsInstance]] = {
@@ -166,20 +167,20 @@ class AwsDiscovery(
 
   ///////////////////////////// filters /////////////////////////////
 
-  import InstanceClassifier._
+  import Classification._
 
   /**
    * Find all the flasks that are currently classified as active.
    * @see funnel.chemist.AwsDiscovery.classify
    */
-  def isActiveFlask(c: InstanceClassifier): Boolean =
+  def isActiveFlask(c: Classification): Boolean =
     c == ActiveFlask
 
   /**
    * Find all chemist instances that are currently classified as active.
    * @see funnel.chemist.AwsDiscovery.classify
    */
-  def isActiveChemist(c: InstanceClassifier): Boolean =
+  def isActiveChemist(c: Classification): Boolean =
     c == ActiveChemist
 
   /**
@@ -192,7 +193,7 @@ class AwsDiscovery(
    * To mittigate this, we specifically call out anything that is not
    * classified as an `ActiveTarget`
    */
-  def notFlask(c: InstanceClassifier): Boolean =
+  def notFlask(c: Classification): Boolean =
     c == ActiveFlask ||
     c == InactiveFlask ||
     c == Unknown
@@ -210,27 +211,27 @@ class AwsDiscovery(
    *
    * It is highly recomended you override this with your own classification logic.
    */
-  val classify: Task[AwsInstance => InstanceClassifier] = {
-    def isFlask(i: AwsInstance): Boolean =
-      i.application.map(_.name.startsWith("flask")).getOrElse(false)
+  // val classify: Task[AwsInstance => Classification] = {
+  //   def isFlask(i: AwsInstance): Boolean =
+  //     i.application.map(_.name.startsWith("flask")).getOrElse(false)
 
-    def isChemist(i: AwsInstance): Boolean =
-      i.application.map(_.name.startsWith("chemist")).getOrElse(false)
+  //   def isChemist(i: AwsInstance): Boolean =
+  //     i.application.map(_.name.startsWith("chemist")).getOrElse(false)
 
-    Task.delay {
-      instance =>
-        if(isFlask(instance)) ActiveFlask
-        else if(isChemist(instance)) ActiveChemist
-        else ActiveTarget
-    }
-  }
+  //   Task.delay {
+  //     instance =>
+  //       if(isFlask(instance)) ActiveFlask
+  //       else if(isChemist(instance)) ActiveChemist
+  //       else ActiveTarget
+  //   }
+  // }
 
   ///////////////////////////// internal api /////////////////////////////
 
-  private def instances(g: InstanceClassifier => Boolean): Task[Seq[AwsInstance]] =
+  private def instances(g: Classification => Boolean): Task[Seq[AwsInstance]] =
     for {
       a <- readAutoScallingGroups
-      b <- classify
+      b <- classifier.task
       c  = b andThen g
       // apply the specified filter if we want to remove specific groups for a reason
       x  = a.filter(c(_))

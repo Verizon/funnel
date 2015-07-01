@@ -38,9 +38,10 @@ case class AwsConfig(
   cfn: AmazonCloudFormation,
   commandTimeout: Duration,
   includeVpcTargets: Boolean,
-  sharder: Sharder
+  sharder: Sharder,
+  classifier: Classifier[AwsInstance]
 ) extends PlatformConfig {
-  val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, templates)
+  val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, classifier, templates)
 
   val repository: Repository = new StatefulRepository
 
@@ -75,6 +76,7 @@ object AwsConfig {
       asg               = readASG(aws),
       cfn               = readCFN(aws),
       sharder           = readSharder(sharding),
+      classifier        = DefaultClassifier, // TIM: This should not be hardcoded.
       commandTimeout    = timeout,
       includeVpcTargets = usevpc,
       machine           = readMachineConfig(cfg)

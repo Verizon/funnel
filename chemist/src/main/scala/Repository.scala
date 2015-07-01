@@ -44,6 +44,7 @@ trait Repository {
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit]
   def errorSink(e: Error): Task[Unit]
   def platformHandler(a: PlatformEvent): Task[Unit]
+
   /////////////// instance operations ///////////////
 
   def targetState(instanceId: URI): TargetState
@@ -81,7 +82,7 @@ class StatefulRepository extends Repository {
    * stores a key-value map of instance-id -> host
    */
   val targets = new Ref[InstanceM](==>>.empty)
-  val flasks  = new Ref[FlaskM](==>>.empty)
+  val knownFlasks  = new Ref[FlaskM](==>>.empty)
 
   private val emptyMap: InstanceM = ==>>.empty
   val stateMaps = new Ref[StateM](==>>(Unknown -> emptyMap,
@@ -123,6 +124,7 @@ class StatefulRepository extends Repository {
   def errorSink(e: Error): Task[Unit] = errorStack.push(e)
 
   /////////////// instance operations ///////////////
+
   def instances: Task[Seq[(URI, StateChange)]] =
     Task(targets.get.toList)
 
@@ -155,7 +157,7 @@ class StatefulRepository extends Repository {
           Task.delay(log.info("platformHandler -- new task: " + f)) >>
           Task {
             D.update(_.insert(f.id, Set.empty))
-            flasks.update(_.insert(f.id, f))
+            knownFlasks.update(_.insert(f.id, f))
           }(Chemist.serverPool) >>
           repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f)) >>
           repoCommandsQ.enqueueOne(RepoCommand.AssignWork(f))
@@ -247,7 +249,7 @@ class StatefulRepository extends Repository {
               case _ => Process.halt
             }
           case NewFlask(flask) =>
-            flasks.update(_ + (flask.id -> flask))
+            knownFlasks.update(_ + (flask.id -> flask))
             Process.halt
         }
       }
@@ -266,17 +268,22 @@ class StatefulRepository extends Repository {
   /**
    * determine the current perceived state of a Target
    */
-  def targetState(id: URI): TargetState = targets.get.lookup(id).fold[TargetState](TargetState.Unknown)(_.to)
-  def instance(id: URI): Option[Target] = targets.get.lookup(id).map(_.msg.target)
-  def flask(id: FlaskID): Option[Flask] = flasks.get.lookup(id)
+  def targetState(id: URI): TargetState =
+    targets.get.lookup(id).fold[TargetState](TargetState.Unknown)(_.to)
+
+  def instance(id: URI): Option[Target] =
+    targets.get.lookup(id).map(_.msg.target)
+
+  def flask(id: FlaskID): Option[Flask] =
+    knownFlasks.get.lookup(id)
 
   /////////////// flask operations ///////////////
 
-  def distribution: Task[Distribution] = Task.now(D.get)
+  def distribution: Task[Distribution] =
+    Task.now(D.get)
 
-  def mergeDistribution(d: Distribution): Task[Distribution] = Task {
-    D.update(_.unionWith(d)(_ ++ _))
-  } (Chemist.serverPool)
+  def mergeDistribution(d: Distribution): Task[Distribution] =
+    Task(D.update(_.unionWith(d)(_ ++ _)))(Chemist.serverPool)
 
   def mergeExistingDistribution(d: Distribution): Task[Distribution] = Task {
     d.toList.foreach {
