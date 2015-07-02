@@ -33,6 +33,8 @@ object Server {
     val repo    = platform.config.repository
     val sharder = platform.config.sharder
 
+    repo.lifecycle()
+
     (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _)).run.runAsync {
       case -\/(err) =>
         log.error(s"Error starting processing of Platform events: $err")
