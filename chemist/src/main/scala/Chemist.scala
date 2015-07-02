@@ -117,6 +117,14 @@ trait Chemist[A <: Platform]{
     f  <- cfg.discovery.listFlasks.liftKleisli
     _  = log.info(s"found ${f.length} flasks in the running instance list...")
 
+    // ask those flasks for their current work and yield a `Distribution`
+    d <- Housekeeping.gatherAssignedTargets(f)(cfg.http).liftKleisli
+    _  = log.debug("read the existing state of assigned work from the remote instances")
+
+    // update the distribution accordingly
+    d2 <- cfg.repository.mergeExistingDistribution(d).liftKleisli
+    _  = log.debug("merged the currently assigned work into the current distribution")
+
     // update the distribution with new capacity seeds
     _ <- f.toVector.traverse_(flask => cfg.repository.platformHandler(PlatformEvent.NewFlask(flask))).liftKleisli
     _  = log.debug("increased the known monitoring capactiy based on discovered flasks")
@@ -126,27 +134,22 @@ trait Chemist[A <: Platform]{
     _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
 
     // filter out all the instances that are in private networks
-    // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
     x  <- filterTargets(l)
-    (z, y)  = x
-    _  = log.info(s"located ${z.length} instances that appear to be monitorable")
+    (monitorable, unmonitorable)  = x
 
-    // set the result to an in-memory list of "the world"
-    targets = z.flatMap { case (id,targets) => targets.toSeq.map(PlatformEvent.NewTarget) } //the fact that I'm throwing ID away here is suspect
+    // figure out given the existing distribution, and the differencen between what's been discovered
+    // STU: the fact that I'm throwing ID away here is suspect
+    unmonitored = d2.values.foldLeft(Set.empty[Target])(_ ++ _) &~ monitorable.foldLeft(Set.empty[Target])(_ ++ _._2)
+    _  = log.info(s"located instances: monitorable=${monitorable.size}, unmonitorable=${unmonitorable.size}, unmonitored=${unmonitored.size}")
+
+    // action the new targets by putting them in the monitoring lifecycle
+    targets = unmonitored.map(t => PlatformEvent.NewTarget(t))
     _ <- targets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
-    _  = log.info("added instances to the repository...")
+    _  = log.info("added ${targets.length} targets to the repository...")
 
-    um = y.flatMap { case (id,um) => um.toSeq.map(PlatformEvent.Unmonitorable) }
+    um = unmonitorable.flatMap { case (id,um) => um.toSeq.map(PlatformEvent.Unmonitorable) }
     _ <- um.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
-    _  = log.info("added unmonitorables to the repository...")
-
-    // ask those flasks for their current work and yield a `Distribution`
-    d <- Housekeeping.gatherAssignedTargets(f)(cfg.http).liftKleisli
-    _  = log.debug("read the existing state of assigned work from the remote instances")
-
-    // update the distribution accordingly
-    d2 <- cfg.repository.mergeExistingDistribution(d).liftKleisli
-    _  = log.debug("merged the currently assigned work into the current distribution")
+    _  = log.info("added ${unmonitorable.length} unmonitorable URIs to the repository...")
 
     _ <- Sharding.distribute(cfg.repository, cfg.sharder, cfg.remoteFlask, d2)(targets.map(_.target).toSet).liftKleisli
 
