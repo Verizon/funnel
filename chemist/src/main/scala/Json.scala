@@ -241,4 +241,15 @@ object JSON {
       case e @ PlatformEvent.Assigned(f, t) => encodeAssigned(f, t, e.time)
       case e @ PlatformEvent.NoOp => ("type" := "NoOp") ->: ("time" := e.time) ->: jEmptyObject
     }
+
+  implicit val targetLifecycleToJson: EncodeJson[TargetLifecycle.TargetState] =
+    EncodeJson((s: TargetState) =>
+      ("state"   := s.toString) ->: jEmptyObject
+    )
+
+  implicit val uriStateChangePairToJson: EncodeJson[(URI,RepoEvent.StateChange)] =
+    EncodeJson((t: (URI,RepoEvent.StateChange)) =>
+      ("uri" := t._1) ->:
+      ("state-change" := t._2) ->: jEmptyObject
+    )
 }
