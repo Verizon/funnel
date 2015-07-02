@@ -81,6 +81,12 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
   import MultiNodeSampleConfig._
   import PlatformEvent._, TargetLifecycle._
 
+  def printObnoxiously[A](a: => A): Unit = {
+    println(">>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    println(a)
+    println("<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+  }
+
   def fetch(path: String) = {
     import dispatch._, Defaults._
 
@@ -155,6 +161,8 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
     runOn(chemist01){
       // just adding this to make sure that in future, the json does not get fubared.
       fetch("/distribution") should equal ("""[{"targets":[{"urls":["http://localhost:4001/stream/now"],"cluster":"target01"},{"urls":["http://localhost:4003/stream/now"],"cluster":"target03"},{"urls":["http://localhost:4002/stream/now"],"cluster":"target02"}],"shard":"flask1"}]""")
+
+      printObnoxiously(fetch("/lifecycle/states"))
 
       ichemist.distribution.exe.toList.sortBy(_._1.value).toMap should equal (
         Map(FlaskID("flask1") -> Map(
