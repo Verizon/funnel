@@ -85,7 +85,7 @@ object TargetLifecycle {
     }
 
     case object Problematic extends TargetState(7) {
-      override def toString = "Exception"
+      override def toString = "Problematic"
     }
 
     case object DoubleMonitored extends TargetState(5) {
