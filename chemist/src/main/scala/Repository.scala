@@ -58,6 +58,7 @@ trait Repository {
   def flask(id: FlaskID): Option[Flask]
   val lifecycleQ: async.mutable.Queue[RepoEvent]
   def instances: Task[Seq[(URI, StateChange)]]
+  def lifecycle(): Unit = {}
 
   /////////////// flask operations ///////////////
 
@@ -255,7 +256,7 @@ class StatefulRepository extends Repository {
   val repoCommands: Process[Task, RepoCommand] =
     repoCommandsQ.dequeue
 
-  def lifecycle(): Unit =  {
+  override def lifecycle(): Unit =  {
     val go: RepoEvent => Process[Task, RepoCommand] = { re =>
       Process.eval(repoHistoryStack.push(re)).flatMap{ _ =>
         log.info(s"executing lifecycle: $re")
