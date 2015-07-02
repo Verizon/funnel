@@ -41,9 +41,16 @@ trait Repository {
    * the most recent mirroring errors
    */
   def errors: Task[Seq[Error]]
+
+  /**
+   * Render the current state of the world, as chemist sees it
+   */
+  def states: Task[Map[TargetState, Map[URI, StateChange]]]
+
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit]
   def errorSink(e: Error): Task[Unit]
   def platformHandler(a: PlatformEvent): Task[Unit]
+
   /////////////// instance operations ///////////////
 
   def targetState(instanceId: URI): TargetState
@@ -111,7 +118,8 @@ class StatefulRepository extends Repository {
   /////////////// audit operations //////////////////
 
   def historicalPlatformEvents: Task[Seq[PlatformEvent]] =
-    Task.delay(historyStack.toSeq.toList.sortWith { case(x, y) => x.time.compareTo(y.time) < 0 })
+    Task.delay(historyStack.toSeq.toList.sortWith {
+      case(x, y) => x.time.compareTo(y.time) < 0 })
 
   def historicalRepoEvents: Task[Seq[RepoEvent]] =
     Task.delay(repoHistoryStack.toSeq.toList)
@@ -119,19 +127,24 @@ class StatefulRepository extends Repository {
   def errors: Task[Seq[Error]] =
     Task.delay(errorStack.toSeq.toList)
 
+  def states: Task[Map[TargetState, Map[URI, StateChange]]] =
+    Task.delay(stateMaps.get.toList.map {
+      case (k,v) => k -> v.toList.toMap }.toMap)
+
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit] = Task.now(())
 
   def errorSink(e: Error): Task[Unit] = errorStack.push(e)
 
   /////////////// instance operations ///////////////
+
   def instances: Task[Seq[(URI, StateChange)]] =
-    Task(targets.get.toList)
+    Task.delay(targets.get.toList)
 
   def unassignedTargets: Task[Set[Target]] =
-    Task(stateMaps.get.lookup(TargetState.Unmonitored).fold(Set.empty[Target])(m => m.values.map(_.msg.target).toSet))(Chemist.serverPool)
+    Task.delay(stateMaps.get.lookup(TargetState.Unmonitored).fold(Set.empty[Target])(m => m.values.map(_.msg.target).toSet))
 
   def unmonitorableTargets: Task[List[URI]] =
-    Task(stateMaps.get.lookup(TargetState.Unmonitorable).fold(List.empty[URI])(m => m.values.map(_.msg.target.uri)))(Chemist.serverPool)
+    Task.delay(stateMaps.get.lookup(TargetState.Unmonitorable).fold(List.empty[URI])(m => m.values.map(_.msg.target.uri)))
 
   def assignedTargets(flask: FlaskID): Task[Set[Target]] =
     D.get.lookup(flask) match {
@@ -150,6 +163,7 @@ class StatefulRepository extends Repository {
       a match {
         case PlatformEvent.NewTarget(target) =>
           Task.delay(log.info("platformHandler -- new target: " + target)) >>
+          // Task.delay(targets.update(_.insert(target.uri, f))) >>
           lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), targetState(target.uri))
 
         case PlatformEvent.NewFlask(f) =>
