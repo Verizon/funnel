@@ -153,10 +153,10 @@ class StatefulRepository extends Repository {
 
         case PlatformEvent.NewFlask(f) =>
           Task.delay(log.info("platformHandler -- new task: " + f)) >>
-          Task {
+          Task.delay {
             D.update(_.insert(f.id, Set.empty))
             flasks.update(_.insert(f.id, f))
-          }(Chemist.serverPool) >>
+          } >>
           repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f)) >>
           repoCommandsQ.enqueueOne(RepoCommand.AssignWork(f))
 
@@ -169,13 +169,14 @@ class StatefulRepository extends Repository {
         case PlatformEvent.TerminatedTarget(i) => {
           val target = targets.get.lookup(i)
           target.map { t =>
-            Task {
+            Task.delay {
               targets.update(_.delete(i))
               stateMaps.update(_.update(t.to, m => Some(m.delete(i))))
               ()
-            }(Chemist.serverPool)
+            }
           }.getOrElse(Task.now(()))
         }
+
         case PlatformEvent.Monitored(f, i) =>
           // TODO: what is this was unexpected? then the lifecycle call will result in nothing
           log.info(s"platformHandler -- $i monitored by $f")
@@ -197,10 +198,14 @@ class StatefulRepository extends Repository {
         }
 
         case PlatformEvent.Unmonitorable(t) => {
+          log.info(s"platformHandler -- unmonitorable=$t")
           val msg = Terminated(t, System.currentTimeMillis)
           val sc = StateChange(Problematic, Problematic, msg)
-          Task { stateMaps.update(_.update(Unmonitorable, m =>
-            Some(m.insert(t.uri, sc)))); () }(Chemist.serverPool)
+          Task.delay {
+            stateMaps.update(_.update(Unmonitorable, m =>
+              Some(m.insert(t.uri, sc))));
+            ()
+          }
         }
 
         case PlatformEvent.Problem(f, i, msg) => {
@@ -214,25 +219,32 @@ class StatefulRepository extends Repository {
             Task.now(())
           }
         }
+
         case PlatformEvent.Assigned(fl, t) =>
           Task.delay(log.info(s"platformHandler -- $t assigned to $fl")) >>
           lifecycle(TargetLifecycle.Assignment(t, fl, System.currentTimeMillis), targetState(t.uri))
-        case PlatformEvent.NoOp => Task.now(())
+
+        case PlatformEvent.NoOp =>
+          Task.now(())
       }
     }
   }
 
   // inbound events from TargetLifecycle
-  val lifecycleQ: async.mutable.Queue[RepoEvent] = async.unboundedQueue(Strategy.Executor(Chemist.serverPool))
+  val lifecycleQ: async.mutable.Queue[RepoEvent] =
+    async.unboundedQueue(Strategy.Executor(Chemist.serverPool))
 
   // outbound events to be consumed by Sharding
-  private val repoCommandsQ: async.mutable.Queue[RepoCommand] = async.unboundedQueue(Strategy.Executor(Chemist.serverPool))
-  val repoCommands: Process[Task, RepoCommand] = repoCommandsQ.dequeue
+  private val repoCommandsQ: async.mutable.Queue[RepoCommand] =
+    async.unboundedQueue(Strategy.Executor(Chemist.serverPool))
+
+  val repoCommands: Process[Task, RepoCommand] =
+    repoCommandsQ.dequeue
 
   def lifecycle(): Unit =  {
     val go: RepoEvent => Process[Task, RepoCommand] = { re =>
       Process.eval(repoHistoryStack.push(re)).flatMap{ _ =>
-        log.info(s"lifecycle: $re")
+        log.info(s"executing lifecycle: $re")
         re match {
           case sc @ StateChange(from,to,msg) =>
             val id = msg.target.uri
@@ -266,27 +278,33 @@ class StatefulRepository extends Repository {
   /**
    * determine the current perceived state of a Target
    */
-  def targetState(id: URI): TargetState = targets.get.lookup(id).fold[TargetState](TargetState.Unknown)(_.to)
-  def instance(id: URI): Option[Target] = targets.get.lookup(id).map(_.msg.target)
-  def flask(id: FlaskID): Option[Flask] = flasks.get.lookup(id)
+  def targetState(id: URI): TargetState =
+    targets.get.lookup(id).fold[TargetState](TargetState.Unknown)(_.to)
+
+  def instance(id: URI): Option[Target] =
+    targets.get.lookup(id).map(_.msg.target)
+
+  def flask(id: FlaskID): Option[Flask] =
+    flasks.get.lookup(id)
 
   /////////////// flask operations ///////////////
 
-  def distribution: Task[Distribution] = Task.now(D.get)
+  def distribution: Task[Distribution] =
+    Task.now(D.get)
 
-  def mergeDistribution(d: Distribution): Task[Distribution] = Task {
-    D.update(_.unionWith(d)(_ ++ _))
-  } (Chemist.serverPool)
+  def mergeDistribution(d: Distribution): Task[Distribution] =
+    Task.delay(D.update(_.unionWith(d)(_ ++ _)))
 
-  def mergeExistingDistribution(d: Distribution): Task[Distribution] = Task {
-    d.toList.foreach {
-      case (fl, ts) =>
-        ts.foreach { t =>
-          val sc = StateChange(TargetState.Unknown, TargetState.Monitored, Confirmation(t, fl, System.currentTimeMillis))
-          stateMaps.update(_.map(_.delete(t.uri)))
-          stateMaps.update(_.update(TargetState.Monitored, m => Some(m.insert(t.uri, sc))))
-          targets.update(_.insert(t.uri, sc))
-        }
-    }
-  } (Chemist.serverPool) >> mergeDistribution(d)
+  def mergeExistingDistribution(d: Distribution): Task[Distribution] =
+    Task.delay {
+      d.toList.foreach {
+        case (fl, ts) =>
+          ts.foreach { t =>
+            val sc = StateChange(TargetState.Unknown, TargetState.Monitored, Confirmation(t, fl, System.currentTimeMillis))
+            stateMaps.update(_.map(_.delete(t.uri)))
+            stateMaps.update(_.update(TargetState.Monitored, m => Some(m.insert(t.uri, sc))))
+            targets.update(_.insert(t.uri, sc))
+          }
+      }
+    } >> mergeDistribution(d)
 }
