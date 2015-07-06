@@ -169,14 +169,9 @@ class AwsDiscovery(
     for {
       a <- readAutoScallingGroups
       // apply the specified filter if we want to remove specific groups for a reason
-      x  = a.filter(f)
-      // actually reach out to all the discovered hosts and check that their port is reachable
-      y  = x.map(g => validate(g).attempt)
-      // run the tasks on the specified thread pool (Server.defaultPool)
-      b <- Task.gatherUnordered(y)
-      r  = b.flatMap(_.toList)
-      _  = log.debug(s"validated instance list: ${r.map(_.id).mkString(", ")}")
-    } yield r
+      b = a.filter(f)
+      _  = log.debug(s"instance list: ${b.map(_.id).mkString(", ")}")
+    } yield b
 
   /**
    * This is kind of horrible, but it is what it is. The AWS api's really do not help here at all.
@@ -247,38 +242,5 @@ class AwsDiscovery(
       tags = machineTags,
       locations = NonEmptyList(a, b.toList:_*)
     )
-  }
-
-  import scala.io.Source
-  import scalaz.\/
-  import java.net.{Socket, InetSocketAddress}
-
-  /**
-   * Goal of this function is to validate that the machine instances specified
-   * by the supplied group `g`, are in fact running a funnel instance and it is
-   * ready to start sending metrics if we connect to its `/stream` function.
-   */
-  private def validate(instance: AwsInstance): Task[AwsInstance] = {
-    /**
-     * Do a naieve check to see if the socket is even network accessible.
-     * Given that funnel is using multiple protocols we can't assume that
-     * any given protocol at this point in time, so we just try to see if
-     * its even avalible on the port the discovery flow said it was.
-     *
-     * This mainly guards against miss-configuration of the network setup,
-     * LAN-ACLs, firewalls etc.
-     */
-    def go(uri: URI): Throwable \/ Unit =
-      \/.fromTryCatchThrowable[Unit, Exception]{
-        val s = new Socket
-        // timeout in 300ms to keep the overhead reasonable
-        try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 300)
-        finally s.close // whatever the outcome, close the socket to prevent leaks.
-      }
-
-    for {
-      a <- Task(go(instance.location.uri))(Chemist.defaultPool)
-      b <- a.fold(e => Task.fail(e), o => Task.now(o))
-    } yield instance
   }
 }

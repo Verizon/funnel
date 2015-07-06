@@ -59,6 +59,7 @@ class ChemistAwsSpec extends FlatSpec with Matchers with Served {
   def setup = { s =>
     val c = new AwsChemist[DefaultAws]
     val p = new DefaultAws { val config = c2 }
+    c.bootstrap(p).run
     val server = new Server(c, p)
     s.plan(server)
   }
