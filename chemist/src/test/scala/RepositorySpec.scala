@@ -121,14 +121,5 @@ object RespositorySpec extends Properties("StaticRepository") with ArbitraryLife
     val out = repo.repoCommands.run.map(_ => true).run
     in && out && consistentRepo(repo) && matchesStates(repo, states)
   }
-
-  property("publishes Unmonitorable") = {
-    val repo = new StatefulRepository
-    val uri = new URI("http://flaberga.st:98765")
-    val event = PlatformEvent.Unmonitorable(Target("my-cluster", uri, false))
-    repo.platformHandler(event).run
-    val um = repo.unmonitorableTargets.run
-    um.length == 1 && um.head == uri
-  }
 }
 

@@ -26,28 +26,6 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
   private val signal: Signal[Boolean] = signalOf(true)
 
   /**
-   * if the config says to include vpc targets, include them if the target is in a private network
-   * if the target is on a public network address, include it
-   * otherwise, wtf, how did we arrive here - dont monitor it.
-   */
-  def filterTargets(instances: Seq[(TargetID, Set[Target])]): ChemistK[(Seq[(TargetID, Set[Target])], Seq[(TargetID, Set[Target])])] =
-    config.map { cfg =>
-      val split = instances.map {
-        case (id, targets) =>
-          id -> targets.partition { t =>
-            true
-          }
-      }
-      val in = split.collect {
-        case (id, (good, bad)) if good.nonEmpty => id -> good
-      }
-      val out = split.collect {
-        case (id, (good, bad)) if bad.nonEmpty => id -> bad
-      }
-      (in, out)
-    }
-
-  /**
    * Initilize the chemist serivce by trying to create the various AWS resources
    * that are required to operate. Once complete, execute the boostrap.
    */
