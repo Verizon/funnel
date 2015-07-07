@@ -130,19 +130,7 @@ trait Chemist[A <: Platform]{
     _ <- f.toVector.traverse_(flask => cfg.repository.platformHandler(PlatformEvent.NewFlask(flask))).liftKleisli
     _  = log.debug(s"increased the number of known flasks to ${f.size}")
 
-    // read the list of all deployed machines
-    l <- cfg.discovery.listTargets.liftKleisli
-    _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
-
-    // figure out given the existing distribution, and the differencen between what's been discovered
-    // STU: the fact that I'm throwing ID away here is suspect
-    unmonitored = l.foldLeft(Set.empty[Target])(_ ++ _._2) &~ d2.values.foldLeft(Set.empty[Target])(_ ++ _)
-    _  = log.info(s"located instances: monitorable=${l.size}, unmonitored=${unmonitored.size}")
-
-    // action the new targets by putting them in the monitoring lifecycle
-    targets = unmonitored.map(t => PlatformEvent.NewTarget(t))
-    _ <- targets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
-    _  = log.info(s"added ${targets.size} targets to the repository...")
+    _ <- Housekeeping.gatherUnassignedTargets(cfg.discovery, cfg.repository).liftKleisli
 
     _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
 

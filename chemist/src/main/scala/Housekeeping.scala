@@ -1,15 +1,62 @@
 package funnel
 package chemist
 
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Task,Strategy}
+import scalaz.stream.{Process, time}
 import scalaz.std.string._
 import scalaz.syntax.apply._
+import scalaz.syntax.kleisli._
+import scalaz.syntax.traverse._
+import scalaz.syntax.id._
+import scalaz.std.vector._
+import scalaz.std.option._
 import journal.Logger
 import java.net.URI
 
 object Housekeeping {
   import Sharding._
+  import concurrent.duration._
+
   private lazy val log = Logger[Housekeeping.type]
+  private lazy val defaultPool = Strategy.Executor(Chemist.defaultPool)
+
+  /**
+   * This is a collection of the tasks that are needed to run on a periodic basis.
+   * Specifically this involves the following:
+   * 1. ensuring that we pickup any target instances that we were not already moniotring
+   * 2. ensuring that targets that are stuck in the assigned state for more than a given 
+   *    period are reaped, and re-assigned to another flask (NOT IMPLEMENTED.)
+   */
+  def periodic(delay: Duration)(discovery: Discovery, repository: Repository): Process[Task,Unit] =
+    time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
+      for {
+        _ <- gatherUnassignedTargets(discovery, repository)
+      } yield ())
+
+  /**
+   * Gather up all the targets that are for reasons unknown sitting in the unassigned
+   * target state. We'll read the list of the whole world, and delta that against the known
+   * distribution, and assign any outliers. This is a fall back mechinism.
+   */
+  def gatherUnassignedTargets(discovery: Discovery, repository: Repository): Task[Unit] =
+    for {
+      // read the state of the existing world
+      d <- repository.distribution
+
+      // read the list of all deployed machines
+      l <- discovery.listTargets
+      _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
+
+      // // figure out given the existing distribution, and the differencen between what's been discovered
+      // // STU: the fact that I'm throwing ID away here is suspect
+      unmonitored = l.foldLeft(Set.empty[Target])(_ ++ _._2) &~ d.values.foldLeft(Set.empty[Target])(_ ++ _)
+      _  = log.info(s"located instances: monitorable=${l.size}, unmonitored=${unmonitored.size}")
+
+      // // action the new targets by putting them in the monitoring lifecycle
+      targets = unmonitored.map(t => PlatformEvent.NewTarget(t))
+      _ <- targets.toVector.traverse_(repository.platformHandler)
+      _  = log.info(s"added ${targets.size} targets to the repository...")
+    } yield ()
 
   /**
    * Given a collection of flask instances, find out what exactly they are already
