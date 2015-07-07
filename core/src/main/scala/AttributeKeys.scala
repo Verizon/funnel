@@ -9,4 +9,6 @@ object AttributeKeys {
   val cluster = "cluster"
   val source = "source"
   val kind = "kind"
+  val experimentID = "experiment_id"
+  val experimentGroup = "experiment_group"
 }
