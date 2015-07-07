@@ -17,6 +17,8 @@ class IntegrationDiscovery extends Discovery {
   def listTargets: Task[Seq[(TargetID, Set[Target])]] =
     Task.now(randomids.toSeq)
 
+  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = Task.now(Seq.empty)
+
   def lookupFlask(id: FlaskID): Task[Flask] =
     for {
       a <- listFlasks

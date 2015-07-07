@@ -24,6 +24,11 @@ object JSON {
       new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ",java.util.Locale.US).format(_)
     }
 
+  implicit def TargetEncodeJson: EncodeJson[Target] =
+    EncodeJson((t: Target) =>
+      ("cluster" := t.cluster) ->:
+      ("uri"     := t.uri) ->: jEmptyObject)
+
   ////////////////////// Chemist messages //////////////////////
 
   /**

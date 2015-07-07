@@ -85,8 +85,9 @@ trait Chemist[A <: Platform]{
   /**
     * List the unmonitorable targets.
     */
-  def unmonitorable: ChemistK[List[URI]] =
-    config.flatMapK(_.repository.unmonitorableTargets)
+  def listUnmonitorableTargets: ChemistK[List[Target]] =
+    config.flatMapK { cfg => cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2))
+  }
 
   /**
    * List out the last 100 lifecycle events that this chemist has seen.
@@ -133,34 +134,21 @@ trait Chemist[A <: Platform]{
     l <- cfg.discovery.listTargets.liftKleisli
     _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
 
-    // filter out all the instances that are in private networks
-    x  <- filterTargets(l)
-    (monitorable, unmonitorable)  = x
-
     // figure out given the existing distribution, and the differencen between what's been discovered
     // STU: the fact that I'm throwing ID away here is suspect
-    unmonitored = monitorable.foldLeft(Set.empty[Target])(_ ++ _._2) &~ d2.values.foldLeft(Set.empty[Target])(_ ++ _)
-    _  = log.info(s"located instances: monitorable=${monitorable.size}, unmonitorable=${unmonitorable.size}, unmonitored=${unmonitored.size}")
+    unmonitored = l.foldLeft(Set.empty[Target])(_ ++ _._2) &~ d2.values.foldLeft(Set.empty[Target])(_ ++ _)
+    _  = log.info(s"located instances: monitorable=${l.size}, unmonitored=${unmonitored.size}")
 
     // action the new targets by putting them in the monitoring lifecycle
     targets = unmonitored.map(t => PlatformEvent.NewTarget(t))
     _ <- targets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
     _  = log.info(s"added ${targets.size} targets to the repository...")
 
-    um = unmonitorable.flatMap { case (id,um) => um.toSeq.map(PlatformEvent.Unmonitorable) }
-    _ <- um.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
-    _  = log.info(s"added ${unmonitorable.length} unmonitorable URIs to the repository...")
-
     _ <- Sharding.distribute(cfg.repository, cfg.sharder, cfg.remoteFlask, d2)(targets.map(_.target).toSet).liftKleisli
 
     _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
 
   } yield ()
-
-  /**
-   * Platform specific way of filtering instances we can discover but we might not want to monitor
-   */
-  def filterTargets(targets: Seq[(TargetID, Set[Target])]): ChemistK[(Seq[(TargetID, Set[Target])], Seq[(TargetID, Set[Target])])]
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources
