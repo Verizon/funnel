@@ -216,14 +216,6 @@ object JSON {
     jEmptyObject
   }
 
-  def encodeUnmonitorable(t: Target, time: Date): Json = {
-    ("type" := "Unmonitorable") ->:
-    ("cluster" := t.cluster) ->:
-    ("uri" := t.uri) ->:
-    ("time" := time) ->:
-    jEmptyObject
-  }
-
   def encodeAssigned(f: FlaskID, t: Target, time: Date): Json = {
     ("type" := "Assigned") ->:
     ("flask" := f.value) ->:
@@ -242,7 +234,6 @@ object JSON {
       case e @ PlatformEvent.Monitored(f, u) => encodeMonitored(f, u, e.time)
       case e @ PlatformEvent.Problem(f, u, msg) => encodeProblem(f, u, msg, e.time)
       case e @ PlatformEvent.Unmonitored(f, u) => encodeUnmonitored(f, u, e.time)
-      case e @ PlatformEvent.Unmonitorable(t) => encodeUnmonitorable(t, e.time)
       case e @ PlatformEvent.Assigned(f, t) => encodeAssigned(f, t, e.time)
       case e @ PlatformEvent.NoOp => ("type" := "NoOp") ->: ("time" := e.time) ->: jEmptyObject
     }

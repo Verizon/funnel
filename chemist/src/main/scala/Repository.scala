@@ -94,7 +94,6 @@ class StatefulRepository extends Repository {
   private val emptyMap: InstanceM = ==>>.empty
   val stateMaps = new Ref[StateM](==>>(Unknown -> emptyMap,
                                        Unmonitored -> emptyMap,
-                                       Unmonitorable -> emptyMap,
                                        Assigned -> emptyMap,
                                        Monitored -> emptyMap,
                                        Problematic -> emptyMap,
@@ -209,17 +208,6 @@ class StatefulRepository extends Repository {
           } getOrElse {
             // if we didn't even know about the target, what do we do? start monitoring it? nothing?
             Task.now(())
-          }
-        }
-
-        case PlatformEvent.Unmonitorable(t) => {
-          log.info(s"platformHandler -- unmonitorable=$t")
-          val msg = Terminated(t, System.currentTimeMillis)
-          val sc = StateChange(Problematic, Problematic, msg)
-          Task.delay {
-            stateMaps.update(_.update(Unmonitorable, m =>
-              Some(m.insert(t.uri, sc))));
-            ()
           }
         }
 
