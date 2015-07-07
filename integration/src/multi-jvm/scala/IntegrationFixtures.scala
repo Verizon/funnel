@@ -35,13 +35,22 @@ object IntegrationFixtures {
 
   val flask1Options = Options(
     name = Some(flask1.id.value),
-    cluster = Some("cluster1"),
+    cluster = None,
     funnelPort = flask1.location.port,
     telemetryPort = flask1.telemetry.port)
 
-  val flaskOptionsWithES = Options(
-    name = Some(flask1.id.value),
-    cluster = Some("cluster1"),
+  val flask2 = Flask(
+    FlaskID("flask2"),
+    localhost.copy(port = 5776),
+    telemetryLocalhost.copy(port = 7391))
+
+  val flask2Options = Options(
+    name = Some(flask2.id.value),
+    cluster = None,
+    funnelPort = flask2.location.port,
+    telemetryPort = flask2.telemetry.port)
+
+  val flaskOptionsWithES = flask1Options.copy(
     elastic = Some(elastic.ElasticCfg(
       url = "http://localhost:9200",
       indexName = "funnel",
@@ -50,10 +59,11 @@ object IntegrationFixtures {
       templateName = "flask",
       templateLocation = None,
       groups = List("previous/jvm", "previous/system", "previous")
-    )),
-    funnelPort = flask1.location.port,
-    telemetryPort = flask1.telemetry.port
-  )
+    )))
+
+  lazy val flasks =
+    flask1 ::
+    flask2 :: Nil
 
   lazy val targets =
     target01 ::

@@ -171,8 +171,7 @@ class StatefulRepository extends Repository {
             D.update(_.insert(f.id, Set.empty))
             flasks.update(_.insert(f.id, f))
           } >>
-          repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f)) >>
-          repoCommandsQ.enqueueOne(RepoCommand.AssignWork(f))
+          repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f))
 
         case PlatformEvent.TerminatedFlask(i) =>
           // This one is a little weird, we are enqueueing this to ourseles
@@ -207,7 +206,7 @@ class StatefulRepository extends Repository {
             lifecycle(TargetLifecycle.Unmonitoring(t.msg.target, f, System.currentTimeMillis), t.to)
           } getOrElse {
             // if we didn't even know about the target, what do we do? start monitoring it? nothing?
-            Task.now(())
+            Task.now(log.info(s"platformHandler -- encounterd an unknown target: $i"))
           }
         }
 
@@ -247,20 +246,26 @@ class StatefulRepository extends Repository {
   override def lifecycle(): Unit =  {
     val go: RepoEvent => Process[Task, RepoCommand] = { re =>
       Process.eval(repoHistoryStack.push(re)).flatMap{ _ =>
-        log.info(s"executing lifecycle: $re")
+        log.info(s"lifecycle: executing event: $re")
         re match {
-          case sc @ StateChange(from,to,msg) =>
+          case sc @ StateChange(from,to,msg) => {
             val id = msg.target.uri
             targets.update(_.insert(id, sc))
             stateMaps.update(_.update(from, (m => Some(m.delete(id)))))
             stateMaps.update(_.update(to, (m => Some(m.insert(id, sc)))))
             sc.to match {
-              case Unmonitored =>
+              case Unmonitored => {
+                log.debug("lifecycle: updating repository...")
                 Process.emit(RepoCommand.Monitor(sc.msg.target))
+              }
 
               // TODO when we implement flask transition we need to hanle double monitored stuff
-              case _ => Process.halt
+              case other => {
+                log.debug(s"lifecycle: reached the unhandled state change: $other")
+                Process.halt
+              }
             }
+          }
           case NewFlask(flask) =>
             flasks.update(_ + (flask.id -> flask))
             Process.halt
