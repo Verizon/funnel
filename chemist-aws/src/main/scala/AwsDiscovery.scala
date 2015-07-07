@@ -58,6 +58,11 @@ class AwsDiscovery(
     v <- valid(i)
   } yield v.map(in => TargetID(in.id) -> in.targets)
 
+/**
+  * List all of the instances that failed basic network reachability validation.
+  * In practice, this is the set difference between all discovered instances
+  * and valid ones.
+  */
   def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = for {
     i <- instances(!isFlask(_))
     v <- valid(i)
@@ -210,11 +215,11 @@ class AwsDiscovery(
       _  = log.debug(s"instance list: ${x.map(_.id).mkString(", ")}")
     } yield x
 
-/**
-  * A monadic function that asynchronously filters the passed instances for validity.
-  */
+  /**
+    * A monadic function that asynchronously filters the passed instances for validity.
+    */
   private def valid(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] = for {
-    x <- Task(instances)
+    x <- Task.now(instances)
     // actually reach out to all the discovered hosts and check that their port is reachable
     y = x.map(g => validate(g).attempt)
     // run the tasks on the specified thread pool (Server.defaultPool)

@@ -24,6 +24,9 @@ object JSON {
       new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ",java.util.Locale.US).format(_)
     }
 
+  implicit def TargetEncodeJson: EncodeJson[Target] =
+    jencode3L((t: Target) => (t.cluster, t.uri, t.isPrivateNetwork))("cluster", "uri", "isPrivateNetwork")
+
   ////////////////////// Chemist messages //////////////////////
 
   /**

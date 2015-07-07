@@ -85,8 +85,8 @@ trait Chemist[A <: Platform]{
   /**
     * List the unmonitorable targets.
     */
-  def listUnmonitorableTargets: ChemistK[List[URI]] =
-    config.flatMapK { cfg => cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2.map(_.uri)))
+  def listUnmonitorableTargets: ChemistK[List[Target]] =
+    config.flatMapK { cfg => cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2))
   }
 
   /**
