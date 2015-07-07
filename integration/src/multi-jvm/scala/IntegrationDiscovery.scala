@@ -7,7 +7,7 @@ import java.util.UUID.randomUUID
 
 class IntegrationDiscovery extends Discovery {
   def listFlasks: Task[Seq[Flask]] =
-    Task.now(IntegrationFixtures.flask1 :: Nil)
+    Task.now(IntegrationFixtures.flasks)
 
   private val randomids: Map[TargetID, Set[Target]] =
     IntegrationFixtures.targets.map(t =>

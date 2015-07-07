@@ -9,6 +9,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scalaz.{\/,-\/,\/-}
 import journal.Logger
+import concurrent.duration._
 
 object JsonRequest {
   def apply[T](r: HttpRequest[T]) =
@@ -30,6 +31,7 @@ object Server {
   // not possible. The server gets into a hang/deadlock situation.
   def unsafeStart[U <: Platform](server: Server[U]): Unit = {
     import server.{platform,chemist}
+    val disco   = platform.config.discovery
     val repo    = platform.config.repository
     val sharder = platform.config.sharder
 
@@ -59,6 +61,14 @@ object Server {
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
+    Housekeeping.periodic(15.minutes)(disco, repo).run.runAsync {
+      case -\/(err) =>
+        log.error(s"Failed running the periodic housekeeping tasks. Error was: $err")
+        err.printStackTrace
+
+      case \/-(_)   => log.info("Sucsessfully completed the periodic housekeeping tasks.")
+    }
+
     val p = this.getClass.getResource("/oncue/www/")
     log.info(s"Setting web resource path to '$p'")
 
@@ -74,7 +84,6 @@ object Server {
 class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
   import chemist.ChemistK
   import JSON._
-  import concurrent.duration._
   import Server._
   import metrics._
 
