@@ -2,7 +2,7 @@ package funnel
 package chemist
 package aws
 
-import java.net.{URI,URL}
+import java.net.{ InetSocketAddress, Socket, URI, URL }
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
@@ -53,8 +53,16 @@ class AwsDiscovery(
    * List all of the instances in the given AWS account that respond to a rudimentry
    * verification that Funnel is running on port 5775 and is network accessible.
    */
-  def listTargets: Task[Seq[(TargetID, Set[Target])]] =
-    instances(!isFlask(_)).map(_.map(in => TargetID(in.id) -> in.targets ))
+  def listTargets: Task[Seq[(TargetID, Set[Target])]] = for {
+    i <- instances(!isFlask(_))
+    v <- valid(i)
+  } yield v.map(in => TargetID(in.id) -> in.targets)
+
+  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = for {
+    i <- instances(!isFlask(_))
+    v <- valid(i)
+    bad = i.toSet &~ v.toSet
+  } yield bad.toList.map(in => TargetID(in.id) -> in.targets)
 
   /**
    * List all of the instances in the given AWS account that respond to a rudimentry
@@ -165,13 +173,55 @@ class AwsDiscovery(
 
   ///////////////////////////// internal api /////////////////////////////
 
+  /**
+   * Goal of this function is to validate that the machine instances specified
+   * by the supplied group `g`, are in fact running a funnel instance and it is
+   * ready to start sending metrics if we connect to its `/stream` function.
+   */
+  private def validate(instance: AwsInstance): Task[AwsInstance] = {
+    /**
+     * Do a naieve check to see if the socket is even network accessible.
+     * Given that funnel is using multiple protocols we can't assume that
+     * any given protocol at this point in time, so we just try to see if
+     * its even avalible on the port the discovery flow said it was.
+     *
+     * This mainly guards against miss-configuration of the network setup,
+     * LAN-ACLs, firewalls etc.
+     */
+    def go(uri: URI): Throwable \/ Unit =
+      \/.fromTryCatchThrowable[Unit, Exception]{
+        val s = new Socket
+        // timeout in 300ms to keep the overhead reasonable
+        try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 300)
+        finally s.close // whatever the outcome, close the socket to prevent leaks.
+      }
+
+    for {
+      a <- Task(go(instance.location.uri))(Chemist.defaultPool)
+      b <- a.fold(e => Task.fail(e), o => Task.now(o))
+    } yield instance
+  }
+
   private def instances(f: AwsInstance => Boolean): Task[Seq[AwsInstance]] =
     for {
       a <- readAutoScallingGroups
       // apply the specified filter if we want to remove specific groups for a reason
-      b = a.filter(f)
-      _  = log.debug(s"instance list: ${b.map(_.id).mkString(", ")}")
-    } yield b
+      x  = a.filter(f)
+      _  = log.debug(s"instance list: ${x.map(_.id).mkString(", ")}")
+    } yield x
+
+/**
+  * A monadic function that asynchronously filters the passed instances for validity.
+  */
+  private def valid(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] = for {
+    x <- Task(instances)
+    // actually reach out to all the discovered hosts and check that their port is reachable
+    y = x.map(g => validate(g).attempt)
+    // run the tasks on the specified thread pool (Server.defaultPool)
+    b <- Task.gatherUnordered(y)
+    r = b.flatMap(_.toList)
+    _ = log.debug(s"validated instance list: ${r.map(_.id).mkString(", ")}")
+  } yield r
 
   /**
    * This is kind of horrible, but it is what it is. The AWS api's really do not help here at all.
