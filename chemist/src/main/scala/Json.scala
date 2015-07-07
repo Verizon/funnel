@@ -25,7 +25,9 @@ object JSON {
     }
 
   implicit def TargetEncodeJson: EncodeJson[Target] =
-    jencode3L((t: Target) => (t.cluster, t.uri, t.isPrivateNetwork))("cluster", "uri", "isPrivateNetwork")
+    EncodeJson((t: Target) =>
+      ("cluster" := t.cluster) ->:
+      ("uri"     := t.uri) ->: jEmptyObject)
 
   ////////////////////// Chemist messages //////////////////////
 
