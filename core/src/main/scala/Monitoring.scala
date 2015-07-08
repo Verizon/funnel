@@ -447,7 +447,7 @@ object Monitoring {
     val topics = new TrieMap[Key[Any], Topic[Any,Any]]()
 
     // For reporting the number of unique experiments in the experimentation API
-    val experiments = new scala.collection.mutable.HashSet[String]
+    val experiments = new TrieMap[String, Unit]
 
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
@@ -459,9 +459,9 @@ object Monitoring {
       // Internal instrumentation of monitoring itself
       object Internal {
         val I = new Instruments(1.minute, self)
-        val numberOfTopics = I.numericGauge("funnel_internal/topics", 0, Units.Count)
-        val numberOfExperiments = I.numericGauge("funnel_internal/experiments", 0, Units.Count)
-        val datapointCount = I.counter("funnel_internal/datapoints")
+        val numberOfTopics = I.numericGauge("funnel/topics", 0, Units.Count)
+        val numberOfExperiments = I.numericGauge("funnel/experiments", 0, Units.Count)
+        val datapointCount = I.counter("funnel/datapoints")
       }
 
       def updateInternalMetrics[O](k: Key[O], neg: Boolean = false) = Task.delay {
@@ -470,7 +470,7 @@ object Monitoring {
           if (neg)
             experiments -= e
           else
-            experiments += e
+            experiments += (e -> (()))
           Internal.numberOfExperiments.set(experiments.size)
         }
       }
