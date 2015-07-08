@@ -53,8 +53,16 @@ class MonitoringServer(M: Monitoring, port: Int) {
   def start(): Unit = {
     server.setExecutor(Monitoring.serverPool)
     val _ = server.createContext("/", handleMetrics(M))
+
     server.start()
-    M.log.info("server started on port: " + port)
+    M.log.info(s"server started on port: $port")
+
+    val t = 36.hours
+    M.keySenescence(Events.every(t), M.distinctKeys).run.runAsync(_.fold(e => {
+      M.log.error(s"Asynchronous error starting key senescence: $e - ${e.getMessage}")
+      M.log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
+    }, identity _))
+    M.log.info(s"Metric key TTL is $t")
   }
 
   def stop(): Unit = server.stop(0)

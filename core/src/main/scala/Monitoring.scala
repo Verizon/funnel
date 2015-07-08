@@ -446,12 +446,34 @@ object Monitoring {
 
     val topics = new TrieMap[Key[Any], Topic[Any,Any]]()
 
+    // For reporting the number of unique experiments in the experimentation API
+    val experiments = new scala.collection.mutable.HashSet[String]
+
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
-    new Monitoring {
+    new Monitoring { self =>
       val log = Logger[Monitoring]
 
       def keys = keys_
+
+      // Internal instrumentation of monitoring itself
+      object Internal {
+        val I = new Instruments(1.minute, self)
+        val numberOfTopics = I.numericGauge("funnel_internal/topics", 0, Units.Count)
+        val numberOfExperiments = I.numericGauge("funnel_internal/experiments", 0, Units.Count)
+        val datapointCount = I.counter("funnel_internal/datapoints")
+      }
+
+      def updateInternalMetrics[O](k: Key[O], neg: Boolean = false) = Task.delay {
+        Internal.numberOfTopics.set(topics.size)
+        k.attributes.get(AttributeKeys.experimentID).foreach { e =>
+          if (neg)
+            experiments -= e
+          else
+            experiments += e
+          Internal.numberOfExperiments.set(experiments.size)
+        }
+      }
 
       def topic[I,O](k: Key[O])(buf: Process1[(I,Duration),O]): Task[I => Task[Unit]] = for {
         p <- bufferedSignal(buf)(ES)
@@ -459,10 +481,13 @@ object Monitoring {
         _ <- Task.delay(topics += (k -> eraseTopic(Topic(pub, v))))
         t = (k.typeOf, k.units)
         _ <- keys_.compareAndSet(_.map(_ + k))
+        _ <- updateInternalMetrics(k)
       } yield i => pub(i -> Duration.fromNanos(System.nanoTime - t0))
 
       protected def update[O](k: Key[O], v: O): Task[Unit] =
-        topics.get(k).map(_.current.set(v)).getOrElse(Task(())(defaultPool)).map(_ => ())
+        topics.get(k).map(_.current.set(v)).getOrElse(Task(())(defaultPool)) *> Task.delay {
+          Internal.datapointCount.increment
+        }
 
       def get[O](k: Key[O]): Signal[O] =
         topics.get(k).map(_.current.asInstanceOf[Signal[O]])
@@ -472,6 +497,7 @@ object Monitoring {
         _ <- keys_.compareAndSet(_.map(_ - k))
         _ <- topics.get(k).traverse_(_.current.close)
         _ <- Task.delay(topics -= k)
+        _ <- updateInternalMetrics(k, true)
       } yield ()
 
       def elapsed: Duration = Duration.fromNanos(System.nanoTime - t0)
