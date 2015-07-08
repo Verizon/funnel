@@ -117,7 +117,7 @@ trait Monitoring {
   private[funnel] val mirroringQueue =
     async.unboundedQueue[Command](Strategy.Executor(Monitoring.serverPool))
 
-  private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue observe(io.stdOut.contramap[Command](_.toString))
+  private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue
 
   private val urlSignals = new ConcurrentHashMap[URI, Signal[Unit]]
 

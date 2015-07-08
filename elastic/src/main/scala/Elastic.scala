@@ -2,6 +2,7 @@ package funnel
 package elastic
 
 import java.net.URI
+import scala.util.control.NonFatal
 import scala.concurrent.duration._
 import scalaz.concurrent.Strategy
 import scalaz.stream._
@@ -39,15 +40,17 @@ import dispatch._, Defaults._
 }
 */
 
-case class ElasticCfg(url: String,
-                      indexName: String,
-                      typeName: String,
-                      dateFormat: String,
-                      templateName: String,
-                      templateLocation: Option[String],
-                      http: dispatch.Http,
-                      groups: List[String],
-            		      subscriptionTimeout: FiniteDuration
+case class ElasticCfg(
+  url: String,                         // Elastic URL
+  indexName: String,                   // Name prefix of elastic index
+  typeName: String,                    // Name of the metric type in ES
+  dateFormat: String,                  // Date format for index suffixes
+  templateName: String,                // Name of ES index template
+  templateLocation: Option[String],    // Path to index template to use
+  http: dispatch.Http,                 // HTTP driver
+  groups: List[String],                // Subscription groups to publish to ES
+  subscriptionTimeout: FiniteDuration, // Maximum interval for publishing to ES
+  bufferSize: Int                      // Size of circular buffer in front of ES
 )
 
 object ElasticCfg {
@@ -60,13 +63,14 @@ object ElasticCfg {
     templateLocation: Option[String],
     groups: List[String],
     subscriptionTimeout: FiniteDuration = 10.minutes,
-    connectionTimeoutMs: Duration = 5000.milliseconds
+    connectionTimeoutMs: Duration = 5000.milliseconds,
+    bufferSize: Int = 4096
   ): ElasticCfg = {
     val driver: Http = Http.configure(
       _.setAllowPoolingConnection(true)
        .setConnectionTimeoutInMs(connectionTimeoutMs.toMillis.toInt))
     ElasticCfg(url, indexName, typeName, dateFormat,
-               templateName, templateLocation, driver, groups, subscriptionTimeout)
+               templateName, templateLocation, driver, groups, subscriptionTimeout, bufferSize)
   }
 }
 
@@ -228,21 +232,54 @@ case class Elastic(M: Monitoring) {
 
   def duration: Reader[ElasticCfg, FiniteDuration] = Reader { es => es.subscriptionTimeout }
 
+  // Retries any non-HTTP errors with exponential backoff
+  def retry[A](task: Task[A]): Task[A] = {
+    val schedule = Stream.iterate(2)(_ * 2).take(30).map(_.seconds)
+    val t = task.attempt.flatMap(_.fold(
+      e => e match {
+        case StatusCode(_) => Task.fail(e)
+        case _ =>
+          Task.delay(M.log.error(s"Error contacting ElasticSearch: ${e}.\nRetrying...")) >>=
+          (_ => Task.fail(e))
+      },
+      a => Task.now(a)
+    ))
+    t.retry(schedule, (e: Throwable) => e.getCause match {
+      case StatusCode(_) => false
+      case NonFatal(_) => true
+      case _ => false
+    })
+  }
+
   /**
    * Publishes to an ElasticSearch URL at `esURL`.
    */
-  def publish(flaskName: String, flaskCluster: String): ES[Unit] = for {
+  def publish(flaskName: String, flaskCluster: String): ES[Unit] = {
+    def doPublish(de: Process[Task, Json], cfg: ElasticCfg): Process[Task, Unit] =
+      de to (constant((json: Json) => for {
+        r <- Task.delay(esURL(cfg))
+        _ <- retry(elasticJson(r.POST, json)(cfg))
+      } yield ()))
+    for {
       _   <- ensureTemplate
       cfg <- getConfig
+      buffer = async.circularBuffer[Json](cfg.bufferSize)
       ref <- lift(IORef(Set[Key[Any]]()))
       d   <- duration.lift[Task]
-      s = Executor(Monitoring.serverPool)
-      timeout = time.awakeEvery(d)(s, Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
-      subscription = Monitoring.subscribe(M)(k => cfg.groups.exists(g => k.startsWith(g))).map(Option.apply)
-      -   <- (timeout.wye(subscription)(wye.merge)(s).translate(lift) |>
-              elasticGroup(cfg.groups) |> elasticUngroup(flaskName, flaskCluster)).evalMap[ES, Unit](
-                json  => esURL.lift[Task] >>= (r => elasticJson(r.POST, json))
-              ).run
+      timeout = time.awakeEvery(d)(
+        Executor(Monitoring.serverPool),
+        Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
+      subscription = Monitoring.subscribe(M)(k =>
+        cfg.groups.exists(g => k.startsWith(g))).map(Option.apply)
+      // Reads from the monitoring instance and posts to the publishing queue
+      read = timeout.wye(subscription)(wye.merge) |>
+               elasticGroup(cfg.groups) |>
+               elasticUngroup(flaskName, flaskCluster) to
+               buffer.enqueue
+      // Reads from the publishing queue and writes to ElasticSearch
+      write  = doPublish(buffer.dequeue, cfg)
+      _ <- lift(Task.reduceUnordered[Unit, Unit](Seq(read.run, write.run), true))
     } yield ()
+  }
 }
 
