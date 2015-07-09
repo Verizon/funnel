@@ -21,8 +21,13 @@ object JSON {
 
   implicit val DateToJson: EncodeJson[Date] =
     implicitly[EncodeJson[String]].contramap {
-      new SimpleDateFormat().format(_)
+      new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ",java.util.Locale.US).format(_)
     }
+
+  implicit def TargetEncodeJson: EncodeJson[Target] =
+    EncodeJson((t: Target) =>
+      ("cluster" := t.cluster) ->:
+      ("uri"     := t.uri) ->: jEmptyObject)
 
   ////////////////////// Chemist messages //////////////////////
 
@@ -46,8 +51,8 @@ object JSON {
       ("targets" := m._2.toList) ->: jEmptyObject
     )
 
-  implicit val SnapshotWithFlaskToJson: EncodeJson[(Flask, Map[ClusterName, List[URI]])] =
-    encodeClusterPairs[Flask]
+  implicit val SnapshotWithFlaskToJson: EncodeJson[(FlaskID, Map[ClusterName, List[URI]])] =
+    encodeClusterPairs[FlaskID]
 
   /**
    * {
@@ -211,14 +216,6 @@ object JSON {
     jEmptyObject
   }
 
-  def encodeUnmonitorable(t: Target, time: Date): Json = {
-    ("type" := "Unmonitorable") ->:
-    ("cluster" := t.cluster) ->:
-    ("uri" := t.uri) ->:
-    ("time" := time) ->:
-    jEmptyObject
-  }
-
   def encodeAssigned(f: FlaskID, t: Target, time: Date): Json = {
     ("type" := "Assigned") ->:
     ("flask" := f.value) ->:
@@ -237,8 +234,19 @@ object JSON {
       case e @ PlatformEvent.Monitored(f, u) => encodeMonitored(f, u, e.time)
       case e @ PlatformEvent.Problem(f, u, msg) => encodeProblem(f, u, msg, e.time)
       case e @ PlatformEvent.Unmonitored(f, u) => encodeUnmonitored(f, u, e.time)
-      case e @ PlatformEvent.Unmonitorable(t) => encodeUnmonitorable(t, e.time)
       case e @ PlatformEvent.Assigned(f, t) => encodeAssigned(f, t, e.time)
       case e @ PlatformEvent.NoOp => ("type" := "NoOp") ->: ("time" := e.time) ->: jEmptyObject
     }
+
+  implicit def stateMapsToJson[A : EncodeJson]: EncodeJson[(TargetLifecycle.TargetState, List[A])] =
+    EncodeJson((s: (TargetLifecycle.TargetState, List[A])) =>
+      ("state" := s._1.toString.toLowerCase) ->:
+      ("locations" := s._2) ->: jEmptyObject
+    )
+
+  implicit val uriStateChangePairToJson: EncodeJson[(URI,RepoEvent.StateChange)] =
+    EncodeJson((t: (URI,RepoEvent.StateChange)) =>
+      ("state-change" := t._2) ->:
+      ("uri" := t._1) ->: jEmptyObject
+    )
 }

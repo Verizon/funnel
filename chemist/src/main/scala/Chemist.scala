@@ -85,8 +85,9 @@ trait Chemist[A <: Platform]{
   /**
     * List the unmonitorable targets.
     */
-  def unmonitorable: ChemistK[List[URI]] =
-    config.flatMapK(_.repository.unmonitorableTargets)
+  def listUnmonitorableTargets: ChemistK[List[Target]] =
+    config.flatMapK { cfg => cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2))
+  }
 
   /**
    * List out the last 100 lifecycle events that this chemist has seen.
@@ -97,8 +98,8 @@ trait Chemist[A <: Platform]{
   /**
    * List out the all the known Funnels and the state they are in.
    */
-  def states: ChemistK[Seq[(URI, RepoEvent.StateChange)]] =
-    config.flatMapK(_.repository.instances)
+  def states: ChemistK[Map[TargetLifecycle.TargetState, Map[URI, RepoEvent.StateChange]]] =
+    config.flatMapK(_.repository.states)
 
   /**
    * List out the last 100 Errors that this chemist has seen.
@@ -117,47 +118,23 @@ trait Chemist[A <: Platform]{
     f  <- cfg.discovery.listActiveFlasks.liftKleisli
     _  = log.info(s"found ${f.length} flasks in the running instance list...")
 
-    // update the distribution with new capacity seeds
-    _ <- f.toVector.traverse_(flask => cfg.repository.platformHandler(PlatformEvent.NewFlask(flask))).liftKleisli
-    _  = log.debug("increased the known monitoring capactiy based on discovered flasks")
-
-    // read the list of all deployed machines
-    l <- cfg.discovery.listTargets.liftKleisli
-    _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
-
-    // filter out all the instances that are in private networks
-    // TODO: support VPCs by dynamically determining if chemist is in a vpc itself
-    x  <- filterTargets(l)
-    (z, y)  = x
-    _  = log.info(s"located ${z.length} instances that appear to be monitorable")
-
-    // set the result to an in-memory list of "the world"
-    targets = z.flatMap { case (id,targets) => targets.toSeq.map(PlatformEvent.NewTarget) } //the fact that I'm throwing ID away here is suspect
-    _ <- targets.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
-    _  = log.info("added instances to the repository...")
-
-    um = y.flatMap { case (id,um) => um.toSeq.map(PlatformEvent.Unmonitorable) }
-    _ <- um.toVector.traverse_(cfg.repository.platformHandler).liftKleisli
-    _  = log.info("added unmonitorables to the repository...")
-
     // ask those flasks for their current work and yield a `Distribution`
     d <- Housekeeping.gatherAssignedTargets(f)(cfg.http).liftKleisli
-    _  = log.debug("read the existing state of assigned work from the remote instances")
+    _  = log.debug(s"read the existing state of assigned work from the remote instances: $d")
 
     // update the distribution accordingly
     d2 <- cfg.repository.mergeExistingDistribution(d).liftKleisli
-    _  = log.debug("merged the currently assigned work into the current distribution")
+    _  = log.debug(s"merged the currently assigned work. distribution=$d2")
 
-    _ <- Sharding.distribute(cfg.repository, cfg.sharder, cfg.remoteFlask, d2)(targets.map(_.target).toSet).liftKleisli
+    // update the distribution with new flask shards
+    _ <- f.toVector.traverse_(flask => cfg.repository.platformHandler(PlatformEvent.NewFlask(flask))).liftKleisli
+    _  = log.debug(s"increased the number of known flasks to ${f.size}")
+
+    _ <- Housekeeping.gatherUnassignedTargets(cfg.discovery, cfg.repository).liftKleisli
 
     _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
 
   } yield ()
-
-  /**
-   * Platform specific way of filtering instances we can discover but we might not want to monitor
-   */
-  def filterTargets(targets: Seq[(TargetID, Set[Target])]): ChemistK[(Seq[(TargetID, Set[Target])], Seq[(TargetID, Set[Target])])]
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources

@@ -6,12 +6,6 @@
   roles:
     - application
   tasks:
-    - name: ulimit | copy template file into /etc/security/limits.d/01-oncue.conf
-      sudo: yes
-      copy: src=files/limits.conf
-            dest=/etc/security/limits.d/01-oncue.conf
-            owner=root group=root mode=0644
-
     - name: flask | override configuration file
       sudo: yes
       template: >
@@ -25,13 +19,3 @@
         src=files/elastic-template.json
         dest=/usr/share/oncue/etc/elastic-template.json
         owner=root group=root mode=0644
-
-    - name: flask | install jq during development
-      sudo: yes
-      yum: name=jq state=latest
-      when: application_environment == "imdev"
-
-    - name: flask | install httpie during development
-      sudo: yes
-      pip: name=httpie
-      when: application_environment == "imdev"

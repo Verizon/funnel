@@ -7,6 +7,7 @@ class TestDiscovery extends Discovery {
   def listActiveFlasks: Task[Seq[Flask]] = ???
   def listActiveChemists: Task[Seq[Location]] = ???
   def listTargets: Task[Seq[(TargetID, Set[Target])]] = ???
+  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = ???
   def lookupFlask(id: funnel.chemist.FlaskID): Task[Flask] = ???
   def lookupTarget(id: funnel.chemist.TargetID): Task[Seq[Target]] = ???
   def lookupTargets(id: funnel.chemist.TargetID): Task[Set[Target]] = ???

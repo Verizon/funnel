@@ -9,6 +9,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scalaz.{\/,-\/,\/-}
 import journal.Logger
+import concurrent.duration._
 
 object JsonRequest {
   def apply[T](r: HttpRequest[T]) =
@@ -30,8 +31,11 @@ object Server {
   // not possible. The server gets into a hang/deadlock situation.
   def unsafeStart[U <: Platform](server: Server[U]): Unit = {
     import server.{platform,chemist}
+    val disco   = platform.config.discovery
     val repo    = platform.config.repository
     val sharder = platform.config.sharder
+
+    repo.lifecycle()
 
     (repo.repoCommands to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _)).run.runAsync {
       case -\/(err) =>
@@ -57,6 +61,14 @@ object Server {
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
+    Housekeeping.periodic(15.minutes)(disco, repo).run.runAsync {
+      case -\/(err) =>
+        log.error(s"Failed running the periodic housekeeping tasks. Error was: $err")
+        err.printStackTrace
+
+      case \/-(_)   => log.info("Sucsessfully completed the periodic housekeeping tasks.")
+    }
+
     val p = this.getClass.getResource("/oncue/www/")
     log.info(s"Setting web resource path to '$p'")
 
@@ -72,7 +84,6 @@ object Server {
 class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
   import chemist.ChemistK
   import JSON._
-  import concurrent.duration._
   import Server._
   import metrics._
 
@@ -96,22 +107,20 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
       GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
     case GET(Path("/errors")) =>
-      GetStatus.time(Ok ~> JsonResponse(Chemist.version))
+      GetErrors.time(json(chemist.errors.map(_.toList)))
 
     case GET(Path("/distribution")) =>
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
 
     case GET(Path("/unmonitorable")) =>
-      json(chemist.unmonitorable)
+      GetUnmonitorable.time(json(chemist.listUnmonitorableTargets))
 
     case GET(Path("/lifecycle/history")) =>
       GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
 
-    // the URI is needed internally, but does not make sense in the remote
-    // user-facing api, so here we just ditch it and return the states.
     case GET(Path("/lifecycle/states")) =>
-      GetLifecycleStates.time(json(chemist.states.map(_.toList.map {
-        case (uri,state) => state })))
+      GetLifecycleStates.time(json(chemist.states.map(
+        _.toList.map { case (k,v) => k -> v.toList })))
 
     case GET(Path("/platform/history")) =>
       GetPlatformHistory.time(json(chemist.platformHistory.map(_.toList)))

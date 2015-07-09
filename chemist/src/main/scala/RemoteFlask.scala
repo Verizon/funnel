@@ -69,8 +69,6 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
     import argonaut._, Argonaut._
     import JSON.ClustersToJSON
 
-    // FIXME: "safe" because we know we're passing in the default localhost
-    // val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
     val payload: Map[ClusterName, List[URI]] =
       targets.groupBy(_.cluster).mapValues(_.map(_.uri).toList)
 

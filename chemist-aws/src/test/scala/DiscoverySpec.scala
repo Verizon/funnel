@@ -14,7 +14,7 @@ class DiscoverySpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   val allTemplates = (t1 :: t2 :: t3 :: Nil).map(x => LocationTemplate(x.get))
 
-  val D = new AwsDiscovery(null, null, allTemplates)
+  val D = new AwsDiscovery(null, null, null, allTemplates)
 
   private def make(template: Option[String], int: LocationIntent = Mirroring): String \/ Location =
     D.toLocation("foo.internal", "local", template, int)
