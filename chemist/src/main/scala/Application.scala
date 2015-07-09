@@ -14,5 +14,5 @@ case class Application(
   qualifier: Option[String]
 ){
   override def toString: String =
-    s"$name-v$version${qualifier.map("-"+_).getOrElse("")}"
+    s"$name-$version${qualifier.map("-"+_).getOrElse("")}"
 }

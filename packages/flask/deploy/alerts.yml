@@ -1,0 +1,32 @@
+---
+- name: flask | configure alerts
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: configure low disk space
+      gong:
+        state: "present"
+        account: {{ application_environment }}
+        namespace: "flask"
+        window: "5 minutes"
+        name: "low-disk-space"
+        query: "cluster: flask*"
+        critical: "!(disk < 0.9)"
+        warning: "!(disk < 0.8)"
+        tags:
+          - funnel
+          - flask
+        aggregations:
+          disk:
+            op: "Min"
+            field: "file_system.%2F.use_percent.numeric.mean"
+        actions:
+          critical:
+            - kind: "email"
+              recipients:
+                - timothy.m.perrett@one.verizon.com
+          warning:
+            - kind: "email"
+              recipients:
+                - timothy.m.perrett@one.verizon.com
