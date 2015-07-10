@@ -32,7 +32,7 @@ class InstanceSpec extends FlatSpec with Matchers {
     inst(
       "Name" -> "service-imdev-contentkey-2-0-5",
       "aws:cloudformation:stack-name" -> "imdev-contentkey-2-0-5"
-    ) should equal ( "service-imdev-contentkey-2-0-5-vunknown" )
+    ) should equal ( "service-imdev-contentkey-2-0-5-unknown" )
   }
 
 }
