@@ -19,14 +19,14 @@ class InstanceSpec extends FlatSpec with Matchers {
       "type" -> "foo",
       "revision" -> "1.2.3",
       "aws:cloudformation:stack-name" -> "imdev-foo-1.2.3-Fsf42fx"
-    ) should equal ( "foo-v1.2.3-Fsf42fx" )
+    ) should equal ( "foo-1.2.3-Fsf42fx" )
   }
 
   it should "drop the qualifier if it is not present" in {
     inst(
       "type" -> "foo",
       "revision" -> "1.2.3"
-    ) should equal ( "foo-v1.2.3" )
+    ) should equal ( "foo-1.2.3" )
 
     // to support the old chef crap.
     inst(
