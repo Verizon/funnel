@@ -7,7 +7,7 @@
     - name: configure low disk space
       gong:
         state: "present"
-        account: {{ application_environment }}
+        account: "{{ application_environment }}"
         namespace: "flask"
         window: "5 minutes"
         name: "low-disk-space"
