@@ -53,9 +53,6 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   val flaskUrl = url(s"http://localhost:${options.funnelPort}/mirror").setContentType("application/json", "UTF-8")
 
-  val S = Strategy.Executor(Monitoring.serverPool)
-  val P = Monitoring.schedulingPool
-
   val log = Logger[this.type]
 
   private def makeMS(port: Int): MonitoringServer = {
@@ -63,10 +60,11 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val M = Monitoring.instance(Monitoring.serverPool, L)
     val I = new Instruments(1.minute, M, 200.milliseconds)
     val C = I.counter("my_counter", 0, "My counter")
-    awakeEvery(100.milliseconds)(S, P).map(_ => C.increment).run.run
+    Task(while (true) { C.increment; Thread.sleep(100) }).runAsync(identity)
     MonitoringServer.start(M, port, 36.hours)
   }
 
+/*
   if (Ø.isEnabled) {
     "mirrorDatapoints with 5000 datapoints input" should "be 5000" in {
       val payload = s"""
@@ -117,15 +115,17 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       app.S.stop()
     }
   }
+ */
 
   "mirrorDatapoints for 1 second with no input" should "be 0" in {
-    val ms = (0 until 100).map((i: Int) => makeMS(i + 1000))
+    val S = Strategy.Executor(Monitoring.serverPool)
+    val ms = (0 until 100).map((i: Int) => makeMS(i + 1024))
     val payload = s"""
     [
       {
         "cluster": "datapoints-1.0-us-east",
         "urls": [
-	  ${(1000 until 1100).map("\"http://localhost:" + _ + "/stream/now\"").mkString(",\n")}
+	  ${(1024 until 1124).map("\"http://localhost:" + _ + "/stream/now\"").mkString(",\n")}
         ]
       }
     ]
@@ -135,7 +135,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     app.run(Array())
     Http(flaskUrl << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)
     val dps = app.I.monitoring.get(app.mirrorDatapoints.keys.now)
-    val window = sleep(1.second)(S, P).fby(emit(true)).wye(dps.continuous)(wye.interrupt)(S)
+    val window = sleep(1.second)(S, Monitoring.schedulingPool).fby(emit(true)).wye(dps.continuous)(wye.interrupt)(S)
     val count = window.runLast.run
     count shouldBe Some(0.0)
     ms.foreach(_.stop)

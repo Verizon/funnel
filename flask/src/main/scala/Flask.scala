@@ -68,7 +68,7 @@ class Flask(options: Options, val I: Instruments) {
       case Some("http")       => SSE.readEvents(uri, Q)
       case Some("zeromq+tcp") => Mirror.from(alive, Q)(uri)
       case unknown            => Process.fail(
-        new RuntimeException("Unknown URI scheme submitted. scheme = $unknown"))
+        new RuntimeException(s"Unknown URI scheme submitted. scheme = $unknown"))
     }
 
   def run(args: Array[String]): Unit = {
