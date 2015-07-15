@@ -6,6 +6,7 @@ import scalaz.concurrent.{Strategy,Task}
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
+import org.scalatest.OptionValues._
 import scalaz.stream.Process
 import Process._
 import scalaz.stream.async.signalOf
@@ -56,12 +57,13 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   val log = Logger[this.type]
 
-  private def makeMS(port: Int): MonitoringServer = {
+  private def makeMS(port: Int): (Counter, MonitoringServer) = {
     val L = ((s: String) => log.debug(s))
     val M = Monitoring.instance(Monitoring.serverPool, L)
     val I = new Instruments(1.minute, M, 200.milliseconds)
     val C = I.counter("my_counter", 0, "My counter")
-    MonitoringServer.start(M, port, 36.hours)
+    val ms = MonitoringServer.start(M, port, 36.hours)
+    (C, ms)
   }
 
 /*
@@ -117,42 +119,37 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
  */
 
-  "mirrorDatapoints for 1 second with 10K input" should "not be 0" in {
-    val ms = List(makeMS(1024))
+  "mirrorDatapoints for 1 second with 100 HTTP endpoints" should "have changed at least once" in {
+    val ms = (1024 until 1124).map(makeMS)
     val payload = s"""
     [
       {
         "cluster": "datapoints-1.0-us-east",
         "urls": [
-          "http://localhost:1024/stream/now"
+          ${(1024 until 1124).map(p => "\"http://localhost:" + p + "/stream/now\"").mkString(",\n")}
         ]
       }
     ]
     """
 
-    val ready = signalOf(false)(Strategy.Executor(Monitoring.serverPool))
+    val S = Strategy.Executor(Monitoring.serverPool)
+    val P = Monitoring.schedulingPool
 
     val app = new Flask(options, new Instruments(1.minute))
 
     app.run(Array())
     Http(flaskUrl << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)
-    Thread.sleep(1000)
+    Thread.sleep(5000)
 
-    app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete.sleepUntil(ready.discrete.once).once.runLast.map(_.get).runAsync { d =>
-      d.fold (
-        t =>
-        throw t,
-        v =>
-        v.toInt should not be (0)
-      )
-    }
+    val (cs, ss) = ms.unzip
+    (0 to 98 by 2) foreach(i => Process.repeatEval(Task(cs(i).increment)).run.runAsync(identity))
+    (1 to 99 by 2) foreach(i => ss(i).stop)
 
-    val M = ms.head.M
-    val sink = (for {
-      key <- M.lookup[Double]("now/my_counter")
-      counter = M.get(key)
-    } yield counter.sink).run
-    val main: Process[Task, Signal.Set[Double]] = Process.range(0, 10000).map(i => Signal.Set(i.toDouble))
-    ((main to sink) fby Process.eval_(ready.set(true))).run.run
+    val waitASec = sleep(1.second)(S, P) fby emit(true)
+
+    val mds = app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete
+    val mdChanges = waitASec.wye(mds)(wye.interrupt)(S)
+    val changes = mdChanges.runLog.run
+    changes shouldBe empty
   }
 }
