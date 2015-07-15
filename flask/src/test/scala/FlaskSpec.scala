@@ -145,11 +145,11 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     (0 to 98 by 2) foreach(i => Process.repeatEval(Task(cs(i).increment)).run.runAsync(identity))
     (1 to 99 by 2) foreach(i => ss(i).stop)
 
-    val waitASec = sleep(1.second)(S, P) fby emit(true)
+    val waitACouple = sleep(2.minutes)(S, P) fby emit(true)
 
-    val mds = app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete
-    val mdChanges = waitASec.wye(mds)(wye.interrupt)(S)
-    val changes = mdChanges.runLog.run
+    val mds: Process[Task, Double] = app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete
+    val mdChanges: Process[Task, Double] = waitACouple.wye(mds)(wye.interrupt)(S)
+    val changes: IndexedSeq[Double] = mdChanges.runLog.run
     changes shouldBe empty
   }
 }
