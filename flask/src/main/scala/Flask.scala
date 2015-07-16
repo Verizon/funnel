@@ -89,7 +89,7 @@ class Flask(options: Options, val I: Instruments) {
       httpOrZmtp(alive, Q)(uri) observe countDatapoints
 
     def retries(names: Names): Event = {
-      val retries = if(args.contains("noretries")) Events.takeEvery(10.seconds, 1) else Monitoring.defaultRetries
+      val retries = if(args.contains("noretries")) Events.takeEvery(10.seconds, 0) else Monitoring.defaultRetries
       retries andThen (_ ++ Process.eval[Task, Unit] {
                          Q.enqueueAll(Seq(Error(names), Problem(names.theirs, "there wasn an error")))
                            .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString)))
@@ -107,6 +107,10 @@ class Flask(options: Options, val I: Instruments) {
 
     log.info("Booting the mirroring process...")
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName, retries))
+/*
+    runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName,
+      (_ => (_ => Process.eval(Task.now(()))))))
+ */
 
     options.elastic.foreach { elastic =>
       log.info("Booting the elastic search sink...")

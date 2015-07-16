@@ -119,14 +119,15 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
  */
 
-  "mirrorDatapoints for 1 second with 100 HTTP endpoints" should "have changed at least once" in {
-    val ms = (1024 until 1124).map(makeMS)
+  "mirrorDatapoints for 45 seconds with 100 HTTP endpoints, half of which die" should "change" in {
+    val n = 100
+    val ms = (1024 until 1024 + n).map(makeMS)
     val payload = s"""
     [
       {
         "cluster": "datapoints-1.0-us-east",
         "urls": [
-          ${(1024 until 1124).map(p => "\"http://localhost:" + p + "/stream/now\"").mkString(",\n")}
+          ${(1024 until 1024 + n).map(p => "\"http://localhost:" + p + "/stream/now\"").mkString(",\n")}
         ]
       }
     ]
@@ -139,17 +140,17 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     app.run(Array())
     Http(flaskUrl << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)
-    Thread.sleep(5000)
+    Thread.sleep(1000)
 
     val (cs, ss) = ms.unzip
-    (0 to 98 by 2) foreach(i => Process.repeatEval(Task(cs(i).increment)).run.runAsync(identity))
-    (1 to 99 by 2) foreach(i => ss(i).stop)
+    (0 until n by 2) foreach(i => Process.repeatEval(Task(cs(i).increment)).run.runAsync(identity))
+    (1 until n by 2) foreach(i => ss(i).stop)
 
-    val waitACouple = sleep(2.minutes)(S, P) fby emit(true)
+    val waitACouple = sleep(45.seconds)(S, P) fby emit(true)
 
     val mds: Process[Task, Double] = app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete
     val mdChanges: Process[Task, Double] = waitACouple.wye(mds)(wye.interrupt)(S)
     val changes: IndexedSeq[Double] = mdChanges.runLog.run
-    changes shouldBe empty
+    changes should not be empty
   }
 }

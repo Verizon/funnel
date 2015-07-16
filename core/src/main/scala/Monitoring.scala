@@ -404,7 +404,7 @@ object Monitoring {
 
   def defaultRetries: Monitoring => Process[Task,Unit] = Events.takeEvery(30 seconds, 6)
 
-  private def daemonThreads(name: String) = new ThreadFactory {
+  private[funnel] def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {
       val t = Executors.defaultThreadFactory.newThread(r)
       t.setDaemon(true)
