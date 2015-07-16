@@ -21,8 +21,17 @@ This document outlines the various steps required to migrate from one version of
 	* `core` now uses `scalaz-stream 0.7.1a`
 	* `core` now uses `journal 2.1.+`
 	* `core` now uses `scalaz 7.1.2`
-	* `http` now uses public `argonaut 6.1-M6` (no longer uses the oncue-internal build)
+	* `http` now uses public `argonaut 6.1` (no longer uses the oncue-internal build)
 	* `chemist`, `flask` now use open source version of Knobs
+
+* Upgrade to sbt-oncue 7.3 to make use of the compatible testing libraries. In your `plugins.sbt` ensure that you have the following: `addSbtPlugin("oncue.build" %% "sbt-oncue" % "7.3.+")`
+
+* Ensure that your dependency versions match the following (if applicable - using older versions will result in binary collisions are runtime):
+	* `"oncue.commonutils" %% "dal-cassandra" % "4.0.+"`
+	* `"oncue.svc.search.client" %% "core" % "9.0.+"`
+	* `"oncue.rna.jetevents" %% "core" % "3.0.+"`
+
+**Be sure that you do not have funnel 2.x on your transitive classpath, and that any common libraries you're using are suitable upgraded.**
 
 Other things of note in this release cycle (does not affect migration):
 
