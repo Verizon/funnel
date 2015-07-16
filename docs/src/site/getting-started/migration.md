@@ -27,11 +27,12 @@ This document outlines the various steps required to migrate from one version of
 * Upgrade to sbt-oncue 7.3 to make use of the compatible testing libraries. In your `plugins.sbt` ensure that you have the following: `addSbtPlugin("oncue.build" %% "sbt-oncue" % "7.3.+")`
 
 * Ensure that your dependency versions match the following (if applicable - using older versions will result in binary collisions are runtime):
-	* `"oncue.commonutils" %% "dal-cassandra" % "4.0.+"`
-	* `"oncue.svc.search.client" %% "core" % "9.0.+"`
-	* `"oncue.rna.jetevents" %% "core" % "3.0.+"`
+	* `"oncue.knobs" %% "core" % "3.2.+"` - does not depend on funnel, but is scalaz-compatible
+	* `"oncue.commonutils" %% "dal-cassandra" % "4.0.+"` - depends on funnel directly
+	* `"oncue.svc.search.client" %% "core" % "9.0.+"` - depends on funnel directly
+	* `"oncue.rna.jetevents" %% "core" % "3.0.+"` - 
 
-**Be sure that you do not have funnel 2.x on your transitive classpath, and that any common libraries you're using are suitable upgraded.**
+*Be sure that you do not have funnel 2.x on your transitive classpath, and that any common libraries you're using are suitable upgraded.*
 
 Other things of note in this release cycle (does not affect migration):
 
