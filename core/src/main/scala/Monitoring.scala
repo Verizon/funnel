@@ -548,13 +548,20 @@ object Monitoring {
   }
 
   /**
-   * Try running the given process `p`, catching errors and reporting
-   * them with `maskedError`, using `schedule` to determine when further
-   * attempts are made. If `schedule` is exhausted, the error is raised.
-   * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
-   * will run `p`; if it encounters an error, it will print the error using `println`,
-   * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
-   * the error in the `Process`.
+    * Try running the given process `p`, catching errors and reporting
+    * them with `maskedError`, using `schedule` to determine when further
+    * attempts are made. If `schedule` is exhausted, the error is raised.
+    * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
+    * will run `p`; if it encounters an error, it will print the error using `println`,
+    * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
+    * the error in the `Process`.
+    * 
+    * NB: previous versions of this code used ++ vs. merge. This meant that the constructed
+    * Process was strictly sequential, and since retries occur on a delayed schedule, the whole
+    * Process only proceeded as fast as the slowest schedule. Using merge interleaves the (fast)
+    * success path with the (slow) retry path. Relatedly, every() changed to use the Naive
+    * concurrency Strategy (thread per request) so large retry volumes don't starve the retry
+    * thread pool.
    */
   private def attemptRepeatedly[A](
     maskedError: Throwable => Unit)(
