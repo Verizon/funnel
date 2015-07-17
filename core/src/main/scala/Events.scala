@@ -15,10 +15,8 @@ object Events {
   type Event = Monitoring => Process[Task, Unit]
 
   /** An event which fires at the supplied regular interval. */
-  def every(d: Duration)(
-    implicit pool: ExecutorService = Monitoring.defaultPool,
-    schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool):
-    Event = _ => awakeEvery(d)(Strategy.Executor(pool), schedulingPool).map(_ => ())
+  def every(d: Duration): Event =
+    _ => awakeEvery(d)(Strategy.Naive, Monitoring.schedulingPool).map(_ => ())
 
   /**
    * The first `n` ticks of an event which fires at the supplied

@@ -556,13 +556,13 @@ object Monitoring {
    * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
    * the error in the `Process`.
    */
-  private[funnel] def attemptRepeatedly[A](
+  private def attemptRepeatedly[A](
     maskedError: Throwable => Unit)(
     p: Process[Task,A])(
     schedule: Process[Task,Unit]): Process[Task,A] = {
     val step: Process[Task, Throwable \/ A] =
       p.attempt(e => Process.eval { Task.delay { maskedError(e); e }})
-    step.stripW ++ schedule.terminated.flatMap {
+    step.stripW merge schedule.terminated.flatMap {
       // on our last reconnect attempt, rethrow error
       case None => step.flatMap(_.fold(Process.fail, Process.emit))
       // on other attempts, ignore the exceptions
