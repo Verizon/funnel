@@ -45,7 +45,7 @@ object MonitoringServer {
   def start(M: Monitoring, log: String => Unit): MonitoringServer = start(M)
 }
 
-class MonitoringServer(val M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
+class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
   import MonitoringServer._
 
   private val server = HttpServer.create(new InetSocketAddress(port), 0)

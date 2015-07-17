@@ -107,10 +107,6 @@ class Flask(options: Options, val I: Instruments) {
 
     log.info("Booting the mirroring process...")
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName, retries))
-/*
-    runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName,
-      (_ => (_ => Process.eval(Task.now(()))))))
- */
 
     options.elastic.foreach { elastic =>
       log.info("Booting the elastic search sink...")

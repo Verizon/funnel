@@ -66,7 +66,6 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     (C, ms)
   }
 
-/*
   if (Ø.isEnabled) {
     "mirrorDatapoints with 5000 datapoints input" should "be 5000" in {
       val payload = s"""
@@ -117,7 +116,6 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       app.S.stop()
     }
   }
- */
 
   "mirrorDatapoints for 45 seconds with 100 HTTP endpoints, half of which die" should "change" in {
     val n = 100
