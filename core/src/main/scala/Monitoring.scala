@@ -404,7 +404,7 @@ object Monitoring {
 
   def defaultRetries: Monitoring => Process[Task,Unit] = Events.takeEvery(30 seconds, 6)
 
-  private def daemonThreads(name: String) = new ThreadFactory {
+  private[funnel] def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {
       val t = Executors.defaultThreadFactory.newThread(r)
       t.setDaemon(true)
@@ -548,21 +548,28 @@ object Monitoring {
   }
 
   /**
-   * Try running the given process `p`, catching errors and reporting
-   * them with `maskedError`, using `schedule` to determine when further
-   * attempts are made. If `schedule` is exhausted, the error is raised.
-   * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
-   * will run `p`; if it encounters an error, it will print the error using `println`,
-   * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
-   * the error in the `Process`.
+    * Try running the given process `p`, catching errors and reporting
+    * them with `maskedError`, using `schedule` to determine when further
+    * attempts are made. If `schedule` is exhausted, the error is raised.
+    * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
+    * will run `p`; if it encounters an error, it will print the error using `println`,
+    * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
+    * the error in the `Process`.
+    * 
+    * NB: previous versions of this code used ++ vs. merge. This meant that the constructed
+    * Process was strictly sequential, and since retries occur on a delayed schedule, the whole
+    * Process only proceeded as fast as the slowest schedule. Using merge interleaves the (fast)
+    * success path with the (slow) retry path. Relatedly, every() changed to use the Naive
+    * concurrency Strategy (thread per request) so large retry volumes don't starve the retry
+    * thread pool.
    */
-  private[funnel] def attemptRepeatedly[A](
+  private def attemptRepeatedly[A](
     maskedError: Throwable => Unit)(
     p: Process[Task,A])(
     schedule: Process[Task,Unit]): Process[Task,A] = {
     val step: Process[Task, Throwable \/ A] =
       p.attempt(e => Process.eval { Task.delay { maskedError(e); e }})
-    step.stripW ++ schedule.terminated.flatMap {
+    step.stripW merge schedule.terminated.flatMap {
       // on our last reconnect attempt, rethrow error
       case None => step.flatMap(_.fold(Process.fail, Process.emit))
       // on other attempts, ignore the exceptions
