@@ -4,13 +4,13 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - name: configure low disk space
+    - name: flask | should not have low disk space
       gong:
         state: "present"
-        account: {{ application_environment }}
-        namespace: "flask"
-        window: "5 minutes"
-        name: "low-disk-space"
+        account: "{{ application_environment }}"
+        namespace: "{{ application_name }}"
+        window: 10 minutes
+        name: low-disk-space
         query: "cluster: flask*"
         critical: "!(disk < 0.9)"
         warning: "!(disk < 0.8)"
@@ -19,14 +19,75 @@
           - flask
         aggregations:
           disk:
-            op: "Min"
+            op: min
             field: "file_system.%2F.use_percent.numeric.mean"
         actions:
           critical:
-            - kind: "email"
+            - kind: email
               recipients:
                 - timothy.m.perrett@one.verizon.com
           warning:
-            - kind: "email"
+            - kind: email
               recipients:
                 - timothy.m.perrett@one.verizon.com
+
+    - name: flask | should not peg its cpu for 10 minutes
+      gong:
+        state: present
+        account: "{{ application_environment }}"
+        namespace: "{{ application_name }}"
+        window: 10 minutes
+        name: high-cpu
+        query: "cluster: flask*"
+        critical: cpu >= 0.9
+        warning: cpu >= 0.75
+        tags:
+          - funnel
+          - flask
+        aggregations:
+          cpu:
+            op: max
+            field: cpu.aggregate.usage.combined.numeric.mean
+        actions:
+          critical:
+            - kind: email
+              recipients:
+                - timothy.m.perrett@one.verizon.com
+          warning:
+            - kind: email
+              recipients:
+                - timothy.m.perrett@one.verizon.com
+
+    # purpose of this alert is to provide a negative check
+    # and ensure that the datapoints do not drop below a
+    # known reasonable threshold. Anything less than a
+    # couple thousand datapoints a minute means the flasks
+    # dont have appropriate workload.
+    - name: flask | should not have low mirroring datapoints
+      gong:
+        state: present
+        account: "{{ application_environment }}"
+        namespace: "{{ application_name }}"
+        window: 5 minutes
+        name: low-mirror-datapoints
+        query: "cluster: flask*"
+        critical: "datapoints > 2000"
+        warning: "datapoints > 4000"
+        tags:
+          - funnel
+          - flask
+        aggregations:
+          datapoints:
+            op: avg
+            field: mirror.datapoints.counter
+        actions:
+          critical:
+            - kind: email
+              recipients:
+                - timothy.m.perrett@one.verizon.com
+          warning:
+            - kind: email
+              recipients:
+                - timothy.m.perrett@one.verizon.com
+
+
