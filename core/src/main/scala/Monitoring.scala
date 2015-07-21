@@ -402,12 +402,7 @@ trait Monitoring {
 
 object Monitoring {
 
-//  def defaultRetries: Monitoring => Process[Task,Unit] = Events.takeEvery(30 seconds, 6)
-  def defaultRetries: Monitoring => Process[Task, Unit] = {
-    val S = Strategy.Executor(Monitoring.serverPool)
-    val P = Monitoring.schedulingPool
-    _ => (Process.emit(()) ++ time.sleep(30.seconds)(S, P)).repeat.take(6)
-  }
+  def defaultRetries: Monitoring => Process[Task,Unit] = Events.takeEvery(30 seconds, 6)
 
   private[funnel] def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {
@@ -552,29 +547,33 @@ object Monitoring {
     ((i: I) => Task.delay(hub ! i), signal)
   }
 
+  /** Terminate `p` when the given signal `alive` terminates. */
+  private def terminate[A](alive: Process[Task,Unit])(p: Process[Task,A]): Process[Task,A] =
+    alive.zip(p).map(_._2)
+
   /**
     * Try running the given process `p`, catching errors and reporting
-    * them with `maskedError`, using `schedule` to determine when
+    * them with `maskedError`, using `schedule` to determine when further
     * attempts are made. If `schedule` is exhausted, the error is raised.
-    * Example: `attemptRepeatedly(println)(p)((Process.emit(()) ++ time.sleep(10 seconds)).repeat.take(3))`
+    * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
     * will run `p`; if it encounters an error, it will print the error using `println`,
     * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
     * the error in the `Process`.
-    * 
-    * NB: schedule should be of the form: Process.emit(()) ++ time.sleep(d: FiniteDuration),
-    * NOT time.awakeEvery(d: FiniteDuration).map(_ => ()). This is because the semantics actually
-    * are to attempt p, INCLUDING FOR THE FIRST TIME, according to the schedule, then drop failures,
-    * then attempt p once more, take the first result (success or failure), and fold it into the end
-    * Process.
    */
   private def attemptRepeatedly[A](
     maskedError: Throwable => Unit)(
     p: Process[Task,A])(
-    schedule: Process[Task, Unit]): Process[Task,A] = {
+    schedule: Process[Task,Unit]): Process[Task,A] = {
+    val S = Strategy.Executor(Monitoring.defaultPool)
+    val alive = async.signalOf[Unit](())(S)
     val step: Process[Task, Throwable \/ A] =
-      p.attempt(e => Process.eval { Task.delay { maskedError(e); e }})
-    val retries = schedule.zip(step.repeat).map(_._2)
-    (retries.dropWhile(_.isLeft) ++ step).take(1).flatMap(_.fold(Process.fail, Process.emit))
+      p.append(Process.eval_(alive.close)).attempt(e => Process.eval { Task.delay { maskedError(e); e }})
+    step.stripW ++ terminate(alive.continuous)(schedule).terminated.flatMap {
+      // on our last reconnect attempt, rethrow error
+      case None => step.flatMap(_.fold(Process.fail, Process.emit))
+      // on other attempts, ignore the exceptions
+      case Some(_) => step.stripW
+    }
   }
 
   private[funnel] def formatURI(uri: URI): String = {

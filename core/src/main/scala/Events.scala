@@ -16,9 +16,8 @@ object Events {
 
   /** An event which fires at the supplied regular interval. */
   def every(d: Duration)(
-    implicit pool: ExecutorService = Monitoring.defaultPool,
-    schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool):
-      Event = _ => awakeEvery(d)(Strategy.Executor(pool), schedulingPool).map(_ => ())
+    implicit schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool):
+      Event = _ => awakeEvery(d)(Strategy.Naive, schedulingPool).map(_ => ())
 
   /**
    * The first `n` ticks of an event which fires at the supplied
