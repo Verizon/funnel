@@ -82,7 +82,7 @@ class Flask(options: Options, val I: Instruments) {
     runAsync(
       telemetryPublishSocket(
         URI.create(s"zeromq+tcp://0.0.0.0:${options.telemetryPort}"), signal,
-        Q.dequeue.wye(I.monitoring.keys.discrete pipe keyChanges)(wye.merge)(Strategy.Executor(Monitoring.serverPool)))
+        Q.dequeue)
     )
 
     def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
@@ -91,7 +91,7 @@ class Flask(options: Options, val I: Instruments) {
     def retries(names: Names): Event = {
       val retries = if(args.contains("noretries")) Events.takeEvery(10.seconds, 0) else Monitoring.defaultRetries
       retries andThen (_ ++ Process.eval[Task, Unit] {
-                         Q.enqueueAll(Seq(Error(names), Problem(names.theirs, "there wasn an error")))
+                         Q.enqueueAll(Seq(Error(names), Problem(names.theirs, "there wasn't an error")))
                            .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString)))
                        })
     }
