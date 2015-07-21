@@ -141,7 +141,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     Thread.sleep(1000)
 
     val (cs, ss) = ms.unzip
-    (0 until n by 2) foreach(i => Process.repeatEval(Task(cs(i).increment)).run.runAsync(identity))
+    (0 until n by 2) foreach(i => Process.repeatEval(Task(cs(i).increment)).run.runAsync(_ => ()))
     (1 until n by 2) foreach(i => ss(i).stop)
 
     val waitACouple = sleep(2.minutes)(S, P) fby emit(true)
