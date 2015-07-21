@@ -3,8 +3,16 @@
   hosts: all
   gather_facts: false
   user: ec2-user
+  include_vars: vars/logging.yml
   roles:
-    - application
+    - role: application
+      loggers:
+        - name: intelmedia.ws
+          level: INFO
+        - name: oncue.svc
+          level: DEBUG
+        - name: funnel
+          level: DEBUG
   tasks:
     - name: flask | override configuration file
       sudo: yes
