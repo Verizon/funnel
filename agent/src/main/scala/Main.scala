@@ -2,7 +2,7 @@ package funnel
 package agent
 
 import knobs._
-import java.net.URI
+import java.net.{URI, URL}
 import java.io.File
 import journal.Logger
 import scalaz.{\/,-\/,\/-}
@@ -23,6 +23,11 @@ object Main {
   case class ProxyConfig(host: String, port: Int)
   case class ZeromqConfig(socket: String, proxy: Option[ProxyConfig])
   case class NginxConfig(uri: String, frequency: Duration)
+  case class MesosConfig(name: String,
+                         uri: String,
+                         frequency: Duration,
+                         queries: List[String] = Nil,
+                         checkfield: String)
 
   case class JmxConfig(
     name: String,
@@ -42,7 +47,8 @@ object Main {
     statsd: Option[StatsdConfig],
     zeromq: Option[ZeromqConfig],
     nginx: Option[NginxConfig],
-    jmx: Option[JmxConfig]
+    jmx: Option[JmxConfig],
+    mesos: Option[MesosConfig]
   )
 
   def main(args: Array[String]): Unit = {
@@ -97,13 +103,20 @@ object Main {
       val jmxQueries  = cfg.lookup[List[String]]("agent.jmx.queries")
       val jmxExcludes = cfg.lookup[List[String]]("agent.jmx.exclude-attribute-patterns")
 
+      val mesosName    = cfg.lookup[String]("agent.mesos.name")
+      val mesosUrl    = cfg.lookup[String]("agent.mesos.url")
+      val mesosFreq     = cfg.lookup[Duration]("agent.mesos.poll-frequency")
+      val mesosQueries  = cfg.lookup[List[String]]("agent.mesos.queries")
+      val mesosCheckfield = cfg.lookup[String]("agent.mesos.checkfield")
+
       Options(
         agent  = (systemMetrics |@| jvmMetrics)(AgentConfig),
         http   = (httpHost |@| httpPort)(HttpConfig),
         statsd = (statsdPort |@| statsdPfx)(StatsdConfig),
         zeromq = proxySocket.map(ZeromqConfig(_, (proxyHost |@| proxyPort)(ProxyConfig))),
         nginx  = (nginxUrl |@| nginxFreq)(NginxConfig),
-        jmx    = (jmxName |@| jmxUri |@| jmxFreq |@| jmxQueries |@| jmxExcludes)(JmxConfig)
+        jmx    = (jmxName |@| jmxUri |@| jmxFreq |@| jmxQueries |@| jmxExcludes)(JmxConfig),
+        mesos = (mesosName |@| mesosUrl |@| mesosFreq |@| mesosQueries |@| mesosCheckfield)(MesosConfig)
       )
     }.run
 
@@ -174,6 +187,15 @@ object Main {
       log.info(s"Launching the Nginx statistics collection from ${n.uri}.")
       nginx.Import.periodicly(new URI(n.uri))(n.frequency, log).run.runAsync {
         case -\/(e) => log.error("Fatal error with the nginx import from ${n.uri}")
+        case _      => ()
+      }
+    }
+
+    // start the mesos statistics importer
+    options.mesos.foreach { n =>
+      log.info(s"Launching the mesos statistics collection from ${n.uri}.")
+      mesos.Import.periodically(new URL(n.uri), n.queries, n.checkfield, n.name)(I)(n.frequency).run.runAsync {
+        case -\/(e) => log.error("Fatal error with the mesos import from ${n.uri}")
         case _      => ()
       }
     }
