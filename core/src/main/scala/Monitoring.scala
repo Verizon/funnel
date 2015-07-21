@@ -547,6 +547,10 @@ object Monitoring {
     ((i: I) => Task.delay(hub ! i), signal)
   }
 
+  /** Terminate `p` when the given signal `alive` terminates. */
+  private def terminate[A](alive: Process[Task,Unit])(p: Process[Task,A]): Process[Task,A] =
+    alive.zip(p).map(_._2)
+
   /**
     * Try running the given process `p`, catching errors and reporting
     * them with `maskedError`, using `schedule` to determine when further
@@ -555,21 +559,16 @@ object Monitoring {
     * will run `p`; if it encounters an error, it will print the error using `println`,
     * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
     * the error in the `Process`.
-    * 
-    * NB: previous versions of this code used ++ vs. merge. This meant that the constructed
-    * Process was strictly sequential, and since retries occur on a delayed schedule, the whole
-    * Process only proceeded as fast as the slowest schedule. Using merge interleaves the (fast)
-    * success path with the (slow) retry path. Relatedly, every() changed to use the Naive
-    * concurrency Strategy (thread per request) so large retry volumes don't starve the retry
-    * thread pool.
    */
   private def attemptRepeatedly[A](
     maskedError: Throwable => Unit)(
     p: Process[Task,A])(
     schedule: Process[Task,Unit]): Process[Task,A] = {
+    val S = Strategy.Executor(Monitoring.defaultPool)
+    val alive = async.signalOf[Unit](())(S)
     val step: Process[Task, Throwable \/ A] =
-      p.attempt(e => Process.eval { Task.delay { maskedError(e); e }})
-    step.stripW merge schedule.terminated.flatMap {
+      p.append(Process.eval_(alive.close)).attempt(e => Process.eval { Task.delay { maskedError(e); e }})
+    step.stripW ++ terminate(alive.continuous)(schedule).terminated.flatMap {
       // on our last reconnect attempt, rethrow error
       case None => step.flatMap(_.fold(Process.fail, Process.emit))
       // on other attempts, ignore the exceptions

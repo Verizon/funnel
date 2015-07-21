@@ -117,7 +117,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     }
   }
 
-  "mirrorDatapoints for 45 seconds with 100 HTTP endpoints, half of which die" should "change" in {
+  "mirrorDatapoints for 2 minutes with 100 HTTP endpoints, half of which die" should "change" in {
     val n = 100
     val ms = (1024 until 1024 + n).map(makeMS)
     val payload = s"""
@@ -144,7 +144,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     (0 until n by 2) foreach(i => Process.repeatEval(Task(cs(i).increment)).run.runAsync(identity))
     (1 until n by 2) foreach(i => ss(i).stop)
 
-    val waitACouple = sleep(45.seconds)(S, P) fby emit(true)
+    val waitACouple = sleep(2.minutes)(S, P) fby emit(true)
 
     val mds: Process[Task, Double] = app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete
     val mdChanges: Process[Task, Double] = waitACouple.wye(mds)(wye.interrupt)(S)
