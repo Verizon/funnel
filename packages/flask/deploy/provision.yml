@@ -3,7 +3,6 @@
   hosts: all
   gather_facts: false
   user: ec2-user
-  include_vars: vars/logging.yml
   roles:
     - role: application
       loggers:
