@@ -23,7 +23,7 @@ class JsonSpec extends FlatSpec with Matchers {
     val t1 = Target("testcluster", new URI("http://xxxx:5775/stream/previous"), true)
     val c1 = RepoEvent.StateChange(Unmonitored, Assigned, Discovery(t1, 123456l))
     (c1 :: Nil).asJson.nospaces should equal (
-      """[{"to-state":"Assigned","from-state":"Unmonitored","message":{"time":123456,"target":"http://xxxx:5775/stream/previous","type":"Discovery"}}]""")
+      """[{"to-state":"Assigned","from-state":"Unmonitored","message":{"time":"1969-12-31T16:02:03-0800","target":"http://xxxx:5775/stream/previous","type":"Discovery"}}]""")
   }
 
 }
