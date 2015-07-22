@@ -42,7 +42,7 @@ object Server {
     val c = repo.repoCommands.append(Process.eval_(Task.delay(LifecycleStream.red)))
     val l = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _))
     val a = l.attempt { err =>
-      log.error(s"Error during processing of Platform events: $err")
+      log.error(s"Error processing repo events: $err")
       Process.eval_(Task.delay(LifecycleStream.red))
     }
     a.stripW.run.runAsync {
