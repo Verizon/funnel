@@ -37,7 +37,7 @@ In addition, we highly recommend upgrading to sbt-oncue 7.3 to make use of the c
 	* `"oncue.knobs" %% "core" % "3.2.+"` - does not depend on funnel, but is scalaz-compatible
 	* `"oncue.svc.journal" %% "core" % "2.1.+"` - does not depend on funnel but is version-compatible
 	* `"oncue.commonutils" %% "dal-cassandra" % "4.0.+"` - depends on funnel directly
-	* `"oncue.svc.search.client" %% "core" % "9.0.+"` - depends on funnel directly
+	* `"oncue.svc.search.client" %% "core" % "10.0.+"` - depends on funnel directly
 	* `"oncue.rna.jetevents" %% "core" % "3.1.+"` - depends on funnel directly
 
 *Be sure that you do not have funnel 2.x on your transitive classpath, and that any common libraries you're using are suitable upgraded.*

@@ -212,7 +212,7 @@ trait Monitoring {
                 implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
     parse(source).evalMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
-      val k = pt.key.withAttributes(attrs)
+      val k = pt.key.withAttributes(pt.key.attributes ++ attrs)
       for {
         b <- exists(k)
         _ <- if (b) {
