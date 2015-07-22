@@ -109,7 +109,7 @@ object JSON {
   private def targetMessage(`type`: String, instance: URI, flask: Option[FlaskID], time: Long) = {
     ("type" := `type`) ->:
     ("instance" := instance) ->:
-    ("time" := time) ->:
+    ("time" := new Date(time)) ->:
     flask.fold(jEmptyObject)(f => ("flask" := f) ->: jEmptyObject)
   }
 
@@ -118,7 +118,7 @@ object JSON {
   private def discoveryJson(d: Discovery) = {
     ("type" := "Discovery") ->:
     ("target" := d.target.uri.toString) ->:
-    ("time" := d.time ) ->:
+    ("time" := new Date(d.time) ) ->:
     jEmptyObject
   }
 
@@ -134,7 +134,7 @@ object JSON {
       case Problem(target,f,m,t) =>
         ("type" := "Problem") ->:
         ("instance" := target.uri) ->:
-        ("time" := t) ->:
+        ("time" := new Date(t)) ->:
         ("flask" := f) ->:
         ("msg" := m) ->: jEmptyObject
     }

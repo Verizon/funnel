@@ -74,7 +74,7 @@
     <div class="container">
       <div class="header">
         <ul class="nav nav-pills pull-right">
-          <li><a href="https://github.svc.oncue.com/pages/IntelMedia/funnel/">About</a></li>
+          <li><a href="https://github.oncue.verizon.net/pages/IntelMedia/funnel/">About</a></li>
           <li><a href="mailto:timothy.m.perrett@oncue.com">Contact</a></li>
         </ul>
         <h3 class="text-muted">Chemist Control Panel</h3>
@@ -83,25 +83,30 @@
       <div class="row marketing">
 
         <div class="col-lg-6">
-          <h4>Distribution Resources</h4>
+          <h4>Control Resources</h4>
           <p><a href="distribution">GET /distribution</a>: Display the current distribution of shards and associated work.</p>
+          <p><a href="bootstrap">POST /bootstrap</a>: Manually force Chemist to re-read its state of the world from the platform.</p>
+        </div>
+
+        <div class="col-lg-6">
+          <h4>Lifecycle Resources</h4>
+          <p><a href="lifecycle/states">GET /lifecycle/states</a>: View the lifecycle state as the chemist sees it.</p>
           <p><a href="lifecycle/history">GET /lifecycle/history</a>: View a rolling snapshot of the last lifecycle events to took place.</p>
-          <p><a href="distribute">POST /distribute</a>: Manually instruct a given set of inputs to be sharded over avalible Flask instances.</p>
-          <p><a href="bootstrap">POST /bootstrap</a>: Manually force Chemist to re-read its state of the world from AWS.</p>
+          <p><a href="platform/history">GET /platform/history</a>: Audit trail for the events that chemist recieved from the platform.</p>
         </div>
 
         <div class="col-lg-6">
           <h4>Shard Resources</h4>
           <p><a href="shards">GET /shards</a>: List all shards and known information about those hosts</p>
-          <p><a href="shard/:shardid">GET /shard/:shard-id</a>: Displays all known information about a given shard.</p>
-          <p><a href="shard/:shardid/include">POST /shard/:shard-id/include</a>: Manually specify a machine to use as a load-bearing shard.</p>
-          <p><a href="shard/:shardid/exclude">POST /shard/:shard-id/exclude</a>: Manually remove a shard from rotation and reshard its work.</p>
+          <p><a href="shard/:id">GET /shard/:id</a>: Displays all known information about a given shard.</p>
+          <p><a href="shard/:id/include">POST /shard/:id/include</a>: Manually specify a machine to use as a load-bearing shard.</p>
+          <p><a href="shard/:id/exclude">POST /shard/:id/exclude</a>: Manually remove a shard from rotation and reshard its work.</p>
         </div>
 
       </div>
 
       <div class="footer">
-        <p>&copy; Verizon OnCue 2014</p>
+        <p>&copy; Verizon OnCue 2013-2015</p>
       </div>
 
     </div>
