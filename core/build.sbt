@@ -25,5 +25,3 @@ libraryDependencies ++= Seq(
 )
 
 addCompilerPlugin("org.brianmckenna" %% "wartremover" % "0.9")
-
-oncue.build.SieveKeys.sieves := Seq.empty
