@@ -39,9 +39,9 @@ object Server {
     repo.lifecycle()
     LifecycleStream.green
 
-    val c = repo.repoCommands.append(Process.eval_(Task.delay(LifecycleStream.red)))
-    val l = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _))
-    val a = l.attempt { err =>
+    val c: Process[Task, RepoCommand] = repo.repoCommands.append(Process.eval_(Task.delay(LifecycleStream.red)))
+    val l: Process[Task, Unit] = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _))
+    val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
       log.error(s"Error processing repo events: $err")
       Process.eval_(Task.delay(LifecycleStream.red))
     }
