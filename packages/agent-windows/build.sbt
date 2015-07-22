@@ -23,6 +23,13 @@ libraryDependencies ++= Seq(
 /* this is basically a hack so that the windows agent can be compiled against jeromq */
 scalaSource in Compile := baseDirectory.value / ".." / ".." / "agent" / "src" / "main" / "scala"
 
+assemblyMergeStrategy in assembly := {
+  case "META-INF/io.netty.versions.properties" => MergeStrategy.first
+  case x =>
+    val oldStrategy = (assemblyMergeStrategy in assembly).value
+    oldStrategy(x)
+}
+
 mappings in Universal ++= Seq(
   file("packages/agent/deploy/etc/agent.cfg") -> "etc/agent.cfg"
 )
