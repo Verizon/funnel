@@ -18,4 +18,5 @@ object metrics {
   val GetShardById = timer("http/get/shards/id", "time taken to get shard by ID")
   val PostShardExclude = timer("http/post/shards/id/exclude", "time taken to exclude shard by ID")
   val PostShardInclude = timer("http/post/shards/id/include", "time taken to include shard by ID")
+  val LifecycleStream = trafficLight("lifecycle/repo-events")
 }
