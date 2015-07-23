@@ -39,10 +39,15 @@ object Telemetry extends TelemetryCodecs {
 
   def telemetrySubscribeEndpoint(uri: URI): Endpoint = Endpoint.unsafeApply(subscribe &&& (connect ~ topics.all), uri)
 
+  private def countSentMessages: Sink[Task, Telemetry] = sink.lift { _ =>
+    import metrics.MessagesSent
+    Task.delay(MessagesSent.increment)
+  }
+
   def telemetryPublishSocket(uri: URI, signal: Signal[Boolean], telemetry: Process[Task,Telemetry]): Task[Unit] = {
     val e = telemetryPublishEndpoint(uri)
     Ø.link(e)(signal) { socket =>
-      telemetry through Ø.write(socket)
+      telemetry observe countSentMessages through Ø.write(socket)
     }.run
   }
 

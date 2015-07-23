@@ -274,6 +274,13 @@ class StatefulRepository extends Repository {
       } ++ Process.eval_ { Task.delay {
         AssignedHosts.set(stateMaps.get.lookup(TargetState.Assigned).size)
         DoubleMonitoredHosts.set(stateMaps.get.lookup(TargetState.DoubleMonitored).size)
+        UnknownHosts.set(stateMaps.get.lookup(TargetState.Unknown).size)
+        UnmonitoredHosts.set(stateMaps.get.lookup(TargetState.Unmonitored).size)
+        UnmonitorableHosts.set(stateMaps.get.lookup(TargetState.Unmonitorable).size)
+        MonitoredHosts.set(stateMaps.get.lookup(TargetState.Monitored).size)
+        DoubleAssignedHosts.set(stateMaps.get.lookup(TargetState.DoubleAssigned).size)
+        ProblematicHosts.set(stateMaps.get.lookup(TargetState.Problematic).size)
+        FinHosts.set(stateMaps.get.lookup(TargetState.Fin).size)
       }}
 
     }
