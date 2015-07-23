@@ -46,7 +46,10 @@ object Telemetry extends TelemetryCodecs {
     }.run
   }
 
-
+  private def countReceivedMessages: Sink[Task, Transported] = sink.lift { _ =>
+    import metrics.MessagesReceived
+    Task.delay(MessagesReceived.increment)
+  }
 
   def telemetrySubscribeSocket(uri: URI, signal: Signal[Boolean],
                                keys: Actor[(URI, Set[Key[Any]])],
@@ -56,7 +59,7 @@ object Telemetry extends TelemetryCodecs {
     val endpoint = telemetrySubscribeEndpoint(uri)
     Ø.link(endpoint)(signal) { socket =>
       log.info(s"connected to telemetry socket on $uri")
-      (Ø.receive(socket) to fromTransported(uri, keys, errors, lifecycle))
+      (Ø.receive(socket) observe countReceivedMessages to fromTransported(uri, keys, errors, lifecycle))
     }.run
   }
 

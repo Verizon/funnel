@@ -4,7 +4,7 @@ package chemist
 import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import Sharding.Distribution
-import scalaz.{-\/,==>>}
+import scalaz.{-\/,==>>,\/}
 import scalaz.std.string._
 import scalaz.syntax.monad._
 import scalaz.stream.{Sink, Channel, Process, Process1, async}
@@ -244,6 +244,7 @@ class StatefulRepository extends Repository {
     repoCommandsQ.dequeue
 
   override def lifecycle(): Unit =  {
+    import metrics._
     val go: RepoEvent => Process[Task, RepoCommand] = { re =>
       Process.eval(repoHistoryStack.push(re)).flatMap{ _ =>
         log.info(s"lifecycle: executing event: $re")
@@ -270,10 +271,20 @@ class StatefulRepository extends Repository {
             flasks.update(_ + (flask.id -> flask))
             Process.halt
         }
-      }
+      } ++ Process.eval_ { Task.delay {
+        AssignedHosts.set(stateMaps.get.lookup(TargetState.Assigned).size)
+        DoubleMonitoredHosts.set(stateMaps.get.lookup(TargetState.DoubleMonitored).size)
+      }}
+
     }
 
-    (lifecycleQ.dequeue flatMap go to repoCommandsQ.enqueue).run.runAsync {
+    val c: Process[Task, RepoEvent] = lifecycleQ.dequeue.append(Process.eval_(Task.delay(LifecycleEventsStream.red)))
+    val l: Process[Task, Unit] = (c flatMap go to repoCommandsQ.enqueue)
+    val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
+      log.error(s"Error processing lifecycle events: $err")
+      Process.eval_(Task.delay(LifecycleEventsStream.red))
+    }
+    a.stripW.run.runAsync {
       case -\/(e) =>
         log.error("error consuming lifecycle events", e)
         repoCommandsQ.close.run

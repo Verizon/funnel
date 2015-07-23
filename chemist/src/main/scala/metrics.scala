@@ -18,5 +18,8 @@ object metrics {
   val GetShardById = timer("http/get/shards/id", "time taken to get shard by ID")
   val PostShardExclude = timer("http/post/shards/id/exclude", "time taken to exclude shard by ID")
   val PostShardInclude = timer("http/post/shards/id/include", "time taken to include shard by ID")
-  val LifecycleStream = trafficLight("lifecycle/repo-events")
+  val AssignedHosts = numericGauge("hosts/assigned", 0.0, Units.Count, "number of hosts in Assigned state")
+  val DoubleMonitoredHosts = numericGauge("hosts/doubleassigned", 0.0, Units.Count, "number of hosts in DoubleAssigned state")
+  val LifecycleEventsStream = trafficLight("lifecycle/lifecycle-events")
+  val RepoEventsStream = trafficLight("lifecycle/repo-events")
 }
