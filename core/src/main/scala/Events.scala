@@ -4,6 +4,7 @@ import java.util.concurrent.{ExecutorService, ScheduledExecutorService}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.Process
+import scalaz.stream.time.awakeEvery
 
 object Events {
 
@@ -13,11 +14,17 @@ object Events {
    */
   type Event = Monitoring => Process[Task, Unit]
 
-  /** An event which fires at the supplied regular interval. */
+  /** 
+   * An event which fires at the supplied regular interval.
+   * Because this drives the schedule for attemptRepeatedly(),
+   * it uses the Naive concurrency Strategy, which assigns a
+   * thread per request. This is to accomodate catastrophic
+   * retry scenarios, e.g. when 50+ endpoints unexpectedly
+   * vanish from a Flask.
+   */
   def every(d: Duration)(
-    implicit pool: ExecutorService = Monitoring.defaultPool,
-    schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool):
-    Event = _ => Process.awakeEvery(d)(Strategy.Executor(pool), schedulingPool).map(_ => ())
+    implicit schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool):
+      Event = _ => awakeEvery(d)(Strategy.Naive, schedulingPool).map(_ => ())
 
   /**
    * The first `n` ticks of an event which fires at the supplied

@@ -7,21 +7,43 @@ import funnel.Monitoring
 import funnel.http.MonitoringServer
 import scalaz.==>>
 import scalaz.std.string._
+import java.net.URI
+import org.scalactic.TypeCheckedTripleEquals
 
-class ShardingSpec extends FlatSpec with Matchers {
+class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
 
-  import Sharding.{Distribution,Target}
+  import Sharding.Distribution
+  import zeromq.TCP
 
   implicit lazy val log: Logger = Logger("chemist-spec")
+  val localhost: Location =
+    Location(
+      host = "127.0.0.1",
+      port = 5775,
+      datacenter = "local",
+      protocol = NetworkScheme.Http,
+      intent = LocationIntent.Mirroring,
+      templates = Seq.empty)
+
+  val telemetryLocalhost: Location =
+    Location(
+      host = "127.0.0.1",
+      port = 7390,
+      datacenter = "local",
+      protocol = NetworkScheme.Zmtp(TCP),
+      intent = LocationIntent.Supervision,
+      templates = Seq.empty)
 
   implicit def tuple2target(in: (String,String)): Target =
-    Target(in._1, SafeURL(in._2))
+    Target(in._1, new URI(in._2), false)
+
+  def fakeFlask(id: String) = Flask(FlaskID(id), localhost, telemetryLocalhost)
 
   val d1: Distribution = ==>>(
-    ("a", Set(("z","http://one.internal"))),
-    ("d", Set(("y","http://two.internal"), ("w","http://three.internal"), ("v","http://four.internal"))),
-    ("c", Set(("x","http://five.internal"))),
-    ("b", Set(("z","http://two.internal"), ("u","http://six.internal")))
+    (fakeFlask("a").id, Set(("z","http://one.internal"))),
+    (fakeFlask("d").id, Set(("y","http://two.internal"), ("w","http://three.internal"), ("v","http://four.internal"))),
+    (fakeFlask("c").id, Set(("x","http://five.internal"))),
+    (fakeFlask("b").id, Set(("z","http://two.internal"), ("u","http://six.internal")))
   )
 
   val i1: Set[Target] = Set(
@@ -44,11 +66,11 @@ class ShardingSpec extends FlatSpec with Matchers {
   )
 
   it should "correctly sort the map and return the flasks in order of their set length" in {
-    Sharding.shards(d1) should equal (Set("a", "c", "b", "d"))
+    Sharding.shards(d1).map(_.value) should equal (Seq("a", "c", "b", "d"))
   }
 
   it should "snapshot the exsiting shard distribution" in {
-    Sharding.sorted(d1).keySet should equal (Set("a", "c", "b", "d"))
+    Sharding.sorted(d1).map(_._1.value) should equal (Seq("a", "c", "b", "d"))
   }
 
   it should "correctly remove urls that are already being monitored" in {
@@ -59,22 +81,31 @@ class ShardingSpec extends FlatSpec with Matchers {
   }
 
   it should "correctly calculate how the new request should be sharded over known flasks" in {
-    Sharding.calculate(i1)(d1) should equal (
-      ("a", Target("u",SafeURL("http://eight.internal"))) ::
-      ("c", Target("v",SafeURL("http://nine.internal"))) :: Nil
-    )
+    val (s, newdist) = LFRRSharding.distribution(i1)(d1)
+    s.map {
+      case (x,y) => x.value -> y
+    }.toSet should === (Set(
+                          "a" -> Target("u",new URI("http://eight.internal"), false),
+                          "c" -> Target("v",new URI("http://nine.internal"), false)))
 
-    Sharding.calculate(i2)(d1) should equal (
-      ("a", Target("v",SafeURL("http://omega.internal"))) ::
-      ("c", Target("w",SafeURL("http://alpha.internal"))) ::
-      ("b", Target("r",SafeURL("http://epsilon.internal"))) ::
-      ("d", Target("z",SafeURL("http://gamma.internal"))) ::
-      ("a", Target("u",SafeURL("http://beta.internal"))) ::
-      ("c", Target("z",SafeURL("http://omicron.internal"))) ::
-      ("b", Target("r",SafeURL("http://kappa.internal"))) ::
-      ("d", Target("r",SafeURL("http://theta.internal"))) ::
-      ("a", Target("p",SafeURL("http://zeta.internal"))) :: Nil
-    )
+    val (s2,newdist2) = LFRRSharding.distribution(i2)(d1)
+    s2.map(_._2).toSet should === (Set(
+                                     Target("v",new URI("http://omega.internal"), false),
+                                     Target("w",new URI("http://alpha.internal"), false),
+                                     Target("r",new URI("http://epsilon.internal"), false),
+                                     Target("z",new URI("http://gamma.internal"), false),
+                                     Target("u",new URI("http://beta.internal"), false),
+                                     Target("z",new URI("http://omicron.internal"), false),
+                                     Target("r",new URI("http://kappa.internal"), false),
+                                     Target("r",new URI("http://theta.internal"), false),
+                                     Target("p",new URI("http://zeta.internal"), false)))
+  }
+
+  it should "assign all the work when using random sharding" in {
+    // this is a lame test, but because the assignment is random,
+    // its not possible to write a test due to the non-deterministic nature
+    val (s, newdist) = RandomSharding.distribution(i2)(d1)
+    newdist.values.flatten.size should equal (i2.size)
   }
 
 }

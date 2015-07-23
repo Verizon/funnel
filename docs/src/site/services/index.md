@@ -69,7 +69,7 @@ agent {
   #   url = "http://127.0.0.1:8080/nginx_status"
   #   poll-frequency = 15 seconds
   # }
-  
+
   # currently only supports non-authenticated, non-ssl connections
   # designed to be use locally within a docker container or host.
   # processes running jmx typically need the following set:
@@ -105,14 +105,14 @@ agent {
   #   # etc
   #   exclude-attribute-patterns = [ "*HistogramMicros", "*Histogram" ]
   # }
-  
+
 }
 ```
 <a name="agent-http"></a>
 
 #### HTTP
 
-As for the HTTP API, it supports reporting of various types of metrics and the agent HTTP process is always bound to `127.0.0.1:7557`. The structure of the JSON payload is as follows: 
+As for the HTTP API, it supports reporting of various types of metrics and the agent HTTP process is always bound to `127.0.0.1:$port`, where `$port` is the `agent.http.port` configuration value. The structure of the JSON payload is defined below, and the body must be `POST`ed to `/metrics` resource on the specified host:port combination:
 
 ```
 {
@@ -141,7 +141,7 @@ The structure is very simple, but lets take a moment to just walk through the va
 
 * `metrics.[0].name`: Name of the metric you wish to report. Names are an opaque handle used to refer to the metric values, but typically these should form a logical pattern which groups them into meaningfull catagories. For example, it might be useful to look at all HTTP GET calls in a website, so we might prefix all keys with the name `http/get` resulting in key names like `http/get/latency/index` or `http/get/latency/account`.
 
-* `metrics.[0].kind` and `metrics.[0].value`: The kind of metric you wish to submit. Valid options are: 
+* `metrics.[0].kind` and `metrics.[0].value`: The kind of metric you wish to submit. Valid options are:
 
 <table>
   <thead>
@@ -176,7 +176,7 @@ The structure is very simple, but lets take a moment to just walk through the va
   </tr>
 </table>
 
-That's about it for the HTTP API. Whilst it should be able to tollerate a good beating performance wise, it will likley not be as performant as the native Scala bindings, so keep that in mind because of the extra layers of indirection. 
+That's about it for the HTTP API. Whilst it should be able to tollerate a good beating performance wise, it will likley not be as performant as the native Scala bindings, so keep that in mind because of the extra layers of indirection.
 
 <a name="agent-statsd"></a>
 
@@ -319,7 +319,7 @@ The SNS topic specified with the configuration parameter `flask.sns-error-topic`
 
 ### Stream Consumers
 
-*Flask* is designed to pull metrics from *Funnel* hosts and then emit those windows to a set of output locations. These output locations are for the most part arbitrary - all that's needed is to write a `Sink` that then serialises the stream from *Flask* to something that can be understood by the system you wish to send the datapoints to. 
+*Flask* is designed to pull metrics from *Funnel* hosts and then emit those windows to a set of output locations. These output locations are for the most part arbitrary - all that's needed is to write a `Sink` that then serialises the stream from *Flask* to something that can be understood by the system you wish to send the datapoints to.
 
 <a name="flask-system-metrics"></a>
 
@@ -344,24 +344,91 @@ SIGAR gathers a large set of metrics for the local machine:
 * Load averages for 5, 10, and 15 minute intervals.
 * Operating system uptime.
 
-
-
 <a name="chemist"></a>
 
 # Chemist
 
-The final component living under the *Funnel* umbrella is *Chemist*. Given that each and every *Flask* does not know about any of its peers - it only understands the work it has been assigned - there has to be a way to automatically identity and assign new work as machines in a operational region startup, fail and gracefully shutdown. This is especially true when a given *Flask* instance fails unexpectedly, as its work will need to be re-assigned to other available *Flask* instances so that operational visibility does not get compromised.
+The final component living under the *Funnel* umbrella is *Chemist*. Given that each and every *Flask* does not know about any of its peers - it only understands the work it has been assigned - there has to be a way to automatically identify and assign new work as machines in a operational region startup, fail and gracefully shutdown. This is especially true when a given *Flask* instance fails unexpectedly, as its work will need to be re-assigned to other available *Flask* instances so that operational visibility is not compromised.
 
-For deployment to AWS, *Chemist* leverages the fact that auto-scalling groups can notify an SNS topic upon different lifecycle events happening which are associated to that group. For example, if a machine is terminated a notification is pushed to SNS detailing exactly what happened and to the specific instance(s). This is incredibly useful from a monitoring perspective, as it means that the *Chemist* lifecycle is the following:
+*Chemist* can be run on a variety of platforms. Currently there are two fully supported paths:
 
-1. *Chemist* boots up and reads the list of machines from the AWS API and figures out which subset of all the given machines can be monitored. 
-1. Figure out of all of those machines, which look like *Flask* instances based upon the deployment metadata.
-1. Next, partition all non-flask instances to the discovered *Flask* instances that are running. 
-1. Consume an SQS queue that is in turn subscribed to the aforementioned SNS topic that ASGs push their lifecycle events to. In this way, *Chemist* always gets notified of new machines that come online within a given region. 
+* `chemist-aws`: for dynamically growing and shrinking monitoring workloads utilising Amazon Web Services.
+* `chemist-static`: for staticly provisioned on-premis hardware that seldom changes.
+* `chemist-mesos`: **currently not implemented**, but initial work has been done on implementing a native mesos scheduler that is capable of conducting all the normal chemist behaviour, along with launching new Flask instances, as-and-when the system needs it.
 
-Because of its managerial role within the system, Chemist has a rudimentary but useful API for conducting several management tasks. At the time of writing the following APIs were available:
+Chemist has a rudimentary but useful API for conducting several management tasks. At the time of writing the following APIs were available:
 
-* `GET /shards`: display a list of all *Flask* shards and display the work that is current assigned to the given shard.
+* `GET /status`: simple status check for load-balancers to use to determine active nodes.
 
-* `POST /mirror`: using the same bucketing format as *Flask* instance, manually add some machines to be monitored.
+* `GET /shards`: display a list of all *Flask* shards, their network and version information.
 
+* `GET /shards/:id`: display a information pertaining to a specific *Flask* shard ID, their network and version information.
+
+* `POST /shards/:id/exclude`: migrate all the monitoring targets currently assigned to this flask shard to the other shards in the cluster. This is an extremely useful utility for conducting rolling upgrades to the flask cluster.
+
+* `POST /shards/:id/include`: the opposite of the `exclude` resource, this re-registers the shard and allows chemist to assign it work.
+
+* `GET /errors`: a bounded stack of all the errors the current set of *Flask* instances have seen. This is intended to be informative for administrators only; its just an FYI about the things the system stopped monitoring (for whatever reason).
+
+* `GET /distribution`: the current split of available work over all the current shards. Essentially detailing which clusters are assigned to which shards.
+
+* `GET /lifecycle/history`: the history of events as seen by chemist. This typically represents events like `StateChange` of a particular node, or `NewFlask` in the event new sharding capacity came online.
+
+* `GET /lifecycle/states`: a bounded stack of the most recent state changes nodes in the system went through (see the below figure detailing the state workflow diagram of chemist internals).
+
+* `GET /platform/history`
+
+* `POST /bootstrap`: force chemist to conduct a full phase of discovery and request all current shard load from all flasks and assign any delta that is not found to be currently monitored. 
+
+The chemist state machine can be visualised with this figure:
+
+![image]({{ site.baseurl }}img/chemist-states.png)
+
+### Chemist AWS
+
+For deployment to AWS, *Chemist* leverages the fact that auto-scalling groups can notify an SNS topic upon different lifecycle events happening which are associated to that group. For example, if a machine is terminated a notification is pushed to SNS detailing exactly what happened and to the specific instance(s). An SQS topic is then connected to this SNS topic, and *Chemist* consumes the incoming messages. SQS acts as a persistent queue, so if the chemist node fails, and a new chemist is brought back up from the auto-scalling group, it simply picks up where its predecessor left off.
+
+### Chemist Static
+
+For deployment to on-premis, or fixed-capacity infrastructure, *Funnel* provides "chemist-static" which can orchestrate your *Flask* instances by way of a simple static file-based configuration. The configuration options are the same as the regular *Chemist*, with a few key additions:
+
+```
+chemist {
+  ...
+
+  targets {
+    instance1 {
+      cluster-name = "one"
+      uris = [ "http://alpha:1234" ]
+    }
+    instance2 {
+      cluster-name = "two"
+      uris = [ "http://beta:5678" ]
+    }
+    instance3 {
+      cluster-name = "three"
+      uris = [ "http://delta:9012" ]
+    }
+  }
+
+  flasks {
+    flask1 {
+      location {
+        host = "ay"
+	     port = 1111
+        protocol = "http"
+      }
+      telemetry {
+        host = "bee"
+        port = 2222
+        protocol = "tcp"
+      }
+    }
+  }
+}
+
+```
+
+As you can see, the `targets` section denotes the *Funnel* endpoints *Chemist* should try to monitor, whilst the `flasks` section denotes those nodes which should do the monitoring. The primary differentiator between the `chemist-static` module from other chemist implementations is that the configuration file will be dynamically reloaded if changes are made at runtime. The reason for this is that in fixed infrastructure, machines are typically mutated in-place using IT automation tools such as [Ansible](http://www.ansible.com/) or [Chef](https://www.chef.io/).
+
+  

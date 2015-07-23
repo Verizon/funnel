@@ -28,8 +28,8 @@ object MonitoringServer {
    * `/stream/<keyid>`: stream of metrics for the given key
    * `/stream/<prefix>`: stream of metrics whose labels start with 'prefix'
    */
-  def start(M: Monitoring, port: Int = 8080): MonitoringServer = {
-    val svr = (new MonitoringServer(M, port))
+  def start(M: Monitoring, port: Int = 8080, keyTTL: Duration = 36.hours): MonitoringServer = {
+    val svr = (new MonitoringServer(M, port, keyTTL))
     svr.start()
     svr
   }
@@ -45,7 +45,7 @@ object MonitoringServer {
   def start(M: Monitoring, log: String => Unit): MonitoringServer = start(M)
 }
 
-class MonitoringServer(M: Monitoring, port: Int) {
+class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
   import MonitoringServer._
 
   private val server = HttpServer.create(new InetSocketAddress(port), 0)
@@ -53,8 +53,15 @@ class MonitoringServer(M: Monitoring, port: Int) {
   def start(): Unit = {
     server.setExecutor(Monitoring.serverPool)
     val _ = server.createContext("/", handleMetrics(M))
+
     server.start()
-    M.log.info("server started on port: " + port)
+    M.log.info(s"server started on port: $port")
+
+    M.keySenescence(Events.every(keyTTL), M.distinctKeys).run.runAsync(_.fold(e => {
+      M.log.error(s"Asynchronous error starting key senescence: $e - ${e.getMessage}")
+      M.log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
+    }, identity _))
+    M.log.info(s"Metric key TTL is $keyTTL")
   }
 
   def stop(): Unit = server.stop(0)
@@ -103,15 +110,25 @@ class MonitoringServer(M: Monitoring, port: Int) {
   protected def handleAddMirroringURLs(M: Monitoring, req: HttpExchange): Unit = {
     import JSON._; import argonaut.Parse;
 
-    post(req){ json =>
-      Parse.decodeEither[List[Bucket]](json).fold(
-        error => flush(400, error.toString, req),
-        blist => {
-          val cs: List[Command] = blist.flatMap(b => b.urls.map(u => Mirror(new URI(u), b.label)))
-          val p0: Process[Task, Command] = Process.emitAll(cs)
-          val p = p0 to M.mirroringQueue.enqueue
-          p.run.run
+    M.log.debug(s"handleAddMirroringURLs($M, $req)")
 
+    post(req){ json =>
+      M.log.debug(s"POST: $json")
+      Parse.decodeEither[List[Cluster]](json).fold(
+        error => {
+          M.log.error(s"Error 400: $error")
+          flush(400, error.toString, req)
+        },
+        blist => {
+          val cs: List[Command] =
+            blist.flatMap(b => b.urls.map(u => Mirror(new URI(u), b.label)))
+
+          M.log.debug(s"recieved instruction to mirror '${cs.mkString(",")}'")
+
+          val p0: Process[Task, Command] = Process.emitAll(cs)
+          val p: Process[Task, Unit] = p0.to(M.mirroringQueue.enqueue)
+          p.run.run
+          M.log.debug(s"added to mirroring queue")
           flush(202, Array.empty[Byte], req)
         }
       )
@@ -138,7 +155,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
   private def handleListMirroringURLs(M: Monitoring, req: HttpExchange): Unit = {
     import JSON._; import argonaut._, Argonaut._;
     flush(200, M.mirroringUrls.map {
-      case (a,b) => Bucket(a,b)
+      case (a,b) => Cluster(a,b)
     }.asJson.nospaces.getBytes, req)
   }
 
@@ -158,7 +175,10 @@ class MonitoringServer(M: Monitoring, port: Int) {
       // as the payloads here will be small, lets just turn it into a string
       val json = Source.fromInputStream(req.getRequestBody).mkString
       f(json)
-    } else flush(405, "Request method not allowed.", req)
+    } else {
+      M.log.error("405 - Request method not allowed.")
+      flush(405, "Request method not allowed.", req)
+    }
   }
 
   private def flush(status: Int, body: String, req: HttpExchange): Unit =
@@ -186,7 +206,7 @@ class MonitoringServer(M: Monitoring, port: Int) {
     val q = getQuery(uri)
     def attr[T:DecodeJson](a: String, v: T) =
       q.get(a).flatMap(Parse.decodeOption[T]).map(_ == v).getOrElse(true)
-    val p = attr("units", k.units) && attr("type", k.typeOf)
+    val p = attr("units", k.units) && attr("type", k.typeOf)(DecodeReportableT)
     (q - "units" - "type").foldLeft(p) {
       case (p, (a, v)) => p && (k.attributes.get(a) == Some(v))
     }

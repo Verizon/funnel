@@ -7,8 +7,9 @@
   </appender>
 
   <logger name="funnel" level="OFF" />
+  <logger name="com.ning.http.client" level="OFF" />
 
-  <root level="ERROR">
+  <root level="OFF">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>

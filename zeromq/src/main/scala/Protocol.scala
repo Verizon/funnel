@@ -17,4 +17,3 @@ case object IPC extends Protocol("ipc")
 case object UDP extends Protocol("udp")
 case object InProc extends Protocol("proc")
 case object Pair extends Protocol("pair")
-

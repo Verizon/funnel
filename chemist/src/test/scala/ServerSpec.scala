@@ -19,7 +19,7 @@ class ServerSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     Await.result(http(url(s"http://127.0.0.1:64523$path") OK as.String), 5.seconds)
 
   override def beforeAll(): Unit = {
-    Future(Server.unsafeStart(core,platform))
+    Future(Server.unsafeStart(new Server(core,platform)))
     Thread.sleep(1.seconds.toMillis)
   }
 

@@ -1,0 +1,28 @@
+---
+- name: flask | create image
+  hosts: all
+  gather_facts: false
+  user: ec2-user
+  roles:
+    - role: application
+      loggers:
+        - name: intelmedia.ws
+          level: INFO
+        - name: oncue.svc
+          level: DEBUG
+        - name: funnel
+          level: DEBUG
+  tasks:
+    - name: flask | override configuration file
+      sudo: yes
+      template: >
+        src=templates/flask.cfg.j2
+        dest=/usr/share/oncue/etc/flask.cfg
+        owner=root group=root mode=0644
+
+    - name: flask | copy elastic-template.json into place
+      sudo: yes
+      copy: >
+        src=files/elastic-template.json
+        dest=/usr/share/oncue/etc/elastic-template.json
+        owner=root group=root mode=0644

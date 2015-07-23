@@ -4,14 +4,10 @@ package chemist
 import scalaz.concurrent.Task
 
 class TestDiscovery extends Discovery {
-  def list: Task[Seq[Instance]] = ???
-    //Task.now(Fixtures.instances)
-
-  def lookupOne(id: InstanceID): Task[Instance] = ???
-    //Task.now(Fixtures.instances.find)
-
-  def lookupMany(ids: Seq[InstanceID]): Task[Seq[Instance]] = ???
-    //Task.now(Fixtures.instances.filter(ids.contains(x.id)))
-
-  def isFlask(i: Instance): Boolean = false
+  def listFlasks: Task[Seq[Flask]] = ???
+  def listTargets: Task[Seq[(TargetID, Set[Target])]] = ???
+  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = ???
+  def lookupFlask(id: funnel.chemist.FlaskID): Task[Flask] = ???
+  def lookupTarget(id: funnel.chemist.TargetID): Task[Seq[Target]] = ???
+  def lookupTargets(id: funnel.chemist.TargetID): Task[Set[Target]] = ???
 }

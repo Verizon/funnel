@@ -3,7 +3,7 @@ package funnel
 import java.net.URI
 
 sealed trait Command
-case class Mirror(uri: URI, bucket: BucketName) extends Command
+case class Mirror(uri: URI, cluster: ClusterName) extends Command
 case class Discard(uri: URI) extends Command
 
 trait ControlServer {

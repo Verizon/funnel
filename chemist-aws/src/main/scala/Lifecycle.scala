@@ -2,15 +2,20 @@ package funnel
 package chemist
 package aws
 
+import scalaz.concurrent.Strategy
 import scalaz.{\/,-\/,\/-}
 import scalaz.syntax.traverse._
-import scalaz.concurrent.Task
-import scalaz.stream.{Process,Sink}
+import scalaz.syntax.monad._
+import scalaz.concurrent.{Actor, Task}
+import scalaz.stream.{Process, Process0, Process1, Sink}
+import scalaz.stream.async.mutable.Signal
 import com.amazonaws.services.sqs.model.Message
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import funnel.aws._
+import telemetry.Telemetry._
+import java.net.URI
 
 /**
  * The purpose of this object is to manage all the "lifecycle" events
@@ -26,9 +31,10 @@ object Lifecycle {
   import journal.Logger
   import scala.collection.JavaConverters._
   import metrics._
+  import PlatformEvent._
 
   private implicit val log = Logger[Lifecycle.type]
-  private val noop = \/-(NoOp)
+  private val noop = \/-(Seq(NoOp))
 
   /**
    * Attempt to parse incomming SQS messages into `AutoScalingEvent`. Yield a
@@ -44,14 +50,14 @@ object Lifecycle {
    * we then pass the `AutoScalingEvent` to the `interpreter` function for further processing.
    * In the event the message does not parse to an `AutoScalingEvent`,
    */
-  def stream(queueName: String, resources: Seq[String]
-    )(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
-    ): Process[Task, Throwable \/ Action] = {
+  def stream(queueName: String, signal: Signal[Boolean]
+    )(sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+    ): Process[Task, Throwable \/ Seq[PlatformEvent]] = {
       // adding this function to ensure that parse errors do not get
       // lifted into errors that will later fail the stream, and that
       // any errors in the interpreter are properly handled.
-      def go(m: Message): Task[Throwable \/ Action] =
-        parseMessage(m).traverseU(interpreter(_, resources)(r, asg, ec2, dsc)).handle {
+      def go(m: Message): Task[Throwable \/ Seq[PlatformEvent]] =
+        parseMessage(m).traverseU(interpreter(_, signal)(asg, ec2, dsc)).handle {
           case MessageParseException(err) =>
             log.warn(s"Unexpected recoverable error when parsing lifecycle message: $err")
             noop
@@ -60,138 +66,87 @@ object Lifecycle {
             log.warn(s"Unexpected recoverable error locating $kind id '$id' specified on lifecycle message.")
             noop
 
-          case _ =>
-            log.warn(s"Failed to handle error state when recieving lifecycle event: ${m.getBody}")
+          case e =>
+            log.warn(s"Failed to handle error state when recieving lifecycle event. event = ${m.getBody}, error = $e")
+            e.printStackTrace
             noop
         }
 
     for {
       a <- SQS.subscribe(queueName)(sqs)(Chemist.defaultPool, Chemist.schedulingPool)
-      _ <- Process.eval(Task(log.debug(s"stream, number messages recieved: ${a.length}")))
-
+      // _ <- Process.eval(Task(log.debug(s"stream, number messages recieved: ${a.length}")))
       b <- Process.emitAll(a)
       _ <- Process.eval(Task(log.debug(s"stream, raw message recieved: $b")))
-
       c <- Process.eval(go(b))
       _ <- Process.eval(Task(log.debug(s"stream, computed action: $c")))
-
       _ <- SQS.deleteMessages(queueName, a)(sqs)
     } yield c
   }
 
-  //////////////////////////// I/O Actions ////////////////////////////
+  def lifecycleActor(repo: Repository): Actor[PlatformEvent] =
+    Actor[PlatformEvent](a => repo.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
 
-  /**
-   * This function is a bit of a monster and forms the crux of the chemist system
-   * when running on AWS. It's primary job is to recieve an AutoScalingEvent and
-   * then determine if that event pertains to a flask instance, or if it pertains
-   * to a normal service instance that needs to be monitored. The following cases
-   * are handled by this function:
-   *
-   * + New flask instance avalible:
-   *     Add this extra capacity to the known flask list
-   *
-   * + Flask instance terminated:
-   *     Remove this flask from the known instances and repartiion any work that
-   *     was assigned to this flask to another still-avalible flask.
-   *
-   * + New generic instance avalible:
-   *     Instruct one of the online flasks to start monitoring this new instance
-   *
-   */
-  def interpreter(e: AutoScalingEvent, resources: Seq[String]
-    )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
-    ): Task[Action] = {
+  def errorActor(repo: Repository): Actor[Error] =
+    Actor[Error](e => repo.errorSink(e).run)(Strategy.Executor(Chemist.serverPool))
+
+  def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] =
+    Actor[(URI, Set[Key[Any]])]{ case (fl, keys) => repo.keySink(fl, keys).run }(Strategy.Executor(Chemist.serverPool))
+
+  def interpreter(e: AutoScalingEvent, signal: Signal[Boolean]
+    )(asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+    ): Task[Seq[PlatformEvent]] = {
+
     log.debug(s"interpreting event: $e")
-
-    // terrible side-effect but we want to track the events
-    // that chemist actually sees
-    r.addEvent(e).run // YIKES!
 
     // MOAR side-effects!
     LifecycleEvents.increment
 
-    def isFlask: Task[Boolean] =
-      ASG.lookupByName(e.asgName)(asg).flatMap { a =>
-        log.debug(s"Found ASG from the EC2 lookup: $a")
+    def targetsFromId(id: TargetID): Task[Seq[NewTarget]] =
+      for {
+        i <- dsc.lookupTargets(id)
+      _  = log.debug(s"Found instance metadata from remote: $i")
+      } yield i.toSeq.map(NewTarget)
 
-        a.getTags.asScala.find(t =>
-          t.getKey.trim == "type" &&
-          t.getValue.trim.startsWith("flask")
-        ).fold(Task.now(false))(_ => Task.now(true))
-      }
+    def terminatedTargetsFromId(id: TargetID): Task[Seq[PlatformEvent]] =
+      for {
+        i <- dsc.lookupTargets(id)
+      } yield i.toSeq.map(t => TerminatedTarget(t.uri))
+
+    def isFlask: Task[Boolean] = {
+      (for {
+        n <- e.metadata.get("asg-name").map(Task.now).getOrElse(Task.fail(NotAFlaskException(e)))
+        a <- ASG.lookupByName(n)(asg)
+        _  = log.debug(s"Lifecycle.isFlask: found ASG from the EC2 lookup: $a")
+        r <- a.getTags.asScala.find(t =>
+               t.getKey.trim == AwsTagKeys.name &&
+               t.getValue.trim.startsWith("flask")
+             ).fold(Task.now(false))(_ => Task.now(true))
+        _  = log.debug(s"Lifecycle.isFlask, r = $r")
+      } yield r).or(Task.now(false))
+    }
+
+    def newFlask(id: FlaskID): Task[Seq[PlatformEvent]] =
+      for {
+        flask <- dsc.lookupFlask(id)
+      } yield Seq(NewFlask(flask))
 
     e match {
-      case AutoScalingEvent(_,Launch,_,_,_,_,_,_,_,_,_,_,id) =>
-        isFlask.flatMap(bool =>
-          if(bool){
-            // if its a flask, update our internal list of avalible shards
-            log.debug(s"Adding capactiy $id")
-            r.increaseCapacity(id).map(_ => NoOp)
-          } else {
-            // in any other case, its something new to monitor
-            for {
-              i <- dsc.lookupOne(id)
-              _  = log.debug(s"Found instance metadata from remote: $i")
+      case AutoScalingEvent(_,Launch,_,_,_,id,_) =>
+        isFlask.ifM(newFlask(FlaskID(id)), targetsFromId(TargetID(id)))
 
-              _ <- r.addInstance(i)
-              _  = log.debug(s"Adding service instance '$id' to known entries")
+      case AutoScalingEvent(_,Terminate,_,_,_,id,_) =>
+        isFlask.ifM(Task.now(Seq(TerminatedFlask(FlaskID(id)))), terminatedTargetsFromId(TargetID(id)))
 
-              t  = Sharding.Target.fromInstance(resources)(i)
-              m <- Sharding.locateAndAssignDistribution(t, r)
-              _  = log.debug("Computed and set a new distribution for the addition of host...")
-            } yield Redistributed(m)
-          }
-        )
-
-      case AutoScalingEvent(_,Terminate,_,_,_,_,_,_,_,_,_,_,id) => {
-        r.isFlask(id).flatMap(bool =>
-          if(bool){
-            log.info(s"Terminating and rebalancing the flask cluster. Downing $id")
-            (for {
-              t <- r.assignedTargets(id)
-              _  = log.debug(s"sink, targets= $t")
-              _ <- r.decreaseCapacity(id)
-              m <- Sharding.locateAndAssignDistribution(t,r)
-            } yield Redistributed(m)) or Task.now(NoOp)
-          } else {
-            log.info(s"Terminating the monitoring of a non-flask service instance with id = $id")
-            Task.now(NoOp)
-          }
-        )
-      }
-
-      case _ => Task.now(NoOp)
+      case _ => Task.now(Seq(NoOp))
     }
   }
 
-  // not sure if this is really needed but
-  // looks like i can use this in a more generic way
-  // to send previously unknown targets to flasks
-  def sink(http: dispatch.Http): Sink[Task,Action] =
-    Process.emit {
-      case Redistributed(seq) =>
-        for {
-          _ <- Sharding.distribute(seq)(http)
-          _ <- Task.now(Reshardings.increment)
-        } yield ()
-
-      case _ => Task.now( () )
-    }
-
-  /**
-   * The purpose of this function is to turn the result from the interpreter
-   * into an effect that has some meaning within the system (i.e. resharding or not)
-   */
-  def event(e: AutoScalingEvent, resources: Seq[String]
-    )(r: Repository, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery, http: dispatch.Http
-    ): Task[Unit] = {
-    interpreter(e, resources)(r, asg, ec2, dsc).flatMap {
-      case Redistributed(seq) =>
-        Sharding.distribute(seq)(http).map(_ => ())
-      case _ =>
-        Task.now( () )
-    }
+  def logErrors(x: Throwable \/ Seq[PlatformEvent]): Process[Task,PlatformEvent] = x match {
+    case -\/(t) =>
+      log.error(s"Problem encountered when trying to processes SQS lifecycle message: $t")
+      t.printStackTrace
+      Process.halt
+    case \/-(a) => Process.emitAll(a)
   }
 
   /**
@@ -200,21 +155,10 @@ object Lifecycle {
    * init method for chemist so that the SQS/SNS lifecycle is started from the edge of
    * the world.
    */
-  def run(queueName: String, resources: Seq[String], s: Sink[Task, Action]
-    )(r: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
-    ): Task[Unit] = {
-    val process: Sink[Task, Action] = stream(queueName, resources)(r,sqs,asg,ec2,dsc).flatMap {
-      case -\/(fail) => {
-        log.error(s"Problem encountered when trying to processes SQS lifecycle message: $fail")
-        fail.printStackTrace
-        s
-      }
-      case \/-(win)  => win match {
-        case Redistributed(_) => s
-        case _ => s
-      }
-    }
-
-    process.run
+  def run(queueName: String, signal: Signal[Boolean]
+    )(repo: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+  ): Task[Unit] = {
+    val ourWorld = stream(queueName, signal)(sqs,asg,ec2,dsc) flatMap logErrors to Process.constant(repo.platformHandler _)
+    ourWorld.run.onFinish(_ => signal.set(false))
   }
 }

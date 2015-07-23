@@ -17,7 +17,7 @@ import scalaz.stream._
   * ````
   * [
   *   {
-  *     "bucket": "accounts",
+  *     "cluster": "accounts",
   *     "urls": [
   *       "http://sdfsd.com/sdf",
   *       "http://improd.dfs/sdfsd"
@@ -26,7 +26,7 @@ import scalaz.stream._
   * ]
   * ````
   **/
-case class Bucket(label: String, urls: List[String])
+case class Cluster(label: String, urls: List[String])
 
 /** JSON encoders and decoders for types in the this library. */
 object JSON {
@@ -38,8 +38,8 @@ object JSON {
   def encode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).nospaces
   def prettyEncode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).spaces2
 
-  implicit val BucketCodecJson: CodecJson[Bucket] =
-    casecodec2(Bucket.apply, Bucket.unapply)("bucket", "urls")
+  implicit val ClusterCodecJson: CodecJson[Cluster] =
+    casecodec2(Cluster.apply, Cluster.unapply)("cluster", "urls")
 
   implicit val DoubleEncodeJson =
     jencode1[Double,Option[Double]] {
@@ -108,7 +108,7 @@ object JSON {
 
   implicit def DecodeKey: DecodeJson[Key[Any]] = DecodeJson { c => for {
     name   <- (c --\ "name").as[String]
-    typeOf <- (c --\ "type").as[Reportable[Any]]
+    typeOf <- (c --\ "type").as[Reportable[Any]](DecodeReportableT)
     u      <- (c --\ "units").as[Units]
     desc   <- (c --\ "description").as[String].option
     attrs  <- c.as[Map[String, String]].map(_ - "name" - "type" - "units" - "description")
@@ -163,7 +163,7 @@ object JSON {
     jencode2L((d: Datapoint[A]) => (d.key, EncodeReportable(d.key.typeOf)(d.value)))("key", "value")
 
   implicit def DecodeDatapoint: DecodeJson[Datapoint[Any]] = DecodeJson { c => for {
-    k <- (c --\ "key").as[Key[Any]]
+    k <- (c --\ "key").as[Key[Any]](DecodeKey)
     v <- (c --\ "value").as[Any](DecodeReportable(k.typeOf))
   } yield Datapoint(k, v) }
 

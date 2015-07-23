@@ -6,8 +6,10 @@ import unfiltered.response._
 import unfiltered.netty._
 import argonaut._, Argonaut._
 import scalaz.concurrent.Task
+import scalaz.stream.Process
 import scalaz.{\/,-\/,\/-}
 import journal.Logger
+import concurrent.duration._
 
 object JsonRequest {
   def apply[T](r: HttpRequest[T]) =
@@ -27,53 +29,109 @@ object Server {
 
   // there seems to be a bug in Task that makes doing what we previously had here
   // not possible. The server gets into a hang/deadlock situation.
-  def unsafeStart[U <: Platform](chemist: Chemist[U], platform: U): Unit = {
+  def unsafeStart[U <: Platform](server: Server[U]): Unit = {
+    import metrics.LifecycleStream
+    import server.{platform,chemist}
+    val disco   = platform.config.discovery
+    val repo    = platform.config.repository
+    val sharder = platform.config.sharder
+
+    repo.lifecycle()
+    LifecycleStream.green
+
+    val c: Process[Task, RepoCommand] = repo.repoCommands.append(Process.eval_(Task.delay(LifecycleStream.red)))
+    val l: Process[Task, Unit] = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _))
+    val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
+      log.error(s"Error processing repo events: $err")
+      Process.eval_(Task.delay(LifecycleStream.red))
+    }
+    a.stripW.run.runAsync {
+      case -\/(err) =>
+        log.error(s"Error starting processing of Platform events: $err")
+        err.printStackTrace
+
+      case \/-(t)   => log.info(s"result of platform processing $t")
+    }
+
     chemist.bootstrap(platform).runAsync {
-      case -\/(err) => log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
+      case -\/(err) =>
+        log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
+        err.printStackTrace
+
       case \/-(_)   => log.info("Sucsessfully bootstrap chemist at startup.")
     }
 
     chemist.init(platform).runAsync {
-      case -\/(err) => log.error(s"Unable to initilize the chemist service. Failed with error: $err")
+      case -\/(err) =>
+        log.error(s"Unable to initilize the chemist service. Failed with error: $err")
+        err.printStackTrace
+
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
+    Housekeeping.periodic(15.minutes)(disco, repo).run.runAsync {
+      case -\/(err) =>
+        log.error(s"Failed running the periodic housekeeping tasks. Error was: $err")
+        err.printStackTrace
+
+      case \/-(_)   => log.info("Sucsessfully completed the periodic housekeeping tasks.")
+    }
+
+    val p = this.getClass.getResource("/oncue/www/")
+    log.info(s"Setting web resource path to '$p'")
+
     unfiltered.netty.Server
       .http(platform.config.network.port, platform.config.network.host)
-      .resources(getClass.getResource("/oncue/www/"), cacheSeconds = 3600)
-      .handler(Server(chemist, platform))
+      .resources(p, cacheSeconds = 3600)
+      .handler(server)
       .run
   }
 }
 
 @io.netty.channel.ChannelHandler.Sharable
-case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
-  import JSON._
-  import concurrent.duration._
+class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cycle.Plan with cycle.SynchronousExecution with ServerErrorResponse {
   import chemist.ChemistK
+  import JSON._
   import Server._
   import metrics._
 
-  private def json[A : EncodeJson](a: ChemistK[A]) =
+  protected def json[A : EncodeJson](a: ChemistK[A]) =
     a(platform).attemptRun.fold(
-      e => InternalServerError ~> JsonResponse(e.toString),
+      e => {
+        log.error(s"Unable to process response: ${e.toString} - ${e.getMessage}")
+        e.printStackTrace
+        InternalServerError ~> JsonResponse(e.toString)
+      },
       o => Ok ~> JsonResponse(o))
 
-  private def decode[A : DecodeJson](req: HttpRequest[Any])(f: A => ResponseFunction[Any]) =
+  protected def decode[A : DecodeJson](req: HttpRequest[Any])(f: A => ResponseFunction[Any]) =
     JsonRequest(req).decodeEither[A].map(f).fold(fail => BadRequest ~> ResponseString(fail), identity)
 
-  def intent = {
+  def intent: cycle.Plan.Intent = {
     case GET(Path("/")) =>
-      GetRoot.time(Redirect("/index.html"))
+      GetRoot.time(Redirect("index.html"))
 
     case GET(Path("/status")) =>
       GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
+    case GET(Path("/errors")) =>
+      GetErrors.time(json(chemist.errors.map(_.toList)))
+
     case GET(Path("/distribution")) =>
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
 
+    case GET(Path("/unmonitorable")) =>
+      GetUnmonitorable.time(json(chemist.listUnmonitorableTargets))
+
     case GET(Path("/lifecycle/history")) =>
-      GetLifecycleHistory.time(json(chemist.history.map(_.toList)))
+      GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
+
+    case GET(Path("/lifecycle/states")) =>
+      GetLifecycleStates.time(json(chemist.states.map(
+        _.toList.map { case (k,v) => k -> v.toList })))
+
+    case GET(Path("/platform/history")) =>
+      GetPlatformHistory.time(json(chemist.platformHistory.map(_.toList)))
 
     case POST(Path("/distribute")) =>
       PostDistribute.time(NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)"))
@@ -85,13 +143,13 @@ case class Server[U <: Platform](chemist: Chemist[U], platform: U) extends cycle
       GetShards.time(json(chemist.shards))
 
     case GET(Path(Seg("shards" :: id :: Nil))) =>
-      GetShardById.time(json(chemist.shard(id)))
+      GetShardById.time(json(chemist.shard(FlaskID(id))))
 
     case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
-      PostShardExclude.time(json(chemist.exclude(id)))
+      PostShardExclude.time(json(chemist.exclude(FlaskID(id))))
 
     case POST(Path(Seg("shards" :: id :: "include" :: Nil))) =>
-      PostShardInclude.time(json(chemist.include(id)))
+      PostShardInclude.time(json(chemist.include(FlaskID(id))))
 
   }
 }

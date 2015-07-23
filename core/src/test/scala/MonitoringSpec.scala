@@ -8,6 +8,10 @@ import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.Nondeterminism
 import scalaz.stream.{process1, Process}
+import scalaz.std.list._
+import scalaz.std.tuple._
+import scalaz.syntax.functor._
+import scalaz.syntax.foldable._
 
 object MonitoringSpec extends Properties("monitoring") {
 
@@ -80,6 +84,7 @@ object MonitoringSpec extends Properties("monitoring") {
     ok && out2.length === 2 && out2(0) === xs.sum && out2(1) === xs.sum
   }
 
+
   /* Check that if all events occur at same moment, `sliding` has no effect. */
   property("sliding-id") = forAll(Gen.nonEmptyListOf(Gen.choose(1,10))) { xs =>
     val c = B.sliding(5.minutes)(identity[Int])(Group.intGroup)
@@ -104,8 +109,8 @@ object MonitoringSpec extends Properties("monitoring") {
    * buffered signal.
    */
   property("bufferedSignal") = forAll { (xs: List[Long]) =>
-    val (snk, s) = Monitoring.bufferedSignal(B.counter(0))
-    xs.foreach(snk)
+    val (snk, s) = Monitoring.bufferedSignal(B.counter(0)).run
+    xs.traverse_(snk).run
     val expected = xs.sum
     // this will 'eventually' become true, and loop otherwise
     while (s.continuous.once.runLastOr(0.0).run !== expected) {
@@ -113,6 +118,7 @@ object MonitoringSpec extends Properties("monitoring") {
     }
     true
   }
+
 
   /*
    * Check that subscribing and filtering is the same as
@@ -137,12 +143,11 @@ object MonitoringSpec extends Properties("monitoring") {
       filter(_.key.name.contains("previous/jvm/gc/ParNew/time"))
     val b2 = Monitoring.subscribe(Monitoring.default)(
       _.name.contains("previous/jvm/gc/ParNew/time"))
-    val xs = listenFor(1.minute)(b1)
-    val ys = listenFor(1.minute)(b2)
+    val xs = listenFor(30.seconds)(b1)
+    val ys = listenFor(30.seconds)(b2)
     val d = (xs.length - ys.length).abs
     d <= 2 // Each of xs and ys could gain or lose one tick, for a total of 2
   }
-
 
   /* Check that `distinct` combinator works. */
   property("distinct") = forAll(Gen.nonEmptyListOf(Gen.choose(-10L,10L))) { xs =>
@@ -154,9 +159,9 @@ object MonitoringSpec extends Properties("monitoring") {
   property("bufferedSignal-profiling") = secure {
     def go: Boolean = {
       val N = 100000
-      val (snk, s) = Monitoring.bufferedSignal(B.counter(0))
+      val (snk, s) = Monitoring.bufferedSignal(B.counter(0)).run
       val t0 = System.nanoTime
-      (0 to N).foreach(x => snk(x))
+      (0 to N).toList.traverse_(x => snk(x)).run
       val expected = (0 to N).map(_.toDouble).sum
       while (s.continuous.once.runLastOr(0.0).run !== expected) {
         Thread.sleep(10)
@@ -174,7 +179,7 @@ object MonitoringSpec extends Properties("monitoring") {
    * with concurrent producers.
    */
   property("profiling") = secure {
-    def go: Boolean = {
+    def go: Prop = {
       import instruments._
       val c = counter("uno")
       val ok = gauge("tres", false)
@@ -198,14 +203,48 @@ object MonitoringSpec extends Properties("monitoring") {
       }
       val publishTime = Duration.fromNanos(System.nanoTime - t0) / N.toDouble
       val okResult = Monitoring.default.latest(ok.keys.now).run
+      Thread.sleep(instruments.bufferTime.toMillis * 2)
 
-      // println("update time: " + updateTime.toNanos)
-      // println("publishTime: " + publishTime.toNanos)
+      //println("update time: " + updateTime)
+      //println("publishTime: " + publishTime)
+      //println("OK result:" + okResult)
       // I am seeing about 40.nanoseconds for update times,
       // 100 nanos for publishing
-      updateTime.toNanos < 1000 &&
-      publishTime.toNanos < 2000 &&
+      (s"Gauge latency should be < 1 μs (was $updateTime)" |: (updateTime.toNanos < 1000)) &&
+      (s"Publish latency should be < 2 μs (was $publishTime)" |: (publishTime.toNanos < 2000)) &&
       okResult
+    }
+    go || go || go
+  }
+
+  /* Make sure key senesence doesn't have quadratic complexity */
+  property("key-senesence") = secure {
+    import scalaz.std.function._
+    import scalaz.syntax.functor._
+    def go: Boolean = {
+      val ranges = List(4, 8, 16, 32, 64, 128).map(Range(0, _))
+      val times = ranges map { r =>
+        val M = Monitoring.instance
+        val I = new Instruments(30.seconds, M)
+        import I._
+        val counters = r.toList.map(n => counter(s"test$n"))
+        val t0 = System.nanoTime
+        val ks = M.keys.discrete.dropWhile(_.isEmpty).evalMap(x =>
+          if (x.isEmpty)
+            M.keys.close
+          else
+            Task.now(())
+        )
+        M.keySenescence(Events.every(100.milliseconds), M.distinctKeys).zip(ks).run.run
+        val t = System.nanoTime - t0
+        t
+      }
+      times.zip(times.tail).foldLeft(true) {
+        case (b, (t1, t2)) =>
+          val dt = t2.toDouble / t1.toDouble
+          // Doubling input size should have complexity closer to 2x than 4x
+          b && (Math.abs(2-dt) < Math.abs(4-dt))
+      }
     }
     go || go || go
   }
@@ -216,9 +255,11 @@ object MonitoringSpec extends Properties("monitoring") {
       import instruments._
       val t = timer("uno")
       t.time { Thread.sleep(50) }
+      // Make sure we wait for the time buffer to catch up
+      Thread.sleep(instruments.bufferTime.toMillis * 2)
       val r = Monitoring.default.latest(t.keys.now).run.mean
-      // println("Sleeping for 50ms took: " + r)
-      (r - 50).abs < 1000
+      //println("Sleeping for 50ms took: " + r)
+      r > 0 && (r - 50).abs < 1000
     }
     go || go || go
   }
@@ -236,9 +277,10 @@ object MonitoringSpec extends Properties("monitoring") {
       }
       val delta = System.nanoTime - t0
       val updateTime = (delta.nanoseconds) / N.toDouble
-      Thread.sleep(100)
+      // Make sure we wait for the time buffer to catch up
+      Thread.sleep(instruments.bufferTime.toMillis * 2)
       val m = Monitoring.default.latest(t.keys.now).run.mean
-      // println("timer:updateTime: " + updateTime)
+      //println("timer:updateTime: " + updateTime + ", m: " + m)
       updateTime.toNanos < 1000 && m == 50
     }
     go || go || go
@@ -274,9 +316,9 @@ object MonitoringSpec extends Properties("monitoring") {
   /** Check that when publishing, we get the count that was published. */
   property("pub/sub") = forAll(Gen.nonEmptyListOf(Gen.choose(1,10))) { a =>
     val M = Monitoring.default
-    val (k, snk) = M.topic[Long,Double]("count", Units.Count, "", identity)(B.ignoreTime(B.counter(0)))
+    val (k, snk) = M.topic[Long,Double]("count", Units.Count, "", identity)(B.ignoreTime(B.counter(0))).map(_.run)
     val count = M.get(k)
-    a.foreach { a => snk(a) }
+    a.traverse_(x => snk(x)).run
     val expected = a.sum
     var got = count.continuous.once.runLastOr(0.0).run
     while (got !== expected) {
@@ -294,7 +336,7 @@ object MonitoringSpec extends Properties("monitoring") {
     // this test takes about 45 seconds
     val (a,b) = ab.splitAt(ab.length / 2)
     val M = Monitoring.instance
-    val I = new Instruments(5.minutes, M)
+    val I = new Instruments(30.seconds, M)
     import I._
     val aN = counter("a")
     val bN = counter("b")

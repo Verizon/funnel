@@ -4,7 +4,9 @@ package zeromq
 import java.net.URI
 import org.scalatest.matchers.{Matcher,MatchResult}
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
-import scalaz.stream.async.signalOf
+import scalaz.concurrent.Strategy
+import scalaz.stream.async
+import async.mutable.Queue
 import scala.concurrent.duration._
 import sockets._
 import Publish.transportDatapoint
@@ -14,15 +16,16 @@ class SubscriptionSpec extends FlatSpec
     with Matchers
     with BeforeAndAfterAll {
 
-  lazy val S  = signalOf[Boolean](true)
+  lazy val S  = async.signalOf[Boolean](true)(Strategy.Executor(Monitoring.serverPool))
   lazy val W  = 30.seconds
+  lazy val Q: Queue[Telemetry] = async.unboundedQueue(Strategy.Executor(Monitoring.serverPool))
 
-  lazy val U1 = new URI("ipc:///tmp/u1.socket")
+  lazy val U1 = new URI("tcp://127.0.0.1:6478/now/numeric")
   lazy val E1 = Endpoint.unsafeApply(publish &&& bind, U1)
   lazy val M1 = Monitoring.instance
   lazy val I1 = new Instruments(W, M1)
 
-  lazy val U2 = new URI("ipc:///tmp/u2.socket")
+  lazy val U2 = new URI("tcp://127.0.0.1:6479/previous")
   lazy val E2 = Endpoint.unsafeApply(publish &&& bind, U2)
   lazy val M2 = Monitoring.instance
   lazy val I2 = new Instruments(W, M2)
@@ -37,6 +40,10 @@ class SubscriptionSpec extends FlatSpec
 
   // mirror previous to this instance
   lazy val MP = Monitoring.instance
+
+  lazy val previous = Transported(Schemes.fsm, Versions.v1, Some(Windows.previous), None, "".getBytes).header.getBytes("ASCII")
+
+  lazy val nowCounter = Transported(Schemes.fsm, Versions.v1, Some(Windows.now), Some(Topic("numeric")), "".getBytes).header.getBytes("ASCII")
 
   override def beforeAll(){
     addInstruments(I1)
@@ -68,14 +75,14 @@ class SubscriptionSpec extends FlatSpec
 
     Thread.sleep(2.seconds.toMillis)
 
-    mirror(U1, MN, List(nowCounter))
-    mirror(U2, MP, List(previous))
+    mirror(U1, MN) //, List(nowCounter))
+    mirror(U2, MP) //, List(previous))
 
     Thread.sleep(W.toMillis*2)
   }
 
-  private def mirror(uri: URI, to: Monitoring, discriminator: List[Array[Byte]]): Unit =
-    to.mirrorAll(Mirror.from(S, discriminator)
+  private def mirror(uri: URI, to: Monitoring): Unit =
+    to.mirrorAll(Mirror.from(S, Q)
     )(uri, Map("uri" -> uri.toString)
     ).run.runAsync(_.fold(e => Ø.log.error(
                             s"Error mirroring $uri: ${e.getMessage}"), identity))
@@ -84,9 +91,6 @@ class SubscriptionSpec extends FlatSpec
   override def afterAll(){
     stop(S).run
   }
-
-  val previous = Transported(Schemes.fsm, Versions.v1, Some(Windows.previous), None, "".getBytes).header.getBytes("ASCII")
-  val nowCounter = Transported(Schemes.fsm, Versions.v1, Some(Windows.now), Some(Topic("numeric")), "".getBytes).header.getBytes("ASCII")
 
   private def countKeys(m: Monitoring): Int =
     m.keys.compareAndSet(identity).run.get.size

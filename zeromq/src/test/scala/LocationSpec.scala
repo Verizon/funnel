@@ -7,7 +7,8 @@ import scalaz.\/
 
 class LocationSpec extends FlatSpec with Matchers {
 
-  def lift(s: String): Option[Location] = Location(new URI(s)).toOption
+  def lift(s: String): Option[Location] =
+    Location(new URI(s)).toOption
 
   "location companion" should "parse from a URI" in {
     lift("ipc:///foo/bar.socket").map(_.hostOrPath
@@ -19,6 +20,10 @@ class LocationSpec extends FlatSpec with Matchers {
     lift("foo:///tmp/bar.socket").map(_.hostOrPath
       ) should equal(None)
 
-  }
+    lift("zeromq+tcp://10.0.0.0:8888/dooo").map(_.hostOrPath
+      ) should equal (Some("10.0.0.0:8888"))
 
+    lift("zeromq+ipc:///var/run/bar.sock").map(_.hostOrPath
+      ) should equal (Some("/var/run/bar.sock"))
+  }
 }

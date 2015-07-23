@@ -22,3 +22,5 @@ bin
 sbt
 *~
 tags
+_site
+logback-test.xml

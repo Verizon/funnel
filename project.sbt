@@ -1,12 +1,14 @@
 
 import oncue.build._
-
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
-//import sbtunidoc.Plugin.UnidocKeys._
+
+OnCue.baseSettings
+
+Publishing.ignore
 
 organization in Global  := "oncue.svc.funnel"
 
-scalaVersion in Global  := "2.10.4"
+scalaVersion in Global  := "2.10.5"
 
 lazy val funnel = project.in(file(".")).aggregate(
   core,
@@ -14,47 +16,65 @@ lazy val funnel = project.in(file(".")).aggregate(
   elastic,
   nginx,
   riemann,
-  messages,
+  integration,
+  telemetry,
   zeromq,
   agent,
   `zeromq-java`,
-  `agent-windows`,
   flask,
   chemist,
-  `chemist-aws`)
+  `chemist-aws`,
+  `chemist-static`,
+  `agent-package`,
+  `agent-windows-package`,
+  `flask-package`,
+  `chemist-aws-package`,
+  `chemist-static-package`
+)
 
 lazy val agent = project.dependsOn(zeromq % "test->test;compile->compile", http, nginx).configs(MultiJvm)
 
-lazy val `agent-windows` = project.dependsOn(`zeromq-java`, http, nginx).configs(MultiJvm)
+lazy val chemist = project.dependsOn(core, http, telemetry)
 
-lazy val aws = project
+lazy val `chemist-aws` = project.dependsOn(chemist % "test->test;compile->compile")
 
-lazy val chemist = project.dependsOn(core, http)
-
-lazy val `chemist-aws` = project.dependsOn(chemist % "test->test;compile->compile", aws)
+lazy val `chemist-static` = project.dependsOn(chemist % "test->test;compile->compile")
 
 lazy val core = project
 
-lazy val docs = project
-//  .settings(unidocProjectFilter in (ScalaUnidoc, unidoc) := inProjects(core))
-  .dependsOn(core)
+lazy val docs = project.dependsOn(core)
 
 lazy val elastic = project.dependsOn(core, http)
 
-lazy val flask = project.dependsOn(aws % "test->test;compile->compile", riemann, elastic, messages, zeromq % "test->test;compile->compile")
+lazy val flask = project.dependsOn(riemann, elastic, telemetry, zeromq % "test->test;compile->compile")
 
 lazy val http = project.dependsOn(core)
 
-lazy val messages = project.dependsOn(core, zeromq).configs(MultiJvm)
+lazy val integration = project.dependsOn(flask, chemist % "test->test;compile->compile").configs(MultiJvm)
 
 lazy val nginx = project.dependsOn(core)
 
 lazy val riemann = project.dependsOn(core)
 
-lazy val zeromq = project.dependsOn(http).configs(MultiJvm)
+lazy val telemetry = project.dependsOn(zeromq).configs(MultiJvm)
+
+lazy val zeromq = project.dependsOn(core, http).configs(MultiJvm) // http? this is for http.JSON._, which should be fixed probably
 
 lazy val `zeromq-java` = project.dependsOn(http).configs(MultiJvm)
 
-OnCue.baseSettings
+//////////////////////////// packages for service deployables ////////////////////////////
 
-Publishing.ignore
+lazy val `agent-package` = project.in(
+  file("packages/agent")).dependsOn(agent)
+
+lazy val `agent-windows-package` = project.in(
+  file("packages/agent-windows")).dependsOn(`zeromq-java`, http, nginx).configs(MultiJvm)
+
+lazy val `flask-package` = project.in(
+  file("packages/flask")).dependsOn(flask)
+
+lazy val `chemist-aws-package` = project.in(
+  file("packages/chemist-aws")).dependsOn(`chemist-aws`)
+
+lazy val `chemist-static-package` = project.in(
+  file("packages/chemist-static")).dependsOn(`chemist-static`)

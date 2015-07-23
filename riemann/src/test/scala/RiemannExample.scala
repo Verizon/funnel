@@ -1,7 +1,7 @@
 package funnel
 package riemann
 
-import scalaz.stream.Process
+import scalaz.stream.{Process,time}
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
 
@@ -19,7 +19,7 @@ object Main {
 
     val R = com.aphyr.riemann.client.RiemannClient.tcp("127.0.0.1", 5555)
 
-    R.connect() // give me stregth!
+    R.connect() // give me strength!
 
     val c = counter("requests")
     val t = timer("response-time")
@@ -27,16 +27,16 @@ object Main {
 
     val stop = new java.util.concurrent.atomic.AtomicBoolean(false)
 
-    implicit val P = Monitoring.schedulingPool
+    val P = Monitoring.schedulingPool
+    val S = scalaz.concurrent.Strategy.Executor(Monitoring.defaultPool)
 
-    val t1 = Process.awakeEvery(2.seconds).map { _ =>
+    val t1 = time.awakeEvery(2.seconds)(S, P).map { _ =>
              c.increment
              t.time(Thread.sleep(100))
              randomLight(l)
            }.run.runAsyncInterruptibly(println, stop)
 
-    val t2 = Riemann.publish(Monitoring.default, 10f,
-        Events.every(10.seconds))(R, Riemann.collector(R)).runAsyncInterruptibly(println, stop)
+    val t2 = Riemann.publish(Monitoring.default, 10f)(R, Riemann.collector(R)).runAsyncInterruptibly(println, stop)
 
     println
     println("Press [Enter] to quit...")

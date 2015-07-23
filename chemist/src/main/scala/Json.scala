@@ -4,20 +4,39 @@ package chemist
 object JSON {
   import argonaut._, Argonaut._
   import javax.xml.bind.DatatypeConverter // hacky, but saves the extra dependencies
+  import java.net.URI
+  import java.text.SimpleDateFormat
+  import java.util.Date
 
   implicit class AsDate(in: String){
     def asDate: java.util.Date =
       javax.xml.bind.DatatypeConverter.parseDateTime(in).getTime
   }
 
-  ////////////////////// chemist messages //////////////////////
+  implicit val FlaskIdToJson: EncodeJson[FlaskID] =
+    implicitly[EncodeJson[String]].contramap(_.value)
+
+  implicit val UriToJson: EncodeJson[URI] =
+    implicitly[EncodeJson[String]].contramap(_.toString)
+
+  implicit val DateToJson: EncodeJson[Date] =
+    implicitly[EncodeJson[String]].contramap {
+      new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ",java.util.Locale.US).format(_)
+    }
+
+  implicit def TargetEncodeJson: EncodeJson[Target] =
+    EncodeJson((t: Target) =>
+      ("cluster" := t.cluster) ->:
+      ("uri"     := t.uri) ->: jEmptyObject)
+
+  ////////////////////// Chemist messages //////////////////////
 
   /**
    * {
    *   "shard": "instance-f1",
    *   "targets": [
    *     {
-   *       "bucket": "testing",
+   *       "cluster": "testing",
    *       "urls": [
    *         "http://...:5775/stream/sliding",
    *         "http://...:5775/stream/sliding"
@@ -26,31 +45,42 @@ object JSON {
    *   ]
    * }
    */
-  implicit val ShardingSnapshotToJson: EncodeJson[(InstanceID, Map[String, List[SafeURL]])] =
-    EncodeJson((m: (InstanceID, Map[String, List[SafeURL]])) =>
+  def encodeClusterPairs[A : EncodeJson]: EncodeJson[(A, Map[ClusterName, List[URI]])] =
+    EncodeJson((m: (A, Map[ClusterName, List[URI]])) =>
       ("shard"   := m._1) ->:
       ("targets" := m._2.toList) ->: jEmptyObject
     )
 
+  implicit val SnapshotWithFlaskToJson: EncodeJson[(FlaskID, Map[ClusterName, List[URI]])] =
+    encodeClusterPairs[FlaskID]
+
   /**
    * {
-   *   "firewalls": [
-   *     "imdev-flask-1-7-118-pbXOvo-WebServiceSecurityGroup-11WVCT4E6GY52",
-   *     "monitor-funnel"
-   *   ],
-   *   "datacenter": "us-east-1a",
-   *   "host": "ec2-54-197-46-246.compute-1.amazonaws.com",
-   *   "id": "i-0c24ede2"
+   *   "id": "flask1",
+   *   "location": ...
    * }
    */
-  implicit val InstanceToJson: EncodeJson[Instance] =
-    EncodeJson((i: Instance) =>
-      ("id"         := i.id) ->:
-      ("host"       := i.location.dns) ->:
-      ("version"    := i.application.map(_.version)) ->:
-      ("datacenter" := i.location.datacenter) ->:
-      ("firewalls"  := i.firewalls.toList) ->:
-      ("tags"       := i.tags) ->: jEmptyObject
+  implicit val FlaskToJson: EncodeJson[Flask] =
+    EncodeJson((f: Flask) =>
+      ("id"       := f.id)       ->:
+      ("location" := f.location) ->: jEmptyObject)
+
+  implicit val LocationToJson: EncodeJson[Location] =
+    EncodeJson { l =>
+      ("host" := l.host) ->:
+      ("port" := l.port) ->:
+      ("datacenter" := l.datacenter) ->:
+      ("protocol" := l.protocol.toString) ->:
+      ("is-private-network" := l.isPrivateNetwork) ->:
+      jEmptyObject
+    }
+
+  implicit val ErrorToJson: EncodeJson[Error] =
+    EncodeJson(error =>
+      ("kind"   := error.names.kind) ->:
+      ("mine"   := error.names.mine) ->:
+      ("theirs" := error.names.theirs) ->:
+      jEmptyObject
     )
 
   ////////////////////// flask messages //////////////////////
@@ -58,7 +88,7 @@ object JSON {
   /**
    *[
    *  {
-   *    "bucket": "imqa-maestro-1-0-261-QmUo7Js",
+   *    "cluster": "imqa-maestro-1-0-261-QmUo7Js",
    *    "urls": [
    *      "http://ec2-23-20-119-134.compute-1.amazonaws.com:5775/stream/sliding",
    *      "http://ec2-23-20-119-134.compute-1.amazonaws.com:5775/stream/uptime",
@@ -68,100 +98,155 @@ object JSON {
    *  }
    *]
    */
-  implicit val BucketsToJSON: EncodeJson[(String, List[SafeURL])] =
-    EncodeJson((t: (String, List[SafeURL])) =>
-      ("bucket" := t._1) ->:
-      ("urls"   := t._2.map(_.underlying) ) ->: jEmptyObject
+  implicit val ClustersToJSON: EncodeJson[(String, List[URI])] =
+    EncodeJson((t: (String, List[URI])) =>
+      ("cluster" := t._1) ->:
+      ("urls"   := t._2 ) ->: jEmptyObject
     )
 
   ////////////////////// lifecycle events //////////////////////
 
-  implicit val JsonToAutoScalingEventKind: DecodeJson[AutoScalingEventKind] =
-    DecodeJson(c => for {
-      a <- (c --\ "Event").as[String]
-    } yield AutoScalingEventKind.find(a).getOrElse(Unknown))
+  private def targetMessage(`type`: String, instance: URI, flask: Option[FlaskID], time: Long) = {
+    ("type" := `type`) ->:
+    ("instance" := instance) ->:
+    ("time" := new Date(time)) ->:
+    flask.fold(jEmptyObject)(f => ("flask" := f) ->: jEmptyObject)
+  }
 
-  implicit def JsonToJavaDate(name: String): DecodeJson[java.util.Date] =
-    DecodeJson(c => (c --\ name).as[String].map(_.asDate))
+  import TargetLifecycle._
 
-  /**
-   * {
-   *   "StatusCode": "InProgress",
-   *   "Service": "AWS Auto Scaling",
-   *   "AutoScalingGroupName": "imdev-su-4-1-264-cSRykpc-WebServiceAutoscalingGroup-1X7QT7QEZKKC7",
-   *   "Description": "Terminating EC2 instance: i-dd947af7",
-   *   "ActivityId": "926c4ae3-8181-4668-bcd1-6febc7668d18",
-   *   "Event": "autoscaling:EC2_INSTANCE_TERMINATE",
-   *   "Details": {
-   *     "Availability Zone": "us-east-1b"
-   *   },
-   *   "AutoScalingGroupARN": "arn:aws:autoscaling:us-east-1:465404450664:autoScalingGroup:cf59efeb-6e6e-40c3-90a8-804662f400c7:autoScalingGroupName/imdev-su-4-1-264-cSRykpc-WebServiceAutoscalingGroup-1X7QT7QEZKKC7",
-   *   "Progress": 50,
-   *   "Time": "2014-07-31T18:30:41.244Z",
-   *   "AccountId": "465404450664",
-   *   "RequestId": "926c4ae3-8181-4668-bcd1-6febc7668d18",
-   *   "StatusMessage": "",
-   *   "EndTime": "2014-07-31T18:30:41.244Z",
-   *   "EC2InstanceId": "i-dd947af7",
-   *   "StartTime": "2014-07-31T18:30:35.406Z",
-   *   "Cause": "At 2014-07-31T18:30:35Z an instance was taken out of service in response to a EC2 health check indicating it has been terminated or stopped."
-   * }
-   */
-  implicit val JsonToAutoScalingEvent: DecodeJson[AutoScalingEvent] =
-    DecodeJson(input => for {
-      a <- (input --\ "ActivityId").as[String]
-      b <- JsonToAutoScalingEventKind(input)
-      c <- (input --\ "AutoScalingGroupName").as[String]
-      d <- (input --\ "AutoScalingGroupARN").as[String]
-      e <- (input --\ "Details" --\ "Availability Zone").as[String]
-      f <- (input --\ "Description").as[String]
-      g <- (input --\ "Cause").as[String]
-      h <- (input --\ "Progress").as[Int]
-      i <- (input --\ "AccountId").as[String]
-      j <- JsonToJavaDate("Time")(input)
-      k <- JsonToJavaDate("StartTime")(input)
-      l <- JsonToJavaDate("EndTime")(input)
-      m <- (input --\ "EC2InstanceId").as[String]
-    } yield AutoScalingEvent(
-      activityId      = a,
-      kind            = b,
-      asgName         = c,
-      asgARN          = d,
-      avalibilityZone = e,
-      description     = f,
-      cause           = g,
-      progress        = h,
-      accountId       = i,
-      time            = j,
-      startTime       = k,
-      endTime         = l,
-      instanceId      = m
-    ))
+  private def discoveryJson(d: Discovery) = {
+    ("type" := "Discovery") ->:
+    ("target" := d.target.uri.toString) ->:
+    ("time" := new Date(d.time) ) ->:
+    jEmptyObject
+  }
 
-  /**
-   * {
-   *   "activity-id": "foo",
-   *   "instance-id": "i-353534",
-   *   "datetime": "2014....",
-   *   "kind": "launch",
-   *   "datacenter": "us-east-1a",
-   *   "description": "sdfsdfdssdfs",
-   *   "cause": "s sdf sdf sdfsd fsd",
-   *   "asg-name": "sodfso sdfs",
-   *   "asg-arn": "sdf sdfs "
-   * }
-   */
-  implicit val AutoScalingEventToJson: EncodeJson[AutoScalingEvent] =
-    EncodeJson((e: AutoScalingEvent) =>
-      ("activity-id" := e.activityId) ->:
-      ("instance-id" := e.instanceId) ->:
-      ("date-time"   := e.time.toString) ->:
-      ("kind"        := e.kind.notification) ->:
-      ("datacenter"  := e.avalibilityZone) ->:
-      ("description" := e.description) ->:
-      ("cause"       := e.cause) ->:
-      ("asg-name"    := e.asgName) ->:
-      ("asg-arn"     := e.asgARN) ->: jEmptyObject
+  implicit val targetMessagesToJson: EncodeJson[TargetMessage] =
+    EncodeJson {
+      case d @ Discovery(_, _) => discoveryJson(d)
+      case Assignment(target, f, l) => targetMessage("Assignment", target.uri, Some(f), l)
+      case Confirmation(target, f, l) => targetMessage("Confirmation", target.uri, Some(f), l)
+      case Migration(target, f, l) => targetMessage("Migration", target.uri, Some(f), l)
+      case Unassignment(target, f, l) => targetMessage("Unassignment", target.uri, Some(f), l)
+      case Unmonitoring(target, f, l) => targetMessage("Unmonitoring", target.uri, Some(f), l)
+      case Terminated(target,t) => targetMessage("Terminated", target.uri, None, t)
+      case Problem(target,f,m,t) =>
+        ("type" := "Problem") ->:
+        ("instance" := target.uri) ->:
+        ("time" := new Date(t)) ->:
+        ("flask" := f) ->:
+        ("msg" := m) ->: jEmptyObject
+    }
+
+  implicit val stateChangeToJson: EncodeJson[RepoEvent.StateChange] =
+    EncodeJson { sc =>
+      ("message" := sc.msg) ->:
+      ("from-state" := sc.from.toString) ->:
+      ("to-state" := sc.to.toString) ->:
+      jEmptyObject
+    }
+
+  implicit val newFlaskToJson: EncodeJson[RepoEvent.NewFlask] =
+    EncodeJson { nf =>
+      ("type" := "NewFlask") ->:
+      ("flask" := nf.flask.id) ->:
+      ("location" := nf.flask.location.uri) ->:
+      jEmptyObject
+    }
+
+  implicit val repoEventToJson: EncodeJson[RepoEvent] =
+    EncodeJson {
+      case sc@RepoEvent.StateChange(_,_,_) => stateChangeToJson.encode(sc)
+      case nf@RepoEvent.NewFlask(_) => newFlaskToJson.encode(nf)
+    }
+
+  def encodeNewTarget(t: Target, time: Date): Json = {
+    ("type" := "NewTarget") ->:
+    ("cluster" := t.cluster) ->:
+    ("uri" := t.uri) ->:
+    ("time" := time) ->:
+    jEmptyObject
+  }
+
+  def encodeNewFlask(f: Flask, time: Date): Json = {
+    ("type" := "NewFlask") ->:
+    ("flask" := f.id) ->:
+    ("location" := f.location) ->:
+    ("time" := time) ->:
+    jEmptyObject
+  }
+
+  def encodeTerminatedTarget(u: URI, time: Date): Json = {
+    ("type" := "TerminatedTarget") ->:
+    ("uri" := u) ->:
+    ("time" := time) ->:
+    jEmptyObject
+  }
+
+  def encodeTerminatedFlask(f: FlaskID, time: Date): Json = {
+    ("type" := "TerminatedFlask") ->:
+    ("flask" := f.value) ->:
+    ("time" := time) ->:
+    jEmptyObject
+  }
+
+  def encodeMonitored(f: FlaskID, u: URI, time: Date): Json = {
+    ("type" := "Monitored") ->:
+    ("flask" := f.value) ->:
+    ("uri" := u) ->:
+    ("time" := time) ->:
+    jEmptyObject
+  }
+
+  def encodeProblem(f: FlaskID, u: URI, msg: String, time: Date): Json = {
+    ("type" := "Problem") ->:
+    ("flask" := f.value) ->:
+    ("uri" := u) ->:
+    ("message" := msg) ->:
+    ("time" := time) ->:
+    jEmptyObject
+  }
+
+  def encodeUnmonitored(f: FlaskID, u: URI, time: Date): Json = {
+    ("type" := "Unmonitored") ->:
+    ("flask" := f.value) ->:
+    ("uri" := u) ->:
+    ("time" := time) ->:
+    jEmptyObject
+  }
+
+  def encodeAssigned(f: FlaskID, t: Target, time: Date): Json = {
+    ("type" := "Assigned") ->:
+    ("flask" := f.value) ->:
+    ("cluster" := t.cluster) ->:
+    ("uri" := t.uri) ->:
+    ("time" := time) ->:
+    jEmptyObject
+  }
+
+  implicit val platformEventToJson: EncodeJson[PlatformEvent] =
+    EncodeJson {
+      case e @ PlatformEvent.NewTarget(t) => encodeNewTarget(t, e.time)
+      case e @ PlatformEvent.NewFlask(f) => encodeNewFlask(f, e.time)
+      case e @ PlatformEvent.TerminatedTarget(u) => encodeTerminatedTarget(u, e.time)
+      case e @ PlatformEvent.TerminatedFlask(f) => encodeTerminatedFlask(f, e.time)
+      case e @ PlatformEvent.Monitored(f, u) => encodeMonitored(f, u, e.time)
+      case e @ PlatformEvent.Problem(f, u, msg) => encodeProblem(f, u, msg, e.time)
+      case e @ PlatformEvent.Unmonitored(f, u) => encodeUnmonitored(f, u, e.time)
+      case e @ PlatformEvent.Assigned(f, t) => encodeAssigned(f, t, e.time)
+      case e @ PlatformEvent.NoOp => ("type" := "NoOp") ->: ("time" := e.time) ->: jEmptyObject
+    }
+
+  implicit def stateMapsToJson[A : EncodeJson]: EncodeJson[(TargetLifecycle.TargetState, List[A])] =
+    EncodeJson((s: (TargetLifecycle.TargetState, List[A])) =>
+      ("state" := s._1.toString.toLowerCase) ->:
+      ("locations" := s._2) ->: jEmptyObject
     )
 
+  implicit val uriStateChangePairToJson: EncodeJson[(URI,RepoEvent.StateChange)] =
+    EncodeJson((t: (URI,RepoEvent.StateChange)) =>
+      ("state-change" := t._2) ->:
+      ("uri" := t._1) ->: jEmptyObject
+    )
 }

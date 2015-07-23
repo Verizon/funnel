@@ -18,6 +18,6 @@ object Endpoint {
     Location(u).map(Endpoint(m, _))
 
   def unsafeApply(m: SocketBuilder, u: URI): Endpoint =
-    apply(m,u).getOrElse(sys.error(
-      "Threw an exception whilst using unsafeApply. Check your arguments."))
+    apply(m,u).fold(e => sys.error(s"Threw an exception: ${e.getMessage} whilst using unsafeApply for uri: $u. Check your arguments."),
+                    x => x)
 }

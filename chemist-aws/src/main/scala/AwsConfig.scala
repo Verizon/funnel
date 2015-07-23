@@ -12,6 +12,8 @@ import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import dispatch.Http
 import concurrent.duration.Duration
 import funnel.aws._
+import scalaz.stream.async.signalOf
+import scalaz.concurrent.Strategy
 
 case class QueueConfig(
   queueName: String,
@@ -19,7 +21,7 @@ case class QueueConfig(
 )
 
 case class AwsConfig(
-  resources: List[String],
+  templates: List[LocationTemplate],
   network: NetworkConfig,
   queue: QueueConfig,
   sns: AmazonSNS,
@@ -27,36 +29,48 @@ case class AwsConfig(
   ec2: AmazonEC2,
   asg: AmazonAutoScaling,
   commandTimeout: Duration,
-  includeVpcTargets: Boolean
+  includeVpcTargets: Boolean,
+  sharder: Sharder
 ) extends PlatformConfig {
-  val discovery: Discovery = new Discovery(ec2, asg)
-  val repository: Repository = new StatefulRepository(discovery)
+  val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, templates)
+  val repository: Repository = new StatefulRepository
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
+  val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
+  val remoteFlask = new HttpFlask(http, repository, signal)
 }
 
-object Config {
+object AwsConfig {
   def readConfig(cfg: Config): AwsConfig = {
     val topic     = cfg.require[String]("chemist.sns-topic-name")
     val queue     = cfg.require[String]("chemist.sqs-queue-name")
-    val resources = cfg.require[List[String]]("chemist.resources-to-monitor")
+    val templates = cfg.require[List[String]]("chemist.target-resource-templates")
     val aws       = cfg.subconfig("aws")
     val network   = cfg.subconfig("chemist.network")
     val timeout   = cfg.require[Duration]("chemist.command-timeout")
     val usevpc    = cfg.lookup[Boolean]("chemist.include-vpc-targets").getOrElse(false)
+    val sharding  = cfg.lookup[String]("chemist.sharding-strategy")
     AwsConfig(
-      resources,
-      network   = readNetwork(network),
-      queue     = QueueConfig(topic, queue),
-      sns       = readSNS(aws),
-      sqs       = readSQS(aws),
-      ec2       = readEC2(aws),
-      asg       = readASG(aws),
-      timeout,
-      usevpc
+      templates 		= templates.map(LocationTemplate),
+      network           = readNetwork(network),
+      queue             = QueueConfig(topic, queue),
+      sns               = readSNS(aws),
+      sqs               = readSQS(aws),
+      ec2               = readEC2(aws),
+      asg               = readASG(aws),
+      sharder           = readSharder(sharding),
+      commandTimeout    = timeout,
+      includeVpcTargets = usevpc
     )
   }
+
+  private def readSharder(c: Option[String]): Sharder =
+    c match {
+      case Some("least-first-round-robin") => LFRRSharding
+      case Some("random")                  => RandomSharding
+      case _                               => RandomSharding
+    }
 
   private def readNetwork(cfg: Config): NetworkConfig =
     NetworkConfig(cfg.require[String]("host"), cfg.require[Int]("port"))

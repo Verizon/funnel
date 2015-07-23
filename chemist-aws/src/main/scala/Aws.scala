@@ -3,5 +3,10 @@ package chemist
 package aws
 
 trait Aws extends Platform {
-  type Config = AwsConfig
+  type Constraint <: AwsConfig
+  type Config = Constraint
+}
+
+trait DefaultAws extends Aws {
+  type Constraint = AwsConfig
 }

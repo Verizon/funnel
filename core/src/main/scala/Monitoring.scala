@@ -1,7 +1,6 @@
 package funnel
 
 import java.net.URI
-import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory, ConcurrentHashMap}
 import scala.concurrent.duration._
 import scala.language.higherKinds
@@ -10,14 +9,16 @@ import scalaz.{Nondeterminism,==>>}
 import scalaz.stream._
 import scalaz.stream.merge._
 import scalaz.stream.async
+import async.mutable.Queue
 import scalaz.syntax.traverse._
 import scalaz.syntax.monad._
 import scalaz.std.option._
 import scalaz.std.string._
+import scalaz.std.set._
 import scalaz.{\/, ~>, Monad}
 import Events.Event
 import scalaz.stream.async.mutable.Signal
-import scalaz.stream.async.signal
+import scalaz.stream.async.{signalOf,signalUnset}
 import journal.Logger
 import internals._
 
@@ -36,12 +37,12 @@ trait Monitoring {
    */
   def topic[I, O:Reportable](
       name: String, units: Units, description: String, keyMod: Key[O] => Key[O])(
-      buf: Process1[(I,Duration),O]): (Key[O], I => Unit) = {
+      buf: Process1[(I,Duration),O]): (Key[O], Task[I => Task[Unit]]) = {
     val k = keyMod(Key[O](name, units, description))
     (k, topic(k)(buf))
   }
 
-  protected def topic[I,O](key: Key[O])(buf: Process1[(I,Duration),O]): I => Unit
+  protected def topic[I,O](key: Key[O])(buf: Process1[(I,Duration),O]): Task[I => Task[Unit]]
 
   /**
    * Return the continuously updated signal of the current value
@@ -73,8 +74,8 @@ trait Monitoring {
     for {
       _ <- proc.evalMap((o: O) => for {
         b <- exists(key)
-        _ <- if (b) Task.fork(update(key, o))
-             else Task(topic[O,O](key)(Buffers.ignoreTime(process1.id)))
+        _ <- if (b) Task.delay(Task.fork(update(key, o))(defaultPool).runAsync(_ => ()))
+             else Task(topic[O,O](key)(Buffers.ignoreTime(process1.id)))(defaultPool)
       } yield ()).run
     } yield key
   }
@@ -116,19 +117,19 @@ trait Monitoring {
   private[funnel] val mirroringQueue =
     async.unboundedQueue[Command](Strategy.Executor(Monitoring.serverPool))
 
-  private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue
+  private[funnel] val mirroringCommands: Process[Task, Command] = mirroringQueue.dequeue observe(io.stdOut.contramap[Command](_.toString))
 
   private val urlSignals = new ConcurrentHashMap[URI, Signal[Unit]]
 
-  private val bucketUrls = new Ref[BucketName ==>> Set[URI]](==>>())
+  private val clusterUrls = new Ref[ClusterName ==>> Set[URI]](==>>())
 
   /**
    * Fetch a list of all the URLs that are currently being mirrored.
    * If nothing is currently being mirrored (as is the case for all funnels)
    * then this method yields an empty `Set[URL]`.
    */
-  def mirroringUrls: List[(BucketName, List[String])] = {
-    bucketUrls.get.toList.map { case (k,s) =>
+  def mirroringUrls: List[(ClusterName, List[String])] = {
+    clusterUrls.get.toList.map { case (k,s) =>
       k -> s.toList.map(_.toString)
     }
   }
@@ -139,60 +140,68 @@ trait Monitoring {
 
   def processMirroringEvents(
     parse: DatapointParser,
+    Q: Queue[Telemetry],
     myName: String = "Funnel Mirror",
     nodeRetries: Names => Event = _ => defaultRetries
   ): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
-    val alive     = signal[Unit](S)
-    val active    = signal[Set[URI]](S)
+    val alive     = signalOf[Unit](())(S)
+    val active    = signalOf[Set[URI]](Set.empty)(S)
 
     /**
      * Update the running state of the world by updating the URLs we know about
-     * to mirror, and the bucket -> url mapping.
+     * to mirror, and the cluster -> url mapping.
      */
-    def modifyActive(b: BucketName, f: Set[URI] => Set[URI]): Task[Unit] =
+    def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] = {
       for {
-        _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))) )
-        _ <- Task( bucketUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))) )
+        _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))))
+        _ <- Task(clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))).filter(!_.isEmpty))(defaultPool)
+        _  = log.debug(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
       } yield ()
+    }
 
     for {
-      _ <- active.set(Set.empty)
-      _ <- alive.set(())
       _ <- mirroringCommands.evalMap {
-        case Mirror(source, bucket) => Task.delay {
+        case Mirror(source, cluster) => Task.suspend {
+          log.info(s"Attempting to monitor '$cluster' located at '$source'")
           val S = Strategy.Executor(Monitoring.serverPool)
-          val hook = signal[Unit](S)
-          hook.set(()).runAsync(_ => ())
+          val hook = signalOf[Unit](())(S)
 
           urlSignals.put(source, hook)
 
-          // adding the `localName` onto the key here so that later in the
-          // process its possible to find the key we're specifically looking for
-          val localName = formatURI(source) // TIM: remove this; keeping for now until we figure out how the source needs sanitising
-
           val received: Process[Task,Unit] = link(hook) {
-            attemptMirrorAll(parse)(nodeRetries(Names("Funnel", myName, localName)))(
-              source, Map(AttributeKeys.bucket -> bucket, AttributeKeys.source -> localName))
+            attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, new URI(source.toString))))(
+              source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> source.toString))
           }
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
-            if (urls.contains(source)) Process.halt // skip it, alread running
-            else Process.eval_(modifyActive(bucket, _ + source)) ++ // add to active at start
-              // and remove it when done
-              received.onComplete(Process.eval_(modifyActive(bucket, _ - source)))
+            if (urls.contains(source)) {
+              log.info(s"Skipping $source, already mirrored")
+              Process.halt
+            }
+            else Process.eval_ {
+              modifyActive(cluster, _ + source) >>
+              Q.enqueueOne(Monitored(source)) >>
+              Task.delay(log.info(s"Enqueued monitored $source on telemetry queue"))
+            } ++ received.onComplete(Process.eval_ {
+              Q.enqueueOne(Problem(source, "")) >>
+              Task.delay(log.info(s"Enqueued problem with $source on telemetry queue"))
+            })
           }
 
-          Task.fork(receivedIdempotent.run).runAsync(_.fold(
-            err => log.error(err.getMessage), identity))
+          Task.delay(logErrors(Task.fork(receivedIdempotent.run)(defaultPool)).runAsync(_ => ()))
         }
-        case Discard(source) => Task.delay {
-          Option(urlSignals.get(source)).foreach(_.close.runAsync(_ => ()))
-        }
+        case Discard(source) => for {
+          _ <- Task.delay { log.info(s"Attempting to stop monitoring $source...") }
+          _ <- Option(urlSignals.get(source)).traverse(_.close)
+        } yield ()
       }.run
       _ <- alive.close
     } yield ()
   }
+
+  def logErrors[A](t: Task[A]) =
+    t.attempt.flatMap(_.fold(e => Task.delay(log.error(e.getMessage)), Task.now))
 
   /**
    * Mirror all metrics from the given URL, adding `localPrefix` onto the front of
@@ -203,16 +212,16 @@ trait Monitoring {
                 implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
     parse(source).evalMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
-      val k = pt.key.withAttributes(attrs)
+      val k = pt.key.withAttributes(pt.key.attributes ++ attrs)
       for {
         b <- exists(k)
         _ <- if (b) {
           update(k, pt.value)
-        } else Task {
-               log.debug(s"$msg new key: $k")
-               val snk = topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
-               snk(pt.value)
-             }
+        } else for {
+          _ <- Task.delay(log.debug(s"$msg new key: $k"))
+          snk <- topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
+          r <- snk(pt.value)
+        } yield r
       } yield ()
     }
   }
@@ -239,7 +248,7 @@ trait Monitoring {
     e <- exists(key)
     _ <- if (e) Task.delay {
       topic[O,O](key)(Buffers.ignoreTime(process1.id))
-    } else Task((o: O) => ())
+    } else Task((o: O) => ())(defaultPool)
   } yield ()
 
   /**
@@ -256,7 +265,7 @@ trait Monitoring {
         val v = f(vs)
         log.debug(s"Monitoring.aggregate: aggregated $v from ${vs.size} matching keys")
         update(out, v)
-      }}}.run)
+      }}}.run)(defaultPool)
   } yield out
 
   /**
@@ -266,16 +275,16 @@ trait Monitoring {
    * `node1/health` metric(s) to `false` if no new values are published
    * within a 10 second window. See `Units.default`.
    */
-  def decay(f: Key[Any] => Boolean)(e: Event): Task[Unit] = Task.delay {
+  def decay(f: Key[Any] => Boolean)(e: Event): Task[Unit] = Task.suspend {
     def reset = keys.continuous.once.map {
-      _.foreach(k => k.default.foreach(update(k, _).run))
+      _.traverse_(k => k.default.traverse_(update(k, _)))
     }.run
     val msg = "Monitoring.decay:" // logging msg prefix
 
     // we merge the `e` stream and the stream of datapoints for the
     // given prefix; if we ever encounter two ticks in a row from `e`,
     // we reset all matching keys back to their default
-    val alive = signal[Unit](Strategy.Sequential); alive.set(()).run
+    val alive = signalOf[Unit](())(Strategy.Sequential)
     val pts = Monitoring.subscribe(this)(f).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
         log.debug(s"$msg no more data points for '$f', resetting...")
@@ -286,30 +295,35 @@ trait Monitoring {
            .scan(Vector(false,false))((acc,a) => acc.tail :+ a.isLeft)
            .filter { xs => xs forall (identity) }
            .evalMap { _ => log.debug(s"$msg no activity for '$f', resetting..."); reset }
-           .run.runAsync { _ => () }
+           .run
   }
 
   /**
    * Remove keys from this `Monitoring` instance for which no updates are seen
    * between two triggerings of the event `e`.
    */
-  def keySenescence(e: Event): Process[Task, Unit] = mergeN(distinctKeys.map { k =>
-    val alive = signal[Unit](Strategy.Sequential); alive.set(()).run
-    val pts = Monitoring.subscribe(this)(_ == k).onComplete {
+  def keySenescence(e: Event, ks: Process[Task, Key[Any]]): Process[Task, Unit] = mergeN(ks.map { k =>
+    val alive = signalOf[Unit](())(Strategy.Sequential)
+    val pts = get(k).discrete.onComplete {
       Process.eval_ { alive.close flatMap { _ =>
-        log.debug(s"TTL: no more data points for '$k', removing...")
+        log.debug(s"Key senescence: no more data points for '${k.name}', removing...")
         remove(k)
       }}
     }
     e(this).zip(alive.continuous).map(_._1).either(pts)
       .scan(Vector(false,false)) {
         (acc, a) => acc.tail :+ a.isLeft
-      }.filter { _ forall (identity) }
-      .evalMap { _ =>
-        log.debug(s"TTL: no activity for '$k' removing...")
-        alive.close >> remove(k)
+      }.evalMap { v =>
+        if (v.forall(identity)) {
+          log.debug(s"Key senescence: no activity for '${k.name}' removing...")
+          alive.close >> remove(k)
+        } else {
+          Task.now(())
+        }
       }
-  })
+  }.onComplete {
+    Process.eval_(Task.delay(log.debug(s"Key senescence: keys exhausted.")))
+  }).onComplete(Process.eval(Task.delay(log.debug(s"Key senescence terminated."))))
 
   /** Return the elapsed time since this instance was started. */
   def elapsed: Duration
@@ -327,7 +341,7 @@ trait Monitoring {
       val ks: List[Key[Any]] = k.toList.flatten
       val clusters: List[String] = ks.flatMap(p(_).toSeq).distinct
       clusters.foldLeft(List.empty[(String, Int)]){ (a,step) =>
-        val items = ks.filter(_.startsWith(step))
+        val items = ks.filter(p(_).isDefined)
         (step, items.length) :: a
       }
     }
@@ -361,7 +375,8 @@ trait Monitoring {
   /** Create a new topic with the given name and discard the key. */
   def topic_[I, O:Reportable](
     name: String, units: Units, description: String,
-    buf: Process1[(I,Duration),O]): I => Unit = topic(name, units, description, identity[Key[O]])(buf)._2
+    buf: Process1[(I,Duration),O]): Task[I => Task[Unit]] =
+      topic(name, units, description, identity[Key[O]])(buf)._2
 
   def filterKeys(f: Key[Any] => Boolean): Process[Task, List[Key[Any]]] =
     keys.continuous.map(_.filter(f).toList)
@@ -376,13 +391,20 @@ trait Monitoring {
       val ksO: Seq[Key[O]] = ks.flatMap(_.cast(family.typeOf, family.units))
       Nondeterminism[Task].gatherUnordered(ksO.map(k => eval(k)).toSeq)
     }
+
+  /**
+   * Convenience method for asynchronously running tasks and logging
+   * errors using the logger in this monitoring instance.
+   */
+  def runLogging(x: Task[Unit]) =
+    x.runAsync(_.fold(e => log.error(e.getMessage, e), _ => ()))
 }
 
 object Monitoring {
 
   def defaultRetries: Monitoring => Process[Task,Unit] = Events.takeEvery(30 seconds, 6)
 
-  private def daemonThreads(name: String) = new ThreadFactory {
+  private[funnel] def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {
       val t = Executors.defaultThreadFactory.newThread(r)
       t.setDaemon(true)
@@ -415,32 +437,32 @@ object Monitoring {
     val t0 = System.nanoTime
     implicit val S = Strategy.Executor(ES)
     val P = Process
-    val keys_ = signal[Set[Key[Any]]](S)
-    keys_.set(Set.empty).run
+    val keys_ = signalOf[Set[Key[Any]]](Set.empty)(S)
 
     case class Topic[I,O](
-      publish: ((I,Duration)) => Unit,
+      publish: ((I,Duration)) => Task[Unit],
       current: Signal[O]
     )
+
     val topics = new TrieMap[Key[Any], Topic[Any,Any]]()
 
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
-    new Monitoring {
+    new Monitoring { self =>
       val log = Logger[Monitoring]
 
       def keys = keys_
 
-      def topic[I,O](k: Key[O])(buf: Process1[(I,Duration),O]): I => Unit = {
-        val (pub, v) = bufferedSignal(buf)(ES)
-        val _ = topics += (k -> eraseTopic(Topic(pub, v)))
-        val t = (k.typeOf, k.units)
-        val __ = keys_.compareAndSet(_.map(_ + k)).run
-        (i: I) => pub(i -> Duration.fromNanos(System.nanoTime - t0))
-      }
+      def topic[I,O](k: Key[O])(buf: Process1[(I,Duration),O]): Task[I => Task[Unit]] = for {
+        p <- bufferedSignal(buf)(ES)
+        (pub, v) = p
+        _ <- Task.delay(topics += (k -> eraseTopic(Topic(pub, v))))
+        t = (k.typeOf, k.units)
+        _ <- keys_.compareAndSet(_.map(_ + k))
+      } yield i => pub(i -> Duration.fromNanos(System.nanoTime - t0))
 
       protected def update[O](k: Key[O], v: O): Task[Unit] =
-        topics.get(k).map(_.current.set(v)).getOrElse(Task(())).map(_ => ())
+        topics.get(k).map(_.current.set(v)).getOrElse(Task(())(defaultPool)).map(_ => ())
 
       def get[O](k: Key[O]): Signal[O] =
         topics.get(k).map(_.current.asInstanceOf[Signal[O]])
@@ -503,12 +525,16 @@ object Monitoring {
   private[funnel] def bufferedSignal[I,O](
       buf: Process1[I,O])(
       implicit ES: ExecutorService = defaultPool):
-      (I => Unit, Signal[O]) = {
-    val signal = scalaz.stream.async.signal[O](Strategy.Executor(ES))
+      Task[(I => Task[Unit], Signal[O])] = Task.delay {
+
+    val S = Strategy.Executor(ES)
+    val signal = signalUnset[O](Strategy.Sequential)
+
     var cur = buf.unemit match {
       case (h, t) if h.nonEmpty => signal.set(h.last).run; t
       case (h, t) => t
     }
+
     val hub = Actor.actor[I] { i =>
       val (h, t) = process1.feed1(i)(cur).unemit
       if (h.nonEmpty) signal.set(h.last).run
@@ -517,26 +543,32 @@ object Monitoring {
         case Process.Halt(e) => signal.fail(e.asThrowable).run
         case _ => ()
       }
-    }
-    ((i: I) => hub ! i, signal)
+    }(S)
+    ((i: I) => Task.delay(hub ! i), signal)
   }
 
+  /** Terminate `p` when the given signal `alive` terminates. */
+  private def terminate[A](alive: Process[Task,Unit])(p: Process[Task,A]): Process[Task,A] =
+    alive.zip(p).map(_._2)
+
   /**
-   * Try running the given process `p`, catching errors and reporting
-   * them with `maskedError`, using `schedule` to determine when further
-   * attempts are made. If `schedule` is exhausted, the error is raised.
-   * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
-   * will run `p`; if it encounters an error, it will print the error using `println`,
-   * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
-   * the error in the `Process`.
+    * Try running the given process `p`, catching errors and reporting
+    * them with `maskedError`, using `schedule` to determine when further
+    * attempts are made. If `schedule` is exhausted, the error is raised.
+    * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
+    * will run `p`; if it encounters an error, it will print the error using `println`,
+    * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
+    * the error in the `Process`.
    */
-  private[funnel] def attemptRepeatedly[A](
+  private def attemptRepeatedly[A](
     maskedError: Throwable => Unit)(
     p: Process[Task,A])(
     schedule: Process[Task,Unit]): Process[Task,A] = {
+    val S = Strategy.Executor(Monitoring.defaultPool)
+    val alive = async.signalOf[Unit](())(S)
     val step: Process[Task, Throwable \/ A] =
-      p.attempt(e => Process.eval { Task.delay { maskedError(e); e }})
-    step.stripW ++ schedule.terminated.flatMap {
+      p.append(Process.eval_(alive.close)).attempt(e => Process.eval { Task.delay { maskedError(e); e }})
+    step.stripW ++ terminate(alive.continuous)(schedule).terminated.flatMap {
       // on our last reconnect attempt, rethrow error
       case None => step.flatMap(_.fold(Process.fail, Process.emit))
       // on other attempts, ignore the exceptions
