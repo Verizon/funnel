@@ -30,20 +30,20 @@ object Server {
   // there seems to be a bug in Task that makes doing what we previously had here
   // not possible. The server gets into a hang/deadlock situation.
   def unsafeStart[U <: Platform](server: Server[U]): Unit = {
-    import metrics.LifecycleStream
+    import metrics.RepoEventsStream
     import server.{platform,chemist}
     val disco   = platform.config.discovery
     val repo    = platform.config.repository
     val sharder = platform.config.sharder
 
     repo.lifecycle()
-    LifecycleStream.green
+    RepoEventsStream.green
 
-    val c: Process[Task, RepoCommand] = repo.repoCommands.append(Process.eval_(Task.delay(LifecycleStream.red)))
+    val c: Process[Task, RepoCommand] = repo.repoCommands.append(Process.eval_(Task.delay(RepoEventsStream.red)))
     val l: Process[Task, Unit] = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _))
     val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
       log.error(s"Error processing repo events: $err")
-      Process.eval_(Task.delay(LifecycleStream.red))
+      Process.eval_(Task.delay(RepoEventsStream.red))
     }
     a.stripW.run.runAsync {
       case -\/(err) =>
