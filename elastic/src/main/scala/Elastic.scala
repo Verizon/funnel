@@ -143,9 +143,8 @@ case class Elastic(M: Monitoring) {
             case (o, (ps, dp)) =>
               val attrs = dp.key.attributes
               val kind = attrs.get(AttributeKeys.kind)
-              val eAttrs = attrs - AttributeKeys.kind - AttributeKeys.cluster
               val clust = ("cluster" :=
-                attrs.get(AttributeKeys.cluster).getOrElse(flaskCluster)) ->: eAttrs.asJson
+                attrs.get(AttributeKeys.cluster).getOrElse(flaskCluster)) ->: jEmptyObject
               clust deepmerge (o deepmerge (ps ++ kind).foldRight((dp.asJson -| "value").get)(
                 (a, b) => (a := b) ->: jEmptyObject))
           }
