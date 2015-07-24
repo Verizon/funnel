@@ -146,22 +146,27 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
       GetShardById.time(json(chemist.shard(FlaskID(id))))
 
     case GET(Path(Seg("shards" :: id :: "distribution" :: Nil))) =>
-      GetShardDistribution.time(json(chemist.distribution.flatMapK(m =>
-        Task.delay(m(FlaskID(id)))
-      )))
+      GetShardDistribution.time(json {
+        chemist.distribution.flatMapK { map =>
+          Task.delay(map.get(FlaskID(id)).toList.flatMap(identity))
+        }
+      })
 
     case GET(Path(Seg("shards" :: id :: "sources" :: Nil))) => GetShardSources.time {
       import dispatch._, Defaults._
       import dispatch.Http
       import LoggingRemote.flaskTemplate
-
-      chemist.shard(FlaskID(id)).flatMapK { fo => Task.delay {
-        val response = fo.map { f =>
-          val uri = f.location.uriFromTemplate(flaskTemplate(path = "mirror/sources"))
-          Http(url(uri.toString) OK as.String)(concurrent.ExecutionContext.Implicits.global)()
-        }.getOrElse("[]")
-        ResponseString(response)
-      }}.run(platform).run
+      import scalaz.syntax.either._
+      json {
+        chemist.shard(FlaskID(id)).flatMapK(fo => Task.delay {
+          (for {
+            a <- fo.fold[Throwable \/ Flask](InstanceNotFoundException(id).left)(_.right)
+            uri = a.location.uriFromTemplate(flaskTemplate(path = "mirror/sources"))
+            b <- \/.fromTryCatchNonFatal[String](Http(url(uri.toString) OK as.String)(concurrent.ExecutionContext.Implicits.global)()).leftMap(new RuntimeException(_))
+            c <- Parse.parse(b).leftMap(new RuntimeException(_))
+          } yield c).valueOr(e => jString(e.getMessage))
+        })
+      }
     }
 
     case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
