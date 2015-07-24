@@ -18,6 +18,8 @@ trait RemoteFlask {
 object LoggingRemote extends RemoteFlask {
   private lazy val log = Logger[HttpFlask]
 
+  def flaskTemplate(path: String) =
+    LocationTemplate(s"http://@host:@port/$path")
   def command(c: FlaskCommand): Task[Unit] = {
     Task.delay {
       log.info("LoggingRemote recieved: " + c)
@@ -28,6 +30,7 @@ object LoggingRemote extends RemoteFlask {
 
 class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) extends RemoteFlask {
   import FlaskCommand._
+  import LoggingRemote.flaskTemplate
 
   private lazy val log = Logger[HttpFlask]
 
@@ -58,9 +61,6 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
       unmonitor(flask.location, targets).void
   }
 
-  private def flaskTemplate(path: String) =
-    LocationTemplate(s"http://@host:@port/$path")
-
   /**
    * Touch the network and do the I/O using Dispatch.
    */
@@ -69,8 +69,6 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
     import argonaut._, Argonaut._
     import JSON.ClustersToJSON
 
-    // FIXME: "safe" because we know we're passing in the default localhost
-    // val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
     val payload: Map[ClusterName, List[URI]] =
       targets.groupBy(_.cluster).mapValues(_.map(_.uri).toList)
 

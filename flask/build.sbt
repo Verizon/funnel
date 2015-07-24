@@ -9,9 +9,6 @@ Revolver.settings
 
 ScalaTest.settings
 
-libraryDependencies ++= Seq (
-  "oncue.svc.knobs"      %% "core"       % V.knobs,
-  "intelmedia.ws.common" %% "logging-s3" % "10.+"
-)
+libraryDependencies += "oncue.knobs" %% "core" % V.knobs
 
 fork in Test := true

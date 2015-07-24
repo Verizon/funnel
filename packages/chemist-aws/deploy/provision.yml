@@ -4,7 +4,14 @@
   gather_facts: false
   user: ec2-user
   roles:
-    - application
+    - role: application
+      loggers:
+        - name: intelmedia.ws
+          level: INFO
+        - name: oncue.svc
+          level: DEBUG
+        - name: funnel
+          level: DEBUG
   tasks:
     - name: chemist | override configuration file
       sudo: yes

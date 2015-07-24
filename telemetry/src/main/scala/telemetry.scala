@@ -39,14 +39,22 @@ object Telemetry extends TelemetryCodecs {
 
   def telemetrySubscribeEndpoint(uri: URI): Endpoint = Endpoint.unsafeApply(subscribe &&& (connect ~ topics.all), uri)
 
+  private def countSentMessages: Sink[Task, Telemetry] = sink.lift { _ =>
+    import metrics.MessagesSent
+    Task.delay(MessagesSent.increment)
+  }
+
   def telemetryPublishSocket(uri: URI, signal: Signal[Boolean], telemetry: Process[Task,Telemetry]): Task[Unit] = {
     val e = telemetryPublishEndpoint(uri)
     Ø.link(e)(signal) { socket =>
-      telemetry through Ø.write(socket)
+      telemetry observe countSentMessages through Ø.write(socket)
     }.run
   }
 
-
+  private def countReceivedMessages: Sink[Task, Transported] = sink.lift { _ =>
+    import metrics.MessagesReceived
+    Task.delay(MessagesReceived.increment)
+  }
 
   def telemetrySubscribeSocket(uri: URI, signal: Signal[Boolean],
                                keys: Actor[(URI, Set[Key[Any]])],
@@ -56,7 +64,7 @@ object Telemetry extends TelemetryCodecs {
     val endpoint = telemetrySubscribeEndpoint(uri)
     Ø.link(endpoint)(signal) { socket =>
       log.info(s"connected to telemetry socket on $uri")
-      (Ø.receive(socket) to fromTransported(uri, keys, errors, lifecycle))
+      (Ø.receive(socket) observe countReceivedMessages to fromTransported(uri, keys, errors, lifecycle))
     }.run
   }
 

@@ -23,7 +23,7 @@ import java.net.URI
 import scalaz.Kleisli
 import scalaz.concurrent.Task
 
-object MultiNodeSampleConfig extends MultiNodeConfig {
+object MultiNodeIntegrationConfig extends MultiNodeConfig {
   /**
    * important thing to note here is that each role needs to be assigned
    * to a specific jvm. If its not, the test will complain there is not
@@ -31,6 +31,7 @@ object MultiNodeSampleConfig extends MultiNodeConfig {
    */
   val chemist01 = role("chemist01")
   val flask01   = role("flask01")
+  val flask02   = role("flask02")
   val target01  = role("target01")
   val target02  = role("target02")
   val target03  = role("target03")
@@ -61,11 +62,12 @@ import akka.remote.testkit.MultiNodeSpec
 import akka.testkit.ImplicitSender
 import akka.actor.{Props,Actor}
 
-class MultiNodeSampleSpecMultiJvmNode1 extends MultiNodeSample
-class MultiNodeSampleSpecMultiJvmNode2 extends MultiNodeSample
-class MultiNodeSampleSpecMultiJvmNode3 extends MultiNodeSample
-class MultiNodeSampleSpecMultiJvmNode4 extends MultiNodeSample
-class MultiNodeSampleSpecMultiJvmNode5 extends MultiNodeSample
+class MultiNodeIntegrationSpecMultiJvmNode1 extends MultiNodeIntegration
+class MultiNodeIntegrationSpecMultiJvmNode2 extends MultiNodeIntegration
+class MultiNodeIntegrationSpecMultiJvmNode3 extends MultiNodeIntegration
+class MultiNodeIntegrationSpecMultiJvmNode4 extends MultiNodeIntegration
+class MultiNodeIntegrationSpecMultiJvmNode5 extends MultiNodeIntegration
+class MultiNodeIntegrationSpecMultiJvmNode6 extends MultiNodeIntegration
 
 //////////////////////// Actual Test //////////////////////////
 
@@ -75,20 +77,24 @@ import chemist.{Server,FlaskID,PlatformEvent,TargetLifecycle,RepoEvent}
 import java.util.concurrent.{CountDownLatch,TimeUnit}
 import concurrent.duration._
 
-class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
+class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
   with STMultiNodeSpec
   with ImplicitSender {
-  import MultiNodeSampleConfig._
+  import MultiNodeIntegrationConfig._
   import PlatformEvent._, TargetLifecycle._
+
+  def printObnoxiously[A](a: => A): Unit = {
+    println(">>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    println(a)
+    println("<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+  }
 
   def fetch(path: String) = {
     import dispatch._, Defaults._
 
     val svc = url(s"http://127.0.0.1:64529${path}")
     val json = http(svc OK as.String)
-    println("-----------------------------")
-    println(scala.concurrent.Await.result(json, 1.seconds))
-    println("-----------------------------")
+    scala.concurrent.Await.result(json, 2.seconds)
   }
 
   def deployTarget(role: RoleName, port: Int, failAfter: Option[Duration] = None) =
@@ -112,6 +118,9 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
 
   def initialParticipants =
     roles.size
+
+  def countForState(s: TargetLifecycle.TargetState): Int =
+    ichemist.states.map(_.apply(s).keys.size).exe
 
   it should "wait for all nodes to enter startup barrier" in {
     enterBarrier(Startup)
@@ -137,6 +146,7 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
 
     deployFlask(flask01, IntegrationFixtures.flask1Options)
 
+    deployFlask(flask02, IntegrationFixtures.flask2Options)
   }
 
   it should "list the appropriate flask ids" in {
@@ -155,12 +165,19 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
 
   it should "show the correct distribution" in {
     runOn(chemist01){
-      ichemist.distribution.exe.toList.sortBy(_._1.value).toMap should equal (
-        Map(FlaskID("flask1") -> Map(
-          "target01" -> List(new URI("http://localhost:4001/stream/now")),
-          "target03" -> List(new URI("http://localhost:4003/stream/now")),
-          "target02" -> List(new URI("http://localhost:4002/stream/now"))))
-      )
+      Thread.sleep(2.seconds.toMillis) // give chemist time to get the messages from all flasks
+      // just adding this to make sure that in future, the json does not get fubared.
+      // fetch("/distribution") should equal ("""[{"targets":[{"urls":["http://localhost:4001/stream/now"],"cluster":"target01"},{"urls":["http://localhost:4003/stream/now"],"cluster":"target03"},{"urls":["http://localhost:4002/stream/now"],"cluster":"target02"}],"shard":"flask1"}]""")
+      printObnoxiously(fetch("/distribution"))
+      printObnoxiously(fetch("/lifecycle/states"))
+      printObnoxiously(fetch("/shards/flask1/sources"))
+      printObnoxiously(fetch("/shards/flask1/distribution"))
+
+      countForState(TargetState.Monitored) should equal (3)
+
+      countForState(TargetState.Assigned) should equal (0)
+
+      countForState(TargetState.DoubleMonitored) should equal (0)
     }
   }
 
@@ -175,7 +192,7 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
     import org.scalatest.OptionValues._
     runOn(chemist01){
       enterBarrier(PhaseTwo)
-      println(">>>><<<<>>>>><<<<<>>>>> PHASE TWO")
+
       val errors = ichemist.errors.exe
 
       errors.size should be > 0

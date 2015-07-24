@@ -144,10 +144,10 @@ object RandomSharding extends Sharder {
   def distribution(s: Set[Target])(d: Distribution): (Seq[(FlaskID,Target)], Distribution) = {
     if(s.isEmpty) (Seq.empty,d)
     else {
-      log.debug(s"RandomSharding.distribution: attempting to distribute targets '${s.mkString(",")}'")
+      log.debug(s"distribution: attempting to distribute targets '${s.mkString(",")}'")
       val work = calculate(s)(d)
 
-      log.debug(s"RandomSharding.distribution: work = $work")
+      log.debug(s"distribution: work = $work")
 
       val dist = work.foldLeft(Distribution.empty){ (a,b) =>
         a.alter(b._1, _ match {
@@ -199,10 +199,10 @@ object LFRRSharding extends Sharder {
     // infinate loop, and this function never completes.
     if(s.isEmpty) (Seq.empty,d)
     else {
-      log.debug(s"LFRRSharding.distribution: attempting to distribute targets '${s.mkString(",")}'")
+      log.debug(s"distribution: attempting to distribute targets '${s.mkString(",")}'")
       val work = calculate(s)(d)
 
-      log.debug(s"LFRRSharding.distribution: work = $work")
+      log.debug(s"distribution: work = $work")
 
       val dist = work.foldLeft(Distribution.empty){ (a,b) =>
         a.alter(b._1, _ match {
