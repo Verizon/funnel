@@ -145,6 +145,25 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
     case GET(Path(Seg("shards" :: id :: Nil))) =>
       GetShardById.time(json(chemist.shard(FlaskID(id))))
 
+    case GET(Path(Seg("shards" :: id :: "distribution" :: Nil))) =>
+      GetShardDistribution.time(json(chemist.distribution.flatMapK(m =>
+        Task.delay(m(FlaskID(id)))
+      )))
+
+    case GET(Path(Seg("shards" :: id :: "sources" :: Nil))) => GetShardSources.time {
+      import dispatch._, Defaults._
+      import dispatch.Http
+      import LoggingRemote.flaskTemplate
+
+      chemist.shard(FlaskID(id)).flatMapK { fo => Task.delay {
+        val response = fo.map { f =>
+          val uri = f.location.uriFromTemplate(flaskTemplate(path = "mirror/sources"))
+          Http(url(uri.toString) OK as.String)(concurrent.ExecutionContext.Implicits.global)()
+        }.getOrElse("[]")
+        ResponseString(response)
+      }}.run(platform).run
+    }
+
     case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
       PostShardExclude.time(json(chemist.exclude(FlaskID(id))))
 
