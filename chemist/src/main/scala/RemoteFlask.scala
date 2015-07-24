@@ -18,6 +18,8 @@ trait RemoteFlask {
 object LoggingRemote extends RemoteFlask {
   private lazy val log = Logger[HttpFlask]
 
+  def flaskTemplate(path: String) =
+    LocationTemplate(s"http://@host:@port/$path")
   def command(c: FlaskCommand): Task[Unit] = {
     Task.delay {
       log.info("LoggingRemote recieved: " + c)
@@ -28,6 +30,7 @@ object LoggingRemote extends RemoteFlask {
 
 class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) extends RemoteFlask {
   import FlaskCommand._
+  import LoggingRemote.flaskTemplate
 
   private lazy val log = Logger[HttpFlask]
 
@@ -57,9 +60,6 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
     case Unmonitor(flask, targets) =>
       unmonitor(flask.location, targets).void
   }
-
-  private def flaskTemplate(path: String) =
-    LocationTemplate(s"http://@host:@port/$path")
 
   /**
    * Touch the network and do the I/O using Dispatch.
