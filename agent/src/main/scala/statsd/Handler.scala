@@ -11,11 +11,13 @@ class Handler(prefix: String, I: Instruments) extends SimpleChannelInboundHandle
   override def channelRead0(ctx: ChannelHandlerContext, packet: DatagramPacket){
     val msg: String = packet.content.toString(CharsetUtil.UTF_8)
     msg.trim.split("\n").foreach { line: String =>
-      val task = Parser.toRequest(line)(prefix).fold(
-        a => Task.fail(a),
-        b => RemoteInstruments.metricsFromRequest(b)(I))
+      if(line.trim.length > 0) {
+        val task = Parser.toRequest(line)(prefix).fold(
+          a => Task.fail(a),
+          b => RemoteInstruments.metricsFromRequest(b)(I))
 
-      task.run // unsafe!
+        task.run // unsafe!
+      }
     }
   }
 
