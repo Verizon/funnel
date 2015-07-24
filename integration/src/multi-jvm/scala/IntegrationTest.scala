@@ -170,6 +170,7 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
       // fetch("/distribution") should equal ("""[{"targets":[{"urls":["http://localhost:4001/stream/now"],"cluster":"target01"},{"urls":["http://localhost:4003/stream/now"],"cluster":"target03"},{"urls":["http://localhost:4002/stream/now"],"cluster":"target02"}],"shard":"flask1"}]""")
       printObnoxiously(fetch("/distribution"))
       printObnoxiously(fetch("/lifecycle/states"))
+      printObnoxiously(fetch("/shards/flask1/sources"))
 
       countForState(TargetState.Monitored) should equal (3)
 
