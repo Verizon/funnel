@@ -18,6 +18,8 @@ object metrics {
   val GetShardById = timer("http/get/shards/id", "time taken to get shard by ID")
   val PostShardExclude = timer("http/post/shards/id/exclude", "time taken to exclude shard by ID")
   val PostShardInclude = timer("http/post/shards/id/include", "time taken to include shard by ID")
+  val GetShardDistribution = timer("http/get/shards/id/distribution", "time taken to list the distribution for a shard")
+  val GetShardSources = timer("http/get/shards/id/sources", "time taken to get the sources for a shard")
   val AssignedHosts = numericGauge("hosts/assigned", 0.0, Units.Count, "number of hosts in Assigned state")
   val DoubleMonitoredHosts = numericGauge("hosts/doublemonitored", 0.0, Units.Count, "number of hosts in DoubleMonitored state")
   val UnknownHosts = numericGauge("hosts/unknown", 0.0, Units.Count, "number of hosts in Unknown state")
