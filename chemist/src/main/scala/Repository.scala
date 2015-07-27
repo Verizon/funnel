@@ -254,6 +254,15 @@ class StatefulRepository extends Repository {
             targets.update(_.insert(id, sc))
             stateMaps.update(_.update(from, (m => Some(m.delete(id)))))
             stateMaps.update(_.update(to, (m => Some(m.insert(id, sc)))))
+            AssignedHosts.set(stateMaps.get.lookup(TargetState.Assigned).size)
+            DoubleMonitoredHosts.set(stateMaps.get.lookup(TargetState.DoubleMonitored).size)
+            UnknownHosts.set(stateMaps.get.lookup(TargetState.Unknown).size)
+            UnmonitoredHosts.set(stateMaps.get.lookup(TargetState.Unmonitored).size)
+            UnmonitorableHosts.set(stateMaps.get.lookup(TargetState.Unmonitorable).size)
+            MonitoredHosts.set(stateMaps.get.lookup(TargetState.Monitored).size)
+            DoubleAssignedHosts.set(stateMaps.get.lookup(TargetState.DoubleAssigned).size)
+            ProblematicHosts.set(stateMaps.get.lookup(TargetState.Problematic).size)
+            FinHosts.set(stateMaps.get.lookup(TargetState.Fin).size)
             sc.to match {
               case Unmonitored => {
                 log.debug("lifecycle: updating repository...")
@@ -271,18 +280,7 @@ class StatefulRepository extends Repository {
             flasks.update(_ + (flask.id -> flask))
             Process.halt
         }
-      } ++ Process.eval_ { Task.delay {
-        AssignedHosts.set(stateMaps.get.lookup(TargetState.Assigned).size)
-        DoubleMonitoredHosts.set(stateMaps.get.lookup(TargetState.DoubleMonitored).size)
-        UnknownHosts.set(stateMaps.get.lookup(TargetState.Unknown).size)
-        UnmonitoredHosts.set(stateMaps.get.lookup(TargetState.Unmonitored).size)
-        UnmonitorableHosts.set(stateMaps.get.lookup(TargetState.Unmonitorable).size)
-        MonitoredHosts.set(stateMaps.get.lookup(TargetState.Monitored).size)
-        DoubleAssignedHosts.set(stateMaps.get.lookup(TargetState.DoubleAssigned).size)
-        ProblematicHosts.set(stateMaps.get.lookup(TargetState.Problematic).size)
-        FinHosts.set(stateMaps.get.lookup(TargetState.Fin).size)
-      }}
-
+      }
     }
 
     val c: Process[Task, RepoEvent] = lifecycleQ.dequeue.append(Process.eval_(Task.delay(LifecycleEventsStream.red)))
