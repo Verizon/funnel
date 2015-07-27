@@ -48,13 +48,15 @@ object Main {
 
   // Determine whether to generate system statistics for the local host
   for {
-    b <- cfg.lookup[Boolean]("flask.collect-local-metrics") if b == true
+    b <- cfg.lookup[Boolean]("flask.collect-local-metrics") if b
     t <- cfg.lookup[Int]("flask.local-metric-frequency")
   }{
     implicit val duration = t.seconds
     Sigar(I).foreach { s =>
       s.instrument
     }
+    JVM.instrument(I)
+    Clocks.instrument(I)
   }
 
   val app = new Flask(options, I)
