@@ -30,20 +30,20 @@ object Server {
   // there seems to be a bug in Task that makes doing what we previously had here
   // not possible. The server gets into a hang/deadlock situation.
   def unsafeStart[U <: Platform](server: Server[U]): Unit = {
-    import metrics.LifecycleStream
+    import metrics.RepoEventsStream
     import server.{platform,chemist}
     val disco   = platform.config.discovery
     val repo    = platform.config.repository
     val sharder = platform.config.sharder
 
     repo.lifecycle()
-    LifecycleStream.green
+    RepoEventsStream.green
 
-    val c: Process[Task, RepoCommand] = repo.repoCommands.append(Process.eval_(Task.delay(LifecycleStream.red)))
+    val c: Process[Task, RepoCommand] = repo.repoCommands.append(Process.eval_(Task.delay(RepoEventsStream.red)))
     val l: Process[Task, Unit] = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _))
     val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
       log.error(s"Error processing repo events: $err")
-      Process.eval_(Task.delay(LifecycleStream.red))
+      Process.eval_(Task.delay(RepoEventsStream.red))
     }
     a.stripW.run.runAsync {
       case -\/(err) =>
@@ -144,6 +144,30 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
 
     case GET(Path(Seg("shards" :: id :: Nil))) =>
       GetShardById.time(json(chemist.shard(FlaskID(id))))
+
+    case GET(Path(Seg("shards" :: id :: "distribution" :: Nil))) =>
+      GetShardDistribution.time(json {
+        chemist.distribution.flatMapK { map =>
+          Task.delay(map.get(FlaskID(id)).toList.flatMap(identity))
+        }
+      })
+
+    case GET(Path(Seg("shards" :: id :: "sources" :: Nil))) => GetShardSources.time {
+      import dispatch._, Defaults._
+      import dispatch.Http
+      import LoggingRemote.flaskTemplate
+      import scalaz.syntax.either._
+      json {
+        chemist.shard(FlaskID(id)).flatMapK(fo => Task.delay {
+          (for {
+            a <- fo.fold[Throwable \/ Flask](InstanceNotFoundException(id).left)(_.right)
+            uri = a.location.uriFromTemplate(flaskTemplate(path = "mirror/sources"))
+            b <- \/.fromTryCatchNonFatal[String](Http(url(uri.toString) OK as.String)(concurrent.ExecutionContext.Implicits.global)()).leftMap(new RuntimeException(_))
+            c <- Parse.parse(b).leftMap(new RuntimeException(_))
+          } yield c).valueOr(e => jString(e.getMessage))
+        })
+      }
+    }
 
     case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
       PostShardExclude.time(json(chemist.exclude(FlaskID(id))))
