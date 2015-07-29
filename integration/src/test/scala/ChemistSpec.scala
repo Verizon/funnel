@@ -89,8 +89,6 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     Http(flaskUrl << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)
     Thread.sleep(1000)
 
-    (0 until n) foreach(i => Process.repeatEval(Task(ms(i)._1.increment)).run.runAsync(_ => ()))
-
     val F = chemist.Flask(
       FlaskID(options.name.get),
       Location("localhost", options.funnelPort, "local", NetworkScheme.Http, false, LocationIntent.Mirroring, templates),

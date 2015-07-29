@@ -150,5 +150,8 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val mdChanges: Process[Task, Double] = waitACouple.wye(mds)(wye.interrupt)(S)
     val changes: IndexedSeq[Double] = mdChanges.runLog.run
     changes should not be empty
+
+    app.S.stop()
+    ms.foreach(_._2.stop())
   }
 }
