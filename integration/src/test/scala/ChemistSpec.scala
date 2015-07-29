@@ -1,6 +1,7 @@
 package funnel
 package integration
 
+import java.net.URI
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy,Task}
 import scalaz.std.option._
@@ -11,9 +12,12 @@ import elastic.ElasticCfg
 import flask.{ Flask, Options, RiemannCfg }
 import journal.Logger
 import http.MonitoringServer
-import chemist.{ FlaskID, Location, LocationIntent, LocationTemplate, NetworkConfig, NetworkScheme, StaticDiscovery }
+import chemist.{ FlaskID, Location, LocationIntent, LocationTemplate, NetworkConfig, NetworkScheme, Sharding, StaticDiscovery }
 import chemist.static.{ Static, StaticConfig, StaticChemist }
 import zeromq.TCP
+import http.Cluster
+import http.JSON._
+import argonaut._, Argonaut._
 
 class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   import java.io.File
@@ -100,14 +104,21 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val platform = new DefaultStatic
     val C = new StaticChemist[DefaultStatic]
 
-    (for {
-      _ <- C.init
-      _ <- C.bootstrap
-    } yield ()).run(platform).run
+    val d: Map[FlaskID, Map[ClusterName, List[URI]]] = (for {
+      _   <- C.init
+      _   <- C.bootstrap
+      dis <- C.distribution
+    } yield dis).run(platform).run
+
+    val sources = Http(flaskUrl / "mirror/sources" OK as.String)(concurrent.ExecutionContext.Implicits.global)()
+    val s = sources.decodeOption[List[Cluster]].get
 
     app.S.stop()
     ms.foreach(s => s._2.stop())
 
-    fail
+    d should have size 1
+    d.keys.head shouldBe (F.id)
+    s should not be empty
+    //    fail
   }
 }
