@@ -28,6 +28,13 @@ mainClass in Revolver.reStart := Some("funnel.agent.Main")
 
 javaOptions in Revolver.reStart += "-Xmx4g"
 
+assemblyMergeStrategy in assembly := {
+  case "META-INF/io.netty.versions.properties" => MergeStrategy.first
+  case x =>
+    val oldStrategy = (assemblyMergeStrategy in assembly).value
+    oldStrategy(x)
+}
+
 // Revolver.reStartArgs :=
 //   ((sourceDirectory in Test).value / "resources/oncue/agent-jmx-kafka.cfg"
 //     ).getCanonicalPath :: Nil
