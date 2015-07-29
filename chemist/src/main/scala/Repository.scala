@@ -6,6 +6,7 @@ import scalaz.concurrent.Task
 import Sharding.Distribution
 import scalaz.{-\/,==>>,\/}
 import scalaz.std.string._
+import scalaz.std.set._
 import scalaz.syntax.monad._
 import scalaz.stream.{Sink, Channel, Process, Process1, async}
 import java.net.URI
@@ -168,7 +169,7 @@ class StatefulRepository extends Repository {
         case PlatformEvent.NewFlask(f) =>
           Task.delay(log.info("platformHandler -- new task: " + f)) >>
           Task.delay {
-            D.update(_.insert(f.id, Set.empty))
+            D.update(_.updateAppend(f.id, Set.empty))
             flasks.update(_.insert(f.id, f))
           } >>
           repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f))
