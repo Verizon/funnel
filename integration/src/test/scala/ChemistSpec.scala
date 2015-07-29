@@ -121,11 +121,10 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     s should have size 1
     val d2 = d.values
     d2 should have size 1
-    val d3 = d2.head.toList
+    val d3 = d2.head.toList.map(p => (p._1, p._2.toSet))
     d3 should have size 1
-    val distribution: (String, List[URI]) = d3.head
-    val sources: (String, List[URI]) = (s.head.label, s.head.urls.map(u => new URI(u)))
+    val distribution: (String, Set[URI]) = d3.head
+    val sources: (String, Set[URI]) = (s.head.label, s.head.urls.map(u => new URI(u)).toSet)
     distribution should equal (sources)
-    //    fail
   }
 }

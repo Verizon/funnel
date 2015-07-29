@@ -4,6 +4,7 @@ package chemist
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.{Process, time}
 import scalaz.std.string._
+import scalaz.std.set._
 import scalaz.syntax.apply._
 import scalaz.syntax.kleisli._
 import scalaz.syntax.traverse._
@@ -75,7 +76,7 @@ object Housekeeping {
          }
        ))
     } yield a.foldLeft(Distribution.empty){ (a,b) =>
-      a.alter(b._1.id, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
+      a.updateAppend(b._1.id, b._2)
     }).map { dis =>
       log.debug(s"Gathered distribution $dis")
       dis
