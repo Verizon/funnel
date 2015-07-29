@@ -48,7 +48,8 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val elastic          = (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
       ElasticCfg(_, _, _, elasticDf, "foo", None, _))
     val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
-    Task((Options(name, cluster, elastic, riemann, port), cfg))
+    val telemetry        = cfg.lookup[Int]("flask.network.telemetry-port").getOrElse(7390)
+    Task((Options(name, cluster, elastic, riemann, port, None, telemetry), cfg))
   }.run
 
   val flaskUrl = url(s"http://localhost:${options.funnelPort}/mirror").setContentType("application/json", "UTF-8")
