@@ -110,15 +110,18 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       dis <- C.distribution
     } yield dis).run(platform).run
 
-    val sources = Http(flaskUrl / "mirror/sources" OK as.String)(concurrent.ExecutionContext.Implicits.global)()
-    val s = sources.decodeOption[List[Cluster]].get
+    val src = Http(flaskUrl / "sources" OK as.String)(concurrent.ExecutionContext.Implicits.global)()
+    val s = src.decodeOption[List[Cluster]].get
 
     app.S.stop()
     ms.foreach(s => s._2.stop())
 
     d should have size 1
     d.keys.head shouldBe (F.id)
-    s should not be empty
+    s should have size 1
+    val distribution = d.values.toList
+    val sources = s.head.map(p => (p._1, new URI(p._2)))
+
     //    fail
   }
 }
