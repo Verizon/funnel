@@ -167,7 +167,7 @@ class StatefulRepository extends Repository {
           lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), targetState(target.uri))
 
         case PlatformEvent.NewFlask(f) =>
-          Task.delay(log.info("platformHandler -- new task: " + f)) >>
+          Task.delay(log.info("platformHandler -- new flask: " + f)) >>
           Task.delay {
             D.update(_.updateAppend(f.id, Set.empty))
             flasks.update(_.insert(f.id, f))
@@ -284,15 +284,16 @@ class StatefulRepository extends Repository {
       }
     }
 
-    val c: Process[Task, RepoEvent] = lifecycleQ.dequeue.append(Process.eval_(Task.delay(LifecycleEventsStream.red)))
+    val c: Process[Task, RepoEvent] = lifecycleQ.dequeue
     val l: Process[Task, Unit] = (c flatMap go to repoCommandsQ.enqueue)
     val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
       log.error(s"Error processing lifecycle events: $err")
-      Process.eval_(Task.delay(LifecycleEventsStream.red))
+      Process.eval_(Task.delay(LifecycleEventsStream.yellow))
     }
     a.stripW.run.runAsync {
       case -\/(e) =>
         log.error("error consuming lifecycle events", e)
+        LifecycleEventsStream.red
         repoCommandsQ.close.run
       case _ =>
         log.info("lifecycle events stream finished")
