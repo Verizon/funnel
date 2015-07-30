@@ -11,7 +11,7 @@ import scalaz.concurrent.Task
 import scalaz.Applicative
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 
-class StaticChemist extends Chemist[Static]{
+class StaticChemist[A <: Static] extends Chemist[A]{
 
   val log = Logger[this.type]
 
