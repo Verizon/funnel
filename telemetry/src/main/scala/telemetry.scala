@@ -136,5 +136,5 @@ object Telemetry extends TelemetryCodecs {
 trait TelemetryCodecs extends KeyCodecs {
 
   implicit val uriCodec: Codec[URI] = utf8.xmap[URI](new URI(_), _.toString)
-  implicit lazy val errorCodec = Codec[Names].xmap[Error](Error(_), _.names)
+  implicit lazy val errorCodec = implicitly[Codec[Names]].xmap[Error](Error(_), _.names)
 }
