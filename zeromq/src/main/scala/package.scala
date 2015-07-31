@@ -5,6 +5,7 @@ package object zeromq {
   import scalaz.stream.async.mutable.Signal
 
   type SocketBuilder = org.zeromq.ZMQ.Context => Location => Task[Socket]
+  type Serial = Int
 
   val Ø = ZeroMQ
 
