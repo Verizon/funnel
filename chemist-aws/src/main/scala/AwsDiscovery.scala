@@ -211,34 +211,6 @@ class AwsDiscovery(
     c == InactiveFlask ||
     c == Unknown
 
-  /**
-   * This default implementation does not properly handle the various upgrade
-   * cases that you might encounter when migrating from one set of clusters to
-   * another, but it instead provided as a default where all avalible flasks
-   * and chemists are are "active". There are a set of upgrade scenarios where
-   * you do not want to mirror from an existing flask cluster, so they are not
-   * targets, nor are they active flasks.
-   *
-   * Providing this function with a task return type so that extensions can do I/O
-   * if they need too (clearly a cache locally would be needed in that case)
-   *
-   * It is highly recomended you override this with your own classification logic.
-   */
-  // val classify: Task[AwsInstance => Classification] = {
-  //   def isFlask(i: AwsInstance): Boolean =
-  //     i.application.map(_.name.startsWith("flask")).getOrElse(false)
-
-  //   def isChemist(i: AwsInstance): Boolean =
-  //     i.application.map(_.name.startsWith("chemist")).getOrElse(false)
-
-  //   Task.delay {
-  //     instance =>
-  //       if(isFlask(instance)) ActiveFlask
-  //       else if(isChemist(instance)) ActiveChemist
-  //       else ActiveTarget
-  //   }
-  // }
-
   ///////////////////////////// internal api /////////////////////////////
 
   /**
@@ -280,8 +252,8 @@ class AwsDiscovery(
     } yield c
 
   /**
-    * A monadic function that asynchronously filters the passed instances for validity.
-    */
+   * A monadic function that asynchronously filters the passed instances for validity.
+   */
   private def valid(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] = for {
     x <- Task.now(instances)
     // actually reach out to all the discovered hosts and check that their port is reachable

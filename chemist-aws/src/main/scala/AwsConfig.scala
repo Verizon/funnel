@@ -41,6 +41,7 @@ case class AwsConfig(
   sharder: Sharder,
   classifier: Classifier[AwsInstance]
 ) extends PlatformConfig {
+
   val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, classifier, templates)
 
   val repository: Repository = new StatefulRepository
