@@ -24,7 +24,7 @@ import scalaz.concurrent.Task
 trait ElectionStrategy {
   def discovery: Discovery
   def leader: Task[Option[Location]]
-  def isLeader(l: Location): Boolean
+  def isLeader(l: Location): Task[Boolean]
 }
 
 /**
@@ -38,5 +38,5 @@ case class ForegoneConclusion(
   nominee: Location
 ) extends ElectionStrategy {
   val leader: Task[Option[Location]] = Task.now(Some(nominee))
-  def isLeader(l: Location): Boolean = true
+  def isLeader(l: Location): Task[Boolean] = Task.now(true)
 }
