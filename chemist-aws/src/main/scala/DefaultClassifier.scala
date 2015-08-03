@@ -20,13 +20,19 @@ import scalaz.concurrent.Task
 object DefaultClassifier extends Classifier[AwsInstance]{
   import Classification._
 
+  private val Flask = "Flask"
+  private val Chemist = "Chemist"
+
+  def isApplication(prefix: String)(i: AwsInstance): Boolean =
+    i.application.map(_.name.trim.toLowerCase.startsWith(prefix)).getOrElse(false)
+
+  def isFlask(i: AwsInstance): Boolean =
+    isApplication(Flask)(i)
+
+  def isChemist(i: AwsInstance): Boolean =
+    isApplication(Chemist)(i)
+
   val task: Task[AwsInstance => Classification] = {
-    def isFlask(i: AwsInstance): Boolean =
-      i.application.map(_.name.startsWith("flask")).getOrElse(false)
-
-    def isChemist(i: AwsInstance): Boolean =
-      i.application.map(_.name.startsWith("chemist")).getOrElse(false)
-
     Task.delay {
       instance =>
         if(isFlask(instance)) ActiveFlask
