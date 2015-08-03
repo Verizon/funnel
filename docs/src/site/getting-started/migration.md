@@ -33,14 +33,42 @@ This release includes several updated dependencies:
 
 In addition, we highly recommend upgrading to sbt-oncue 7.3 to make use of the compatible testing libraries. To do this, please ensure your `plugins.sbt` contains the following: `addSbtPlugin("oncue.build" %% "sbt-oncue" % "7.3.+")`
 
+* Chemist no longer prepends `v` to the cluster version. Where previously your cluster name may have been `foo-v1.0.0-Gfhq3Dgx`, it is now `foo-1.0.0-Gfhq3Dgx`. Searching in elastic search using the old-style naming will *not* work, and will result in zero documents. This change was put into place to align cluster naming across tools (i.e. the addition of the `v` was essentially arbitrary).
+
 * Ensure that your dependency versions match the following (if applicable - using older versions will result in binary collisions are runtime):
 	* `"oncue.knobs" %% "core" % "3.2.+"` - does not depend on funnel, but is scalaz-compatible
 	* `"oncue.svc.journal" %% "core" % "2.1.+"` - does not depend on funnel but is version-compatible
 	* `"oncue.commonutils" %% "dal-cassandra" % "4.0.+"` - depends on funnel directly
 	* `"oncue.svc.search.client" %% "core" % "10.0.+"` - depends on funnel directly
-	* `"oncue.rna.jetevents" %% "core" % "3.1.+"` - depends on funnel directly
+	* `"oncue.rna.jetevents" %% "core" % "3.1.+"` - depends on funnel directly 
+	* *Be sure that you do not have funnel 2.x on your transitive classpath, and that any common libraries you're using are suitable upgraded.*
 
-*Be sure that you do not have funnel 2.x on your transitive classpath, and that any common libraries you're using are suitable upgraded.*
+* The way in which the *Funnel* elastic search module renders documents has changed to work around document indexing collisions in elastic search which causes documents to be rejected upon ingest, as the structure does not match that which has already been indexed on previous ingests. **This will require you to update any dashboards / saved searches in Kibana**. The following changes are now in effect:
+
+<table>
+  <thead>
+    <td><strong>Instrument</strong></td>
+    <td><strong>Old Name</strong></td>
+    <td><strong>New Name</strong></td>
+  </thead>
+  <tr>
+    <td><code>numericGauge</code></td>
+    <td>foo.bar.mean</td>
+    <td>foo.bar.numeric.mean</td>
+  </tr>
+  <tr>
+    <td><code>counter</code></td>
+    <td>foo.bar</td>
+    <td>foo.bar.counter</td>
+  </tr>
+  <tr>
+    <td><code>timer</code></td>
+    <td>foo.bar.mean</td>
+    <td>foo.bar.timer.mean</td>
+  </tr>
+</table>
+
+*Whilst "mean" was used in these examples, any Stats attribute is valid (standardDeviation, last, etc)*
 
 Other things of note in this release cycle (does not affect migration):
 

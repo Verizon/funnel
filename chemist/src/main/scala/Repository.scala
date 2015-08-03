@@ -4,8 +4,9 @@ package chemist
 import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import Sharding.Distribution
-import scalaz.{-\/,==>>}
+import scalaz.{-\/,==>>,\/}
 import scalaz.std.string._
+import scalaz.std.set._
 import scalaz.syntax.monad._
 import scalaz.stream.{Sink, Channel, Process, Process1, async}
 import java.net.URI
@@ -165,9 +166,9 @@ class StatefulRepository extends Repository {
           lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), targetState(target.uri))
 
         case PlatformEvent.NewFlask(f) =>
-          Task.delay(log.info("platformHandler -- new task: " + f)) >>
+          Task.delay(log.info("platformHandler -- new flask: " + f)) >>
           Task.delay {
-            D.update(_.insert(f.id, Set.empty))
+            D.update(_.updateAppend(f.id, Set.empty))
             knownFlasks.update(_.insert(f.id, f))
           } >>
           repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f))
@@ -243,6 +244,7 @@ class StatefulRepository extends Repository {
     repoCommandsQ.dequeue
 
   override def lifecycle(): Unit =  {
+    import metrics._
     val go: RepoEvent => Process[Task, RepoCommand] = { re =>
       Process.eval(repoHistoryStack.push(re)).flatMap{ _ =>
         log.info(s"lifecycle: executing event: $re")
@@ -252,6 +254,15 @@ class StatefulRepository extends Repository {
             targets.update(_.insert(id, sc))
             stateMaps.update(_.update(from, (m => Some(m.delete(id)))))
             stateMaps.update(_.update(to, (m => Some(m.insert(id, sc)))))
+            AssignedHosts.set(stateMaps.get.lookup(TargetState.Assigned).size)
+            DoubleMonitoredHosts.set(stateMaps.get.lookup(TargetState.DoubleMonitored).size)
+            UnknownHosts.set(stateMaps.get.lookup(TargetState.Unknown).size)
+            UnmonitoredHosts.set(stateMaps.get.lookup(TargetState.Unmonitored).size)
+            UnmonitorableHosts.set(stateMaps.get.lookup(TargetState.Unmonitorable).size)
+            MonitoredHosts.set(stateMaps.get.lookup(TargetState.Monitored).size)
+            DoubleAssignedHosts.set(stateMaps.get.lookup(TargetState.DoubleAssigned).size)
+            ProblematicHosts.set(stateMaps.get.lookup(TargetState.Problematic).size)
+            FinHosts.set(stateMaps.get.lookup(TargetState.Fin).size)
             sc.to match {
               case Unmonitored => {
                 log.debug("lifecycle: updating repository...")
@@ -272,9 +283,16 @@ class StatefulRepository extends Repository {
       }
     }
 
-    (lifecycleQ.dequeue flatMap go to repoCommandsQ.enqueue).run.runAsync {
+    val c: Process[Task, RepoEvent] = lifecycleQ.dequeue
+    val l: Process[Task, Unit] = (c flatMap go to repoCommandsQ.enqueue)
+    val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
+      log.error(s"Error processing lifecycle events: $err")
+      Process.eval_(Task.delay(LifecycleEventsStream.yellow))
+    }
+    a.stripW.run.runAsync {
       case -\/(e) =>
         log.error("error consuming lifecycle events", e)
+        LifecycleEventsStream.red
         repoCommandsQ.close.run
       case _ =>
         log.info("lifecycle events stream finished")

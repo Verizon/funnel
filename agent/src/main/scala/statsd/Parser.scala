@@ -4,9 +4,11 @@ package statsd
 
 import util.matching.Regex
 import scalaz.\/
+import journal.Logger
 
 object Parser {
 
+  private[this] val log = Logger[Parser.type]
   // borrowed this from the bsd work here:
   // https://github.com/mojodna/metricsd
   private[statsd] val matcher =
@@ -21,16 +23,20 @@ object Parser {
       b <- toInstrumentKind(a._3)
       c <- toSampleRate(a._4)
       d <- toValue(a._2, c)
-    } yield ArbitraryMetric(a._1,b,Option(d.toString))
+      dd = if(b == InstrumentKinds.Timer) s"$d milliseconds" else d.toString
+  } yield ArbitraryMetric(a._1,b,Option(dd))
 
-  private[statsd] def fromString(line: String): Throwable \/ (String,String,String,String) = {
+
+
+  def fromString(line: String): Throwable \/ (String,String,String,String) = {
     \/.fromTryCatchNonFatal {
-      val matcher(name,_,_,value,_,_,kind,_, sampleRate) = line
+      log.warn("fromString: <" + line + ">")
+      val matcher(name,_,_,value,_,_,kind,_, sampleRate) = line.trim
       (name, value, kind, sampleRate)
     }.leftMap(err => new RuntimeException(s"Unable to parse input. Check the formating and ensure you are using valid statsd syntax. Error was: $err"))
   }
 
-  private[statsd] def toInstrumentKind(s: String): Throwable \/ InstrumentKind = {
+  def toInstrumentKind(s: String): Throwable \/ InstrumentKind = {
     s.trim match {
       case "c"  => \/.right(InstrumentKinds.Counter)
       case "ms" => \/.right(InstrumentKinds.Timer)
@@ -40,7 +46,7 @@ object Parser {
     }
   }
 
-  private[statsd] def toValue(s: String, rate: Double): Throwable \/ Double = {
+  def toValue(s: String, rate: Double): Throwable \/ Double = {
     for {
       a <- \/.fromTryCatchNonFatal(s.trim.toLowerCase)
       _ <- if(a == "delete") \/.left(new Exception("Deletion is not supported.")) else \/.right(a)

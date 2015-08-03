@@ -12,8 +12,6 @@ object TelemetrySpec extends Properties("Telemetry codecs") with ArbitraryTeleme
 
   property("scodec key roundtrip") = forAll {(k: Key[Any]) ⇒
     keyEncode.encode(k).fold(_ => false,
-                             bits => keyDecode.decodeValidValue(bits) == k)
+                             bits => keyDecode.decode(bits).require.value == k)
   }
-
-
 }

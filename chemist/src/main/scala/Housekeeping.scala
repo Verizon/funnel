@@ -4,6 +4,7 @@ package chemist
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.{Process, time}
 import scalaz.std.string._
+import scalaz.std.set._
 import scalaz.syntax.apply._
 import scalaz.syntax.kleisli._
 import scalaz.syntax.traverse._
@@ -64,13 +65,24 @@ object Housekeeping {
    *
    * This function should only really be used startup of chemist.
    */
-  def gatherAssignedTargets(flasks: Seq[Flask])(http: dispatch.Http): Task[Distribution] =
-    (for {
+  def gatherAssignedTargets(flasks: Seq[Flask])(http: dispatch.Http): Task[Distribution] = {
+    val d = (for {
        a <- Task.gatherUnordered(flasks.map(
-            f => requestAssignedTargets(f.location)(http).map(f -> _)))
+         f => requestAssignedTargets(f.location)(http).map(f -> _).flatMap { t =>
+           Task.delay {
+             log.debug(s"Read targets $t from flask $f")
+             t
+           }
+         }
+       ))
     } yield a.foldLeft(Distribution.empty){ (a,b) =>
-      a.alter(b._1.id, o => o.map(_ ++ b._2) orElse Some(Set.empty[Target]) )
-    }) or Task.now(Distribution.empty)
+      a.updateAppend(b._1.id, b._2)
+    }).map { dis =>
+      log.debug(s"Gathered distribution $dis")
+      dis
+    }
+    d or Task.now(Distribution.empty)
+  }
 
   import funnel.http.{Cluster,JSON => HJSON}
 
@@ -88,7 +100,10 @@ object Housekeeping {
       http(b OK as.String).map { c =>
         Parse.decodeOption[List[Cluster]](c
         ).toList.flatMap(identity
-        ).foldLeft(Set.empty[Target]){ (a,b) =>
+        ).map { cluster =>
+          log.debug(s"Received cluster $cluster from $a")
+          cluster
+        }.foldLeft(Set.empty[Target]){ (a,b) =>
           b.urls.map(s => Target(b.label, new URI(s), false)).toSet
         }
       }

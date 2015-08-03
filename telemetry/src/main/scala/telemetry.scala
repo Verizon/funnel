@@ -18,20 +18,20 @@ object Telemetry extends TelemetryCodecs {
   implicit val transportedTelemetry = Transportable[Telemetry] { t =>
     t match {
       case e @ Error(_) =>
-        val t = Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("error")), errorCodec.encodeValid(e).toByteArray)
+        val t = Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("error")), errorCodec.encode(e).require.toByteArray)
         t
       case NewKey(key) =>
-        val bytes = keyEncode.encodeValid(key).toByteArray
+        val bytes = keyEncode.encode(key).require.toByteArray
         val t = Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("key")), bytes)
         t
       case Monitored(i) =>
-       Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("monitor")), uriCodec.encodeValid(i).toByteArray)
+       Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("monitor")), uriCodec.encode(i).require.toByteArray)
 
       case Unmonitored(i) =>
-        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("unmonitor")), uriCodec.encodeValid(i).toByteArray)
+        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("unmonitor")), uriCodec.encode(i).require.toByteArray)
 
       case Problem(i, msg) =>
-        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("exception")), uriCodec.encodeValid(i).toByteArray)
+        Transported(Schemes.telemetry, Versions.v1, None, Some(Topic("exception")), uriCodec.encode(i).require.toByteArray)
     }
   }
 
@@ -39,14 +39,22 @@ object Telemetry extends TelemetryCodecs {
 
   def telemetrySubscribeEndpoint(uri: URI): Endpoint = Endpoint.unsafeApply(subscribe &&& (connect ~ topics.all), uri)
 
+  private def countSentMessages: Sink[Task, Telemetry] = sink.lift { _ =>
+    import metrics.MessagesSent
+    Task.delay(MessagesSent.increment)
+  }
+
   def telemetryPublishSocket(uri: URI, signal: Signal[Boolean], telemetry: Process[Task,Telemetry]): Task[Unit] = {
     val e = telemetryPublishEndpoint(uri)
     Ø.link(e)(signal) { socket =>
-      telemetry through Ø.write(socket)
+      telemetry observe countSentMessages through Ø.write(socket)
     }.run
   }
 
-
+  private def countReceivedMessages: Sink[Task, Transported] = sink.lift { _ =>
+    import metrics.MessagesReceived
+    Task.delay(MessagesReceived.increment)
+  }
 
   def telemetrySubscribeSocket(uri: URI, signal: Signal[Boolean],
                                keys: Actor[(URI, Set[Key[Any]])],
@@ -56,7 +64,7 @@ object Telemetry extends TelemetryCodecs {
     val endpoint = telemetrySubscribeEndpoint(uri)
     Ø.link(endpoint)(signal) { socket =>
       log.info(s"connected to telemetry socket on $uri")
-      (Ø.receive(socket) to fromTransported(uri, keys, errors, lifecycle))
+      (Ø.receive(socket) observe countReceivedMessages to fromTransported(uri, keys, errors, lifecycle))
     }.run
   }
 
@@ -68,33 +76,33 @@ object Telemetry extends TelemetryCodecs {
         x match {
           case Transported(_, Versions.v1, _, Some(Topic("error")), bytes) =>
           errorCodec.decode(BitVector(bytes)) match {
-            case -\/(err) => Task.delay(log.error(s"Error parsing error from telemetry $err"))
-            case \/-((_,err)) => Task.delay(errors ! err)
+            case Attempt.Failure(err) => Task.delay(log.error(s"Error parsing error from telemetry $err"))
+            case Attempt.Successful(DecodeResult(err, _)) => Task.delay(errors ! err)
           }
           case Transported(_, Versions.v1, _, Some(Topic("key")), bytes) =>
           keyDecode.decode(BitVector(bytes)) match {
-            case -\/(err) => Task.delay(log.error(s"Error parsing keys from telemetry $err"))
-            case \/-((_,k)) =>
+            case Attempt.Failure(err) => Task.delay(log.error(s"Error parsing keys from telemetry $err"))
+            case Attempt.Successful(DecodeResult(k,_)) =>
               currentKeys += k
               Task.delay(keys ! id -> currentKeys.toSet)
           }
           case Transported(_, Versions.v1, _, Some(Topic("monitor")), bytes) =>
             uriCodec.decode(BitVector(bytes)) match {
-              case -\/(err) => Task.delay(log.error(s"Error parsing monitor from telemetry $err"))
-              case \/-((_,uri)) => Task.delay(lifecycleSink ! Either3.middle3(uri))
+              case Attempt.Failure(err) => Task.delay(log.error(s"Error parsing monitor from telemetry $err"))
+              case Attempt.Successful(DecodeResult(uri,_)) => Task.delay(lifecycleSink ! Either3.middle3(uri))
             }
           case Transported(_, Versions.v1, _, Some(Topic("unmonitor")), bytes) =>
             uriCodec.decode(BitVector(bytes)) match {
-              case -\/(err) => Task.delay(log.error(s"Error parsing unmonitor from telemetry $err"))
-              case \/-((_,uri)) => Task.delay(lifecycleSink ! Either3.left3(uri))
+              case Attempt.Failure(err) => Task.delay(log.error(s"Error parsing unmonitor from telemetry $err"))
+              case Attempt.Successful(DecodeResult(uri,_)) => Task.delay(lifecycleSink ! Either3.left3(uri))
             }
 
           case Transported(_, Versions.v1, None, Some(Topic("exception")), bytes) =>
             uriCodec.decode(BitVector(bytes)) map {
-              case (_, uri) => uri -> ""
+              case DecodeResult(uri,_) => uri -> ""
             } match {
-              case -\/(err) => Task.delay(log.error(s"Error parsing exception from telemetry $err"))
-              case \/-((uri, msg)) => Task.delay(lifecycleSink ! Either3.right3(uri -> msg))
+              case Attempt.Failure(err) => Task.delay(log.error(s"Error parsing exception from telemetry $err"))
+              case Attempt.Successful((uri, msg)) => Task.delay(lifecycleSink ! Either3.right3(uri -> msg))
             }
 
           case x => log.error("unexpected message from telemetry: " + x)
@@ -128,5 +136,5 @@ object Telemetry extends TelemetryCodecs {
 trait TelemetryCodecs extends KeyCodecs {
 
   implicit val uriCodec: Codec[URI] = utf8.xmap[URI](new URI(_), _.toString)
-  implicit lazy val errorCodec = Codec.derive[Names].xmap[Error](Error(_), _.names)
+  implicit lazy val errorCodec = implicitly[Codec[Names]].xmap[Error](Error(_), _.names)
 }
