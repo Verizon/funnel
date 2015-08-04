@@ -176,8 +176,23 @@ case class Elastic(M: Monitoring) {
 
   type ES[A] = Kleisli[Task, ElasticCfg, A]
 
-  def elasticString(req: Req): ES[String] =
-    getConfig.flatMapK(c => fromScalaFuture(c.http(req OK as.String)))
+  /** sadly required as dispatch has a very naieve error handler by default,
+      and in this case we're looking to output the body of the response to the log
+      in order to help with debugging in the event documents were not able to be
+      submitted to the backend. Should function exactly like the default impl
+      with the addition of the logging. */
+  val handler = new FunctionHandler[String]({ resp =>
+    val status = resp.getStatusCode
+    if((status / 100) == 2) resp.getResponseBody
+    else {
+      M.log.error(s"Backend returned a code ${resp.getStatusCode} failure. Body response was: ${resp.getResponseBody}")
+      throw StatusCode(status)
+    }
+  })
+
+  def elasticString(req: Req): ES[String] = {
+    getConfig.flatMapK(c => fromScalaFuture(c.http(req > handler)))
+  }
 
   // Not in Scalaz until 7.2 so duplicating here
   def lower[M[_]:Monad,A,B](k: Kleisli[M,A,B]): Kleisli[M,A,M[B]] =
@@ -190,7 +205,7 @@ case class Elastic(M: Monitoring) {
     es <- getConfig
     ta <- lower(elasticString(req << json))
     _  <- lift(ta.attempt.map(_.fold(
-      e => {M.log.error(s"Unable to send document to elastic search due to '$e'.")
+      e => {  M.log.error(s"Unable to send document to elastic search due to '$e'.")
             M.log.error(s"Configuration was $es. Document was: \n ${json}")},
       _ => ())))
   } yield ()
