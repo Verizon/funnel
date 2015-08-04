@@ -40,3 +40,29 @@ case class ForegoneConclusion(
   val leader: Task[Option[Location]] = Task.now(Some(nominee))
   def isLeader(l: Location): Task[Boolean] = Task.now(true)
 }
+
+/**
+ * FirstFoundActive stratagy is one that makes no real choices of its own,
+ * rather, control comes from a third-party agent which determines if
+ * this chemist is the one - true - chemist that will commendere all the
+ * flasks, live-long and prosper (until the next deployment, at least).
+ *
+ * In orcer to effectivly use this stratagy, you need to plugin
+ * an appropriate `Classifier` into whatever `Discovery` instance you
+ * supply to this class. If you're just using the `DefaultClassifier`
+ * your results will likley be non-deterministic if you're running multiple
+ * instnaces of chemist.
+ */
+case class FirstFoundActive(
+  discovery: Discovery
+) extends ElectionStrategy {
+
+  def leader: Task[Option[Location]] =
+    discovery.listActiveChemists.map(_.headOption)
+
+  def isLeader(mine: Location): Task[Boolean] =
+    leader.map {
+      case Some(theirs) => mine == theirs
+      case None         => true // their was no current leader, so take control
+    }
+}

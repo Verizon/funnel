@@ -67,6 +67,7 @@ object AwsConfig {
     val timeout   = cfg.require[Duration]("chemist.command-timeout")
     val usevpc    = cfg.lookup[Boolean]("chemist.include-vpc-targets").getOrElse(false)
     val sharding  = cfg.lookup[String]("chemist.sharding-strategy")
+    val classifiy = cfg.lookup[String]("chemist.classification-stratagy")
     AwsConfig(
       templates 		= templates.map(LocationTemplate),
       network           = readNetwork(network),
@@ -77,12 +78,18 @@ object AwsConfig {
       asg               = readASG(aws),
       cfn               = readCFN(aws),
       sharder           = readSharder(sharding),
-      classifier        = DefaultClassifier, // TIM: This should not be hardcoded.
+      classifier        = readClassifier(classifiy),
       commandTimeout    = timeout,
       includeVpcTargets = usevpc,
       machine           = readMachineConfig(cfg)
     )
   }
+
+  private def readClassifier(c: Option[String]): Classifier[AwsInstance] =
+    c match {
+      case Some("default") => DefaultClassifier
+      case _               => DefaultClassifier
+    }
 
   private def readMachineConfig(cfg: Config): MachineConfig =
     MachineConfig(
