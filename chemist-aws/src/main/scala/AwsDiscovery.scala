@@ -143,17 +143,17 @@ class AwsDiscovery(
     def lookInAws(specificIds: Seq[String]): Task[Seq[AwsInstance]] =
       for {
         a <- EC2.reservations(specificIds)(ec2)
-        _  = log.debug(s"AwsDiscovery.lookupMany, a = ${a.length}")
+        _  = log.debug(s"lookupMany, a = ${a.length}")
         b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
         (fails,successes) = b.toVector.separate
-        _  = log.warn(s"AwsDiscovery.lookupMany failed to validate ${fails.length} instances.")
-        _  = log.debug(s"AwsDiscovery.lookupMany validated = ${b}")
+        _  = log.warn(s"lookupMany, failed to validate ${fails.length} instances.")
+        _  = log.debug(s"lookupMany, validated = ${b}")
         _  = fails.foreach(x => log.error(x))
       } yield successes
 
     def updateCache(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] =
       Task.delay {
-        log.debug(s"Updating the cache with ${instances.length} items.")
+        log.debug(s"lookupMany, updating the cache with ${instances.length} items.")
         instances.foreach(i => cache.put(i.id, i))
         instances
       }
@@ -161,17 +161,17 @@ class AwsDiscovery(
     lookInCache match {
       // all found in cache
       case (Nil,found) =>
-        log.debug(s"AwsDiscovery.lookupMany: all ${found.length} instances in the cache.")
+        log.debug(s"lookupMany, all ${found.length} instances in the cache.")
         Task.now(found)
 
       // none found in cache
       case (missing,Nil) =>
-        log.debug(s"AwsDiscovery.lookupMany: all ${missing.length} instances are missing in the cache.")
+        log.debug(s"lookupMany, all ${missing.length} instances are missing in the cache.")
         lookInAws(missing).flatMap(updateCache)
 
       // partially found in cache
       case (missing,found) =>
-        log.debug(s"AwsDiscovery.lookupMany: ${missing.length} missing. ${found.length} found in the cache.")
+        log.debug(s"lookupMany, ${missing.length} missing. ${found.length} found in the cache.")
         lookInAws(missing)
           .flatMap(updateCache)
           .map(_ ++ found)
@@ -242,13 +242,17 @@ class AwsDiscovery(
     } yield instance
   }
 
+  /**
+   * This is the main work-horse function of discovery and provides a mechanism
+   * to find all the instances that are contained within an auto-scaling group.
+   */
   private def instances(g: Classification => Boolean): Task[Seq[AwsInstance]] =
     for {
       a <- readAutoScallingGroups
       b <- classifier.task.map(_ andThen g)
       // apply the specified filter if we want to remove specific groups for a reason
       c  = a.filter(b(_))
-      _  = log.debug(s"validated instance list: ${c.map(_.id).mkString(", ")}")
+      _  = log.debug(s"discovered ${c.size} instances.")
     } yield c
 
   /**
