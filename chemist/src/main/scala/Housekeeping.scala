@@ -80,13 +80,12 @@ object Housekeeping {
 
     time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
       for {
-        _ <- gatherUnassignedTargets(discovery, repository)
+        _  <- gatherUnassignedTargets(discovery, repository)
 
-        ts <- repository.states.map(_.apply(TargetState.Investigating).values.map(_.msg.target))
-        _   = for {
-          t  <- ts
-          _   = attemptRepeatedly(debugString)(reachOut(t))(iSchedule).onFailure(e => fail(t)).run
-        } yield ()
+        ts <- repository.states.map(_.apply(TargetState.Investigating).values.toSeq.map(_.msg.target))
+        _  <- Task.gatherUnordered(
+          ts.map(t => attemptRepeatedly(debugString)(reachOut(t))(iSchedule).onFailure(e => fail(t)).run)
+        )
       } yield ()
     )
 
