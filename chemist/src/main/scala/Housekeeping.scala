@@ -78,18 +78,18 @@ object Housekeeping {
 
     def reachOut(t: Target) = Process.eval(Task.fromDisjunction(contact(t.uri))) ++ succeed(t)
 
-    (for {
-      ts <- repository.states.map(_.apply(TargetState.Investigating).values.map(_.msg.target))
-      _   = for {
-        t  <- ts
-        _   = attemptRepeatedly(debugString)(reachOut(t))(iSchedule).onFailure(e => fail(t)).run
-      } yield ()
-    } yield ()).run
-
     time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
       for {
         _ <- gatherUnassignedTargets(discovery, repository)
-      } yield ())
+
+        ts <- repository.states.map(_.apply(TargetState.Investigating).values.map(_.msg.target))
+        _   = for {
+          t  <- ts
+          _   = attemptRepeatedly(debugString)(reachOut(t))(iSchedule).onFailure(e => fail(t)).run
+        } yield ()
+      } yield ()
+    )
+
   }
 
   /**
