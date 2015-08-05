@@ -560,7 +560,6 @@ object Monitoring {
     maskedError: Throwable => Unit)(
     p: Process[Task,A])(
     schedule: Process[Task,Unit]): Process[Task,A] = {
-    val S = Strategy.Executor(Monitoring.defaultPool)
     val step: Process[Task, Throwable \/ A] =
       p.append(schedule.kill).attempt(e => Process.eval { Task.delay { maskedError(e); e }})
     val retries: Process[Task, Throwable \/ A] = schedule.zip(step.repeat).map(_._2)

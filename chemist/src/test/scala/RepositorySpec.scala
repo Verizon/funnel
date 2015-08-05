@@ -85,6 +85,8 @@ object RespositorySpec extends Properties("StaticRepository") with ArbitraryLife
         Problem(i, FlaskID(""), "msg", System.currentTimeMillis)
       case DoubleMonitored =>
         Confirmation(i, FlaskID(""), System.currentTimeMillis)
+      case Investigating =>
+        Investigation(i, FlaskID(""), "msg", System.currentTimeMillis)
       case Fin =>
         Terminated(i, System.currentTimeMillis)
       case Unmonitorable =>

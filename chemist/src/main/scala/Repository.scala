@@ -100,7 +100,8 @@ class StatefulRepository extends Repository {
                                        Problematic -> emptyMap,
                                        DoubleAssigned -> emptyMap,
                                        DoubleMonitored -> emptyMap,
-                                       Fin -> emptyMap))
+    				       Investigating -> emptyMap,
+    				       Fin -> emptyMap))
 
   /**
    * stores lifecycle events to serve as an audit log that
@@ -263,6 +264,7 @@ class StatefulRepository extends Repository {
             MonitoredHosts.set(stateMaps.get.lookup(TargetState.Monitored).size)
             DoubleAssignedHosts.set(stateMaps.get.lookup(TargetState.DoubleAssigned).size)
             ProblematicHosts.set(stateMaps.get.lookup(TargetState.Problematic).size)
+            InvestigatingHosts.set(stateMaps.get.lookup(TargetState.Investigating).size)
             FinHosts.set(stateMaps.get.lookup(TargetState.Fin).size)
             sc.to match {
               case Unmonitored => {

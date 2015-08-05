@@ -88,6 +88,10 @@ object TargetLifecycle {
       override def toString = "Problematic"
     }
 
+    case object Investigating extends TargetState(9) {
+      override def toString = "Investigating"
+    }
+
     case object DoubleMonitored extends TargetState(5) {
       override def toString = "DoubleMonitored"
     }
@@ -107,6 +111,7 @@ object TargetLifecycle {
   case object Migrate extends TargetTransition
   case object Unassign extends TargetTransition
   case object Exceptional extends TargetTransition
+  case object Investigate extends TargetTransition
   case object Unmonitor extends TargetTransition
   case object Terminate extends TargetTransition
 
@@ -124,7 +129,8 @@ object TargetLifecycle {
                           DoubleAssigned.node,
                           DoubleMonitored.node,
                           Problematic.node,
-                          Fin.node)
+    			  Investigating.node,
+    			  Fin.node)
 
                                 // From          // To             // Msg
   val edges: Seq[M] = Seq(LEdge(Unknown,         Unmonitored,     Discover),
@@ -147,7 +153,9 @@ object TargetLifecycle {
                           LEdge(Monitored,       Fin,             Terminate),
                           LEdge(DoubleAssigned,  Fin,             Terminate),
                           LEdge(DoubleMonitored, Fin,             Terminate),
-                          LEdge(Problematic,     Fin,             Terminate),
+    			  LEdge(Problematic,     Investigating,   Investigate),
+			  LEdge(Investigating,   Assigned,        Assign),
+			  LEdge(Investigating,   Fin,             Terminate),
                           LEdge(Monitored,       Unmonitored,     Unmonitor))
 
   val targetLifecycle: G = mkGraph(nodes, edges)
@@ -178,6 +186,9 @@ object TargetLifecycle {
   }
   case class Problem(target: Target, flask: FlaskID, msg: String, time: Long) extends TargetMessage {
     val transition = Exceptional
+  }
+  case class Investigation(target: Target, flask: FlaskID, msg: String, time: Long) extends TargetMessage {
+    val transition = Investigate
   }
   case class Terminated(target: Target, time: Long) extends TargetMessage {
     val transition = Terminate
