@@ -56,6 +56,7 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
             log.error(s"Missing frame$s from Flask: ${flask}")
           }
           d <- Housekeeping.gatherAssignedTargets(Seq(flask))(http)
+          _ <- repo.mergeExistingDistribution(d)
           _ <- Task.suspend(t)
         } yield ()
       }).runAsync(_.fold({
