@@ -49,8 +49,17 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
   def command(c: FlaskCommand): Task[Unit] = c match {
     case Telemetry(flask) =>
       val t = monitorTelemetry(flask, keys, errors, lifecycle, signal)
-      Task.delay(t.runAsync(_.fold(
-        e => {
+      Task.delay(t.handleWith({
+        case telemetry.Telemetry.MissingFrame(a, b) => for {
+          _ <- Task.delay {
+            val s = if (a+1 == b-1) s" ${a+1}" else s"s ${a+1}-${b-1}"
+            log.error(s"Missing frame$s from Flask: ${flask}")
+          }
+          d <- Housekeeping.gatherAssignedTargets(Seq(flask))(http)
+          _ <- Task.suspend(t)
+        } yield ()
+      }).runAsync(_.fold({
+        case e: Exception =>
           log.error(e.getMessage)
           e.printStackTrace
         },
