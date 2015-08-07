@@ -99,10 +99,7 @@ trait Chemist[A <: Platform]{
    * List out the all the known Funnels and the state they are in.
    */
   def states: ChemistK[Map[TargetLifecycle.TargetState, Map[URI, RepoEvent.StateChange]]] =
-    config.flatMapK { _.repository.states.map {
-      _.get.toList.map {
-        case (k,v) => k -> v.toList.toMap }.toMap
-    }}
+    config.flatMapK(_.repository.states)
 
   /**
    * List out the last 100 Errors that this chemist has seen.

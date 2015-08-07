@@ -116,9 +116,6 @@ object Housekeeping {
   }
 
   private def handleInvestigating(r: Repository): Task[Unit] = {
-    import internals._
-    import r.StateM
-
     def contact(uri: URI): Throwable \/ Unit =
       \/.fromTryCatchThrowable[Unit, Exception]{
         val s = new Socket
@@ -127,7 +124,9 @@ object Housekeeping {
         finally s.close // whatever the outcome, close the socket to prevent leaks.
       }
 
-    def go(i: Investigate, smr: Ref[StateM]): Task[Unit] = {
+    def go(sc: StateChange, r: Repository): Task[Unit] = {
+      val i = sc.msg.asInstanceOf[Investigate]
+
       if (i.retryCount < 6) {				// TODO: make max retries oonfigurable?
         val now = System.currentTimeMillis
         val later = i.time + math.pow(2.0, i.retryCount.toDouble).toInt.hours.toMillis
@@ -135,15 +134,11 @@ object Housekeeping {
           Task.fromDisjunction(contact(i.target.uri)).onFinish { ot => ot match {
             case Some(t) => Task.delay {		// Retry failed with Throwable t
               log.debug(s"Failed retrying target ${i.target} for the ${i.retryCount}th time, with Throwable $t")
-              val nm = Investigate(i.target, now, i.retryCount + 1)
-              smr.update(				// Update a Ref to a Map of a Map to a case class
-                _.update(TargetState.Investigating,
-                  im => Some(im.update(i.target.uri,
-                    sc => Some(sc.copy(msg = nm))
-                  ))
-                )
-              )
-            }
+            } <* r.updateState(
+              i.target.uri,
+              TargetState.Investigating,
+              sc.copy(msg = Investigate(i.target, now, i.retryCount + 1))
+            )
             case None    => Task.delay {		// Retry succeeded; 
               log.debug(s"Succeeded retrying target ${i.target} for the ${i.retryCount}th time")
             } <* r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri)) <*
@@ -162,9 +157,9 @@ object Housekeeping {
     }
 
     for {
-      smr  <- r.states
-      msgs  = smr.get.lookup(TargetState.Investigating).get.values.map(_.msg.asInstanceOf[Investigate])
-      _    <- Task.gatherUnordered(msgs.map(go(_, smr)))
+      sm   <- r.states
+      scs   = sm(TargetState.Investigating).values.toSeq
+      _    <- Task.gatherUnordered(scs.map(go(_, r)))
     } yield ()
   }
 }

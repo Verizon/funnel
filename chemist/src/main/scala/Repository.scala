@@ -48,7 +48,7 @@ trait Repository {
   /**
    * Render the current state of the world, as chemist sees it
    */
-  def states: Task[Ref[StateM]]
+  def states: Task[Map[TargetLifecycle.TargetState, Map[URI, RepoEvent.StateChange]]]
 
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit]
   def errorSink(e: Error): Task[Unit]
@@ -57,6 +57,7 @@ trait Repository {
   /////////////// instance operations ///////////////
 
   def targetState(instanceId: URI): TargetState
+  def updateState(instanceId: URI, state: TargetState, change: StateChange): Task[Unit]
   def instance(id: URI): Option[Target]
   def flask(id: FlaskID): Option[Flask]
   val lifecycleQ: async.mutable.Queue[RepoEvent]
@@ -129,7 +130,11 @@ class StatefulRepository extends Repository {
   def errors: Task[Seq[Error]] =
     Task.delay(errorStack.toSeq.toList)
 
-  def states: Task[Ref[StateM]] = Task.delay(stateMaps)
+  def states: Task[Map[TargetLifecycle.TargetState, Map[URI, RepoEvent.StateChange]]] = Task.delay {
+    stateMaps.get.toList.map {
+      case (k,v) => k -> v.toList.toMap
+    }.toMap
+  }
 
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit] = Task.now(())
 
@@ -307,6 +312,16 @@ class StatefulRepository extends Repository {
    */
   def targetState(id: URI): TargetState =
     targets.get.lookup(id).fold[TargetState](TargetState.Unknown)(_.to)
+
+  def updateState(instanceId: URI, state: TargetState, change: StateChange): Task[Unit] = Task.delay {
+    stateMaps.update(				// Update a Ref to a Map of a Map to a case class
+      _.update(state,
+        im => Some(im.update(instanceId,
+          sc => Some(change)
+        ))
+      )
+    )
+  }
 
   def instance(id: URI): Option[Target] =
     targets.get.lookup(id).map(_.msg.target)
