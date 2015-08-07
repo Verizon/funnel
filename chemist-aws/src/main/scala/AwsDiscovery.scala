@@ -64,11 +64,12 @@ class AwsDiscovery(
   * In practice, this is the set difference between all discovered instances
   * and valid ones.
   */
-  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = for {
-    i <- instances(notFlask)
-    v <- valid(i)
-    bad = i.toSet &~ v.toSet
-  } yield bad.toList.map(in => TargetID(in.id) -> in.targets)
+  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = 
+    for {
+      i <- instances(notFlask)
+      v <- valid(i)
+      bad = i.toSet &~ v.toSet
+    } yield bad.toList.map(in => TargetID(in.id) -> in.targets)
 
   /**
    * List all of the instances in the given AWS account and figure out which ones of
@@ -143,12 +144,12 @@ class AwsDiscovery(
     def lookInAws(specificIds: Seq[String]): Task[Seq[AwsInstance]] =
       for {
         a <- EC2.reservations(specificIds)(ec2)
-        _  = log.debug(s"lookupMany, a = ${a.length}")
+        _  = log.debug(s"lookupMany, reservations = ${a.length}")
         b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
         (fails,successes) = b.toVector.separate
-        _  = log.warn(s"lookupMany, failed to validate ${fails.length} instances.")
-        _  = log.debug(s"lookupMany, validated = ${b}")
-        _  = fails.foreach(x => log.error(x))
+        _  = log.info(s"lookupMany, failed to validate ${fails.length} instances.")
+        _  = log.debug(s"lookupMany, validated ${successes.length} instances.")
+        _  = fails.foreach(x => log.error(s"lookupMany, failed to validate '$x'"))
       } yield successes
 
     def updateCache(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] =
@@ -252,7 +253,7 @@ class AwsDiscovery(
       b <- classifier.task.map(_ andThen g)
       // apply the specified filter if we want to remove specific groups for a reason
       c  = a.filter(b(_))
-      _  = log.debug(s"discovered ${c.size} instances.")
+      _  = log.debug(s"instances, discovered ${c.size} instances (minus ${a.size - c.size} filtered instances).")
     } yield c
 
   /**
@@ -265,7 +266,7 @@ class AwsDiscovery(
     // run the tasks on the specified thread pool (Server.defaultPool)
     b <- Task.gatherUnordered(y)
     r = b.flatMap(_.toList)
-    _ = log.debug(s"validated instance list: ${r.map(_.id).mkString(", ")}")
+    _ = log.debug(s"valid, validated instance list: ${r.map(_.id).mkString(", ")}")
   } yield r
 
   /**
