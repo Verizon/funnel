@@ -30,7 +30,8 @@ case class AwsConfig(
   asg: AmazonAutoScaling,
   commandTimeout: Duration,
   includeVpcTargets: Boolean,
-  sharder: Sharder
+  sharder: Sharder,
+  maxInvestigatingRetries: Int
 ) extends PlatformConfig {
   val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, templates)
   val repository: Repository = new StatefulRepository
@@ -51,17 +52,19 @@ object AwsConfig {
     val timeout   = cfg.require[Duration]("chemist.command-timeout")
     val usevpc    = cfg.lookup[Boolean]("chemist.include-vpc-targets").getOrElse(false)
     val sharding  = cfg.lookup[String]("chemist.sharding-strategy")
+    val retries   = cfg.require[Int]("chemist.max-investigating-retries")
     AwsConfig(
-      templates 		= templates.map(LocationTemplate),
-      network           = readNetwork(network),
-      queue             = QueueConfig(topic, queue),
-      sns               = readSNS(aws),
-      sqs               = readSQS(aws),
-      ec2               = readEC2(aws),
-      asg               = readASG(aws),
-      sharder           = readSharder(sharding),
-      commandTimeout    = timeout,
-      includeVpcTargets = usevpc
+      templates 	      = templates.map(LocationTemplate),
+      network                 = readNetwork(network),
+      queue                   = QueueConfig(topic, queue),
+      sns                     = readSNS(aws),
+      sqs                     = readSQS(aws),
+      ec2                     = readEC2(aws),
+      asg                     = readASG(aws),
+      sharder                 = readSharder(sharding),
+      commandTimeout          = timeout,
+      includeVpcTargets       = usevpc,
+      maxInvestigatingRetries = retries
     )
   }
 

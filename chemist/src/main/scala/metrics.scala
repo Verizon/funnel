@@ -31,6 +31,7 @@ object metrics {
   val MonitoredHosts = numericGauge("hosts/monitored", 0.0, Units.Count, "number of hosts in Monitored state")
   val DoubleAssignedHosts = numericGauge("hosts/doubleassigned", 0.0, Units.Count, "number of hosts in DoubleAssigned state")
   val ProblematicHosts = numericGauge("hosts/problematic", 0.0, Units.Count, "number of hosts in Problematic state")
+  val InvestigatingHosts = numericGauge("hosts/investigating", 0.0, Units.Count, "number of hosts in Investigating state")
   val FinHosts = numericGauge("hosts/fin", 0.0, Units.Count, "number of hosts in Fin state")
 
   // lifecycle

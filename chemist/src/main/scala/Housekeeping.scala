@@ -1,6 +1,8 @@
 package funnel
 package chemist
 
+import java.net.URI
+import scalaz.\/
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.{Process, time}
 import scalaz.std.string._
@@ -12,9 +14,11 @@ import scalaz.syntax.id._
 import scalaz.std.vector._
 import scalaz.std.option._
 import journal.Logger
-import java.net.URI
+import TargetLifecycle.{ Investigate, TargetMessage, TargetState }
+import RepoEvent.StateChange
 
 object Housekeeping {
+  import Chemist.contact
   import Sharding._
   import concurrent.duration._
 
@@ -28,11 +32,14 @@ object Housekeeping {
    * 2. ensuring that targets that are stuck in the assigned state for more than a given 
    *    period are reaped, and re-assigned to another flask (NOT IMPLEMENTED.)
    */
-  def periodic(delay: Duration)(discovery: Discovery, repository: Repository): Process[Task,Unit] =
+  def periodic(delay: Duration)(maxRetries: Int)(d: Discovery, r: Repository): Process[Task,Unit] = {
     time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
       for {
-        _ <- gatherUnassignedTargets(discovery, repository)
-      } yield ())
+        _  <- gatherUnassignedTargets(d, r) <*
+              handleInvestigating(maxRetries)(r)
+      } yield ()
+    )
+  }
 
   /**
    * Gather up all the targets that are for reasons unknown sitting in the unassigned
@@ -108,5 +115,45 @@ object Housekeeping {
         }
       }
     }
+  }
+
+  private def handleInvestigating(maxRetries: Int)(r: Repository): Task[Unit] = {
+    def go(sc: StateChange, r: Repository): Task[Unit] = {
+      val i = sc.msg.asInstanceOf[Investigate]
+
+      if (i.retryCount < maxRetries) {			// TODO: make max retries oonfigurable?
+        val now = System.currentTimeMillis
+        val later = i.time + math.pow(2.0, i.retryCount.toDouble).toInt.hours.toMillis
+        if (now >= later) {				// Not done retrying; time to retry
+          Task.fromDisjunction(contact(i.target.uri)).onFinish { ot => ot match {
+            case Some(t) => Task.delay {		// Retry failed with Throwable t
+              log.debug(s"Failed retrying target ${i.target} for the ${i.retryCount}th time, with Throwable $t")
+            } <* r.updateState(
+              i.target.uri,
+              TargetState.Investigating,
+              sc.copy(msg = Investigate(i.target, now, i.retryCount + 1))
+            )
+            case None    => Task.delay {		// Retry succeeded; 
+              log.debug(s"Succeeded retrying target ${i.target} for the ${i.retryCount}th time")
+            } <* r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri)) <*
+                 r.platformHandler(PlatformEvent.NewTarget(i.target))
+          }}
+        } else {					// Not done retrying but not time to retry yet
+          Task.delay {
+            log.debug(s"Target ${i.target} is being investigated, but it's not time to retry it right now")
+          }
+        }
+      } else {						// Too many retries; ultimate failure
+        Task.delay {
+          log.debug(s"Target ${i.target} was retried too many times and is being terminated")
+        } <* r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri))
+      }
+    }
+
+    for {
+      sm   <- r.states
+      scs   = sm(TargetState.Investigating).values.toSeq
+      _    <- Task.gatherUnordered(scs.map(go(_, r)))
+    } yield ()
   }
 }

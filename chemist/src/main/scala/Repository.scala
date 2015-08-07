@@ -1,6 +1,7 @@
 package funnel
 package chemist
 
+import concurrent.duration._
 import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import Sharding.Distribution
@@ -11,6 +12,7 @@ import scalaz.syntax.monad._
 import scalaz.stream.{Sink, Channel, Process, Process1, async}
 import java.net.URI
 import TargetLifecycle._
+import funnel.internals._
 
 /**
  * A Repository acts as our ledger of our current view of the state of
@@ -46,7 +48,7 @@ trait Repository {
   /**
    * Render the current state of the world, as chemist sees it
    */
-  def states: Task[Map[TargetState, Map[URI, StateChange]]]
+  def states: Task[Map[TargetLifecycle.TargetState, Map[URI, RepoEvent.StateChange]]]
 
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit]
   def errorSink(e: Error): Task[Unit]
@@ -55,6 +57,7 @@ trait Repository {
   /////////////// instance operations ///////////////
 
   def targetState(instanceId: URI): TargetState
+  def updateState(instanceId: URI, state: TargetState, change: StateChange): Task[Unit]
   def instance(id: URI): Option[Target]
   def flask(id: FlaskID): Option[Flask]
   val lifecycleQ: async.mutable.Queue[RepoEvent]
@@ -73,7 +76,6 @@ trait Repository {
   def repoCommands: Process[Task, RepoCommand]
 }
 
-import funnel.internals._
 import journal.Logger
 
 class StatefulRepository extends Repository {
@@ -100,7 +102,8 @@ class StatefulRepository extends Repository {
                                        Problematic -> emptyMap,
                                        DoubleAssigned -> emptyMap,
                                        DoubleMonitored -> emptyMap,
-                                       Fin -> emptyMap))
+    				       Investigating -> emptyMap,
+    				       Fin -> emptyMap))
 
   /**
    * stores lifecycle events to serve as an audit log that
@@ -127,9 +130,11 @@ class StatefulRepository extends Repository {
   def errors: Task[Seq[Error]] =
     Task.delay(errorStack.toSeq.toList)
 
-  def states: Task[Map[TargetState, Map[URI, StateChange]]] =
-    Task.delay(stateMaps.get.toList.map {
-      case (k,v) => k -> v.toList.toMap }.toMap)
+  def states: Task[Map[TargetLifecycle.TargetState, Map[URI, RepoEvent.StateChange]]] = Task.delay {
+    stateMaps.get.toList.map {
+      case (k,v) => k -> v.toList.toMap
+    }.toMap
+  }
 
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit] = Task.now(())
 
@@ -204,7 +209,7 @@ class StatefulRepository extends Repository {
           val target = targets.get.lookup(i)
           target.map { t =>
             // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
-            lifecycle(TargetLifecycle.Unmonitoring(t.msg.target, f, System.currentTimeMillis), t.to)
+            lifecycle(TargetLifecycle.Investigate(t.msg.target, System.currentTimeMillis, 0), t.to)
           } getOrElse {
             // if we didn't even know about the target, what do we do? start monitoring it? nothing?
             Task.now(log.info(s"platformHandler -- encounterd an unknown target: $i"))
@@ -263,6 +268,7 @@ class StatefulRepository extends Repository {
             MonitoredHosts.set(stateMaps.get.lookup(TargetState.Monitored).size)
             DoubleAssignedHosts.set(stateMaps.get.lookup(TargetState.DoubleAssigned).size)
             ProblematicHosts.set(stateMaps.get.lookup(TargetState.Problematic).size)
+            InvestigatingHosts.set(stateMaps.get.lookup(TargetState.Investigating).size)
             FinHosts.set(stateMaps.get.lookup(TargetState.Fin).size)
             sc.to match {
               case Unmonitored => {
@@ -306,6 +312,16 @@ class StatefulRepository extends Repository {
    */
   def targetState(id: URI): TargetState =
     targets.get.lookup(id).fold[TargetState](TargetState.Unknown)(_.to)
+
+  def updateState(instanceId: URI, state: TargetState, change: StateChange): Task[Unit] = Task.delay {
+    stateMaps.update(				// Update a Ref to a Map of a Map to a case class
+      _.update(state,
+        im => Some(im.update(instanceId,
+          sc => Some(change)
+        ))
+      )
+    )
+  }
 
   def instance(id: URI): Option[Target] =
     targets.get.lookup(id).map(_.msg.target)
