@@ -46,29 +46,33 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
     case ev => repo.platformHandler(ev).run
   }
 
-  def command(c: FlaskCommand): Task[Unit] = c match {
-    case Telemetry(flask) =>
-      val t = monitorTelemetry(flask, keys, errors, lifecycle, signal)
-      Task.delay(t.handleWith({
-        case telemetry.Telemetry.MissingFrame(a, b) => for {
-          _ <- Task.delay {
-            val s = if (a+1 == b-1) s" ${a+1}" else s"s ${a+1}-${b-1}"
-            log.error(s"Missing frame$s from Flask: ${flask}")
-          }
-          d <- Housekeeping.gatherAssignedTargets(Seq(flask))(http)
-          _ <- repo.mergeExistingDistribution(d)
-          _ <- Task.suspend(t)
-        } yield ()
-      }).runAsync(_.fold({
-        case e: Exception =>
-          log.error(e.getMessage)
-          e.printStackTrace
-        },
-        _ => log.info("Telemetry terminated"))))
-    case Monitor(flask, targets) =>
-      monitor(flask.location, targets).void
-    case Unmonitor(flask, targets) =>
-      unmonitor(flask.location, targets).void
+  def command(c: FlaskCommand): Task[Unit] = {
+    metrics.TotalCommands.increment
+    c match {
+      case Telemetry(flask) =>
+        val t = monitorTelemetry(flask, keys, errors, lifecycle, signal)
+        Task.delay(t.handleWith({
+          case telemetry.Telemetry.MissingFrame(a, b) => for {
+            _ <- Task.delay {
+              val s = if (a+1 == b-1) s" ${a+1}" else s"s ${a+1}-${b-1}"
+              log.error(s"Missing frame$s from Flask: ${flask}")
+              metrics.DroppedCommands.increment
+            }
+            d <- Housekeeping.gatherAssignedTargets(Seq(flask))(http)
+            _ <- repo.mergeExistingDistribution(d)
+            _ <- Task.suspend(t)
+          } yield ()
+        }).runAsync(_.fold({
+          case e: Exception =>
+            log.error(e.getMessage)
+            e.printStackTrace
+          },
+          _ => log.info("Telemetry terminated"))))
+      case Monitor(flask, targets) =>
+        monitor(flask.location, targets).void
+      case Unmonitor(flask, targets) =>
+        unmonitor(flask.location, targets).void
+    }
   }
 
   /**
