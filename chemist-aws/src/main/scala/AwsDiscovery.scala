@@ -2,7 +2,7 @@ package funnel
 package chemist
 package aws
 
-import java.net.{ InetSocketAddress, Socket, URI, URL }
+import java.net.{ InetSocketAddress, Socket, URI }
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
@@ -58,16 +58,17 @@ class AwsDiscovery(
     v <- valid(i)
   } yield v.map(in => TargetID(in.id) -> in.targets)
 
-/**
-  * List all of the instances that failed basic network reachability validation.
-  * In practice, this is the set difference between all discovered instances
-  * and valid ones.
-  */
-  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = for {
-    i <- instances(!isFlask(_))
-    v <- valid(i)
-    bad = i.toSet &~ v.toSet
-  } yield bad.toList.map(in => TargetID(in.id) -> in.targets)
+  /**
+   * List all of the instances that failed basic network reachability validation.
+   * In practice, this is the set difference between all discovered instances
+   * and valid ones.
+   */
+  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] =
+    for {
+      i <- instances(!isFlask(_))
+      v <- valid(i)
+      bad = i.toSet &~ v.toSet
+    } yield bad.toList.map(in => TargetID(in.id) -> in.targets)
 
   /**
    * List all of the instances in the given AWS account that respond to a rudimentry
@@ -133,17 +134,17 @@ class AwsDiscovery(
     def lookInAws(specificIds: Seq[String]): Task[Seq[AwsInstance]] =
       for {
         a <- EC2.reservations(specificIds)(ec2)
-        _  = log.debug(s"AwsDiscovery.lookupMany, a = ${a.length}")
+        _  = log.debug(s"lookupMany, reservations = ${a.length}")
         b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
         (fails,successes) = b.toVector.separate
-        _  = log.warn(s"AwsDiscovery.lookupMany failed to validate ${fails.length} instances.")
-        _  = log.debug(s"AwsDiscovery.lookupMany b = ${b}")
-        _  = fails.foreach(x => log.error(x))
+        _  = log.info(s"lookupMany, failed to validate ${fails.length} instances.")
+        _  = log.debug(s"lookupMany, validated ${successes.length} instances.")
+        _  = fails.foreach(x => log.error(s"lookupMany, failed to validate '$x'"))
       } yield successes
 
     def updateCache(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] =
       Task.delay {
-        log.debug(s"Updating the cache with ${instances.length} items.")
+        log.debug(s"lookupMany, updating the cache with ${instances.length} items.")
         instances.foreach(i => cache.put(i.id, i))
         instances
       }
@@ -151,17 +152,17 @@ class AwsDiscovery(
     lookInCache match {
       // all found in cache
       case (Nil,found) =>
-        log.debug(s"AwsDiscovery.lookupMany: all ${found.length} instances in the cache.")
+        log.debug(s"lookupMany, all ${found.length} instances in the cache.")
         Task.now(found)
 
       // none found in cache
       case (missing,Nil) =>
-        log.debug(s"AwsDiscovery.lookupMany: all ${missing.length} instances are missing in the cache.")
+        log.debug(s"lookupMany, all ${missing.length} instances are missing in the cache.")
         lookInAws(missing).flatMap(updateCache)
 
       // partially found in cache
       case (missing,found) =>
-        log.debug(s"AwsDiscovery.lookupMany: ${missing.length} missing. ${found.length} found in the cache.")
+        log.debug(s"lookupMany, ${missing.length} missing. ${found.length} found in the cache.")
         lookInAws(missing)
           .flatMap(updateCache)
           .map(_ ++ found)
@@ -207,12 +208,16 @@ class AwsDiscovery(
     } yield instance
   }
 
+  /**
+   * This is the main work-horse function of discovery and provides a mechanism
+   * to find all the instances that are contained within an auto-scaling group.
+   */
   private def instances(f: AwsInstance => Boolean): Task[Seq[AwsInstance]] =
     for {
       a <- readAutoScallingGroups
       // apply the specified filter if we want to remove specific groups for a reason
       x  = a.filter(f)
-      _  = log.debug(s"instance list: ${x.map(_.id).mkString(", ")}")
+      _  = log.debug(s"instances, discovered ${x.size} instances (minus ${a.size - x.size} filtered instances).")
     } yield x
 
   /**
@@ -225,7 +230,7 @@ class AwsDiscovery(
     // run the tasks on the specified thread pool (Server.defaultPool)
     b <- Task.gatherUnordered(y)
     r = b.flatMap(_.toList)
-    _ = log.debug(s"validated instance list: ${r.map(_.id).mkString(", ")}")
+    _ = log.debug(s"valid, validated instance list: ${r.map(_.id).mkString(", ")}")
   } yield r
 
   /**

@@ -55,7 +55,7 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
           case telemetry.Telemetry.MissingFrame(a, b) => for {
             _ <- Task.delay {
               val s = if (a+1 == b-1) s" ${a+1}" else s"s ${a+1}-${b-1}"
-              log.error(s"Missing frame$s from Flask: ${flask}")
+              log.error(s"command, missing frame$s from flask: ${flask}")
               metrics.DroppedCommands.increment
             }
             d <- Housekeeping.gatherAssignedTargets(Seq(flask))(http)
@@ -64,12 +64,14 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
           } yield ()
         }).runAsync(_.fold({
           case e: Exception =>
-            log.error(e.getMessage)
+            log.error(s"command, unable to start the 0mq channel for $flask - ${e.getMessage}")
             e.printStackTrace
           },
-          _ => log.info("Telemetry terminated"))))
+          _ => log.info(s"command, telemetry terminated for $flask"))))
+
       case Monitor(flask, targets) =>
         monitor(flask.location, targets).void
+
       case Unmonitor(flask, targets) =>
         unmonitor(flask.location, targets).void
     }
