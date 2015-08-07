@@ -4,6 +4,7 @@ package chemist
 import funnel.instruments._
 
 object metrics {
+  // HTTP
   val GetRoot = timer("http/get/index", "time taken to get the root document")
   val GetStatus = timer("http/get/status", "time taken to get the version of Chemist")
   val GetErrors = timer("http/get/errors", "time taken to get the list of aggregated errors")
@@ -20,6 +21,8 @@ object metrics {
   val PostShardInclude = timer("http/post/shards/id/include", "time taken to include shard by ID")
   val GetShardDistribution = timer("http/get/shards/id/distribution", "time taken to list the distribution for a shard")
   val GetShardSources = timer("http/get/shards/id/sources", "time taken to get the sources for a shard")
+
+  // hosts
   val AssignedHosts = numericGauge("hosts/assigned", 0.0, Units.Count, "number of hosts in Assigned state")
   val DoubleMonitoredHosts = numericGauge("hosts/doublemonitored", 0.0, Units.Count, "number of hosts in DoubleMonitored state")
   val UnknownHosts = numericGauge("hosts/unknown", 0.0, Units.Count, "number of hosts in Unknown state")
@@ -29,6 +32,12 @@ object metrics {
   val DoubleAssignedHosts = numericGauge("hosts/doubleassigned", 0.0, Units.Count, "number of hosts in DoubleAssigned state")
   val ProblematicHosts = numericGauge("hosts/problematic", 0.0, Units.Count, "number of hosts in Problematic state")
   val FinHosts = numericGauge("hosts/fin", 0.0, Units.Count, "number of hosts in Fin state")
+
+  // lifecycle
   val LifecycleEventsStream = trafficLight("lifecycle/lifecycle-events")
   val RepoEventsStream = trafficLight("lifecycle/repo-events")
+
+  // telemetry
+  val DroppedCommands = counter("telemetry/commands/dropped")
+  val TotalCommands = counter("telemetry/commands/total")
 }
