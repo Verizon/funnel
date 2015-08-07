@@ -24,14 +24,6 @@ object Housekeeping {
   private lazy val log = Logger[Housekeeping.type]
   private lazy val defaultPool = Strategy.Executor(Chemist.defaultPool)
 
-  private[chemist] def contact(uri: URI): Throwable \/ Unit =
-    \/.fromTryCatchThrowable[Unit, Exception]{
-      val s = new Socket
-      // timeout in 300ms to keep the overhead reasonable
-      try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 300)
-      finally s.close // whatever the outcome, close the socket to prevent leaks.
-    }
-
   /**
    * This is a collection of the tasks that are needed to run on a periodic basis.
    * Specifically this involves the following:
@@ -42,8 +34,7 @@ object Housekeeping {
   def periodic(delay: Duration)(discovery: Discovery, repository: Repository): Process[Task,Unit] = {
     time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
       for {
-        _  <- gatherUnassignedTargets(discovery, repository)
-        _  <- handleInvestigating(repository)
+        _  <- gatherUnassignedTargets(discovery, repository) <* handleInvestigating(repository)
       } yield ()
     )
   }
@@ -136,7 +127,6 @@ object Housekeeping {
         finally s.close // whatever the outcome, close the socket to prevent leaks.
       }
 
-
     def go(i: Investigate, smr: Ref[StateM]): Task[Unit] = {
       if (i.retryCount < 6) {				// TODO: make max retries oonfigurable?
         val now = System.currentTimeMillis
@@ -156,9 +146,8 @@ object Housekeeping {
             }
             case None    => Task.delay {		// Retry succeeded; 
               log.debug(s"Succeeded retrying target ${i.target} for the ${i.retryCount}th time")
-              r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri))
-              r.platformHandler(PlatformEvent.NewTarget(i.target))
-            }
+            } <* r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri)) <*
+                 r.platformHandler(PlatformEvent.NewTarget(i.target))
           }}
         } else {					// Not done retrying but not time to retry yet
           Task.delay {
@@ -168,8 +157,7 @@ object Housekeeping {
       } else {						// Too many retries; ultimate failure
         Task.delay {
           log.debug(s"Target ${i.target} was retried too many times and is being terminated")
-          r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri))
-        }
+        } <* r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri))
       }
     }
 
