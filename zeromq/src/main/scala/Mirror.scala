@@ -26,8 +26,11 @@ object Mirror {
         (Windows.fromString(w), Option(Topic(topic.mkString("/"))))
     }
 
+    // this whole thing is a bit of a hack, but it
+    // saves duplicting the header parsing code.
     Versions.supported.toList.map { v =>
       Transported(
+        serial = 0, // this will be ignored
         scheme = Schemes.fsm,
         version = v,
         window = win,

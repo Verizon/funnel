@@ -9,15 +9,12 @@ import sockets._
 import java.util.concurrent.atomic.AtomicLong
 
 class SpecMultiJvmNodeA extends FlatSpec with Matchers {
+  import common._
 
   val E = Endpoint.unsafeApply(pull &&& bind, Settings.uri)
   val received = new AtomicLong(0L)
   val ledger: Channel[Task, String, Unit] =
     channel.lift(_ => Task(received.incrementAndGet))
-
-  implicit val batransport: Transportable[Array[Byte]] = Transportable { ba =>
-    Transported(Schemes.unknown, Versions.unknown, None, None, ba)
-  }
 
   "receiving streams" should "pull all the sent messages" in {
     Ø.link(E)(Fixtures.signal)(Ø.receive)
@@ -34,14 +31,11 @@ class SpecMultiJvmNodeA extends FlatSpec with Matchers {
 }
 
 class SpecMultiJvmNodeB extends FlatSpec with Matchers with BeforeAndAfterAll {
+  import common._
 
   implicit val B = scalaz.std.anyVal.booleanInstance.conjunction
 
   val E = Endpoint.unsafeApply(push &&& connect, Settings.uri)
-
-  implicit val batransport: Transportable[Array[Byte]] = Transportable { ba =>
-    Transported(Schemes.unknown, Versions.unknown, None, None, ba)
-  }
 
   val seq: Seq[Array[Byte]] = for(i <- 0 to 10000) yield Fixtures.data
   val k: Seq[Boolean] = seq.map(_ => true) ++ Seq(false)

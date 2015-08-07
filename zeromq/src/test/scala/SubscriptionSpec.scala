@@ -41,10 +41,6 @@ class SubscriptionSpec extends FlatSpec
   // mirror previous to this instance
   lazy val MP = Monitoring.instance
 
-  lazy val previous = Transported(Schemes.fsm, Versions.v1, Some(Windows.previous), None, "".getBytes).header.getBytes("ASCII")
-
-  lazy val nowCounter = Transported(Schemes.fsm, Versions.v1, Some(Windows.now), Some(Topic("numeric")), "".getBytes).header.getBytes("ASCII")
-
   override def beforeAll(){
     addInstruments(I1)
     addInstruments(I2)

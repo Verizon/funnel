@@ -86,8 +86,8 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
       val E = Endpoint.unsafeApply(publish &&& bind, Settings.tcp)
 
-      implicit val batransport: Transportable[Array[Byte]] = Transportable { ba =>
-        Transported(Schemes.unknown, Versions.v1, None, None, ba)
+      implicit val batransport: Transportable[Array[Byte]] = Transportable { (ba, s) =>
+        Transported(s, Schemes.unknown, Versions.v1, None, None, ba)
       }
 
       val seq: Seq[Array[Byte]] = for(i <- 0 until 5000) yield Datapoint(Key[Double]("now/life", Units.Count: Units, "description", Map("url" -> "http://localhost")), 42.0).asJson.spaces2.getBytes
