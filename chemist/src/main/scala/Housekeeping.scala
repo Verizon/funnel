@@ -1,6 +1,7 @@
 package funnel
 package chemist
 
+import java.net.URI
 import scalaz.\/
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.{Process, time}
@@ -13,11 +14,11 @@ import scalaz.syntax.id._
 import scalaz.std.vector._
 import scalaz.std.option._
 import journal.Logger
-import java.net.{ InetSocketAddress, Socket, URI, URL }
 import TargetLifecycle.{ Investigate, TargetMessage, TargetState }
 import RepoEvent.StateChange
 
 object Housekeeping {
+  import Chemist.contact
   import Sharding._
   import concurrent.duration._
 
@@ -31,10 +32,11 @@ object Housekeeping {
    * 2. ensuring that targets that are stuck in the assigned state for more than a given 
    *    period are reaped, and re-assigned to another flask (NOT IMPLEMENTED.)
    */
-  def periodic(delay: Duration)(discovery: Discovery, repository: Repository): Process[Task,Unit] = {
+  def periodic(delay: Duration)(maxRetries: Int)(d: Discovery, r: Repository): Process[Task,Unit] = {
     time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
       for {
-        _  <- gatherUnassignedTargets(discovery, repository) <* handleInvestigating(repository)
+        _  <- gatherUnassignedTargets(d, r) <*
+              handleInvestigating(maxRetries)(r)
       } yield ()
     )
   }
@@ -115,19 +117,11 @@ object Housekeeping {
     }
   }
 
-  private def handleInvestigating(r: Repository): Task[Unit] = {
-    def contact(uri: URI): Throwable \/ Unit =
-      \/.fromTryCatchThrowable[Unit, Exception]{
-        val s = new Socket
-        // timeout in 300ms to keep the overhead reasonable
-        try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 300)
-        finally s.close // whatever the outcome, close the socket to prevent leaks.
-      }
-
+  private def handleInvestigating(maxRetries: Int)(r: Repository): Task[Unit] = {
     def go(sc: StateChange, r: Repository): Task[Unit] = {
       val i = sc.msg.asInstanceOf[Investigate]
 
-      if (i.retryCount < 6) {				// TODO: make max retries oonfigurable?
+      if (i.retryCount < maxRetries) {			// TODO: make max retries oonfigurable?
         val now = System.currentTimeMillis
         val later = i.time + math.pow(2.0, i.retryCount.toDouble).toInt.hours.toMillis
         if (now >= later) {				// Not done retrying; time to retry

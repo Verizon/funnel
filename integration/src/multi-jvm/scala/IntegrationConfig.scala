@@ -18,4 +18,5 @@ class IntegrationConfig extends PlatformConfig {
   val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
   val sharder: funnel.chemist.Sharder = RandomSharding
   val remoteFlask: RemoteFlask = new HttpFlask(http, repository, signal)
+  val maxInvestigatingRetries = 6
 }
