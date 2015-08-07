@@ -20,7 +20,7 @@ class LoggingRepository extends Repository {
 
   def addEvent(e: AutoScalingEvent): Task[Unit] = Task.now(())
   def errors: Task[Seq[Error]] = Task.now(Seq())
-  def states: Task[Map[TargetLifecycle.TargetState, Map[URI, RepoEvent.StateChange]]] = Task.now(Map.empty)
+  def states: Task[Ref[StateM]] = Task.now(new Ref[StateM](==>>()))
   def historicalPlatformEvents: Task[Seq[PlatformEvent]] = Task.now(Seq())
   def historicalRepoEvents: scalaz.concurrent.Task[Seq[funnel.chemist.RepoEvent]] = Task.now(Seq())
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit] = Task.now(())

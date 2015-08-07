@@ -137,12 +137,11 @@ object JSON {
         ("time" := new Date(t)) ->:
         ("flask" := f) ->:
         ("msg" := m) ->: jEmptyObject
-      case Investigation(target,f,m,t) =>
-        ("type" := "Investigate") ->:
+      case Investigate(target,t,c) =>
+        ("type" := "Investigating") ->:
         ("instance" := target.uri) ->:
         ("time" := new Date(t)) ->:
-        ("flask" := f) ->:
-        ("msg" := m) ->: jEmptyObject
+        ("retry-count" := c) ->: jEmptyObject
     }
 
   implicit val stateChangeToJson: EncodeJson[RepoEvent.StateChange] =

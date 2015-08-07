@@ -1,6 +1,7 @@
 package funnel
 package chemist
 
+import concurrent.duration._
 import org.scalacheck._
 import Arbitrary._
 import org.scalacheck.Prop.forAll
@@ -85,12 +86,12 @@ object RespositorySpec extends Properties("StaticRepository") with ArbitraryLife
         Problem(i, FlaskID(""), "msg", System.currentTimeMillis)
       case DoubleMonitored =>
         Confirmation(i, FlaskID(""), System.currentTimeMillis)
-      case Investigating =>
-        Investigation(i, FlaskID(""), "msg", System.currentTimeMillis)
       case Fin =>
         Terminated(i, System.currentTimeMillis)
       case Unmonitorable =>
         Terminated(i, System.currentTimeMillis)
+      case Investigating =>
+        Investigate(i, System.currentTimeMillis, 0)
     }
   }
 

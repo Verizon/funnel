@@ -72,6 +72,10 @@ object TargetLifecycle {
       override def toString = "Unmonitorable"
     }
 
+    case object Investigating extends TargetState(9) {
+      override def toString = "Investigating"
+    }
+
     case object Assigned extends TargetState(2) {
       override def toString = "Assigned"
     }
@@ -86,10 +90,6 @@ object TargetLifecycle {
 
     case object Problematic extends TargetState(7) {
       override def toString = "Problematic"
-    }
-
-    case object Investigating extends TargetState(9) {
-      override def toString = "Investigating"
     }
 
     case object DoubleMonitored extends TargetState(5) {
@@ -111,7 +111,6 @@ object TargetLifecycle {
   case object Migrate extends TargetTransition
   case object Unassign extends TargetTransition
   case object Exceptional extends TargetTransition
-  case object Investigate extends TargetTransition
   case object Unmonitor extends TargetTransition
   case object Terminate extends TargetTransition
 
@@ -153,10 +152,10 @@ object TargetLifecycle {
                           LEdge(Monitored,       Fin,             Terminate),
                           LEdge(DoubleAssigned,  Fin,             Terminate),
                           LEdge(DoubleMonitored, Fin,             Terminate),
-    			  LEdge(Problematic,     Investigating,   Investigate),
-			  LEdge(Investigating,   Assigned,        Assign),
-			  LEdge(Investigating,   Fin,             Terminate),
-                          LEdge(Monitored,       Unmonitored,     Unmonitor))
+    			  LEdge(Problematic,     Investigating,   Exceptional),
+    			  LEdge(Investigating,   Unmonitored,     Discover),
+    			  LEdge(Investigating,   Fin,             Terminate),
+    			  LEdge(Monitored,       Unmonitored,     Unmonitor))
 
   val targetLifecycle: G = mkGraph(nodes, edges)
 
@@ -187,8 +186,8 @@ object TargetLifecycle {
   case class Problem(target: Target, flask: FlaskID, msg: String, time: Long) extends TargetMessage {
     val transition = Exceptional
   }
-  case class Investigation(target: Target, flask: FlaskID, msg: String, time: Long) extends TargetMessage {
-    val transition = Investigate
+  case class Investigate(target: Target, time: Long, retryCount: Int) extends TargetMessage {
+    val transition = Exceptional
   }
   case class Terminated(target: Target, time: Long) extends TargetMessage {
     val transition = Terminate

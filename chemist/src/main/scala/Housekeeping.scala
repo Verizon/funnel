@@ -14,7 +14,8 @@ import scalaz.std.vector._
 import scalaz.std.option._
 import journal.Logger
 import java.net.{ InetSocketAddress, Socket, URI, URL }
-import TargetLifecycle._
+import TargetLifecycle.{ Investigate, TargetMessage, TargetState }
+import RepoEvent.StateChange
 
 object Housekeeping {
   import Sharding._
@@ -22,26 +23,6 @@ object Housekeeping {
 
   private lazy val log = Logger[Housekeeping.type]
   private lazy val defaultPool = Strategy.Executor(Chemist.defaultPool)
-  private def debugString(a: Any): Unit = log.debug(a.toString)
-
-  /**
-    * Try running the given process `p`, catching errors and reporting
-    * them with `maskedError`, using `schedule` to determine when further
-    * attempts are made. If `schedule` is exhausted, the error is raised.
-    * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
-    * will run `p`; if it encounters an error, it will print the error using `println`,
-    * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
-    * the error in the `Process`.
-   */
-  private[chemist] def attemptRepeatedly[A](
-    maskedError: Throwable => Unit)(
-    p: Process[Task,A])(
-    schedule: Process[Task,Unit]): Process[Task,A] = {
-    val step: Process[Task, Throwable \/ A] =
-      p.append(schedule.kill).attempt(e => Process.eval { Task.delay { maskedError(e); e }})
-    val retries: Process[Task, Throwable \/ A] = schedule.zip(step.repeat).map(_._2)
-    (step ++ retries).last.flatMap(_.fold(Process.fail, Process.emit))
-  }
 
   private[chemist] def contact(uri: URI): Throwable \/ Unit =
     \/.fromTryCatchThrowable[Unit, Exception]{
@@ -51,8 +32,6 @@ object Housekeeping {
       finally s.close // whatever the outcome, close the socket to prevent leaks.
     }
 
-  private[chemist] val iSchedule: Process[Task, Unit] = Process.iterate(1)(_ * 2).take(6).flatMap(t => time.sleep(t.hours)(defaultPool, Chemist.schedulingPool) ++ Process.emit(()))
-
   /**
    * This is a collection of the tasks that are needed to run on a periodic basis.
    * Specifically this involves the following:
@@ -61,34 +40,12 @@ object Housekeeping {
    *    period are reaped, and re-assigned to another flask (NOT IMPLEMENTED.)
    */
   def periodic(delay: Duration)(discovery: Discovery, repository: Repository): Process[Task,Unit] = {
-    def fail(t: Target) = 
-      Process.eval(
-        Task.delay(
-          repository.platformHandler(PlatformEvent.TerminatedTarget(t.uri))
-        )
-      )
-
-    def succeed(t: Target) =
-      fail(t) ++
-      Process.eval(
-        Task.delay(
-          repository.platformHandler(PlatformEvent.NewTarget(t))
-        )
-      )
-
-    def reachOut(t: Target) = Process.eval(Task.fromDisjunction(contact(t.uri))) ++ succeed(t)
-
     time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
       for {
         _  <- gatherUnassignedTargets(discovery, repository)
-
-        ts <- repository.states.map(_.apply(TargetState.Investigating).values.toSeq.map(_.msg.target))
-        _  <- Task.gatherUnordered(
-          ts.map(t => attemptRepeatedly(debugString)(reachOut(t))(iSchedule).onFailure(e => fail(t)).run)
-        )
+        _  <- handleInvestigating(repository)
       } yield ()
     )
-
   }
 
   /**
@@ -165,5 +122,61 @@ object Housekeeping {
         }
       }
     }
+  }
+
+  private def handleInvestigating(r: Repository): Task[Unit] = {
+    import internals._
+    import r.StateM
+
+    def contact(uri: URI): Throwable \/ Unit =
+      \/.fromTryCatchThrowable[Unit, Exception]{
+        val s = new Socket
+        // timeout in 300ms to keep the overhead reasonable
+        try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 300)
+        finally s.close // whatever the outcome, close the socket to prevent leaks.
+      }
+
+
+    def go(i: Investigate, smr: Ref[StateM]): Task[Unit] = {
+      if (i.retryCount < 6) {				// TODO: make max retries oonfigurable?
+        val now = System.currentTimeMillis
+        val later = i.time + math.pow(2.0, i.retryCount.toDouble).toInt.hours.toMillis
+        if (now >= later) {				// Not done retrying; time to retry
+          Task.fromDisjunction(contact(i.target.uri)).onFinish { ot => ot match {
+            case Some(t) => Task.delay {		// Retry failed with Throwable t
+              log.debug(s"Failed retrying target ${i.target} for the ${i.retryCount}th time, with Throwable $t")
+              val nm = Investigate(i.target, now, i.retryCount + 1)
+              smr.update(				// Update a Ref to a Map of a Map to a case class
+                _.update(TargetState.Investigating,
+                  im => Some(im.update(i.target.uri,
+                    sc => Some(sc.copy(msg = nm))
+                  ))
+                )
+              )
+            }
+            case None    => Task.delay {		// Retry succeeded; 
+              log.debug(s"Succeeded retrying target ${i.target} for the ${i.retryCount}th time")
+              r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri))
+              r.platformHandler(PlatformEvent.NewTarget(i.target))
+            }
+          }}
+        } else {					// Not done retrying but not time to retry yet
+          Task.delay {
+            log.debug(s"Target ${i.target} is being investigated, but it's not time to retry it right now")
+          }
+        }
+      } else {						// Too many retries; ultimate failure
+        Task.delay {
+          log.debug(s"Target ${i.target} was retried too many times and is being terminated")
+          r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri))
+        }
+      }
+    }
+
+    for {
+      smr  <- r.states
+      msgs  = smr.get.lookup(TargetState.Investigating).get.values.map(_.msg.asInstanceOf[Investigate])
+      _    <- Task.gatherUnordered(msgs.map(go(_, smr)))
+    } yield ()
   }
 }
