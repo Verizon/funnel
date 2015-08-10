@@ -74,7 +74,7 @@ object Telemetry extends TelemetryCodecs {
     def go(previousFrame: Option[Serial]): Process1[Transported, MissingFrame \/ Transported] =
       Process.await1[Transported] flatMap { x => Process.emit {
         previousFrame.map { f =>
-          if (f == x.serial)
+          if (f + 1 == x.serial)
             right(x)
           else
             left(MissingFrame(f, x.serial))
