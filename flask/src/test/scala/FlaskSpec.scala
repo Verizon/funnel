@@ -159,7 +159,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       {
         "cluster": "datapoints-1.0-us-east",
         "urls": [
-          ${(1024 until 1025).map(p => "\"http://localhost:" + p + "/stream/now\"").mkString(",\n")}
+          ${(1024 until 1025).map(p => "\"http://localhost:" + p + "/stream/previous\"").mkString(",\n")}
         ]
       }
     ]
