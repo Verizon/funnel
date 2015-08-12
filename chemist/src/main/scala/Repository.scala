@@ -89,7 +89,7 @@ class StatefulRepository extends Repository {
   private val D = new Ref[Distribution](Distribution.empty)
 
   /**
-   * stores a key-value map of instance-id -> host
+   * stores a key-value map of uri -> state-change
    */
   val targets = new Ref[InstanceM](==>>.empty)
   val flasks  = new Ref[FlaskM](==>>.empty)
