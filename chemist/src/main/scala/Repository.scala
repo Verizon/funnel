@@ -209,7 +209,7 @@ class StatefulRepository extends Repository {
           val target = targets.get.lookup(i)
           target.map { t =>
             // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
-            lifecycle(TargetLifecycle.Investigate(t.msg.target, System.currentTimeMillis, 0), t.to)
+            lifecycle(TargetLifecycle.Unmonitoring(t.msg.target, f, System.currentTimeMillis), t.to)
           } getOrElse {
             // if we didn't even know about the target, what do we do? start monitoring it? nothing?
             Task.now(log.info(s"platformHandler -- encounterd an unknown target: $i"))
@@ -221,7 +221,7 @@ class StatefulRepository extends Repository {
           val target = targets.get.lookup(i)
           target.map { t =>
             // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
-            lifecycle(TargetLifecycle.Problem(t.msg.target, f, msg, System.currentTimeMillis), t.to)
+            lifecycle(TargetLifecycle.Investigate(t.msg.target, System.currentTimeMillis, 0), t.to)
           } getOrElse {
             // if we didn't even know about the target, what do we do? start monitoring it? nothing?
             Task.now(())
