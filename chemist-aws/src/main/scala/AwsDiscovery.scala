@@ -196,7 +196,7 @@ class AwsDiscovery(
      * LAN-ACLs, firewalls etc.
      */
     for {
-      a <- Task(contact(instance.location.uri))(Chemist.defaultPool)
+      a <- Task(contact(instance.location.uri))(Chemist.serverPool)
       b <- a.fold(e => Task.fail(e), o => Task.now(o))
     } yield instance
   }
@@ -269,7 +269,7 @@ class AwsDiscovery(
    * host that chemist should be able to find the admin telemetry socket. Only valid
    * protocol is `tcp` for a zeromq PUB socket.
    */
-  private def fromAWSInstance(in: AWSInstance): String \/ AwsInstance = {
+  private[aws] def fromAWSInstance(in: AWSInstance): String \/ AwsInstance = {
     import LocationIntent._
 
     val machineTags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
