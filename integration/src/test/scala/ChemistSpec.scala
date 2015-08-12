@@ -33,7 +33,9 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   val (options, cfg) = config.flatMap { cfg =>
     val name             = cfg.lookup[String]("flask.name")
-    val cluster           = cfg.lookup[String]("flask.cluster")
+    val cluster          = cfg.lookup[String]("flask.cluster")
+    val retriesDuration  = cfg.require[Duration]("flask.schedule.duration")
+    val maxRetries       = cfg.require[Int]("flask.schedule.retries")
     val elasticURL       = cfg.lookup[String]("flask.elastic-search.url")
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
@@ -49,7 +51,7 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       ElasticCfg(_, _, _, elasticDf, "foo", None, _))
     val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
     val telemetry        = cfg.lookup[Int]("flask.network.telemetry-port").getOrElse(7390)
-    Task((Options(name, cluster, elastic, riemann, port, None, telemetry), cfg))
+    Task((Options(name, cluster, retriesDuration, maxRetries, elastic, riemann, port, None, telemetry), cfg))
   }.run
 
   val flaskUrl = url(s"http://localhost:${options.funnelPort}/mirror").setContentType("application/json", "UTF-8")

@@ -20,7 +20,9 @@ object Main {
 
   val (options, cfg) = config.flatMap { cfg =>
     val name             = cfg.lookup[String]("flask.name")
-    val cluster           = cfg.lookup[String]("flask.cluster")
+    val cluster          = cfg.lookup[String]("flask.cluster")
+    val retriesDuration  = cfg.require[Duration]("flask.schedule.duration")
+    val maxRetries       = cfg.require[Int]("flask.schedule.retries")
     val elasticURL       = cfg.lookup[String]("flask.elastic-search.url")
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
@@ -41,7 +43,7 @@ object Main {
     val metricTTL        = cfg.lookup[Duration]("flask.metric-ttl")
     val telemetryPort    = cfg.require[Int]("flask.network.telemetry-port")
 
-    Task((Options(name, cluster, elastic, riemann, httpPort, metricTTL, telemetryPort), cfg))
+    Task((Options(name, cluster, retriesDuration, maxRetries, elastic, riemann, httpPort, metricTTL, telemetryPort), cfg))
   }.run
 
   val I = new Instruments(1.minute)
