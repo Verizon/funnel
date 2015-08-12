@@ -21,7 +21,9 @@ object Fixtures {
     .withPublicDnsName(publicDns)
     .withTags(tags.map { case (k,v) => new Tag(k,v) }:_*)
 
-  val defaultTemplates = List(LocationTemplate("http://@host:@port/stream/previous"))
+  val defaultTemplates =
+    LocationTemplate("http://@host:@port/stream/previous") ::
+    LocationTemplate("http://@host:@port/stream/now?kind=traffic") :: Nil
 
   val instances: Seq[EC2Instance] =
     instance("i-dx947af7") ::
@@ -38,7 +40,7 @@ object Fixtures {
       port = 5775,
       datacenter = "local",
       protocol = NetworkScheme.Http,
-      intent = LocationIntent.Supervision,
+      intent = LocationIntent.Mirroring,
       templates = defaultTemplates)
 
   val telemetryLocalhost: Location =

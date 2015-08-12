@@ -560,11 +560,12 @@ object Monitoring {
     maskedError: Throwable => Unit)(
     p: Process[Task,A])(
     schedule: Process[Task,Unit]): Process[Task,A] = {
-    val S = Strategy.Executor(Monitoring.defaultPool)
     val step: Process[Task, Throwable \/ A] =
       p.append(schedule.kill).attempt(e => Process.eval { Task.delay { maskedError(e); e }})
-    val retries: Process[Task, Throwable \/ A] = schedule.zip(step.repeat).map(_._2)
-    (step ++ retries).last.flatMap(_.fold(Process.fail, Process.emit))
+    step.stripW ++ schedule.terminated.flatMap {
+      case None => step.flatMap(_.fold(Process.fail, Process.emit))
+      case Some(_) => step.stripW
+    }
   }
 
   private[funnel] def formatURI(uri: URI): String = {

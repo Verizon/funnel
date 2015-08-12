@@ -39,7 +39,8 @@ case class AwsConfig(
   commandTimeout: Duration,
   includeVpcTargets: Boolean,
   sharder: Sharder,
-  classifier: Classifier[AwsInstance]
+  classifier: Classifier[AwsInstance],
+  maxInvestigatingRetries: Int
 ) extends PlatformConfig {
 
   val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, classifier, templates)
@@ -68,6 +69,7 @@ object AwsConfig {
     val usevpc    = cfg.lookup[Boolean]("chemist.include-vpc-targets").getOrElse(false)
     val sharding  = cfg.lookup[String]("chemist.sharding-strategy")
     val classifiy = cfg.lookup[String]("chemist.classification-stratagy")
+    val retries   = cfg.require[Int]("chemist.max-investigating-retries")
     AwsConfig(
       templates 		= templates.map(LocationTemplate),
       network           = readNetwork(network),
@@ -80,8 +82,9 @@ object AwsConfig {
       sharder           = readSharder(sharding),
       classifier        = readClassifier(classifiy),
       commandTimeout    = timeout,
-      includeVpcTargets = usevpc,
-      machine           = readMachineConfig(cfg)
+      includeVpcTargets       = usevpc,
+      machine                 = readMachineConfig(cfg),
+      maxInvestigatingRetries = retries
     )
   }
 

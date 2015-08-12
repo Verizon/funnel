@@ -3,7 +3,7 @@ package chemist
 
 import knobs.{loadImmutable,Required,FileResource,ClassPathResource}
 import java.io.File
-import java.net.URI
+import java.net.{ InetSocketAddress, Socket, URI, URL }
 import journal.Logger
 import oncue.svc.funnel.BuildInfo
 import scalaz.{\/,-\/,\/-,Kleisli}
@@ -175,5 +175,12 @@ object Chemist {
   val schedulingPool: ScheduledExecutorService =
     Executors.newScheduledThreadPool(2, daemonThreads("chemist-scheduled-tasks"))
 
+  def contact(uri: URI): Throwable \/ Unit =
+    \/.fromTryCatchThrowable[Unit, Exception]{
+      val s = new Socket
+      // timeout in 300ms to keep the overhead reasonable
+      try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 300)
+      finally s.close // whatever the outcome, close the socket to prevent leaks.
+    }
 }
 

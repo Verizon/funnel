@@ -15,12 +15,17 @@ chemist {
 
   command-timeout = 2 seconds
 
+  # the maximum number of times that chemist will try to investigate
+  # a downed node. The mode of investigation is exponentially backs-off
+  # so be sure to set this to a reasoanble value.
+  max-investigating-retries = 6
+
   sns-topic-name = "ops-chemist"
   sqs-queue-name = "ops-chemist"
 
   target-resource-templates = [
     "http://@host:@port/stream/previous",
-    # "http://@host:@port/stream/now?type='String'",
+    "http://@host:@port/stream/now?kind=traffic",
     "zeromq+tcp://@host:@port/previous"
   ]
 }

@@ -70,7 +70,7 @@ object Server {
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
-    Housekeeping.periodic(15.minutes)(disco, repo).run.runAsync {
+    Housekeeping.periodic(15.minutes)(platform.config.maxInvestigatingRetries)(disco, repo).run.runAsync {
       case -\/(err) =>
         log.error(s"Failed running the periodic housekeeping tasks. Error was: $err")
         err.printStackTrace

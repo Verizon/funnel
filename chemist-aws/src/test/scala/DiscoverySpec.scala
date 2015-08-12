@@ -9,7 +9,7 @@ import zeromq.TCP
 
 class DiscoverySpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   val t1 = Some("http://@host:5555/stream/previous")
-  val t2 = Some("http://@host:@port/stream/now?type='String'")
+  val t2 = Some("http://@host:@port/stream/now?kind=traffic")
   val t3 = Some("zeromq+tcp://@host:7390/")
 
   val allTemplates = (t1 :: t2 :: t3 :: Nil).map(x => LocationTemplate(x.get))

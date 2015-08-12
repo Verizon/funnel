@@ -12,4 +12,5 @@ trait PlatformConfig {
   def remoteFlask: RemoteFlask
   def http: Http
   def election: ElectionStrategy
+  def maxInvestigatingRetries: Int
 }

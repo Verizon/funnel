@@ -14,4 +14,5 @@ class TestConfig extends PlatformConfig {
   def http: dispatch.Http = ???
   val sharder: Sharder = RandomSharding
   def election: ElectionStrategy = ???
+  val maxInvestigatingRetries = 6
 }

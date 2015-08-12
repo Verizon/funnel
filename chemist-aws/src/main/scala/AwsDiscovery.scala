@@ -35,6 +35,7 @@ class AwsDiscovery(
   resourceTemplates: Seq[LocationTemplate],
   cacheMaxSize: Int = 2000
 ) extends Discovery {
+  import Chemist.contact
 
   type AwsInstanceId = String
 
@@ -229,16 +230,8 @@ class AwsDiscovery(
      * This mainly guards against miss-configuration of the network setup,
      * LAN-ACLs, firewalls etc.
      */
-    def go(uri: URI): Throwable \/ Unit =
-      \/.fromTryCatchThrowable[Unit, Exception]{
-        val s = new Socket
-        // timeout in 300ms to keep the overhead reasonable
-        try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 300)
-        finally s.close // whatever the outcome, close the socket to prevent leaks.
-      }
-
     for {
-      a <- Task(go(instance.location.uri))(Chemist.defaultPool)
+      a <- Task(contact(instance.location.uri))(Chemist.serverPool)
       b <- a.fold(e => Task.fail(e), o => Task.now(o))
     } yield instance
   }
@@ -312,7 +305,7 @@ class AwsDiscovery(
    * host that chemist should be able to find the admin telemetry socket. Only valid
    * protocol is `tcp` for a zeromq PUB socket.
    */
-  private def fromAWSInstance(in: AWSInstance): String \/ AwsInstance = {
+  private[aws] def fromAWSInstance(in: AWSInstance): String \/ AwsInstance = {
     import LocationIntent._
 
     val machineTags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
