@@ -2,7 +2,7 @@ package funnel
 package agent
 
 import knobs._
-import java.net.{URI, URL}
+import java.net.URI
 import java.io.File
 import journal.Logger
 import scalaz.{\/,-\/,\/-}
@@ -194,7 +194,7 @@ object Main {
     // start the mesos statistics importer
     options.mesos.foreach { n =>
       log.info(s"Launching the mesos statistics collection from ${n.uri}.")
-      mesos.Import.periodically(new URL(n.uri), n.queries, n.checkfield, n.name)(I)(n.frequency).run.runAsync {
+      mesos.Import.periodically(new URI(n.uri), n.queries, n.checkfield, n.name)(I)(n.frequency).run.runAsync {
         case -\/(e) => log.error("Fatal error with the mesos import from ${n.uri}")
         case _      => ()
       }

@@ -8,7 +8,7 @@ import journal.Logger
 
 import scala.util.matching.Regex
 import scalaz._
-import java.net.{URI,URL}
+import java.net.URI
 import scala.io.Source
 import scalaz.stream.{ Process, time }
 import scalaz.concurrent.{Task,Strategy}
@@ -30,7 +30,7 @@ object Import {
    * See the configuration agent.cfg for details on specifiying queries
    */
   def periodically(
-                    url: URL,
+                    url: URI,
                     queries: List[String],
                     checkfield: String,
                     cluster: String
@@ -46,7 +46,7 @@ object Import {
    * See the configuration agent.cfg for details on specifiying queries
    */
   def now(
-           url: URL,
+           url: URI,
            queries: List[String],
            checkfield: String,
            cluster: String
@@ -59,11 +59,11 @@ object Import {
     } yield ()
   }
 
-  private[this] def fetch(url: URL): Task[String] =
-    Task.now(Source.fromInputStream(url.openConnection.getInputStream).mkString)
+  private[this] def fetch(url: URI): Task[String] =
+    Task.now(Source.fromInputStream(url.toURL.openConnection.getInputStream).mkString)
 
 
-  def fetch(url: URL, queries: List[String], checkfield: String): Task[Seq[ArbitraryMetric]] =  {
+  def fetch(url: URI, queries: List[String], checkfield: String): Task[Seq[ArbitraryMetric]] =  {
    fetch(url).map(jsonString => {fetch(jsonString, queries, checkfield)}.get).handleWith {
      case NonFatal(e) =>
        log.error(s"An error occoured with the mesos import from $url")
