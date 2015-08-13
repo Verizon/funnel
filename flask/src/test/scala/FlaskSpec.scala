@@ -2,17 +2,15 @@ package funnel
 package flask
 
 import scala.concurrent.duration._
+import scalaz.\/-
 import scalaz.concurrent.{Strategy,Task}
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
 import org.scalatest.OptionValues._
-import scalaz.stream.Process
-import Process._
+import scalaz.stream._
 import scalaz.stream.async.signalOf
 import scalaz.stream.async.mutable.Signal
-import scalaz.stream.time.{ awakeEvery, sleep }
-import scalaz.stream.wye
 import argonaut._, Argonaut._
 import journal.Logger
 import funnel.elastic._
@@ -53,9 +51,12 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     Task((Options(name, cluster, elastic, riemann, port), cfg))
   }.run
 
-  val flaskUrl = url(s"http://localhost:${options.funnelPort}/mirror").setContentType("application/json", "UTF-8")
+  val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
 
   val log = Logger[this.type]
+
+  val S = Strategy.Executor(Monitoring.serverPool)
+  val P = Monitoring.schedulingPool
 
   private def makeMS(port: Int): (Counter, MonitoringServer) = {
     val L = ((s: String) => log.debug(s))
@@ -86,20 +87,20 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
       val E = Endpoint.unsafeApply(publish &&& bind, Settings.tcp)
 
-      implicit val batransport: Transportable[Array[Byte]] = Transportable { ba =>
-        Transported(Schemes.unknown, Versions.v1, None, None, ba)
+      implicit val batransport: Transportable[Array[Byte]] = Transportable { (ba, s) =>
+        Transported(s, Schemes.unknown, Versions.v1, None, None, ba)
       }
 
       val seq: Seq[Array[Byte]] = for(i <- 0 until 5000) yield Datapoint(Key[Double]("now/life", Units.Count: Units, "description", Map("url" -> "http://localhost")), 42.0).asJson.spaces2.getBytes
       val k: Seq[Boolean] = seq.map(_ => true) ++ Seq(false)
 
-      val proc: Process[Task, Array[Byte]] = Process.emitAll(seq) fby Process.eval_(ready.set(true))
+      val proc: Process[Task, Array[Byte]] = Process.emitAll(seq) ++ Process.eval_(ready.set(true))
       val alive: Process[Task, Boolean] = Process.emitAll(k)
 
       val app = new Flask(options, new Instruments(1.minute))
 
       app.run(Array())
-      Http(flaskUrl << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)
+      Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
 
       app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete.sleepUntil(ready.discrete.once).once.runLast.map(_.get).runAsync { d =>
         d.fold (
@@ -131,24 +132,64 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     ]
     """
 
-    val S = Strategy.Executor(Monitoring.serverPool)
-    val P = Monitoring.schedulingPool
-
     val app = new Flask(options, new Instruments(1.minute))
 
     app.run(Array())
-    Http(flaskUrl << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)
+    Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
     Thread.sleep(1000)
 
     val (cs, ss) = ms.unzip
     (0 until n by 2) foreach(i => Process.repeatEval(Task(cs(i).increment)).run.runAsync(_ => ()))
     (1 until n by 2) foreach(i => ss(i).stop)
 
-    val waitACouple = sleep(2.minutes)(S, P) fby emit(true)
+    val waitACouple = time.sleep(2.minutes)(S, P) ++ Process.emit(true)
 
     val mds: Process[Task, Double] = app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete
     val mdChanges: Process[Task, Double] = waitACouple.wye(mds)(wye.interrupt)(S)
     val changes: IndexedSeq[Double] = mdChanges.runLog.run
     changes should not be empty
+
+    app.S.stop()
+    ms.foreach(_._2.stop())
+  }
+
+  "An endpoint dying from under Flask" should "result in an empty sources list" in {
+    val payload = s"""
+    [
+      {
+        "cluster": "datapoints-1.0-us-east",
+        "urls": [
+          ${(1024 until 1025).map(p => "\"http://localhost:" + p + "/stream/previous\"").mkString(",\n")}
+        ]
+      }
+    ]
+    """
+    val (c, ms) = makeMS(1024)					// Counter and MonitoringServer
+    val s = signalOf(true)(S)					// Signal indicating liveness of Counter
+    val b = s.continuous.zip(
+      Process.eval(
+        Task.delay(c.increment)
+      ).repeat
+    )								// Increment Counter until Signal closed
+    val k = b.take(1000) ++
+      Process.eval(
+        Task.delay {
+          ms.stop
+          s.close
+        }
+      ) ++
+      time.sleep((6 * 30 + 10).seconds)(S, P)			// Increment 1,000 times, die, and timeout
+
+    val app = new Flask(options, new Instruments(1.minute))
+
+    app.run(Array())
+    Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
+    Thread.sleep(1000)						// Let Flask mirroring catch up
+
+    k.run.run							// Bang on the Counter, die, and sleep
+
+    val r = Http(flaskUrl / "sources" OK as.String)(concurrent.ExecutionContext.Implicits.global)()
+    val sources = Parse.parse(r)
+    sources should === (\/-(jEmptyArray))
   }
 }

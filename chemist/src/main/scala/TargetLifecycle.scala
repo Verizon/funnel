@@ -72,6 +72,10 @@ object TargetLifecycle {
       override def toString = "Unmonitorable"
     }
 
+    case object Investigating extends TargetState(9) {
+      override def toString = "Investigating"
+    }
+
     case object Assigned extends TargetState(2) {
       override def toString = "Assigned"
     }
@@ -124,7 +128,8 @@ object TargetLifecycle {
                           DoubleAssigned.node,
                           DoubleMonitored.node,
                           Problematic.node,
-                          Fin.node)
+    			  Investigating.node,
+    			  Fin.node)
 
                                 // From          // To             // Msg
   val edges: Seq[M] = Seq(LEdge(Unknown,         Unmonitored,     Discover),
@@ -147,8 +152,10 @@ object TargetLifecycle {
                           LEdge(Monitored,       Fin,             Terminate),
                           LEdge(DoubleAssigned,  Fin,             Terminate),
                           LEdge(DoubleMonitored, Fin,             Terminate),
-                          LEdge(Problematic,     Fin,             Terminate),
-                          LEdge(Monitored,       Unmonitored,     Unmonitor))
+    			  LEdge(Problematic,     Investigating,   Exceptional),
+    			  LEdge(Investigating,   Unmonitored,     Discover),
+    			  LEdge(Investigating,   Fin,             Terminate),
+    			  LEdge(Monitored,       Unmonitored,     Unmonitor))
 
   val targetLifecycle: G = mkGraph(nodes, edges)
 
@@ -177,6 +184,9 @@ object TargetLifecycle {
     val transition = Unmonitor
   }
   case class Problem(target: Target, flask: FlaskID, msg: String, time: Long) extends TargetMessage {
+    val transition = Exceptional
+  }
+  case class Investigate(target: Target, time: Long, retryCount: Int) extends TargetMessage {
     val transition = Exceptional
   }
   case class Terminated(target: Target, time: Long) extends TargetMessage {

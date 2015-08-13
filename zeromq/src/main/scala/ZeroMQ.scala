@@ -74,9 +74,11 @@ object ZeroMQ {
    * assumes that there is a message framing system like this:
    *
    * +---------------+
-   * |     Header    |
+   * |     Header    |
    * +---------------+
-   * |      Body     |
+   * |   Serial No.  |
+   * +---------------+
+   * |      Body     |
    * +---------------+
    *
    * If another framing stratagy is needed, another can easily be created by user-level
@@ -85,8 +87,9 @@ object ZeroMQ {
   def receive(socket: Socket): Process[Task, Transported] = {
     Process.eval(Task.delay {
       val header: Array[Byte] = socket.recv
+      val serial: Array[Byte] = socket.recv
       val body: Array[Byte]   = socket.recv
-      Transported(new String(header), body)
+      Transported(new String(header), new String(serial).toInt, body)
     }) ++ receive(socket)
   }
 
@@ -100,15 +103,9 @@ object ZeroMQ {
    * write any A for which we have a [[Transportable]] instance
    */
   def write[A](socket: Socket)(implicit T: Transportable[A]): Channel[Task, A, Boolean] =
-    channel.lift { a =>
-      Task.delay {
-        val t = T(a)
-        socket.sendMore(t.header)
-        socket.send(t.bytes, 0)
-      }
-    }
-
-//    writeTrans(socket).contramap[A](T.apply)
+    writeTrans(socket)
+      .zip(Process.iterate(0)(_ + 1))
+      .map { case (f,s) => a => f(T(a,s))}
 
   /**
    * An internal method for writing a Transported message
@@ -117,11 +114,11 @@ object ZeroMQ {
     channel.lift { t =>
       Task.delay {
         socket.sendMore(t.header)
+        socket.sendMore(t.serial.toString)
         socket.send(t.bytes, 0)
       }
     }
   }
-
 
   /////////////////////////////// INTERNALS ///////////////////////////////////
 

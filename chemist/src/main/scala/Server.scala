@@ -39,16 +39,17 @@ object Server {
     repo.lifecycle()
     RepoEventsStream.green
 
-    val c: Process[Task, RepoCommand] = repo.repoCommands.append(Process.eval_(Task.delay(RepoEventsStream.red)))
+    val c: Process[Task, RepoCommand] = repo.repoCommands
     val l: Process[Task, Unit] = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _))
     val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
       log.error(s"Error processing repo events: $err")
-      Process.eval_(Task.delay(RepoEventsStream.red))
+      Process.eval_(Task.delay(RepoEventsStream.yellow))
     }
     a.stripW.run.runAsync {
       case -\/(err) =>
         log.error(s"Error starting processing of Platform events: $err")
         err.printStackTrace
+        RepoEventsStream.red
 
       case \/-(t)   => log.info(s"result of platform processing $t")
     }
@@ -69,7 +70,7 @@ object Server {
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
-    Housekeeping.periodic(15.minutes)(disco, repo).run.runAsync {
+    Housekeeping.periodic(15.minutes)(platform.config.maxInvestigatingRetries)(disco, repo).run.runAsync {
       case -\/(err) =>
         log.error(s"Failed running the periodic housekeeping tasks. Error was: $err")
         err.printStackTrace

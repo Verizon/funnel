@@ -32,6 +32,8 @@ class LoggingRepository extends Repository {
 
   def targetState(instanceId: URI): TargetState = Unknown
 
+  def updateState(instanceId: URI, state: TargetState, change: RepoEvent.StateChange): Task[Unit] = Task.now(())
+
   def instance(id: URI): Option[Target] = all.get.lookup(id).map(_.msg.target)
 
   def countTask[A](i: AtomicInteger, t: Task[A]): Task[A] = t.onFinish { _ =>

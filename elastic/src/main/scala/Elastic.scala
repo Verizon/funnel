@@ -72,11 +72,19 @@ object ElasticCfg {
 
 case class Elastic(M: Monitoring) {
   type SourceURL = String
+  type ExperimentID = String
+  type GroupID = String
   type Window = String
   type Path = List[String]
 
-  /** Data points grouped by mirror URL and key */
-  type ESGroup[A] = Map[(String, Option[SourceURL]), Map[Path, Datapoint[A]]]
+  /**
+   * Data points grouped by mirror URL, experiment ID, experiment group,
+   * and grouping key from config
+   */
+  type ESGroup[A] = Map[(String,
+                         Option[SourceURL],
+                         Option[ExperimentID],
+                         Option[GroupID]), Map[Path, Datapoint[A]]]
 
   import Process._
   import scalaz.concurrent.Task
@@ -94,9 +102,11 @@ case class Elastic(M: Monitoring) {
         case Some(pt) =>
           val name = pt.key.name
           val source = pt.key.attributes.get(AttributeKeys.source)
-          val group = groups.find(name startsWith _) getOrElse ""
-          val k = name.drop(group.length).split("/").toList.filterNot(_ == "")
-          val host = (group, source)
+          val experimentID = pt.key.attributes.get(AttributeKeys.experimentID)
+          val experimentGroup = pt.key.attributes.get(AttributeKeys.experimentGroup)
+          val grouping = groups.find(name startsWith _) getOrElse ""
+          val k = name.drop(grouping.length).split("/").toList.filterNot(_ == "")
+          val host = (grouping, source, experimentID, experimentGroup)
           m.get(host) match {
             case Some(g) => g.get(k) match {
               case Some(_) =>
@@ -166,8 +176,23 @@ case class Elastic(M: Monitoring) {
 
   type ES[A] = Kleisli[Task, ElasticCfg, A]
 
-  def elasticString(req: Req): ES[String] =
-    getConfig.flatMapK(c => fromScalaFuture(c.http(req OK as.String)))
+  /** sadly required as dispatch has a very naieve error handler by default,
+      and in this case we're looking to output the body of the response to the log
+      in order to help with debugging in the event documents were not able to be
+      submitted to the backend. Should function exactly like the default impl
+      with the addition of the logging. */
+  val handler = new FunctionHandler[String]({ resp =>
+    val status = resp.getStatusCode
+    if((status / 100) == 2) resp.getResponseBody
+    else {
+      M.log.error(s"Backend returned a code ${resp.getStatusCode} failure. Body response was: ${resp.getResponseBody}")
+      throw StatusCode(status)
+    }
+  })
+
+  def elasticString(req: Req): ES[String] = {
+    getConfig.flatMapK(c => fromScalaFuture(c.http(req > handler)))
+  }
 
   // Not in Scalaz until 7.2 so duplicating here
   def lower[M[_]:Monad,A,B](k: Kleisli[M,A,B]): Kleisli[M,A,M[B]] =
