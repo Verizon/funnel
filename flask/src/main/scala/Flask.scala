@@ -35,9 +35,12 @@ class Flask(options: Options, val I: Instruments) {
 
   val log = Logger[this.type]
 
-  val mirrorDatapoints = I.counter("mirror/datapoints")
+  val Selfie = Monitoring.instance
+  val ISelfie = new Instruments(1.minute, Selfie)
+  val mirrorDatapoints = ISelfie.counter("mirror/datapoints")
 
   val S = MonitoringServer.start(I.monitoring, options.funnelPort)
+  val SelfServing = MonitoringServer.start(ISelfie.monitoring, options.selfiePort)
 
   lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)(Strategy.Executor(Monitoring.serverPool))
 
@@ -75,6 +78,20 @@ class Flask(options: Options, val I: Instruments) {
 
     def countDatapoints: Sink[Task, Datapoint[Any]] =
       channel.lift(_ => Task(mirrorDatapoints.increment))
+
+
+    // Determine whether to generate system statistics for the local host
+    for {
+      b <- options.collectLocalMetrics
+      t <- options.localMetricFrequency
+    }{
+      implicit val duration = t.seconds
+      Sigar(ISelfie).foreach { s =>
+        s.instrument
+      }
+      JVM.instrument(ISelfie)
+      Clocks.instrument(ISelfie)
+    }
 
     val Q = async.unboundedQueue[Telemetry](Strategy.Executor(funnel.Monitoring.serverPool))
 

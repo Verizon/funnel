@@ -50,7 +50,11 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val elastic          = (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
       ElasticCfg(_, _, _, elasticDf, "foo", None, _))
     val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
-    Task((Options(name, cluster, retriesDuration, maxRetries, elastic, riemann, port), cfg))
+    val selfiePort       = cfg.lookup[Int]("flask.network.selfie-port").getOrElse(7557)
+    val collectLocal     = cfg.lookup[Boolean]("flask.collect-local-metrics")
+    val localFrequency   = cfg.lookup[Int]("flask.local-metric-frequency")
+
+    Task((Options(name, cluster, retriesDuration, maxRetries, elastic, riemann, collectLocal, localFrequency, port), cfg))
   }.run
 
   val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
@@ -99,12 +103,13 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       val proc: Process[Task, Array[Byte]] = Process.emitAll(seq) ++ Process.eval_(ready.set(true))
       val alive: Process[Task, Boolean] = Process.emitAll(k)
 
-      val app = new Flask(options, new Instruments(1.minute))
+      val is = new Instruments(1.minute)
+      val app = new Flask(options, is)
 
       app.run(Array())
       Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
 
-      app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete.sleepUntil(ready.discrete.once).once.runLast.map(_.get).runAsync { d =>
+      app.ISelfie.monitoring.get(app.mirrorDatapoints.keys.now).discrete.sleepUntil(ready.discrete.once).once.runLast.map(_.get).runAsync { d =>
         d.fold (
           t =>
           throw t,
@@ -117,6 +122,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
         proc.through(Ø.write(socket))).runFoldMap(identity).run
 
       app.S.stop()
+      app.SelfServing.stop()
     }
   }
 
@@ -134,7 +140,8 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     ]
     """
 
-    val app = new Flask(options, new Instruments(1.minute))
+    val is = new Instruments(1.minute)
+    val app = new Flask(options, is)
 
     app.run(Array())
     Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
@@ -146,12 +153,13 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val waitACouple = time.sleep(2.minutes)(S, P) ++ Process.emit(true)
 
-    val mds: Process[Task, Double] = app.I.monitoring.get(app.mirrorDatapoints.keys.now).discrete
+    val mds: Process[Task, Double] = app.ISelfie.monitoring.get(app.mirrorDatapoints.keys.now).discrete
     val mdChanges: Process[Task, Double] = waitACouple.wye(mds)(wye.interrupt)(S)
     val changes: IndexedSeq[Double] = mdChanges.runLog.run
     changes should not be empty
 
     app.S.stop()
+    app.SelfServing.stop()
     ms.foreach(_._2.stop())
   }
 
@@ -182,7 +190,8 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       ) ++
       time.sleep((6 * 30 + 10).seconds)(S, P)			// Increment 1,000 times, die, and timeout
 
-    val app = new Flask(options, new Instruments(1.minute))
+    val is = new Instruments(1.minute)
+    val app = new Flask(options, is)
 
     app.run(Array())
     Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
@@ -191,6 +200,8 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     k.run.run							// Bang on the Counter, die, and sleep
 
     val r = Http(flaskUrl / "sources" OK as.String)(concurrent.ExecutionContext.Implicits.global)()
+    app.S.stop()
+    app.SelfServing.stop()
     val sources = Parse.parse(r)
     sources should === (\/-(jEmptyArray))
   }
