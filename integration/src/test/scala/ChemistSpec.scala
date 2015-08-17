@@ -34,8 +34,8 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   val (options, cfg) = config.flatMap { cfg =>
     val name             = cfg.lookup[String]("flask.name")
     val cluster          = cfg.lookup[String]("flask.cluster")
-    val retriesDuration  = cfg.require[Duration]("flask.schedule.duration")
-    val maxRetries       = cfg.require[Int]("flask.schedule.retries")
+    val retriesDuration  = cfg.require[Duration]("flask.retry-schedule.duration")
+    val maxRetries       = cfg.require[Int]("flask.retry-schedule.retries")
     val elasticURL       = cfg.lookup[String]("flask.elastic-search.url")
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
