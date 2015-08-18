@@ -89,7 +89,8 @@ class Flask(options: Options, val I: Instruments) {
       httpOrZmtp(alive, Q)(uri) observe countDatapoints
 
     def retries(names: Names): Event = {
-      val retries = if(args.contains("noretries")) Events.takeEvery(10.seconds, 0) else Monitoring.defaultRetries
+      val retries = Events.takeEvery(options.retriesDuration, options.maxRetries)
+
       retries andThen (_ ++ Process.eval[Task, Unit] {
                          Q.enqueueAll(Seq(Error(names), Problem(names.theirs, "there wasn't an error")))
                            .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString)))

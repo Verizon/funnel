@@ -13,6 +13,8 @@ case class RiemannCfg(
 case class Options(
   name: Option[String],
   cluster: Option[String],
+  retriesDuration: Duration,
+  maxRetries: Int,
   elastic: Option[ElasticCfg] = None,
   riemann: Option[RiemannCfg] = None,
   funnelPort: Int = 5775,
