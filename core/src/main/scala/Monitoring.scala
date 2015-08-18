@@ -212,7 +212,7 @@ trait Monitoring {
                 implicit S: ExecutorService = Monitoring.serverPool): Process[Task,Unit] = {
     parse(source).evalMap { pt =>
       val msg = "Monitoring.mirrorAll:" // logging msg prefix
-      val k = pt.key.withAttributes(attrs)
+      val k = pt.key.withAttributes(pt.key.attributes ++ attrs)
       for {
         b <- exists(k)
         _ <- if (b) {
@@ -404,7 +404,7 @@ object Monitoring {
 
   def defaultRetries: Monitoring => Process[Task,Unit] = Events.takeEvery(30 seconds, 6)
 
-  private def daemonThreads(name: String) = new ThreadFactory {
+  private[funnel] def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {
       val t = Executors.defaultThreadFactory.newThread(r)
       t.setDaemon(true)
@@ -448,7 +448,7 @@ object Monitoring {
 
     def eraseTopic[I,O](t: Topic[I,O]): Topic[Any,Any] = t.asInstanceOf[Topic[Any,Any]]
 
-    new Monitoring {
+    new Monitoring { self =>
       val log = Logger[Monitoring]
 
       def keys = keys_
@@ -548,24 +548,22 @@ object Monitoring {
   }
 
   /**
-   * Try running the given process `p`, catching errors and reporting
-   * them with `maskedError`, using `schedule` to determine when further
-   * attempts are made. If `schedule` is exhausted, the error is raised.
-   * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
-   * will run `p`; if it encounters an error, it will print the error using `println`,
-   * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
-   * the error in the `Process`.
+    * Try running the given process `p`, catching errors and reporting
+    * them with `maskedError`, using `schedule` to determine when further
+    * attempts are made. If `schedule` is exhausted, the error is raised.
+    * Example: `attemptRepeatedly(println)(p)(Process.awakeEvery(10 seconds).take(3))`
+    * will run `p`; if it encounters an error, it will print the error using `println`,
+    * then wait 10 seconds and try again. After 3 reattempts it will give up and raise
+    * the error in the `Process`.
    */
-  private[funnel] def attemptRepeatedly[A](
+  def attemptRepeatedly[A](
     maskedError: Throwable => Unit)(
     p: Process[Task,A])(
     schedule: Process[Task,Unit]): Process[Task,A] = {
     val step: Process[Task, Throwable \/ A] =
-      p.attempt(e => Process.eval { Task.delay { maskedError(e); e }})
+      p.append(schedule.kill).attempt(e => Process.eval { Task.delay { maskedError(e); e }})
     step.stripW ++ schedule.terminated.flatMap {
-      // on our last reconnect attempt, rethrow error
       case None => step.flatMap(_.fold(Process.fail, Process.emit))
-      // on other attempts, ignore the exceptions
       case Some(_) => step.stripW
     }
   }

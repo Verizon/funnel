@@ -24,12 +24,32 @@ case class Location(
   intent: LocationIntent,
   templates: Seq[LocationTemplate]
 ){
+
+  /**
+   * This is used to generate the paths that we need to monitor
+   * based on the supplied templates. For example, even though
+   * the location knows its IP:PORT combination, it does not know
+   * which paths we might like to monitor - let's say we wanted
+   * /stream/previous and /stream/now?kind=traffic; these are clearly
+   * different URIs, so we use the templates to generate that.
+   */
   def templatedPathURIs: Seq[URI] =
     templates.map(uriFromTemplate)
 
+  /**
+   * Generate a canonical URI for this particular location. This is
+   * always done without regard for any templates, as its typically
+   * used for network validation.
+   */
   def uri: URI =
     URI.create(s"${protocol.toString}://$host:$port")
 
+  /**
+   * Given a particular `LocationTemplate`, apply this `Location`s
+   * data to the template. This is used when we have an arbitrary
+   * template and want to turn it into something actionable elsewhere
+   * in the codebase.
+   */
   def uriFromTemplate(t: LocationTemplate): URI =
     URI.create(t.build(
       "@protocol" -> protocol.scheme,
@@ -39,6 +59,17 @@ case class Location(
 }
 
 object Location {
+
+  /**
+   * Given a `java.net.URI`, attempt to conver this into a `Location`
+   * instance. This is not guarenteed to work, and there are a range
+   * of failure cases because of the problems with the way `URI` is
+   * actually implemented within the JDK. With that being said, for
+   * our purposes, this works as our URIs are always well formed -
+   * if they are not, we either have a problem with the configuration
+   * (i.e. a human screwed up the settings) or LocationTemplate is
+   * doing the wrong thing.
+   */
   def fromURI(
     uri: URI,
     dc: String,

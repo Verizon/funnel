@@ -28,6 +28,7 @@ case class StaticConfig(
   val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
   val remoteFlask = new HttpFlask(http, repository, signal)
   val templates = List.empty
+  val maxInvestigatingRetries = 6
 }
 
 object Config {

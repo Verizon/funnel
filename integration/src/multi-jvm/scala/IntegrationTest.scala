@@ -94,7 +94,7 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
 
     val svc = url(s"http://127.0.0.1:64529${path}")
     val json = http(svc OK as.String)
-    scala.concurrent.Await.result(json, 1.seconds)
+    scala.concurrent.Await.result(json, 2.seconds)
   }
 
   def deployTarget(role: RoleName, port: Int, failAfter: Option[Duration] = None) =
@@ -168,8 +168,10 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
       Thread.sleep(2.seconds.toMillis) // give chemist time to get the messages from all flasks
       // just adding this to make sure that in future, the json does not get fubared.
       // fetch("/distribution") should equal ("""[{"targets":[{"urls":["http://localhost:4001/stream/now"],"cluster":"target01"},{"urls":["http://localhost:4003/stream/now"],"cluster":"target03"},{"urls":["http://localhost:4002/stream/now"],"cluster":"target02"}],"shard":"flask1"}]""")
-
+      printObnoxiously(fetch("/distribution"))
       printObnoxiously(fetch("/lifecycle/states"))
+      printObnoxiously(fetch("/shards/flask1/sources"))
+      printObnoxiously(fetch("/shards/flask1/distribution"))
 
       countForState(TargetState.Monitored) should equal (3)
 

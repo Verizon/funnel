@@ -13,4 +13,5 @@ class TestConfig extends PlatformConfig {
   val remoteFlask: RemoteFlask = LoggingRemote
   def http: dispatch.Http = ???
   val sharder: funnel.chemist.Sharder = RandomSharding
+  val maxInvestigatingRetries = 6
 }

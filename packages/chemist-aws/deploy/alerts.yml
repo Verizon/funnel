@@ -1,0 +1,60 @@
+---
+- name: chemist | configure alerts
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: chemist | should not have low disk space
+      gong:
+        state: "present"
+        account: "{{ application_environment }}"
+        namespace: "{{ application_name }}"
+        window: 10 minutes
+        name: low-disk-space
+        query: "cluster: chemist*"
+        critical: "!(disk < 0.9)"
+        warning: "!(disk < 0.8)"
+        tags:
+          - funnel
+          - chemist
+        aggregations:
+          disk:
+            op: min
+            field: "file_system.%2F.use_percent.numeric.mean"
+        actions:
+          critical:
+            - kind: email
+              recipients:
+                - timothy.m.perrett@one.verizon.com
+          warning:
+            - kind: email
+              recipients:
+                - timothy.m.perrett@one.verizon.com
+
+    - name: chemist | should not peg its cpu for 10 minutes
+      gong:
+        state: present
+        account: "{{ application_environment }}"
+        namespace: "{{ application_name }}"
+        window: 10 minutes
+        name: high-cpu
+        query: "cluster: chemist*"
+        critical: cpu >= 0.9
+        warning: cpu >= 0.75
+        tags:
+          - funnel
+          - chemist
+        aggregations:
+          cpu:
+            op: max
+            field: cpu.aggregate.usage.combined.numeric.mean
+        actions:
+          critical:
+            - kind: email
+              recipients:
+                - timothy.m.perrett@one.verizon.com
+          warning:
+            - kind: email
+              recipients:
+                - timothy.m.perrett@one.verizon.com
+

@@ -18,9 +18,14 @@ object JVM {
     implicit ES: ExecutorService = Monitoring.defaultPool,
              TS: ScheduledExecutorService = Monitoring.schedulingPool,
              t: Duration = 30 seconds): Unit = {
+
     val mxBean = ManagementFactory.getMemoryMXBean
     val gcs = ManagementFactory.getGarbageCollectorMXBeans.toList
     val pools = ManagementFactory.getMemoryPoolMXBeans.toList
+
+    def threadCount(s: Thread.State): Int =
+      Thread.getAllStackTraces.keySet.toList.map(
+        _.getState).filter(_ == s).length
 
     val ST = Strategy.Executor(ES)
 
@@ -35,8 +40,18 @@ object JVM {
       }.run.runAsync(_ => ())
     }
 
+    def TC(state: Thread.State) =
+      numericGauge(s"jvm/threads/${state.toString.toLowerCase}", 0d)
+
     def MB(lbl: String, desc: String): Gauge[Periodic[Stats], Double] =
       Gauge.scale(1/1e6)(numericGauge(lbl, 0.0, Units.Megabytes, desc))
+
+    val newThreads = TC(Thread.State.NEW)
+    val runnableThreads = TC(Thread.State.RUNNABLE)
+    val blockedThreads = TC(Thread.State.BLOCKED)
+    val waitingThreads = TC(Thread.State.WAITING)
+    val timedWaitingThreads = TC(Thread.State.TIMED_WAITING)
+    val terminatedThreads = TC(Thread.State.TERMINATED)
 
     val totalInit = MB("jvm/memory/total/init",
                        "The amount of memory that the JVM initially requests from the operating system for memory management.")
@@ -85,6 +100,13 @@ object JVM {
       nonheapUsage.set(nonheap.getUsed.toDouble / nonheap.getMax)
       nonheapMax.set(nonheap.getMax)
       nonheapCommitted.set(nonheap.getCommitted)
+
+      newThreads.set(threadCount(Thread.State.NEW))
+      runnableThreads.set(threadCount(Thread.State.RUNNABLE))
+      blockedThreads.set(threadCount(Thread.State.BLOCKED))
+      waitingThreads.set(threadCount(Thread.State.WAITING))
+      timedWaitingThreads.set(threadCount(Thread.State.TIMED_WAITING))
+      terminatedThreads.set(threadCount(Thread.State.TERMINATED))
     }.run.runAsync(_ => ())
   }
 }

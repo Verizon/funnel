@@ -1,15 +1,18 @@
 package funnel
 package chemist
 
+import concurrent.duration._
 import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
 import Sharding.Distribution
-import scalaz.{-\/,==>>}
+import scalaz.{-\/,==>>,\/}
 import scalaz.std.string._
+import scalaz.std.set._
 import scalaz.syntax.monad._
 import scalaz.stream.{Sink, Channel, Process, Process1, async}
 import java.net.URI
 import TargetLifecycle._
+import funnel.internals._
 
 /**
  * A Repository acts as our ledger of our current view of the state of
@@ -45,7 +48,7 @@ trait Repository {
   /**
    * Render the current state of the world, as chemist sees it
    */
-  def states: Task[Map[TargetState, Map[URI, StateChange]]]
+  def states: Task[Map[TargetLifecycle.TargetState, Map[URI, RepoEvent.StateChange]]]
 
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit]
   def errorSink(e: Error): Task[Unit]
@@ -54,6 +57,7 @@ trait Repository {
   /////////////// instance operations ///////////////
 
   def targetState(instanceId: URI): TargetState
+  def updateState(instanceId: URI, state: TargetState, change: StateChange): Task[Unit]
   def instance(id: URI): Option[Target]
   def flask(id: FlaskID): Option[Flask]
   val lifecycleQ: async.mutable.Queue[RepoEvent]
@@ -72,7 +76,6 @@ trait Repository {
   def repoCommands: Process[Task, RepoCommand]
 }
 
-import funnel.internals._
 import journal.Logger
 
 class StatefulRepository extends Repository {
@@ -86,7 +89,7 @@ class StatefulRepository extends Repository {
   private val D = new Ref[Distribution](Distribution.empty)
 
   /**
-   * stores a key-value map of instance-id -> host
+   * stores a key-value map of uri -> state-change
    */
   val targets = new Ref[InstanceM](==>>.empty)
   val flasks  = new Ref[FlaskM](==>>.empty)
@@ -99,7 +102,8 @@ class StatefulRepository extends Repository {
                                        Problematic -> emptyMap,
                                        DoubleAssigned -> emptyMap,
                                        DoubleMonitored -> emptyMap,
-                                       Fin -> emptyMap))
+    				       Investigating -> emptyMap,
+    				       Fin -> emptyMap))
 
   /**
    * stores lifecycle events to serve as an audit log that
@@ -126,9 +130,11 @@ class StatefulRepository extends Repository {
   def errors: Task[Seq[Error]] =
     Task.delay(errorStack.toSeq.toList)
 
-  def states: Task[Map[TargetState, Map[URI, StateChange]]] =
-    Task.delay(stateMaps.get.toList.map {
-      case (k,v) => k -> v.toList.toMap }.toMap)
+  def states: Task[Map[TargetLifecycle.TargetState, Map[URI, RepoEvent.StateChange]]] = Task.delay {
+    stateMaps.get.toList.map {
+      case (k,v) => k -> v.toList.toMap
+    }.toMap
+  }
 
   def keySink(uri: URI, keys: Set[Key[Any]]): Task[Unit] = Task.now(())
 
@@ -166,9 +172,9 @@ class StatefulRepository extends Repository {
           lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), targetState(target.uri))
 
         case PlatformEvent.NewFlask(f) =>
-          Task.delay(log.info("platformHandler -- new task: " + f)) >>
+          Task.delay(log.info("platformHandler -- new flask: " + f)) >>
           Task.delay {
-            D.update(_.insert(f.id, Set.empty))
+            D.update(_.updateAppend(f.id, Set.empty))
             flasks.update(_.insert(f.id, f))
           } >>
           repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f))
@@ -215,7 +221,7 @@ class StatefulRepository extends Repository {
           val target = targets.get.lookup(i)
           target.map { t =>
             // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
-            lifecycle(TargetLifecycle.Problem(t.msg.target, f, msg, System.currentTimeMillis), t.to)
+            lifecycle(TargetLifecycle.Investigate(t.msg.target, System.currentTimeMillis, 0), t.to)
           } getOrElse {
             // if we didn't even know about the target, what do we do? start monitoring it? nothing?
             Task.now(())
@@ -244,6 +250,7 @@ class StatefulRepository extends Repository {
     repoCommandsQ.dequeue
 
   override def lifecycle(): Unit =  {
+    import metrics._
     val go: RepoEvent => Process[Task, RepoCommand] = { re =>
       Process.eval(repoHistoryStack.push(re)).flatMap{ _ =>
         log.info(s"lifecycle: executing event: $re")
@@ -253,6 +260,16 @@ class StatefulRepository extends Repository {
             targets.update(_.insert(id, sc))
             stateMaps.update(_.update(from, (m => Some(m.delete(id)))))
             stateMaps.update(_.update(to, (m => Some(m.insert(id, sc)))))
+            AssignedHosts.set(stateMaps.get.lookup(TargetState.Assigned).size)
+            DoubleMonitoredHosts.set(stateMaps.get.lookup(TargetState.DoubleMonitored).size)
+            UnknownHosts.set(stateMaps.get.lookup(TargetState.Unknown).size)
+            UnmonitoredHosts.set(stateMaps.get.lookup(TargetState.Unmonitored).size)
+            UnmonitorableHosts.set(stateMaps.get.lookup(TargetState.Unmonitorable).size)
+            MonitoredHosts.set(stateMaps.get.lookup(TargetState.Monitored).size)
+            DoubleAssignedHosts.set(stateMaps.get.lookup(TargetState.DoubleAssigned).size)
+            ProblematicHosts.set(stateMaps.get.lookup(TargetState.Problematic).size)
+            InvestigatingHosts.set(stateMaps.get.lookup(TargetState.Investigating).size)
+            FinHosts.set(stateMaps.get.lookup(TargetState.Fin).size)
             sc.to match {
               case Unmonitored => {
                 log.debug("lifecycle: updating repository...")
@@ -273,9 +290,16 @@ class StatefulRepository extends Repository {
       }
     }
 
-    (lifecycleQ.dequeue flatMap go to repoCommandsQ.enqueue).run.runAsync {
+    val c: Process[Task, RepoEvent] = lifecycleQ.dequeue
+    val l: Process[Task, Unit] = (c flatMap go to repoCommandsQ.enqueue)
+    val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
+      log.error(s"Error processing lifecycle events: $err")
+      Process.eval_(Task.delay(LifecycleEventsStream.yellow))
+    }
+    a.stripW.run.runAsync {
       case -\/(e) =>
         log.error("error consuming lifecycle events", e)
+        LifecycleEventsStream.red
         repoCommandsQ.close.run
       case _ =>
         log.info("lifecycle events stream finished")
@@ -288,6 +312,16 @@ class StatefulRepository extends Repository {
    */
   def targetState(id: URI): TargetState =
     targets.get.lookup(id).fold[TargetState](TargetState.Unknown)(_.to)
+
+  def updateState(instanceId: URI, state: TargetState, change: StateChange): Task[Unit] = Task.delay {
+    stateMaps.update(				// Update a Ref to a Map of a Map to a case class
+      _.update(state,
+        im => Some(im.update(instanceId,
+          sc => Some(change)
+        ))
+      )
+    )
+  }
 
   def instance(id: URI): Option[Target] =
     targets.get.lookup(id).map(_.msg.target)

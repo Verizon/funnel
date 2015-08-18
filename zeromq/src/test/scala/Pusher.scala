@@ -6,17 +6,21 @@ import scalaz.stream.async.signalOf
 import scalaz.stream.{Process,time}
 import java.net.URI
 
+object common {
+  implicit val batransport: Transportable[Array[Byte]] =
+    Transportable { (ba,s) =>
+      Transported(s, Schemes.unknown, Versions.unknown, None, None, ba)
+    }
+}
+
 abstract class Pusher(name: String, uri: URI = Settings.uri, size: Int = 1000000) {
   def main(args: Array[String]): Unit = {
-    import sockets._
+    import sockets._, common._
 
     Ø.log.info(s"Booting $name...")
 
     val E = Endpoint.unsafeApply(push &&& connect, uri)
 
-    implicit val batransport: Transportable[Array[Byte]] = Transportable { ba =>
-      Transported(Schemes.unknown, Versions.unknown, None, None, ba)
-    }
 
     val seq: Seq[Array[Byte]] = for(i <- 0 to size) yield Fixtures.data
     // stupid scalac cant handle this in-line.

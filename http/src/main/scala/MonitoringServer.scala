@@ -28,8 +28,8 @@ object MonitoringServer {
    * `/stream/<keyid>`: stream of metrics for the given key
    * `/stream/<prefix>`: stream of metrics whose labels start with 'prefix'
    */
-  def start(M: Monitoring, port: Int = 8080): MonitoringServer = {
-    val svr = (new MonitoringServer(M, port))
+  def start(M: Monitoring, port: Int = 8080, keyTTL: Duration = 36.hours): MonitoringServer = {
+    val svr = (new MonitoringServer(M, port, keyTTL))
     svr.start()
     svr
   }
@@ -45,7 +45,7 @@ object MonitoringServer {
   def start(M: Monitoring, log: String => Unit): MonitoringServer = start(M)
 }
 
-class MonitoringServer(M: Monitoring, port: Int) {
+class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
   import MonitoringServer._
 
   private val server = HttpServer.create(new InetSocketAddress(port), 0)
@@ -53,8 +53,15 @@ class MonitoringServer(M: Monitoring, port: Int) {
   def start(): Unit = {
     server.setExecutor(Monitoring.serverPool)
     val _ = server.createContext("/", handleMetrics(M))
+
     server.start()
-    M.log.info("server started on port: " + port)
+    M.log.info(s"server started on port: $port")
+
+    M.keySenescence(Events.every(keyTTL), M.distinctKeys).run.runAsync(_.fold(e => {
+      M.log.error(s"Asynchronous error starting key senescence: $e - ${e.getMessage}")
+      M.log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
+    }, identity _))
+    M.log.info(s"Metric key TTL is $keyTTL")
   }
 
   def stop(): Unit = server.stop(0)

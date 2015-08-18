@@ -17,7 +17,6 @@ import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorServic
 import funnel.aws._
 
 class AwsChemist[A <: Aws] extends Chemist[A]{
-
   private val log = Logger[AwsChemist[_]]
 
   /**

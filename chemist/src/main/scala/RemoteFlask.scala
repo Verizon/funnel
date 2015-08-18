@@ -18,6 +18,8 @@ trait RemoteFlask {
 object LoggingRemote extends RemoteFlask {
   private lazy val log = Logger[HttpFlask]
 
+  def flaskTemplate(path: String) =
+    LocationTemplate(s"http://@host:@port/$path")
   def command(c: FlaskCommand): Task[Unit] = {
     Task.delay {
       log.info("LoggingRemote recieved: " + c)
@@ -28,6 +30,7 @@ object LoggingRemote extends RemoteFlask {
 
 class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) extends RemoteFlask {
   import FlaskCommand._
+  import LoggingRemote.flaskTemplate
 
   private lazy val log = Logger[HttpFlask]
 
@@ -43,23 +46,36 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
     case ev => repo.platformHandler(ev).run
   }
 
-  def command(c: FlaskCommand): Task[Unit] = c match {
-    case Telemetry(flask) =>
-      val t = monitorTelemetry(flask, keys, errors, lifecycle, signal)
-      Task.delay(t.runAsync(_.fold(
-        e => {
-          log.error(e.getMessage)
-          e.printStackTrace
-        },
-        _ => log.info("Telemetry terminated"))))
-    case Monitor(flask, targets) =>
-      monitor(flask.location, targets).void
-    case Unmonitor(flask, targets) =>
-      unmonitor(flask.location, targets).void
-  }
+  def command(c: FlaskCommand): Task[Unit] = {
+    metrics.TotalCommands.increment
+    c match {
+      case Telemetry(flask) =>
+        val t = monitorTelemetry(flask, keys, errors, lifecycle, signal)
+        Task.delay(t.handleWith({
+          case telemetry.Telemetry.MissingFrame(a, b) => for {
+            _ <- Task.delay {
+              val s = if (a+1 == b-1) s" ${a+1}" else s"s ${a+1}-${b-1}"
+              log.error(s"command, missing frame$s from flask: ${flask}")
+              metrics.DroppedCommands.increment
+            }
+            d <- Housekeeping.gatherAssignedTargets(Seq(flask))(http)
+            _ <- repo.mergeExistingDistribution(d)
+            _ <- Task.suspend(t)
+          } yield ()
+        }).runAsync(_.fold({
+          case e: Exception =>
+            log.error(s"command, unable to start the 0mq channel for $flask - ${e.getMessage}")
+            e.printStackTrace
+          },
+          _ => log.info(s"command, telemetry terminated for $flask"))))
 
-  private def flaskTemplate(path: String) =
-    LocationTemplate(s"http://@host:@port/$path")
+      case Monitor(flask, targets) =>
+        monitor(flask.location, targets).void
+
+      case Unmonitor(flask, targets) =>
+        unmonitor(flask.location, targets).void
+    }
+  }
 
   /**
    * Touch the network and do the I/O using Dispatch.

@@ -3,6 +3,7 @@ package chemist
 package static
 
 import java.io.File
+import concurrent.duration._
 import scalaz.concurrent.Task
 import http.MonitoringServer
 import knobs.{FileResource,ClassPathResource,Optional,Pattern,Required}
@@ -10,7 +11,7 @@ import knobs.{FileResource,ClassPathResource,Optional,Pattern,Required}
 object Main {
   def main(args: Array[String]): Unit = {
 
-    val chemist = new StaticChemist
+    val chemist = new StaticChemist[Static]
 
     val k = knobs.load(
       Required(ClassPathResource("oncue/chemist.cfg")) ::
