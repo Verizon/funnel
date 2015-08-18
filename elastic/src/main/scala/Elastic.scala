@@ -280,6 +280,7 @@ case class Elastic(M: Monitoring) {
    * Publishes to an ElasticSearch URL at `esURL`.
    */
   def publish(flaskName: String, flaskCluster: String): ES[Unit] = {
+    val E = Executor(Monitoring.defaultPool)
     def doPublish(de: Process[Task, Json], cfg: ElasticCfg): Process[Task, Unit] =
       de to (constant((json: Json) => for {
         r <- Task.delay(esURL(cfg))
@@ -288,16 +289,16 @@ case class Elastic(M: Monitoring) {
     for {
       _   <- ensureTemplate
       cfg <- getConfig
-      buffer = async.circularBuffer[Json](cfg.bufferSize)
+      buffer = async.circularBuffer[Json](cfg.bufferSize)(E)
       ref <- lift(IORef(Set[Key[Any]]()))
       d   <- duration.lift[Task]
       timeout = time.awakeEvery(d)(
-        Executor(Monitoring.serverPool),
+        E,
         Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
       subscription = Monitoring.subscribe(M)(k =>
         cfg.groups.exists(g => k.startsWith(g))).map(Option.apply)
       // Reads from the monitoring instance and posts to the publishing queue
-      read = timeout.wye(subscription)(wye.merge) |>
+      read = timeout.wye(subscription)(wye.merge)(E) |>
                elasticGroup(cfg.groups) |>
                elasticUngroup(flaskName, flaskCluster) to
                buffer.enqueue
