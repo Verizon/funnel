@@ -17,7 +17,7 @@ libraryDependencies += "funnel" %% "http" % "x.y.z"
 Current transitive dependencies this will introduce on your classpath:
 
 - [Scalaz](https://github.com/scalaz/scalaz) 7.1.0
-- [Scalaz Stream](https://github.com/scalaz/scalaz-stream) 0.6a
+- [Scalaz Stream](https://github.com/scalaz/scalaz-stream) 0.7.1a
 - [Algebird Core](https://github.com/twitter/algebird) 0.8.0
 
 You will likely never touch these dependencies directly, but its important to be aware of them in case you decide yourself to use Scalaz (for example); if you have conflicting versions then you will see some very strange binary collisions at runtime.
