@@ -79,8 +79,8 @@ object Main {
      */
     val options: Options = config.map { cfg =>
       // general
-      val systemMetrics = cfg.lookup[Boolean]("enable-system-metrics")
-      val jvmMetrics    = cfg.lookup[Boolean]("enable-jvm-metrics")
+      val systemMetrics = cfg.lookup[Boolean]("agent.enable-system-metrics")
+      val jvmMetrics    = cfg.lookup[Boolean]("agent.enable-jvm-metrics")
 
       // http
       val httpHost    = cfg.lookup[String]("agent.http.host")
