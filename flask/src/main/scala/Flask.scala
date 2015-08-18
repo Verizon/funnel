@@ -88,7 +88,8 @@ class Flask(options: Options, val I: Instruments) {
     def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
       httpOrZmtp(alive, Q)(uri) observe countDatapoints
 
-    def retries(names: Names): Event = Events.takeEvery(options.retriesDuration, options.maxRetries)
+    def retries(names: Names): Event = {
+      val retries = Events.takeEvery(options.retriesDuration, options.maxRetries)
 
       retries andThen (_ ++ Process.eval[Task, Unit] {
                          Q.enqueueAll(Seq(Error(names), Problem(names.theirs, "there wasn't an error")))
