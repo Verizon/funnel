@@ -17,7 +17,10 @@ case class Options(
   maxRetries: Int,
   elastic: Option[ElasticCfg] = None,
   riemann: Option[RiemannCfg] = None,
+  collectLocalMetrics: Option[Boolean] = None,
+  localMetricFrequency: Option[Int] = None,
   funnelPort: Int = 5775,
+  selfiePort: Int = 7557,
   metricTTL: Option[Duration] = None,
   telemetryPort: Int = 7390
 )

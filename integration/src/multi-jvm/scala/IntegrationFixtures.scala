@@ -40,6 +40,7 @@ object IntegrationFixtures {
     retriesDuration = 30.seconds,
     maxRetries = 6,
     funnelPort = flask1.location.port,
+    selfiePort = 7557,
     telemetryPort = flask1.telemetry.port)
 
   val flask2 = Flask(
@@ -53,6 +54,7 @@ object IntegrationFixtures {
     retriesDuration = 30.seconds,
     maxRetries = 6,
     funnelPort = flask2.location.port,
+    selfiePort = 7558,
     telemetryPort = flask2.telemetry.port)
 
   val flaskOptionsWithES = flask1Options.copy(

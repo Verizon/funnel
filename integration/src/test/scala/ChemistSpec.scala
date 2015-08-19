@@ -34,8 +34,8 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   val (options, cfg) = config.flatMap { cfg =>
     val name             = cfg.lookup[String]("flask.name")
     val cluster          = cfg.lookup[String]("flask.cluster")
-    val retriesDuration  = cfg.require[Duration]("flask.schedule.duration")
-    val maxRetries       = cfg.require[Int]("flask.schedule.retries")
+    val retriesDuration  = cfg.require[Duration]("flask.retry-schedule.duration")
+    val maxRetries       = cfg.require[Int]("flask.retry-schedule.retries")
     val elasticURL       = cfg.lookup[String]("flask.elastic-search.url")
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
@@ -51,7 +51,11 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       ElasticCfg(_, _, _, elasticDf, "foo", None, _))
     val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
     val telemetry        = cfg.lookup[Int]("flask.network.telemetry-port").getOrElse(7390)
-    Task((Options(name, cluster, retriesDuration, maxRetries, elastic, riemann, port, None, telemetry), cfg))
+    val selfiePort       = cfg.lookup[Int]("flask.network.selfie-port").getOrElse(7557)
+    val collectLocal     = cfg.lookup[Boolean]("flask.collect-local-metrics")
+    val localFrequency   = cfg.lookup[Int]("flask.local-metric-frequency")
+
+    Task((Options(name, cluster, retriesDuration, maxRetries, elastic, riemann, collectLocal, localFrequency, port, selfiePort, None, telemetry), cfg))
   }.run
 
   val flaskUrl = url(s"http://localhost:${options.funnelPort}/mirror").setContentType("application/json", "UTF-8")
@@ -115,6 +119,7 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val s = src.decodeOption[List[Cluster]].get
 
     app.S.stop()
+    app.SelfServing.stop()
     ms.foreach(s => s._2.stop())
 
     d should have size 1
