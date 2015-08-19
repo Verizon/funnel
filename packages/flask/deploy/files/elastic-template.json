@@ -1,6 +1,103 @@
 {
   "template" : "funnel*",
+  "order" : 10,
   "mappings": {
+    "_default_" : {
+      "dynamic_templates" : [ {
+        "date_fields" : {
+          "mapping" : {
+            "type" : "date",
+            "doc_values": true,
+            "format" : "dateOptionalTime"
+          },
+          "match_mapping_type" : "date",
+          "match" : "*"
+        }
+      },
+      {
+        "byte_fields" : {
+          "mapping" : {
+            "type" : "byte",
+            "doc_values": true
+          },
+          "match_mapping_type" : "byte",
+          "match" : "*"
+        }
+      },
+      {
+        "double_fields" : {
+          "mapping" : {
+            "type" : "double",
+            "doc_values": true
+          },
+          "match_mapping_type" : "double",
+          "match" : "*"
+        }
+      },
+      {
+        "float_fields" : {
+          "mapping" : {
+            "type" : "float",
+            "doc_values": true
+          },
+          "match_mapping_type" : "float",
+          "match" : "*"
+        }
+      },
+      {
+        "integer_fields" : {
+          "mapping" : {
+            "type" : "integer",
+            "doc_values": true
+          },
+          "match_mapping_type" : "integer",
+          "match" : "*"
+        }
+      },
+      {
+        "long_fields" : {
+          "mapping" : {
+            "type" : "long",
+            "doc_values": true
+          },
+          "match_mapping_type" : "long",
+          "match" : "*"
+        }
+      },
+      {
+        "short_fields" : {
+          "mapping" : {
+            "type" : "short",
+            "doc_values": true
+          },
+          "match_mapping_type" : "short",
+          "match" : "*"
+        }
+      },
+      {
+        "string_fields" : {
+          "mapping" : {
+            "index" : "not_analyzed",
+            "omit_norms" : true,
+            "type" : "string",
+            "doc_values": true
+          },
+          "match_mapping_type" : "string",
+          "match" : "*"
+        }
+      }
+      ],
+      "_all" : {
+        "enabled" : true
+      },
+      "properties" : {
+        "@version" : {
+          "index" : "not_analyzed",
+          "type" : "string",
+          "doc_values": true
+        }
+      }
+    },
     "metric": {
       "dynamic_templates": [
         {
