@@ -38,9 +38,14 @@ object MultiNodeIntegrationConfig extends MultiNodeConfig {
 
   //////// barriers /////////
   val Startup      = "startup"
+  // everything is deployed and running
   val Deployed     = "deployed"
+  // metrics are flowing around and we're monitoring for
+  // a period of time
   val PhaseOne     = "phase-one"
+  // time to tear some shit down and track errors!
   val PhaseTwo     = "phase-two"
+  // test is over
   val Finished     = "finished"
 
   val platform = new IntegrationPlatform {
