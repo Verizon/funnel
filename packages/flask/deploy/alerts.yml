@@ -71,8 +71,8 @@
         window: 10 minutes
         name: low-mirror-datapoints
         query: "cluster: flask*"
-        critical: "datapoints > 500"
-        warning: "datapoints > 1000"
+        critical: "datapoints < 500"
+        warning: "datapoints < 1000"
         tags:
           - funnel
           - flask
