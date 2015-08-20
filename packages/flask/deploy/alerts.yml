@@ -25,11 +25,11 @@
           critical:
             - kind: email
               recipients:
-                - timothy.m.perrett@one.verizon.com
+                - oncue.monitoring@one.verizon.com
           warning:
             - kind: email
               recipients:
-                - timothy.m.perrett@one.verizon.com
+                - oncue.monitoring@one.verizon.com
 
     - name: flask | should not peg its cpu for 10 minutes
       gong:
@@ -39,24 +39,24 @@
         window: 10 minutes
         name: high-cpu
         query: "cluster: flask*"
-        critical: cpu >= 0.9
-        warning: cpu >= 0.75
+        critical: cpu >= 0.95
+        warning: cpu >= 0.90
         tags:
           - funnel
           - flask
         aggregations:
           cpu:
-            op: max
+            op: avg
             field: cpu.aggregate.usage.combined.numeric.mean
         actions:
           critical:
             - kind: email
               recipients:
-                - timothy.m.perrett@one.verizon.com
+                - oncue.monitoring@one.verizon.com
           warning:
             - kind: email
               recipients:
-                - timothy.m.perrett@one.verizon.com
+                - oncue.monitoring@one.verizon.com
 
     # purpose of this alert is to provide a negative check
     # and ensure that the datapoints do not drop below a
@@ -71,8 +71,8 @@
         window: 5 minutes
         name: low-mirror-datapoints
         query: "cluster: flask*"
-        critical: "datapoints > 2000"
-        warning: "datapoints > 4000"
+        critical: "datapoints > 500"
+        warning: "datapoints > 1000"
         tags:
           - funnel
           - flask
@@ -84,10 +84,10 @@
           critical:
             - kind: email
               recipients:
-                - timothy.m.perrett@one.verizon.com
+                - oncue.monitoring@one.verizon.com
           warning:
             - kind: email
               recipients:
-                - timothy.m.perrett@one.verizon.com
+                - oncue.monitoring@one.verizon.com
 
 
