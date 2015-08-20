@@ -68,7 +68,7 @@
         state: present
         account: "{{ application_environment }}"
         namespace: "{{ application_name }}"
-        window: 5 minutes
+        window: 10 minutes
         name: low-mirror-datapoints
         query: "cluster: flask*"
         critical: "datapoints > 500"
@@ -78,7 +78,7 @@
           - flask
         aggregations:
           datapoints:
-            op: avg
+            op: max
             field: mirror.datapoints.counter
         actions:
           critical:
