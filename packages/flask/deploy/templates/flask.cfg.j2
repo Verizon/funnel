@@ -16,6 +16,12 @@ flask {
     host = "127.0.0.1"
     http-port = 5775
     telemetry-port = 7390
+    selfie-port = 7557
+  }
+
+  retry-schedule {
+    duration = 30s
+    retries = 6
   }
 
   elastic-search {
@@ -33,6 +39,8 @@ flask {
     partition-date-format = "yyyy.MM.dd"
 
     connection-timeout-in-ms = 3000
+
+    minimum-publish-frequency = 10 minutes
 
     groups = [ "previous/jvm", "previous/system", "previous", "now" ]
 
