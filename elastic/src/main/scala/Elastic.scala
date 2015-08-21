@@ -121,11 +121,12 @@ case class Elastic(M: Monitoring) {
             case None =>
               go(true, m + (host -> Map(k -> pt)))
           }
-        case None =>				// No Datapoint this time
-          if (sawDatapoint) {			// Saw one last time
-            go(false, m)			// Keep going with current Map
-          } else {				// Didn't see one last time, either
-            emit(m) ++ go(false, Map())		// Publish current Map
+        case None =>                    // No Datapoint this time
+          if (sawDatapoint) {           // Saw one last time
+            go(false, m)                // Keep going with current Map
+          } else {				              // Didn't see one last time, either
+            M.log.info("I haven't seen any data points for a while. I hope everything's alright.")
+            emit(m) ++ go(false, Map())	// Publish current Map
           }
       }
     go(false, Map())
@@ -148,6 +149,7 @@ case class Elastic(M: Monitoring) {
    */
   def elasticUngroup[A](flaskName: String, flaskCluster: String): Process1[ESGroup[A], Json] =
     await1[ESGroup[A]].flatMap { g =>
+      M.log.info(s"Publishing ${g.size} elements to ElasticSearch")
       emitAll(g.toSeq.map { case (name, m) =>
         ("uri" := name._2.getOrElse(flaskName)) ->:
         ("host" := name._2.map(u => (new URI(u)).getHost).getOrElse(flaskName)) ->:
@@ -287,16 +289,19 @@ case class Elastic(M: Monitoring) {
         _ <- retry(elasticJson(r.POST, json)(cfg))
       } yield ()))
     for {
-      _   <- ensureTemplate
       cfg <- getConfig
+      _ = M.log.info(s"Ensuring Elastic template ${cfg.templateName} exists...")
+      _   <- ensureTemplate
+      _ = M.log.info(s"Initializing Elastic buffer of size ${cfg.bufferSize}...")
       buffer = async.circularBuffer[Json](cfg.bufferSize)(E)
       ref <- lift(IORef(Set[Key[Any]]()))
       d   <- duration.lift[Task]
       timeout = time.awakeEvery(d)(
         E,
         Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
-      subscription = Monitoring.subscribe(M)(k =>
-        cfg.groups.exists(g => k.startsWith(g))).map(Option.apply)
+      _ = M.log.info(s"Started Elastic subscription")
+      subscription = Monitoring.subscribe(M){ k =>
+        cfg.groups.exists(g => k.startsWith(g))}.map(Option.apply)
       // Reads from the monitoring instance and posts to the publishing queue
       read = timeout.wye(subscription)(wye.merge)(E) |>
                elasticGroup(cfg.groups) |>

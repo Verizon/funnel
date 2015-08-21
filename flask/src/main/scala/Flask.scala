@@ -126,6 +126,12 @@ class Flask(options: Options, val I: Instruments) {
     log.info("Booting the mirroring process...")
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName, retries))
 
+    log.info("Mirroring own Funnel instance...")
+    List(s"http://localhost:${options.selfiePort}/stream/previous",
+         s"http://localhost:${options.selfiePort}/stream/now?kind=traffic").foreach { s =>
+      I.monitoring.mirroringQueue.enqueueOne(funnel.Mirror(new URI(s), flaskCluster)).run
+    }
+
     options.elastic.foreach { elastic =>
       log.info("Booting the elastic search sink...")
       runAsync(Elastic(I.monitoring).publish(flaskName, flaskCluster)(elastic))
