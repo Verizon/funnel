@@ -16,7 +16,7 @@ import scalaz.syntax.traverse._
 import scala.collection.JavaConversions._
 import java.net.URI
 
-object RespositorySpec extends Properties("StaticRepository") with ArbitraryLifecycle {
+object RepositorySpec extends Properties("StaticRepository") with ArbitraryLifecycle {
   import TargetLifecycle._
   import TargetState._
   import RepoEvent._
@@ -45,9 +45,7 @@ object RespositorySpec extends Properties("StaticRepository") with ArbitraryLife
 
   property("handle state changes") = forAll {(events: Vector[StateChange]) =>
     val repo = new StatefulRepository
-    val in =  Process.eval(Task.now(events)).flatMap(Process.emitAll).to(repo.lifecycleQ.enqueue).run.map(_ => true).run
-    repo.lifecycle()
-    repo.lifecycleQ.close.run
+    val in = (events.map(repo.processRepoEvent) :+ repo.repoCommandsQ.close).sequence_.map(_ => true).run
     val out = repo.repoCommands.run.map(_ => true).run
 
     in & out
@@ -117,10 +115,8 @@ object RespositorySpec extends Properties("StaticRepository") with ArbitraryLife
     val (states, msgs) = events.sortBy(_._1).map(_._2).runTraverseS(init)(statechanges)
 
     val repo = new StatefulRepository
-    val doRun = Process.eval(Task.now(msgs)).flatMap(Process.emitAll).to(repo.lifecycleQ.enqueue)
-    val in = doRun.run.map(_ => true).run
-    repo.lifecycleQ.close.run
-    repo.lifecycle()
+    val doRun = (msgs.map(repo.processRepoEvent) :+ repo.repoCommandsQ.close).sequence_.map(_ => true)
+    val in = doRun.run
     val out = repo.repoCommands.run.map(_ => true).run
     in && out && consistentRepo(repo) && matchesStates(repo, states)
   }

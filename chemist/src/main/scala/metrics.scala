@@ -35,7 +35,7 @@ object metrics {
   val FinHosts = numericGauge("hosts/fin", 0.0, Units.Count, "number of hosts in Fin state")
 
   // lifecycle
-  val LifecycleEventsStream = trafficLight("lifecycle/lifecycle-events")
+  val PlatformEventFailures = counter("lifecycle/platform-failures")
   val RepoEventsStream = trafficLight("lifecycle/repo-events")
 
   // telemetry
