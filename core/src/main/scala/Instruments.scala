@@ -283,10 +283,10 @@ class Instruments(val window: Duration,
     def setAttribute[A](k: Key[A]): Key[A] = k.setAttribute("timercounter", label)
     new TimerNCounter(
       timer = timer(
-        label  = s"timercounter/$label",
+        label  = s"$label",
         keyMod = setAttribute),
       counter = counter(
-        label  = s"timercounter/$label",
+        label  = s"$label",
         keyMod = setAttribute)
     )
   }
