@@ -1,17 +1,15 @@
 package funnel
 
+import java.util.concurrent.TimeUnit
+
 import com.twitter.algebird.Group
 import funnel.{Buffers => B}
-import java.net.URL
-import java.util.concurrent.{ExecutorService,TimeUnit}
+
 import scala.concurrent.duration._
-import scalaz.concurrent.Task
-import scalaz.stream.Process
-import scalaz.std.tuple._
 import scalaz.std.list._
-import scalaz.syntax.functor._
+import scalaz.std.tuple._
 import scalaz.syntax.foldable._
-import scalaz.stream.process1.lift
+import scalaz.syntax.functor._
 
 /**
  * Provider of counters, gauges, and timers, tied to some
@@ -270,6 +268,27 @@ class Instruments(val window: Duration,
       }
     }
     t.buffer(bufferTime)
+  }
+
+  /**
+   * Return a `TimerNCounter` which updates the following keys:
+   * `now/timercounter/label`, `previous/timercounter/label`, and `sliding/timercounter/label`.
+   * See [[funnel.TimerNCounter]].
+   *
+   * @param label The name of the timer counter metric
+   * @param description A human-readable description of the semantics of this metric
+   */
+  def timerNCounter(label: String,
+                    description: String = ""): TimerNCounter = {
+    def setAttribute[A](k: Key[A]): Key[A] = k.setAttribute("timercounter", label)
+    new TimerNCounter(
+      timer = timer(
+        label  = s"timercounter/$label",
+        keyMod = setAttribute),
+      counter = counter(
+        label  = s"timercounter/$label",
+        keyMod = setAttribute)
+    )
   }
 
 }
