@@ -36,7 +36,6 @@ object Server {
     val repo    = platform.config.repository
     val sharder = platform.config.sharder
 
-    repo.lifecycle()
     RepoEventsStream.green
 
     val c: Process[Task, RepoCommand] = repo.repoCommands

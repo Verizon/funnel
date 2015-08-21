@@ -29,7 +29,7 @@ object Housekeeping {
    * This is a collection of the tasks that are needed to run on a periodic basis.
    * Specifically this involves the following:
    * 1. ensuring that we pickup any target instances that we were not already moniotring
-   * 2. ensuring that targets that are stuck in the assigned state for more than a given 
+   * 2. ensuring that targets that are stuck in the assigned state for more than a given
    *    period are reaped, and re-assigned to another flask (NOT IMPLEMENTED.)
    */
   def periodic(delay: Duration)(maxRetries: Int)(d: Discovery, r: Repository): Process[Task,Unit] = {
@@ -133,7 +133,7 @@ object Housekeeping {
               TargetState.Investigating,
               sc.copy(msg = Investigate(i.target, now, i.retryCount + 1))
             )
-            case None    => Task.delay {		// Retry succeeded; 
+            case None    => Task.delay {		// Retry succeeded;
               log.debug(s"Succeeded retrying target ${i.target} for the ${i.retryCount}th time")
             } <* r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri)) <*
                  r.platformHandler(PlatformEvent.NewTarget(i.target))

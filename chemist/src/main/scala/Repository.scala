@@ -13,6 +13,7 @@ import scalaz.stream.{Sink, Channel, Process, Process1, async}
 import java.net.URI
 import TargetLifecycle._
 import funnel.internals._
+import metrics._
 
 /**
  * A Repository acts as our ledger of our current view of the state of
@@ -60,9 +61,8 @@ trait Repository {
   def updateState(instanceId: URI, state: TargetState, change: StateChange): Task[Unit]
   def instance(id: URI): Option[Target]
   def flask(id: FlaskID): Option[Flask]
-  val lifecycleQ: async.mutable.Queue[RepoEvent]
+  def processRepoEvent(event: RepoEvent): Task[Unit]
   def instances: Task[Seq[(URI, StateChange)]]
-  def lifecycle(): Unit = {}
 
   /////////////// flask operations ///////////////
 
@@ -196,7 +196,7 @@ class StatefulRepository extends Repository {
           }.getOrElse(Task.now(()))
         }
 
-        case PlatformEvent.Monitored(f, i) =>
+       case PlatformEvent.Monitored(f, i) =>
           // TODO: what is this was unexpected? then the lifecycle call will result in nothing
           log.info(s"platformHandler -- $i monitored by $f")
           val target = targets.get.lookup(i)
@@ -236,76 +236,60 @@ class StatefulRepository extends Repository {
           Task.now(())
       }
     }
-  }
+  }.attempt.flatMap(_.fold(
+      e => Task.delay {
+        log.error(s"Error processing platform event $a: $e")
+        PlatformEventFailures.increment
+      },
+      _ => Task.now(())
+    ))
 
-  // inbound events from TargetLifecycle
-  val lifecycleQ: async.mutable.Queue[RepoEvent] =
-    async.unboundedQueue(Strategy.Executor(Chemist.serverPool))
+  def processRepoEvent(re: RepoEvent): Task[Unit] =
+    for {
+      _ <- repoHistoryStack.push(re)
+      _ <- Task.delay(log.info(s"lifecycle: executing event: $re"))
+      _ <- re match {
+        case sc @ StateChange(from,to,msg) =>
+          for {
+            _ <- Task.delay {
+              val id = msg.target.uri
+              targets.update(_.insert(id, sc))
+              stateMaps.update(_.update(from, (m => Some(m.delete(id)))))
+              stateMaps.update(_.update(to, (m => Some(m.insert(id, sc)))))
+              AssignedHosts.set(stateMaps.get.lookup(TargetState.Assigned).size)
+              DoubleMonitoredHosts.set(stateMaps.get.lookup(TargetState.DoubleMonitored).size)
+              UnknownHosts.set(stateMaps.get.lookup(TargetState.Unknown).size)
+              UnmonitoredHosts.set(stateMaps.get.lookup(TargetState.Unmonitored).size)
+              UnmonitorableHosts.set(stateMaps.get.lookup(TargetState.Unmonitorable).size)
+              MonitoredHosts.set(stateMaps.get.lookup(TargetState.Monitored).size)
+              DoubleAssignedHosts.set(stateMaps.get.lookup(TargetState.DoubleAssigned).size)
+              ProblematicHosts.set(stateMaps.get.lookup(TargetState.Problematic).size)
+              InvestigatingHosts.set(stateMaps.get.lookup(TargetState.Investigating).size)
+              FinHosts.set(stateMaps.get.lookup(TargetState.Fin).size)
+            }
+            _ <- to match {
+              case Unmonitored => Task.delay {
+                  log.debug("lifecycle: updating repository...")
+                } >> repoCommandsQ.enqueueOne(RepoCommand.Monitor(sc.msg.target))
+
+              // TODO when we implement flask transition we need to hanle double monitored stuff
+              case other => Task.delay {
+                log.debug(s"lifecycle: reached the unhandled state change: $other")
+              }
+            }
+          } yield ()
+        case NewFlask(flask) => Task {
+          flasks.update(_ + (flask.id -> flask))
+        }
+      }
+    } yield ()
 
   // outbound events to be consumed by Sharding
-  private val repoCommandsQ: async.mutable.Queue[RepoCommand] =
+  val repoCommandsQ: async.mutable.Queue[RepoCommand] =
     async.unboundedQueue(Strategy.Executor(Chemist.serverPool))
 
   val repoCommands: Process[Task, RepoCommand] =
     repoCommandsQ.dequeue
-
-  override def lifecycle(): Unit =  {
-    import metrics._
-    val go: RepoEvent => Process[Task, RepoCommand] = { re =>
-      Process.eval(repoHistoryStack.push(re)).flatMap{ _ =>
-        log.info(s"lifecycle: executing event: $re")
-        re match {
-          case sc @ StateChange(from,to,msg) => {
-            val id = msg.target.uri
-            targets.update(_.insert(id, sc))
-            stateMaps.update(_.update(from, (m => Some(m.delete(id)))))
-            stateMaps.update(_.update(to, (m => Some(m.insert(id, sc)))))
-            AssignedHosts.set(stateMaps.get.lookup(TargetState.Assigned).size)
-            DoubleMonitoredHosts.set(stateMaps.get.lookup(TargetState.DoubleMonitored).size)
-            UnknownHosts.set(stateMaps.get.lookup(TargetState.Unknown).size)
-            UnmonitoredHosts.set(stateMaps.get.lookup(TargetState.Unmonitored).size)
-            UnmonitorableHosts.set(stateMaps.get.lookup(TargetState.Unmonitorable).size)
-            MonitoredHosts.set(stateMaps.get.lookup(TargetState.Monitored).size)
-            DoubleAssignedHosts.set(stateMaps.get.lookup(TargetState.DoubleAssigned).size)
-            ProblematicHosts.set(stateMaps.get.lookup(TargetState.Problematic).size)
-            InvestigatingHosts.set(stateMaps.get.lookup(TargetState.Investigating).size)
-            FinHosts.set(stateMaps.get.lookup(TargetState.Fin).size)
-            sc.to match {
-              case Unmonitored => {
-                log.debug("lifecycle: updating repository...")
-                Process.emit(RepoCommand.Monitor(sc.msg.target))
-              }
-
-              // TODO when we implement flask transition we need to hanle double monitored stuff
-              case other => {
-                log.debug(s"lifecycle: reached the unhandled state change: $other")
-                Process.halt
-              }
-            }
-          }
-          case NewFlask(flask) =>
-            flasks.update(_ + (flask.id -> flask))
-            Process.halt
-        }
-      }
-    }
-
-    val c: Process[Task, RepoEvent] = lifecycleQ.dequeue
-    val l: Process[Task, Unit] = (c flatMap go to repoCommandsQ.enqueue)
-    val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
-      log.error(s"Error processing lifecycle events: $err")
-      Process.eval_(Task.delay(LifecycleEventsStream.yellow))
-    }
-    a.stripW.run.runAsync {
-      case -\/(e) =>
-        log.error("error consuming lifecycle events", e)
-        LifecycleEventsStream.red
-        repoCommandsQ.close.run
-      case _ =>
-        log.info("lifecycle events stream finished")
-        repoCommandsQ.close.run
-    }
-  }
 
   /**
    * determine the current perceived state of a Target
