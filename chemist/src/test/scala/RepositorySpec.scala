@@ -45,9 +45,7 @@ object RepositorySpec extends Properties("StaticRepository") with ArbitraryLifec
 
   property("handle state changes") = forAll {(events: Vector[StateChange]) =>
     val repo = new StatefulRepository
-    println("about to in")
     val in = (events.map(repo.processRepoEvent) :+ repo.repoCommandsQ.close).sequence_.map(_ => true).run
-    println("about to out")
     val out = repo.repoCommands.run.map(_ => true).run
 
     in & out
