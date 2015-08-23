@@ -1,6 +1,7 @@
 package funnel
 package integration
 
+import concurrent.duration._
 import chemist.{Flask,FlaskID,Location,LocationIntent,LocationTemplate,Target,NetworkScheme}
 import flask.Options
 import java.net.URI
@@ -36,7 +37,10 @@ object IntegrationFixtures {
   val flask1Options = Options(
     name = Some(flask1.id.value),
     cluster = None,
+    retriesDuration = 2.seconds,
+    maxRetries = 0,
     funnelPort = flask1.location.port,
+    selfiePort = 7557,
     telemetryPort = flask1.telemetry.port)
 
   val flask2 = Flask(
@@ -47,7 +51,10 @@ object IntegrationFixtures {
   val flask2Options = Options(
     name = Some(flask2.id.value),
     cluster = None,
+    retriesDuration = 2.seconds,
+    maxRetries = 0,
     funnelPort = flask2.location.port,
+    selfiePort = 7558,
     telemetryPort = flask2.telemetry.port)
 
   val flaskOptionsWithES = flask1Options.copy(

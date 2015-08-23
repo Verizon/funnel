@@ -193,10 +193,9 @@ object TargetLifecycle {
     val transition = Terminate
   }
 
-
   def process(repo: Repository)(msg: TargetMessage, state: TargetState): Task[Unit] = {
     def findTrans(msg: TargetMessage, from: TargetState, v: Vector[(TargetTransition, TargetState)]): Option[RepoEvent.StateChange] = v match {
-      case (t,s) +: vs if(t == msg.transition) => Some(RepoEvent.StateChange(from, s, msg))
+      case (t,s) +: vs if (t == msg.transition) => Some(RepoEvent.StateChange(from, s, msg))
       case _ +: vs => findTrans(msg, from, vs)
       case _ => None
     }
@@ -205,7 +204,7 @@ object TargetLifecycle {
       case Decomp(Some(Context(_, _, _, out)), _) =>
         findTrans(msg, state, out).fold(
           Task.now(log.error(s"found context but failed: msg=$msg, state=$state, out=$out"))
-            )(s => repo.lifecycleQ.enqueueOne(s))
+            )(repo.processRepoEvent)
 
       case other => Task.now(log.error(
         s"transistion process failed: msg=$msg, state=$state, other=$other"))

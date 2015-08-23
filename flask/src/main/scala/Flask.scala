@@ -35,9 +35,12 @@ class Flask(options: Options, val I: Instruments) {
 
   val log = Logger[this.type]
 
-  val mirrorDatapoints = I.counter("mirror/datapoints")
+  val Selfie = Monitoring.instance
+  val ISelfie = new Instruments(1.minute, Selfie)
+  val mirrorDatapoints = ISelfie.counter("mirror/datapoints")
 
   val S = MonitoringServer.start(I.monitoring, options.funnelPort)
+  val SelfServing = MonitoringServer.start(ISelfie.monitoring, options.selfiePort)
 
   lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)(Strategy.Executor(Monitoring.serverPool))
 
@@ -76,6 +79,20 @@ class Flask(options: Options, val I: Instruments) {
     def countDatapoints: Sink[Task, Datapoint[Any]] =
       channel.lift(_ => Task(mirrorDatapoints.increment))
 
+
+    // Determine whether to generate system statistics for the local host
+    for {
+      b <- options.collectLocalMetrics
+      t <- options.localMetricFrequency
+    }{
+      implicit val duration = t.seconds
+      Sigar(ISelfie).foreach { s =>
+        s.instrument
+      }
+      JVM.instrument(ISelfie)
+      Clocks.instrument(ISelfie)
+    }
+
     val Q = async.unboundedQueue[Telemetry](Strategy.Executor(funnel.Monitoring.serverPool))
 
     log.info("Booting the key mirroring process...")
@@ -89,7 +106,8 @@ class Flask(options: Options, val I: Instruments) {
       httpOrZmtp(alive, Q)(uri) observe countDatapoints
 
     def retries(names: Names): Event = {
-      val retries = if(args.contains("noretries")) Events.takeEvery(10.seconds, 0) else Monitoring.defaultRetries
+      val retries = Events.takeEvery(options.retriesDuration, options.maxRetries)
+
       retries andThen (_ ++ Process.eval[Task, Unit] {
                          Q.enqueueAll(Seq(Error(names), Problem(names.theirs, "there wasn't an error")))
                            .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString)))
@@ -107,6 +125,12 @@ class Flask(options: Options, val I: Instruments) {
 
     log.info("Booting the mirroring process...")
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName, retries))
+
+    log.info("Mirroring own Funnel instance...")
+    List(s"http://localhost:${options.selfiePort}/stream/previous",
+         s"http://localhost:${options.selfiePort}/stream/now?kind=traffic").foreach { s =>
+      I.monitoring.mirroringQueue.enqueueOne(funnel.Mirror(new URI(s), flaskCluster)).run
+    }
 
     options.elastic.foreach { elastic =>
       log.info("Booting the elastic search sink...")

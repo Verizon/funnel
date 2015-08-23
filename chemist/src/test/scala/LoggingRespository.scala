@@ -47,8 +47,6 @@ class LoggingRepository extends Repository {
 
   val increase = new AtomicInteger(0)
 
-  val lifecycleQ: async.mutable.Queue[RepoEvent] = async.unboundedQueue(Strategy.Executor(Chemist.serverPool))
-
   /////////////// flask operations ///////////////
   import Sharding.Distribution
   def distribution: Task[Distribution] = countTask(increase, Task.now(Distribution.empty))
@@ -57,5 +55,7 @@ class LoggingRepository extends Repository {
   def assignedTargets(flask: Flask): Task[Set[Target]] = Task.now(Set.empty)
 
   def repoCommands: Process[Task, RepoCommand] = ???
+
+  def processRepoEvent(ev: RepoEvent): Task[Unit] = Task.now(())
 
 }

@@ -20,7 +20,9 @@ object Main {
 
   val (options, cfg) = config.flatMap { cfg =>
     val name             = cfg.lookup[String]("flask.name")
-    val cluster           = cfg.lookup[String]("flask.cluster")
+    val cluster          = cfg.lookup[String]("flask.cluster")
+    val retriesDuration  = cfg.require[Duration]("flask.retry-schedule.duration")
+    val maxRetries       = cfg.require[Int]("flask.retry-schedule.retries")
     val elasticURL       = cfg.lookup[String]("flask.elastic-search.url")
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
@@ -38,26 +40,16 @@ object Main {
     val elastic          = (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
       ElasticCfg(_, _, _, elasticDf, esTemplate, esTemplateLoc, _, esPublishTimeout.toNanos.nanos, elasticTimeout))
     val httpPort         = cfg.lookup[Int]("flask.network.http-port").getOrElse(5775)
+    val selfiePort       = cfg.lookup[Int]("flask.network.selfie-port").getOrElse(7557)
     val metricTTL        = cfg.lookup[Duration]("flask.metric-ttl")
     val telemetryPort    = cfg.require[Int]("flask.network.telemetry-port")
+    val collectLocal     = cfg.lookup[Boolean]("flask.collect-local-metrics")
+    val localFrequency   = cfg.lookup[Int]("flask.local-metric-frequency")
 
-    Task((Options(name, cluster, elastic, riemann, httpPort, metricTTL, telemetryPort), cfg))
+    Task((Options(name, cluster, retriesDuration, maxRetries, elastic, riemann, collectLocal, localFrequency, httpPort, selfiePort, metricTTL, telemetryPort), cfg))
   }.run
 
   val I = new Instruments(1.minute)
-
-  // Determine whether to generate system statistics for the local host
-  for {
-    b <- cfg.lookup[Boolean]("flask.collect-local-metrics") if b
-    t <- cfg.lookup[Int]("flask.local-metric-frequency")
-  }{
-    implicit val duration = t.seconds
-    Sigar(I).foreach { s =>
-      s.instrument
-    }
-    JVM.instrument(I)
-    Clocks.instrument(I)
-  }
 
   val app = new Flask(options, I)
 
