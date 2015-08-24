@@ -65,7 +65,7 @@ class AwsDiscovery(
   * In practice, this is the set difference between all discovered instances
   * and valid ones.
   */
-  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = 
+  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] =
     for {
       i <- instances(notFlask)
       v <- valid(i)
@@ -74,11 +74,24 @@ class AwsDiscovery(
 
   /**
    * List all of the instances in the given AWS account and figure out which ones of
-   * those instances meets the classification criterion for being considered a flask.
+   * those instances meets the classification criterion for being considered
+   * an active flask.
    */
   def listActiveFlasks: Task[Seq[Flask]] =
     for {
       a <- instances(isActiveFlask)
+      b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
+    } yield b
+
+
+  /**
+   * List all instances that clsasify as a flask, regardless of working state.
+   * This function is only ever called during migration / re-election of an orchestrating
+   * leader chemist.
+   */
+  def listAllFlasks: Task[Seq[Flask]] =
+    for {
+      a <- instances(isFlask)
       b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
     } yield b
 
@@ -186,14 +199,22 @@ class AwsDiscovery(
 
   /**
    * Find all the flasks that are currently classified as active.
-   * @see funnel.chemist.AwsDiscovery.classify
+   * @see funnel.chemist.Classifier
    */
   def isActiveFlask(c: Classification): Boolean =
     c == ActiveFlask
 
   /**
+   * Find all the flasks - active and inactive.
+   * @see funnel.chemist.Classifier
+   */
+  def isFlask(c: Classification): Boolean =
+    c == ActiveFlask ||
+    c == InactiveFlask
+
+  /**
    * Find all chemist instances that are currently classified as active.
-   * @see funnel.chemist.AwsDiscovery.classify
+   * @see funnel.chemist.Classifier
    */
   def isActiveChemist(c: Classification): Boolean =
     c == ActiveChemist
@@ -207,6 +228,8 @@ class AwsDiscovery(
    *
    * To mittigate this, we specifically call out anything that is not
    * classified as an `ActiveTarget`
+   *
+   * @see funnel.chemist.Classifier
    */
   def notFlask(c: Classification): Boolean =
     c == ActiveFlask ||
