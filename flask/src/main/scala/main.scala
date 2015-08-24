@@ -27,7 +27,7 @@ object Main {
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
     val elasticDf        =
-      cfg.lookup[String]("flask.elastic-search.partition-date-format").getOrElse("yyyy.MM.dd")
+      cfg.lookup[String]("flask.elastic-search.partition-date-format").getOrElse("yyyy.MM.ww")
     val elasticTimeout   = cfg.lookup[Duration]("flask.elastic-search.connection-timeout").getOrElse(5.seconds)
     val esGroups         = cfg.lookup[List[String]]("flask.elastic-search.groups")
     val esTemplate       = cfg.lookup[String]("flask.elastic-search.template.name").getOrElse("flask")
