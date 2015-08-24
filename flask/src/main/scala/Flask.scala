@@ -115,7 +115,8 @@ class Flask(options: Options, val I: Instruments) {
     }
 
     import java.net.InetAddress
-    val flaskName = options.name.getOrElse(InetAddress.getLocalHost.getHostName)
+    val flaskHost = InetAddress.getLocalHost.getHostName
+    val flaskName = options.name.getOrElse(flaskHost)
     val flaskCluster = options.cluster.getOrElse(s"flask-${oncue.svc.funnel.BuildInfo.version}")
 
     options.metricTTL.foreach { t =>
@@ -127,8 +128,8 @@ class Flask(options: Options, val I: Instruments) {
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName, retries))
 
     log.info("Mirroring own Funnel instance...")
-    List(s"http://localhost:${options.selfiePort}/stream/previous",
-         s"http://localhost:${options.selfiePort}/stream/now?kind=traffic").foreach { s =>
+    List(s"http://$flaskHost:${options.selfiePort}/stream/previous",
+         s"http://$flaskHost:${options.selfiePort}/stream/now?kind=traffic").foreach { s =>
       I.monitoring.mirroringQueue.enqueueOne(funnel.Mirror(new URI(s), flaskCluster)).run
     }
 
