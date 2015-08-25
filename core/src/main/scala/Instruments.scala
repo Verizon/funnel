@@ -287,7 +287,7 @@ class Instruments(val window: Duration,
         keyMod = setAttribute),
       counter = counter(
         label  = s"$label",
-        keyMod = setAttribute),
+        keyMod = setAttribute)
     )
   }
 
