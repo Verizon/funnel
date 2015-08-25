@@ -43,7 +43,6 @@ class TimerNCounter (
 
   /** A bit of syntax for stopping a stopwatch returned from `start`. */
   def stop(stopwatch: () => Unit): Unit = {
-    counter.increment
     timer.stop(stopwatch)
   }
 
