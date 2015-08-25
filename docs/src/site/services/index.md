@@ -274,7 +274,7 @@ flask {
 #   type-name = "fff"
 #
 #   # Optional Parameters:
-#   partition-date-format = "yyyy.MM.ww"
+#   partition-date-format = "yyyy.ww"
 #   connection-timeout-in-ms = 5000
 # }
 
