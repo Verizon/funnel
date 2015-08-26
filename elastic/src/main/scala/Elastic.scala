@@ -149,7 +149,7 @@ case class Elastic(M: Monitoring) {
    */
   def elasticUngroup[A](flaskName: String, flaskCluster: String): Process1[ESGroup[A], Json] =
     await1[ESGroup[A]].flatMap { g =>
-      M.log.info(s"Publishing ${g.size} elements to ElasticSearch")
+      M.log.debug(s"Publishing ${g.size} elements to ElasticSearch")
       emitAll(g.toSeq.map { case (name, m) =>
         ("uri" := name._2.getOrElse(flaskName)) ->:
         ("host" := name._2.map(u => (new URI(u)).getHost).getOrElse(flaskName)) ->:

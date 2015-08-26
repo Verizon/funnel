@@ -40,7 +40,7 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
     val elasticDf        =
-      cfg.lookup[String]("flask.elastic-search.partition-date-format").getOrElse("yyyy.MM.dd")
+      cfg.lookup[String]("flask.elastic-search.partition-date-format").getOrElse("yyyy.MM.ww")
     val elasticTimeout   = cfg.lookup[Int]("flask.elastic-search.connection-timeout-in-ms").getOrElse(5000)
     val esGroups         = cfg.lookup[List[String]]("flask.elastic-search.groups")
     val riemannHost      = cfg.lookup[String]("flask.riemann.host")
