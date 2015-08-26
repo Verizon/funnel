@@ -55,9 +55,9 @@ object Housekeeping {
       l <- discovery.listTargets
       _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
 
-      // // figure out given the existing distribution, and the differencen between what's been discovered
+      // // figure out given the existing distribution, and the difference between what's been discovered
       // // STU: the fact that I'm throwing ID away here is suspect
-      unmonitored = l.foldLeft(Set.empty[Target])(_ ++ _._2) &~ d.values.foldLeft(Set.empty[Target])(_ ++ _)
+      unmonitored = l.foldLeft(Set.empty[Target])(_ ++ _._2) -- d.values.foldLeft(Set.empty[Target])(_ ++ _)
       _  = log.info(s"located instances: monitorable=${l.size}, unmonitored=${unmonitored.size}")
 
       // // action the new targets by putting them in the monitoring lifecycle
