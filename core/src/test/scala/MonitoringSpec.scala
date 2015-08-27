@@ -481,26 +481,26 @@ object MonitoringSpec extends Properties("monitoring") {
     fraction(.5)(List(Red,Red,Green,Green)) == Amber
   }
 
-  /* Simple sanity check of timerNCounter. */
-  property("TimerNCounter.basic") = secure {
+  /* Simple sanity check of LapTimer. */
+  property("LapTimer.basic") = secure {
     def go: Boolean = {
       import instruments._
 
       import scala.concurrent.ExecutionContext.Implicits.global
       import scala.concurrent._
       import scala.language.postfixOps
-      val label = "timerncounter"
+      val label = "laptimer"
       val t = timer(label)
       val c = counter(label)
-      val tc = new TimerNCounter(t, c)
-      tc.record(50 milliseconds)
-      tc.recordNanos(50000)
-      val stop = tc.start
+      val lt = new LapTimer(t, c)
+      lt.record(50 milliseconds)
+      lt.recordNanos(50000)
+      val stop = lt.start
       Thread.sleep(50)
-      tc.stop(stop)
-      tc.time { Thread.sleep(50) }
-      tc.timeFuture(Future { Thread.sleep(50); None })
-      tc.timeTask(Task { Thread.sleep(50); None }).run
+      lt.stop(stop)
+      lt.time { Thread.sleep(50) }
+      lt.timeFuture(Future { Thread.sleep(50); None })
+      lt.timeTask(Task { Thread.sleep(50); None }).run
       // Make sure we wait for the time buffer to catch up
       Thread.sleep(instruments.bufferTime.toMillis * 2)
       val m = Monitoring.default
@@ -512,22 +512,22 @@ object MonitoringSpec extends Properties("monitoring") {
   }
 
   /* Make sure timers allow concurrent updates. */
-  property("TimerNCounter.concurrent") = secure {
+  property("LapTimer.concurrent") = secure {
     def go: Boolean = {
       import instruments._
-      val label = "timerncounter"
+      val label = "laptimer"
       val t = timer(label)
       val c = counter(label)
-      val tc = new TimerNCounter(t, c)
+      val lt = new LapTimer(t, c)
       val N = 100000
       val S = scalaz.concurrent.Strategy.DefaultStrategy
       val t0 = System.nanoTime
       val d1 = (1.milliseconds); val d2 = (3.milliseconds)
       val f1 = S { (0 until N).foreach { _ =>
-        tc.record(d1)
+        lt.record(d1)
       }}
       val f2 = S { (0 until N).foreach { _ =>
-        tc.record(d2)
+        lt.record(d2)
       }}
       f1(); f2()
       val updateTime = Duration.fromNanos(System.nanoTime - t0) / N.toDouble

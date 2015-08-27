@@ -4,7 +4,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 import scalaz.concurrent.Task
 
-class TimerNCounter (
+class LapTimer (
   timer: Timer[Periodic[Stats]],
   counter: Counter
 ) {

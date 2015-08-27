@@ -271,17 +271,17 @@ class Instruments(val window: Duration,
   }
 
   /**
-   * Return a `TimerNCounter` which updates the following keys:
-   * `now/timercounter/label`, `previous/timercounter/label`, and `sliding/timercounter/label`.
-   * See [[funnel.TimerNCounter]].
+   * Return a `LapTimer` which updates the following keys:
+   * `now/label`, `previous/label`, and `sliding/label`.
+   * See [[funnel.LapTimer]].
    *
-   * @param label The name of the timer counter metric
+   * @param label The name of the lap timer metric
    * @param description A human-readable description of the semantics of this metric
    */
-  def timerNCounter(label: String,
-                    description: String = ""): TimerNCounter = {
-    def setAttribute[A](k: Key[A]): Key[A] = k.setAttribute("timercounter", label)
-    new TimerNCounter(
+  def lapTimer(label: String,
+                    description: String = ""): LapTimer = {
+    def setAttribute[A](k: Key[A]): Key[A] = k.setAttribute("laptimer", label)
+    new LapTimer(
       timer = timer(
         label  = s"$label",
         keyMod = setAttribute),
