@@ -85,10 +85,8 @@ object Sharding {
     s.toVector.traverse_ { x =>
       val flask = repo.flask(x._1)
       flask.fold(Task.delay(log.error("asked to assign to an unknown flask: " + x._1))){ f =>
-        // optimistically set the state to assigned in order to workaround race
-        // conditions pertaining to the async-responses from flask down the 0mq channel.
-        remote.command(FlaskCommand.Monitor(f,Seq(x._2))) >>
-        repo.platformHandler(PlatformEvent.Assigned(x._1, x._2))
+        repo.platformHandler(PlatformEvent.Assigned(x._1, x._2)) >>
+        remote.command(FlaskCommand.Monitor(f,Seq(x._2)))
       }
     } <* repo.mergeDistribution(newdist)
   }

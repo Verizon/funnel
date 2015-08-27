@@ -59,7 +59,7 @@ object Telemetry extends TelemetryCodecs {
   def telemetrySubscribeSocket(uri: URI, signal: Signal[Boolean],
                                keys: Actor[(URI, Set[Key[Any]])],
                                errors: Actor[Error],
-                               lifecycle: Actor[Either3[URI, URI, (URI,String)]]
+                               lifecycle: Actor[ShardingEvent]
                                ): Task[Unit] = {
     val endpoint = telemetrySubscribeEndpoint(uri)
     Ø.link(endpoint)(signal) { socket =>
@@ -87,7 +87,7 @@ object Telemetry extends TelemetryCodecs {
 
   // Throws a `MissingFrame` if two consecutive `Transported` don't have
   // consecutive serial numbers.
-  def fromTransported(id: URI, keys: Actor[(URI, Set[Key[Any]])], errors: Actor[Error], lifecycleSink: Actor[Either3[URI, URI, (URI, String)]]): Sink[Task, Transported] = {
+  def fromTransported(id: URI, keys: Actor[(URI, Set[Key[Any]])], errors: Actor[Error], lifecycleSink: Actor[ShardingEvent]): Sink[Task, Transported] = {
     val currentKeys = collection.mutable.Set.empty[Key[Any]]
     val t = Process.constant[Transported => Task[Unit]] {
       case Transported(_, _, Versions.v1, _, Some(Topic("error")), bytes) =>
@@ -110,14 +110,14 @@ object Telemetry extends TelemetryCodecs {
           case Attempt.Failure(err) =>
             Task.delay(log.error(s"Error parsing monitor from telemetry $err"))
           case Attempt.Successful(DecodeResult(uri,_)) =>
-            Task.delay(lifecycleSink ! Either3.middle3(uri))
+            Task.delay(lifecycleSink ! SMonitored(uri))
         }
       case Transported(_, _, Versions.v1, _, Some(Topic("unmonitor")), bytes) =>
         uriCodec.decode(BitVector(bytes)) match {
           case Attempt.Failure(err) =>
             Task.delay(log.error(s"Error parsing unmonitor from telemetry $err"))
           case Attempt.Successful(DecodeResult(uri,_)) =>
-            Task.delay(lifecycleSink ! Either3.left3(uri))
+            Task.delay(lifecycleSink ! SUnmonitored(uri))
         }
       case Transported(_, _, Versions.v1, None, Some(Topic("exception")), bytes) =>
         uriCodec.decode(BitVector(bytes)) map {
@@ -126,7 +126,7 @@ object Telemetry extends TelemetryCodecs {
           case Attempt.Failure(err) =>
             Task.delay(log.error(s"Error parsing exception from telemetry $err"))
           case Attempt.Successful((uri, msg)) =>
-            Task.delay(lifecycleSink ! Either3.right3(uri -> msg))
+            Task.delay(lifecycleSink ! SProblem(uri, msg))
         }
       case x => log.error("unexpected message from telemetry: " + x)
         Task.now(())
@@ -159,3 +159,9 @@ trait TelemetryCodecs extends KeyCodecs {
   implicit val uriCodec: Codec[URI] = utf8.xmap[URI](new URI(_), _.toString)
   implicit lazy val errorCodec = implicitly[Codec[Names]].xmap[Error](Error(_), _.names)
 }
+
+sealed trait ShardingEvent
+case class SUnmonitored(id: URI) extends ShardingEvent
+case class SMonitored(id: URI) extends ShardingEvent
+case class SProblem(id: URI, msg: String) extends ShardingEvent
+

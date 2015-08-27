@@ -163,7 +163,12 @@ class StatefulRepository extends Repository {
    * Handle the Actions emitted from the Platform
    */
   def platformHandler(a: PlatformEvent): Task[Unit] = {
-    historyStack.push(a).flatMap{ _ =>
+    if (a == PlatformEvent.NoOp) {
+      Task.now(())
+    } else {
+      historyStack.push(a)
+    } >>
+    Task.delay {
       val lifecycle = TargetLifecycle.process(this) _
       a match {
         case PlatformEvent.NewTarget(target) =>
@@ -196,13 +201,12 @@ class StatefulRepository extends Repository {
           }.getOrElse(Task.now(()))
         }
 
-       case PlatformEvent.Monitored(f, i) =>
-          // TODO: what is this was unexpected? then the lifecycle call will result in nothing
+        case PlatformEvent.Monitored(f, i) =>
           log.info(s"platformHandler -- $i monitored by $f")
           val target = targets.get.lookup(i)
           target.map { t =>
             lifecycle(TargetLifecycle.Confirmation(t.msg.target, f, System.currentTimeMillis), t.to)
-          } getOrElse Task.now(())
+          } getOrElse Task.delay(log.error(s"platformHandler -- never heard of target $i"))
 
         case PlatformEvent.Unmonitored(f, i) => {
           log.info(s"platformHandler -- $i no longer monitored by by $f")
@@ -211,20 +215,18 @@ class StatefulRepository extends Repository {
             // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
             lifecycle(TargetLifecycle.Unmonitoring(t.msg.target, f, System.currentTimeMillis), t.to)
           } getOrElse {
-            // if we didn't even know about the target, what do we do? start monitoring it? nothing?
-            Task.now(log.info(s"platformHandler -- encounterd an unknown target: $i"))
+            Task.delay(log.error(s"platformHandler -- encounterd an unknown target: $i"))
           }
         }
 
         case PlatformEvent.Problem(f, i, msg) => {
-          log.error(s"platformHandler -- $i no exception from  $f: $msg")
+          log.error(s"platformHandler -- $i no exception from $f: $msg")
           val target = targets.get.lookup(i)
           target.map { t =>
             // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
             lifecycle(TargetLifecycle.Investigate(t.msg.target, System.currentTimeMillis, 0), t.to)
           } getOrElse {
-            // if we didn't even know about the target, what do we do? start monitoring it? nothing?
-            Task.now(())
+            Task.delay(log.error(s"platformHandler -- target $i had a problem, but never heard of it"))
           }
         }
 
@@ -237,12 +239,12 @@ class StatefulRepository extends Repository {
       }
     }
   }.attempt.flatMap(_.fold(
-      e => Task.delay {
-        log.error(s"Error processing platform event $a: $e")
-        PlatformEventFailures.increment
-      },
-      _ => Task.now(())
-    ))
+    e => Task.delay {
+      log.error(s"Error processing platform event $a: $e")
+      PlatformEventFailures.increment
+    },
+    _ => Task.now(())
+  ))
 
   def processRepoEvent(re: RepoEvent): Task[Unit] =
     for {
