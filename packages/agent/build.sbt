@@ -3,15 +3,10 @@ import spray.revolver.RevolverPlugin._
 import com.typesafe.sbt.SbtMultiJvm
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 import NativePackagerKeys.scriptClasspath
-import com.typesafe.sbt.SbtNativePackager._
 
 OnCue.baseSettings
 
-Bundle.settings ++ Seq(
-  publish <<= publish dependsOn Def.taskDyn {
-                           (packageBin in Debian)
-                       }
-)
+Bundle.settings
 
 normalizedName := "funnel-agent"
 
