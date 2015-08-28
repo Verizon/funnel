@@ -4,6 +4,12 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 import scalaz.concurrent.Task
 
+/**
+ * A `LapTimer` instrument is a compound instrument, which combines Timer and
+ * Counter instruments. It adds counter to all the timer operations.
+ *
+ * An `LapTimer` should be constructed using the [[Instruments.lapTimer]] method.
+ */
 class LapTimer (
   timer: Timer[Periodic[Stats]],
   counter: Counter
