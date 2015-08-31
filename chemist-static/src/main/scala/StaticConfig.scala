@@ -29,9 +29,6 @@ case class StaticConfig(
   val remoteFlask = new HttpFlask(http, repository, signal)
   val templates = List.empty
   val maxInvestigatingRetries = 6
-  val election = ForegoneConclusion(discovery,
-    Location(network.host, network.port, "local",
-      intent = LocationIntent.Mirroring, templates = Nil))
 }
 
 object Config {

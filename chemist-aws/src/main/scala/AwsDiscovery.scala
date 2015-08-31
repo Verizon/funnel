@@ -96,15 +96,6 @@ class AwsDiscovery(
     } yield b
 
   /**
-   * List all of the instances in the given AWS account and figure out which ones of
-   * those instances meets the classification criterion for being considered a chemist.
-   */
-  def listActiveChemists: Task[Seq[Location]] =
-    for {
-      a <- instances(isActiveChemist)
-    } yield a.flatMap(_.locations.list)
-
-  /**
    * Lookup the `AwsInstance` for a given `InstanceID`; `AwsInstance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */

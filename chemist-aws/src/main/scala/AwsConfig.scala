@@ -47,8 +47,6 @@ case class AwsConfig(
 
   val repository: Repository = new StatefulRepository
 
-  val election: ElectionStrategy = ForegoneConclusion(discovery, machine.location)
-
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))

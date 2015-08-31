@@ -6,11 +6,11 @@ import chemist.{FlaskID,Flask,TargetID,Target,Discovery,Location}
 import java.util.UUID.randomUUID
 
 class IntegrationDiscovery extends Discovery {
+  def listAllFlasks: Task[Seq[Flask]] =
+    listActiveFlasks
+
   def listActiveFlasks: Task[Seq[Flask]] =
     Task.now(IntegrationFixtures.flasks)
-
-  def listActiveChemists: Task[Seq[Location]] =
-    Task.now(IntegrationFixtures.localhost :: Nil)
 
   private val randomids: Map[TargetID, Set[Target]] =
     IntegrationFixtures.targets.map(t =>

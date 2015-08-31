@@ -95,15 +95,16 @@ class StatefulRepository extends Repository {
   val knownFlasks  = new Ref[FlaskM](==>>.empty)
 
   private val emptyMap: InstanceM = ==>>.empty
-  val stateMaps = new Ref[StateM](==>>(Unknown -> emptyMap,
-                                       Unmonitored -> emptyMap,
-                                       Assigned -> emptyMap,
-                                       Monitored -> emptyMap,
-                                       Problematic -> emptyMap,
-                                       DoubleAssigned -> emptyMap,
-                                       DoubleMonitored -> emptyMap,
-    				       Investigating -> emptyMap,
-    				       Fin -> emptyMap))
+  val stateMaps = new Ref[StateM](==>>(
+    Unknown -> emptyMap,
+    Unmonitored -> emptyMap,
+    Assigned -> emptyMap,
+    Monitored -> emptyMap,
+    Problematic -> emptyMap,
+    DoubleAssigned -> emptyMap,
+    DoubleMonitored -> emptyMap,
+    Investigating -> emptyMap,
+    Fin -> emptyMap))
 
   /**
    * stores lifecycle events to serve as an audit log that

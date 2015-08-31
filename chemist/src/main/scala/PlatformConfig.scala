@@ -11,6 +11,5 @@ trait PlatformConfig {
   def sharder: Sharder
   def remoteFlask: RemoteFlask
   def http: Http
-  def election: ElectionStrategy
   def maxInvestigatingRetries: Int
 }
