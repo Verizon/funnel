@@ -60,11 +60,11 @@ class AwsDiscovery(
     v <- valid(i)
   } yield v.map(in => TargetID(in.id) -> in.targets)
 
-/**
-  * List all of the instances that failed basic network reachability validation.
-  * In practice, this is the set difference between all discovered instances
-  * and valid ones.
-  */
+  /**
+   * List all of the instances that failed basic network reachability validation.
+   * In practice, this is the set difference between all discovered instances
+   * and valid ones.
+   */
   def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] =
     for {
       i <- instances(notFlask)
@@ -82,7 +82,6 @@ class AwsDiscovery(
       a <- instances(isActiveFlask)
       b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
     } yield b
-
 
   /**
    * List all instances that clsasify as a flask, regardless of working state.
