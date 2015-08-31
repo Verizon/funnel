@@ -71,10 +71,10 @@ object Server {
 
     Housekeeping.periodic(15.minutes)(platform.config.maxInvestigatingRetries)(disco, repo).run.runAsync {
       case -\/(err) =>
-        log.error(s"Failed running the periodic housekeeping tasks. Error was: $err")
+        log.error(s"Terminal failure when running the periodic housekeeping tasks. Error was: $err")
         err.printStackTrace
 
-      case \/-(_)   => log.info("Sucsessfully completed the periodic housekeeping tasks.")
+      case \/-(_)   => log.warn("Completed the periodic housekeeping tasks. The stream may have terminated early which is not desirable.")
     }
 
     val p = this.getClass.getResource("/oncue/www/")
