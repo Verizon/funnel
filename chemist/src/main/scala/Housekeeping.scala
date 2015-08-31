@@ -2,7 +2,7 @@ package funnel
 package chemist
 
 import java.net.URI
-import scalaz.\/
+import scalaz.{\/,-\/,\/-}
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.{Process, time}
 import scalaz.std.string._
@@ -32,14 +32,13 @@ object Housekeeping {
    * 2. ensuring that targets that are stuck in the assigned state for more than a given
    *    period are reaped, and re-assigned to another flask (NOT IMPLEMENTED.)
    */
-  def periodic(delay: Duration)(maxRetries: Int)(d: Discovery, r: Repository): Process[Task,Unit] = {
+  def periodic(delay: Duration)(maxRetries: Int)(d: Discovery, r: Repository): Process[Task, Unit] =
     time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
-      for {
-        _  <- gatherUnassignedTargets(d, r) <*
-              handleInvestigating(maxRetries)(r)
-      } yield ()
+      (gatherUnassignedTargets(d, r) <* handleInvestigating(maxRetries)(r)).attempt.map {
+        case \/-(_) => ()
+        case -\/(e) => log.warn(s"failed running housekeeping itteration due to $e")
+      }
     )
-  }
 
   /**
    * Gather up all the targets that are for reasons unknown sitting in the unassigned
