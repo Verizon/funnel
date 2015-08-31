@@ -2,7 +2,7 @@ package funnel
 package chemist
 
 import java.net.URI
-import scalaz.\/
+import scalaz.{\/,-\/,\/-}
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.{Process, time}
 import scalaz.std.string._
@@ -32,14 +32,13 @@ object Housekeeping {
    * 2. ensuring that targets that are stuck in the assigned state for more than a given
    *    period are reaped, and re-assigned to another flask (NOT IMPLEMENTED.)
    */
-  def periodic(delay: Duration)(maxRetries: Int)(d: Discovery, r: Repository): Process[Task,Unit] = {
+  def periodic(delay: Duration)(maxRetries: Int)(d: Discovery, r: Repository): Process[Task, Unit] =
     time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
-      for {
-        _  <- gatherUnassignedTargets(d, r) <*
-              handleInvestigating(maxRetries)(r)
-      } yield ()
+      (gatherUnassignedTargets(d, r) <* handleInvestigating(maxRetries)(r)).attempt.map {
+        case \/-(_) => ()
+        case -\/(e) => log.warn(s"failed running housekeeping itteration due to $e")
+      }
     )
-  }
 
   /**
    * Gather up all the targets that are for reasons unknown sitting in the unassigned
@@ -55,9 +54,9 @@ object Housekeeping {
       l <- discovery.listTargets
       _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
 
-      // // figure out given the existing distribution, and the differencen between what's been discovered
+      // // figure out given the existing distribution, and the difference between what's been discovered
       // // STU: the fact that I'm throwing ID away here is suspect
-      unmonitored = l.foldLeft(Set.empty[Target])(_ ++ _._2) &~ d.values.foldLeft(Set.empty[Target])(_ ++ _)
+      unmonitored = l.foldLeft(Set.empty[Target])(_ ++ _._2) -- d.values.foldLeft(Set.empty[Target])(_ ++ _)
       _  = log.info(s"located instances: monitorable=${l.size}, unmonitored=${unmonitored.size}")
 
       // // action the new targets by putting them in the monitoring lifecycle

@@ -344,6 +344,59 @@ val anEdge = edge("myservice/otherservice",
 ```
 
 
+### LapTimer
+
+A `LapTimer` instrument is a compound instrument, which combines Timer and Counter instruments. It adds counter to all the timer operations.
+
+A Timer can be easily replaced with LapTimer, by simply replacing the way it is created:
+
+``` scala
+package oncue.svc
+package yourproject
+
+import funnel.instruments._
+
+object metrics {
+  val GetUserList = lapTimer("db/get-user-list")
+}
+```
+
+LapTimer fully supports Timer features:
+
+``` scala
+import metrics._
+import scalaz.concurrent.Task
+import scala.concurrent.Future
+
+trait SomeFun {
+
+  private def getList: Future[Int] = …
+  private def getListTask: Task[Int]
+
+  def foobar = {
+
+    // for timing strict values, just use the block syntax:
+    GetUserList.time {
+      // expensive operation goes here
+    }
+
+    // for timing async Future[A]
+    GetUserList.timeFuture(getList)
+
+    // for timing scalaz.concurrent.Task[A]
+    GetUserList.timeTask(getListTask)
+
+    // for anything else procedural, the side-effecting API
+    val stopwatch = GetUserList.start()
+    val x = // operation to be timed
+    stopwatch() // stops the stopwatch and records the time taken
+
+  }
+
+}
+```
+
+
 ### Monitoring Server
 
 All the metrics you define in your application, plus some additional platform metrics supplied by the monitoring library can be exposed via a baked in administration server. In order to use this server, one simply only needs to add the following line to the `main` of their application:

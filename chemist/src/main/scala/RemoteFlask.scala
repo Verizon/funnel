@@ -113,16 +113,15 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
     req.flatMap(r => fromScalaFuture(http(r OK as.String)))
   }
 
+  import telemetry._
+
   /**
-   * used to contramap the Sharding handler towards the Unmonitored Either3
-   * Monitored stream we get from telemetry
-   *
-   * Either3[Monitored, Unmonitored,Problem], I promise
+   * used to contramap the Sharding handler towards the stream we get from telemetry
    */
-  private def actionsFromLifecycle(flask: FlaskID): Either3[URI, URI, (URI, String)] => PlatformEvent = {
-    case Left3(id) => PlatformEvent.Unmonitored(flask, id)
-    case Middle3(id) => PlatformEvent.Monitored(flask, id)
-    case Right3((id,msg)) => PlatformEvent.Problem(flask, id, msg)
+  private def actionsFromLifecycle(flask: FlaskID): ShardingEvent => PlatformEvent = {
+    case SUnmonitored(id) => PlatformEvent.Unmonitored(flask, id)
+    case SMonitored(id) => PlatformEvent.Monitored(flask, id)
+    case SProblem(id,msg) => PlatformEvent.Problem(flask, id, msg)
   }
 
   def monitorTelemetry(flask: Flask,
@@ -134,7 +133,7 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
     import telemetry.Telemetry.telemetrySubscribeSocket
 
     log.info(s"attempting to connect to 0mq telemetry channel ${flask.telemetry.uri}")
-    val lc: Actor[Either3[URI, URI, (URI,String)]] = lifecycle.contramap(actionsFromLifecycle(flask.id))
+    val lc: Actor[ShardingEvent] = lifecycle.contramap(actionsFromLifecycle(flask.id))
     telemetrySubscribeSocket(flask.telemetry.uri, signal, keys, errors, lc)
   }
 

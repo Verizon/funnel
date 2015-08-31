@@ -1,17 +1,18 @@
 package funnel
 
 import com.twitter.algebird.Group
+import org.scalacheck.Arbitrary._
+import org.scalacheck.Prop._
 import org.scalacheck._
-import Prop._
-import Arbitrary._
+
 import scala.concurrent.duration._
-import scalaz.concurrent.{Strategy, Task}
 import scalaz.Nondeterminism
-import scalaz.stream.{process1, Process}
+import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.tuple._
-import scalaz.syntax.functor._
+import scalaz.stream.Process
 import scalaz.syntax.foldable._
+import scalaz.syntax.functor._
 
 object MonitoringSpec extends Properties("monitoring") {
 
@@ -219,8 +220,6 @@ object MonitoringSpec extends Properties("monitoring") {
 
   /* Make sure key senesence doesn't have quadratic complexity */
   property("key-senesence") = secure {
-    import scalaz.std.function._
-    import scalaz.syntax.functor._
     def go: Boolean = {
       val ranges = List(4, 8, 16, 32, 64, 128).map(Range(0, _))
       val times = ranges map { r =>
@@ -418,8 +417,8 @@ object MonitoringSpec extends Properties("monitoring") {
   } yield bs
 
   property("Metric.bsequence") = forAll(bools) { bs =>
-    import scalaz.~>
     import scalaz.std.option._
+    import scalaz.~>
     val alwaysNone = new (Key ~> Option) { def apply[A](k: Key[A]) = None }
     val expected = Policies.majority(bs)
     Metric.bsequence(bs.map(Metric.point(_)))
@@ -481,4 +480,65 @@ object MonitoringSpec extends Properties("monitoring") {
     fraction(.66)(List(Red,Red,Green)) == Red &&
     fraction(.5)(List(Red,Red,Green,Green)) == Amber
   }
+
+  /* Simple sanity check of LapTimer. */
+  property("LapTimer.basic") = secure {
+    def go: Boolean = {
+      import instruments._
+
+      import scala.concurrent.ExecutionContext.Implicits.global
+      import scala.concurrent._
+      import scala.language.postfixOps
+      val label = "laptimer"
+      val t = timer(label)
+      val c = counter(label)
+      val lt = new LapTimer(t, c)
+      lt.record(50 milliseconds)
+      lt.recordNanos(50000)
+      val stop = lt.start
+      Thread.sleep(50)
+      lt.stop(stop)
+      lt.time { Thread.sleep(50) }
+      lt.timeFuture(Future { Thread.sleep(50); None })
+      lt.timeTask(Task { Thread.sleep(50); None }).run
+      // Make sure we wait for the time buffer to catch up
+      Thread.sleep(instruments.bufferTime.toMillis * 2)
+      val m = Monitoring.default
+      val r1 = m.latest(t.keys.now).run.mean
+      val r2 = m.latest((c.keys.now)).run
+      r1 > 0 && (r1 - 50).abs < 1000 && r2 == 6
+    }
+    go || go || go
+  }
+
+  /* Make sure timers allow concurrent updates. */
+  property("LapTimer.concurrent") = secure {
+    def go: Boolean = {
+      import instruments._
+      val label = "laptimer"
+      val t = timer(label)
+      val c = counter(label)
+      val lt = new LapTimer(t, c)
+      val N = 100000
+      val S = scalaz.concurrent.Strategy.DefaultStrategy
+      val t0 = System.nanoTime
+      val d1 = (1.milliseconds); val d2 = (3.milliseconds)
+      val f1 = S { (0 until N).foreach { _ =>
+        lt.record(d1)
+      }}
+      val f2 = S { (0 until N).foreach { _ =>
+        lt.record(d2)
+      }}
+      f1(); f2()
+      val updateTime = Duration.fromNanos(System.nanoTime - t0) / N.toDouble
+      Thread.sleep(200)
+      // average time should be 2 millis
+      val m = Monitoring.default
+      val r1 = m.latest(t.keys.now).run.mean
+      val r2 = m.latest((c.keys.now)).run
+      r1 === 2.0 && updateTime.toNanos < 1000 && r2 == N*2
+    }
+    go || go || go
+  }
+
 }

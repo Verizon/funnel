@@ -18,9 +18,11 @@ bin
 .project
 .ivy2
 .lib
+.idea
 *.swp
 sbt
 *~
 tags
 _site
 logback-test.xml
+*.local.yml

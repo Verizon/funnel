@@ -40,7 +40,7 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
     val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
     val elasticDf        =
-      cfg.lookup[String]("flask.elastic-search.partition-date-format").getOrElse("yyyy.MM.dd")
+      cfg.lookup[String]("flask.elastic-search.partition-date-format").getOrElse("yyyy.MM.ww")
     val elasticTimeout   = cfg.lookup[Int]("flask.elastic-search.connection-timeout-in-ms").getOrElse(5000)
     val esGroups         = cfg.lookup[List[String]]("flask.elastic-search.groups")
     val riemannHost      = cfg.lookup[String]("flask.riemann.host")
@@ -102,7 +102,7 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       Location("localhost", options.telemetryPort, "local", NetworkScheme.Zmtp(TCP), false, LocationIntent.Supervision, templates)
     )
 
-    val cfg = StaticConfig(NetworkConfig("127.0.0.1", 64529), 1.second, Map.empty, Map(F.id -> F)) 
+    val cfg = StaticConfig(NetworkConfig("127.0.0.1", 64529), 1.second, Map.empty, Map(F.id -> F))
     class DefaultStatic extends Static {
       def config = cfg
     }
@@ -124,13 +124,14 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     d should have size 1
     d.keys.head shouldBe (F.id)
-    s should have size 1
+    // Size 2 because of selfie
+    s should have size 2
     val d2 = d.values
     d2 should have size 1
     val d3 = d2.head.toList.map(p => (p._1, p._2.toSet))
     d3 should have size 1
     val distribution: (String, Set[URI]) = d3.head
-    val sources: (String, Set[URI]) = (s.head.label, s.head.urls.map(u => new URI(u)).toSet)
-    distribution should equal (sources)
+    val sources: Set[(String, Set[URI])] = s.map(x => (x.label, x.urls.map(u => new URI(u)).toSet)).toSet
+    sources should contain (distribution)
   }
 }

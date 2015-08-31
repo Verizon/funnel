@@ -83,7 +83,7 @@ class SpecMultiJvmSub extends FlatSpec with Matchers with TelemetryMultiTest {
     val sub = telemetrySubscribeSocket(U1, S,
                                        keyActor,
                                        errorsActor,
-                                       dummyActor.asInstanceOf[Actor[Either3[URI,URI,(URI,String)]]])
+                                       dummyActor.asInstanceOf[Actor[ShardingEvent]])
 
     sub.runAsync(x => println("RESULT OF RUNNING TELEMETRY: " + x))
 

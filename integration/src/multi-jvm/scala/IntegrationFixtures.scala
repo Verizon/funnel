@@ -62,7 +62,7 @@ object IntegrationFixtures {
       url = "http://localhost:9200",
       indexName = "funnel",
       typeName = "metric",
-      dateFormat = "yyyy.MM.dd",
+      dateFormat = "yyyy.MM.ww",
       templateName = "flask",
       templateLocation = None,
       groups = List("previous/jvm", "previous/system", "previous")

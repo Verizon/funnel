@@ -236,7 +236,7 @@ Whilst *Flask* is a fairly small process, this section includes several sub-sect
 ````
 [
   {
-    "bucket": "accounts-2.1-us-east",
+    "cluster": "accounts-2.1-us-east",
     "urls": [
       "http://accounts-01.us-east.verizon.com:5777/stream/previous",
       "http://accounts-01.us-east.verizon.com:5777/stream/now?type=\"String\""
@@ -245,9 +245,9 @@ Whilst *Flask* is a fairly small process, this section includes several sub-sect
 ]
 ````
 
-This simple structure represents the "buckets" of URLs that one wishes to monitor. The expectation is that a given logical bucket (for example, accounts-2.1-us-east) there will be an associated set of URLs that are exposing metrics. This bucketing is entirely arbitrary, and you can construct whatever bucket/URL combinations you want, with the one restriction that a given stream can only be connected to a single bucket at any given time (on the basis that connecting over and over to the same machine is a needless drain on resources). However, it is fine to send the same URL multiple times. In the event that there is an existing connection to that URL, the existing connection will be used instead of creating a new one (in other words, monitoring instructions are idempotent for bucket -> url combinations).
+This simple structure represents the "cluster" of URLs that one wishes to monitor. The expectation is that a given logical cluster (for example, accounts-2.1-us-east) there will be an associated set of URLs that are exposing metrics. This clustering is entirely arbitrary, and you can construct whatever cluster/URL combinations you want, with the one restriction that a given stream can only be connected to a single cluster at any given time (on the basis that connecting over and over to the same machine is a needless drain on resources). However, it is fine to send the same URL multiple times. In the event that there is an existing connection to that URL, the existing connection will be used instead of creating a new one (in other words, monitoring instructions are idempotent for cluster -> url combinations).
 
-A URL can be any Funnel URL that serves a stream of metrics. It's a good idea to be as specific as possible here. Don't request the entire stream if you don't need it. As an example, the above bucket specification asks only for metrics from the `previous` window, as well as metrics from the `now` window that have the type `"String"` (which will generally not exist in the `previous` window).
+A URL can be any Funnel URL that serves a stream of metrics. It's a good idea to be as specific as possible here. Don't request the entire stream if you don't need it. As an example, the above cluster specification asks only for metrics from the `previous` window, as well as metrics from the `now` window that have the type `"String"` (which will generally not exist in the `previous` window).
 
 <a name="flask-configuration"></a>
 
@@ -274,7 +274,7 @@ flask {
 #   type-name = "fff"
 #
 #   # Optional Parameters:
-#   partition-date-format = "yyyy.MM.dd"
+#   partition-date-format = "yyyy.ww"
 #   connection-timeout-in-ms = 5000
 # }
 
