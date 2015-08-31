@@ -16,11 +16,20 @@ import funnel.aws._
 import scalaz.stream.async.signalOf
 import scalaz.concurrent.Strategy
 
+/**
+ * Settings needed to subscribe ot the appropriate queues
+ * used by Chemist in AWS.
+ */
 case class QueueConfig(
   queueName: String,
   topicName: String
 )
 
+/**
+ * Used to figure out where this particular chemist
+ * is running, which is going to be useful for figuring
+ * out service-locality in the future.
+ */
 case class MachineConfig(
   id: String,
   location: Location

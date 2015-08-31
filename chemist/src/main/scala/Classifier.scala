@@ -3,6 +3,13 @@ package chemist
 
 import scalaz.concurrent.Task
 
+/**
+ * Classifier is required by all `Discovery` instances, and
+ * should form an important part of discovery, by allowing the
+ * system to partition systems in a meaningful manner.
+ *
+ * @see funnel.chemist.Classification
+ */
 trait Classifier[A] {
   def task: Task[A => Classification]
 }
