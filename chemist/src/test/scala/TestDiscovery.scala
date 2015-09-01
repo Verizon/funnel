@@ -4,7 +4,8 @@ package chemist
 import scalaz.concurrent.Task
 
 class TestDiscovery extends Discovery {
-  def listFlasks: Task[Seq[Flask]] = ???
+  def listActiveFlasks: Task[Seq[Flask]] = ???
+  def listAllFlasks: Task[Seq[Flask]] = ???
   def listTargets: Task[Seq[(TargetID, Set[Target])]] = ???
   def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = ???
   def lookupFlask(id: funnel.chemist.FlaskID): Task[Flask] = ???

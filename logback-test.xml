@@ -6,7 +6,7 @@
     </encoder>
   </appender>
 
-  <logger name="funnel" level="OFF" />
+  <logger name="funnel" level="DEBUG" />
   <logger name="com.ning.http.client" level="OFF" />
 
   <root level="OFF">
