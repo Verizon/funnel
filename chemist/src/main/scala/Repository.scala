@@ -10,7 +10,7 @@ import scalaz.std.string._
 import scalaz.std.set._
 import scalaz.syntax.monad._
 import scalaz.stream.{Sink, Channel, Process, Process1, async}
-import java.net.{ InetAddress, URI }
+import java.net.URI
 import TargetLifecycle._
 import funnel.internals._
 import metrics._
