@@ -105,9 +105,9 @@ object AwsConfig {
     MachineConfig(
       id = cfg.lookup[String]("aws.instance-id").getOrElse("local"),
       location = Location(
-        host = cfg.require[String]("aws.meta-data.local-ipv4"),
+        host = cfg.require[String]("aws.network.local-ipv4"),
         port = cfg.require[Int]("chemist.network.funnel-port"),
-        datacenter = cfg.require[String]("aws.meta-data.placement.region"),
+        datacenter = cfg.require[String]("aws.region"),
         intent = LocationIntent.Mirroring,
         templates = Nil
       )
