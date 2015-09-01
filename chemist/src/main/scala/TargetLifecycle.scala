@@ -203,7 +203,7 @@ object TargetLifecycle {
     targetLifecycle decomp state match {
       case Decomp(Some(Context(_, _, _, out)), _) =>
         findTrans(msg, state, out).fold(
-          Task.now(log.error(s"found context but failed: msg=$msg, state=$state, out=$out"))
+          Task.now(log.error(s"found context but failed: msg=$msg, state=$state, out=$out, repostates=${repo.states}"))
             )(repo.processRepoEvent)
 
       case other => Task.now(log.error(
