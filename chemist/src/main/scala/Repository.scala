@@ -92,18 +92,19 @@ class StatefulRepository extends Repository {
    * stores a key-value map of uri -> state-change
    */
   val targets = new Ref[InstanceM](==>>.empty)
-  val flasks  = new Ref[FlaskM](==>>.empty)
+  val knownFlasks  = new Ref[FlaskM](==>>.empty)
 
   private val emptyMap: InstanceM = ==>>.empty
-  val stateMaps = new Ref[StateM](==>>(Unknown -> emptyMap,
-                                       Unmonitored -> emptyMap,
-                                       Assigned -> emptyMap,
-                                       Monitored -> emptyMap,
-                                       Problematic -> emptyMap,
-                                       DoubleAssigned -> emptyMap,
-                                       DoubleMonitored -> emptyMap,
-    				       Investigating -> emptyMap,
-    				       Fin -> emptyMap))
+  val stateMaps = new Ref[StateM](==>>(
+    Unknown -> emptyMap,
+    Unmonitored -> emptyMap,
+    Assigned -> emptyMap,
+    Monitored -> emptyMap,
+    Problematic -> emptyMap,
+    DoubleAssigned -> emptyMap,
+    DoubleMonitored -> emptyMap,
+    Investigating -> emptyMap,
+    Fin -> emptyMap))
 
   /**
    * stores lifecycle events to serve as an audit log that
@@ -168,14 +169,13 @@ class StatefulRepository extends Repository {
       a match {
         case PlatformEvent.NewTarget(target) =>
           Task.delay(log.info("platformHandler -- new target: " + target)) >>
-          // Task.delay(targets.update(_.insert(target.uri, f))) >>
           lifecycle(TargetLifecycle.Discovery(target, System.currentTimeMillis), targetState(target.uri))
 
         case PlatformEvent.NewFlask(f) =>
           Task.delay(log.info("platformHandler -- new flask: " + f)) >>
           Task.delay {
             D.update(_.updateAppend(f.id, Set.empty))
-            flasks.update(_.insert(f.id, f))
+            knownFlasks.update(_.insert(f.id, f))
           } >>
           repoCommandsQ.enqueueOne(RepoCommand.Telemetry(f))
 
@@ -215,7 +215,7 @@ class StatefulRepository extends Repository {
         }
 
         case PlatformEvent.Problem(f, i, msg) => {
-          log.error(s"platformHandler -- $i no exception from $f: $msg")
+          log.warn(s"platformHandler -- $i no exception from  $f: $msg")
           val target = targets.get.lookup(i)
           target.map { t =>
             // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
@@ -276,7 +276,7 @@ class StatefulRepository extends Repository {
             }
           } yield ()
         case NewFlask(flask) => Task {
-          flasks.update(_ + (flask.id -> flask))
+          knownFlasks.update(_ + (flask.id -> flask))
         }
       }
     } yield ()
@@ -308,7 +308,7 @@ class StatefulRepository extends Repository {
     targets.get.lookup(id).map(_.msg.target)
 
   def flask(id: FlaskID): Option[Flask] =
-    flasks.get.lookup(id)
+    knownFlasks.get.lookup(id)
 
   /////////////// flask operations ///////////////
 

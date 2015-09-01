@@ -158,7 +158,7 @@ object Lifecycle {
   def run(queueName: String, signal: Signal[Boolean]
     )(repo: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
   ): Task[Unit] = {
-    val ourWorld = stream(queueName, signal)(sqs,asg,ec2,dsc) flatMap logErrors to Process.constant(repo.platformHandler _)
+    val ourWorld = stream(queueName, signal)(sqs,asg,ec2,dsc).flatMap(logErrors) to Process.constant(repo.platformHandler _)
     ourWorld.run.onFinish(_ => signal.set(false))
   }
 }
