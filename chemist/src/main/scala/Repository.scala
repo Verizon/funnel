@@ -110,8 +110,8 @@ class StatefulRepository extends Repository {
    * stores lifecycle events to serve as an audit log that
    * retains the last 100 scalling events
    */
-  private[chemist] val historyStack = new BoundedStack[PlatformEvent](500)
-  private[chemist] val repoHistoryStack = new BoundedStack[RepoEvent](500)
+  private[chemist] val historyStack = new BoundedStack[PlatformEvent](2000)
+  private[chemist] val repoHistoryStack = new BoundedStack[RepoEvent](2000)
 
   /**
    * stores the list of errors we have gotten from flasks, most recent
