@@ -80,7 +80,7 @@ trait Chemist[A <: Platform]{
    * List out the last 100 lifecycle events that this chemist has seen.
    */
   def platformHistory: ChemistK[Seq[PlatformEvent]] =
-    config.flatMapK(_.repository.historicalPlatformEvents)
+    config.flatMapK(_.repository.historicalPlatformEvents.map(_.filterNot(_ == PlatformEvent.NoOp)))
 
   /**
     * List the unmonitorable targets.
