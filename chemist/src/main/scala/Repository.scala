@@ -10,7 +10,7 @@ import scalaz.std.string._
 import scalaz.std.set._
 import scalaz.syntax.monad._
 import scalaz.stream.{Sink, Channel, Process, Process1, async}
-import java.net.URI
+import java.net.{ InetAddress, URI }
 import TargetLifecycle._
 import funnel.internals._
 import metrics._
@@ -216,12 +216,16 @@ class StatefulRepository extends Repository {
 
         case PlatformEvent.Problem(f, i, msg) => {
           log.error(s"platformHandler -- $i no exception from $f: $msg")
-          val target = targets.get.lookup(i)
-          target.map { t =>
-            // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
-            lifecycle(TargetLifecycle.Investigate(t.msg.target, System.currentTimeMillis, 0), t.to)
-          } getOrElse {
-            Task.delay(log.error(s"platformHandler -- target $i had a problem, but never heard of it"))
+          if (i.getHost != InetAddress.getLocalHost.getHostName) {
+            val target = targets.get.lookup(i)
+            target.map { t =>
+              // TODO: make sure we handle correctly all the cases where this might arrive (possibly unexpectedly)
+              lifecycle(TargetLifecycle.Investigate(t.msg.target, System.currentTimeMillis, 0), t.to)
+            } getOrElse {
+              Task.delay(log.error(s"platformHandler -- target $i had a problem, but never heard of it"))
+            }
+          } else {
+            Task.delay(log.debug("Chemist was asked to investigate itself--ignoring."))
           }
         }
 
