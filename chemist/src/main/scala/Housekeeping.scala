@@ -122,7 +122,7 @@ object Housekeeping {
 
       if (i.retryCount < maxRetries) {			// TODO: make max retries oonfigurable?
         val now = System.currentTimeMillis
-        val later = i.time + math.pow(2.0, i.retryCount.toDouble).toInt.hours.toMillis
+        val later = i.time + math.pow(2.0, i.retryCount.toDouble).toInt.minutes.toMillis
         if (now >= later) {				// Not done retrying; time to retry
           Task.fromDisjunction(contact(i.target.uri)).onFinish { ot => ot match {
             case Some(t) => Task.delay {		// Retry failed with Throwable t
