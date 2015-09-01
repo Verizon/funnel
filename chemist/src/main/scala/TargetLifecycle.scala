@@ -152,10 +152,10 @@ object TargetLifecycle {
                           LEdge(Monitored,       Fin,             Terminate),
                           LEdge(DoubleAssigned,  Fin,             Terminate),
                           LEdge(DoubleMonitored, Fin,             Terminate),
-    			  LEdge(Problematic,     Investigating,   Exceptional),
-    			  LEdge(Investigating,   Unmonitored,     Discover),
-    			  LEdge(Investigating,   Fin,             Terminate),
-    			  LEdge(Monitored,       Unmonitored,     Unmonitor))
+                          LEdge(Problematic,     Investigating,   Exceptional),
+                          LEdge(Investigating,   Unmonitored,     Discover),
+                          LEdge(Investigating,   Fin,             Terminate),
+                          LEdge(Monitored,       Unmonitored,     Unmonitor))
 
   val targetLifecycle: G = mkGraph(nodes, edges)
 

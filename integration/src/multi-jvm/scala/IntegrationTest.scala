@@ -178,7 +178,7 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
       printObnoxiously(fetch("/shards/flask1/sources"))
       printObnoxiously(fetch("/shards/flask1/distribution"))
 
-      countForState(TargetState.Monitored) should equal (3)
+      countForState(TargetState.Monitored) should equal (7)
 
       countForState(TargetState.Assigned) should equal (0)
 
