@@ -10,7 +10,13 @@ ScalaTest.settings
 
 Custom.compilation
 
-libraryDependencies += "com.amazonaws" % "aws-java-sdk" % "1.8.6"
+libraryDependencies ++= Seq(
+  "com.amazonaws" % "aws-java-sdk-ec2"            % V.aws,
+  "com.amazonaws" % "aws-java-sdk-autoscaling"    % V.aws,
+  "com.amazonaws" % "aws-java-sdk-sns"            % V.aws,
+  "com.amazonaws" % "aws-java-sdk-sqs"            % V.aws,
+  "com.amazonaws" % "aws-java-sdk-cloudformation" % V.aws
+)
 
 fork in Test := true
 

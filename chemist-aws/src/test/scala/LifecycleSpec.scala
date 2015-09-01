@@ -26,7 +26,7 @@ class LifecycleSpec extends FlatSpec with Matchers {
 
   val asg1 = TestAmazonASG.single(_ => uuid)
 
-  val dsc = new AwsDiscovery(ec2, asg1, templates)
+  val dsc = new AwsDiscovery(ec2, asg1, DefaultClassifier, templates)
 
   val k1 = "i-dx947af7"
   val k2 = "i-15807647"

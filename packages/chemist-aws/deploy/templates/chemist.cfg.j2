@@ -1,12 +1,15 @@
 
 chemist {
   network {
-    host = "127.0.0.1"
-    port = 9000
+    host        = "127.0.0.1"
+    port        = 9000
+    funnel-port = 5775
   }
 
   # sharding-strategy = "least-first-round-robin"
   sharding-strategy = "random"
+
+  classification-stratagy = "default"
 
   include-vpc-targets = true
 
@@ -32,3 +35,5 @@ aws {
   access-key = "$(AWS_ACCESS_KEY)"
   secret-key = "$(AWS_SECRET_KEY)"
 }
+
+import "/usr/share/oncue/etc/env.conf"

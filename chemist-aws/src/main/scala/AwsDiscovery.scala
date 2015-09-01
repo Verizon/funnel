@@ -31,6 +31,7 @@ import concurrent.duration._
 class AwsDiscovery(
   ec2: AmazonEC2,
   asg: AmazonAutoScaling,
+  classifier: Classifier[AwsInstance],
   resourceTemplates: Seq[LocationTemplate],
   cacheMaxSize: Int = 2000
 ) extends Discovery {
@@ -55,7 +56,7 @@ class AwsDiscovery(
    * verification that Funnel is running on port 5775 and is network accessible.
    */
   def listTargets: Task[Seq[(TargetID, Set[Target])]] = for {
-    i <- instances(!isFlask(_))
+    i <- instances(notFlask)
     v <- valid(i)
   } yield v.map(in => TargetID(in.id) -> in.targets)
 
@@ -66,23 +67,35 @@ class AwsDiscovery(
    */
   def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] =
     for {
-      i <- instances(!isFlask(_))
+      i <- instances(notFlask)
       v <- valid(i)
       bad = i.toSet &~ v.toSet
     } yield bad.toList.map(in => TargetID(in.id) -> in.targets)
 
   /**
-   * List all of the instances in the given AWS account that respond to a rudimentry
-   * verification that Funnel is running on port 5775 and is network accessible.
+   * List all of the instances in the given AWS account and figure out which ones of
+   * those instances meets the classification criterion for being considered
+   * an active flask.
    */
-  def listFlasks: Task[Seq[Flask]] =
+  def listActiveFlasks: Task[Seq[Flask]] =
+    for {
+      a <- instances(isActiveFlask)
+      b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
+    } yield b
+
+  /**
+   * List all instances that clsasify as a flask, regardless of working state.
+   * This function is only ever called during migration / re-election of an orchestrating
+   * leader chemist.
+   */
+  def listAllFlasks: Task[Seq[Flask]] =
     for {
       a <- instances(isFlask)
       b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
     } yield b
 
   /**
-   * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
+   * Lookup the `AwsInstance` for a given `InstanceID`; `AwsInstance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
   def lookupFlask(id: FlaskID): Task[Flask] =
@@ -92,7 +105,7 @@ class AwsDiscovery(
     } yield Flask(FlaskID(a.id), a.location, b)
 
   /**
-   * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
+   * Lookup the `AwsInstance` for a given `InstanceID`; `AwsInstance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
   def lookupTargets(id: TargetID): Task[Set[Target]] = {
@@ -105,10 +118,10 @@ class AwsDiscovery(
   }
 
   /**
-   * Lookup the `Instance` for a given `InstanceID`; `Instance` returned contains all
+   * Lookup the `AwsInstance` for a given `InstanceID`; `AwsInstance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
-  protected def lookupOne(id: String): Task[AwsInstance] = {
+  def lookupOne(id: String): Task[AwsInstance] = {
     lookupMany(Seq(id)).flatMap {
       _.filter(_.id == id).headOption match {
         case None => Task.fail(InstanceNotFoundException(id))
@@ -118,7 +131,7 @@ class AwsDiscovery(
   }
 
   /**
-   * Lookup the `Instance` metadata for a set of `InstanceID`.
+   * Lookup the `AwsInstance` metadata for a set of `InstanceID`.
    * @see funnel.chemist.AwsDiscovery.lookupOne
    */
   protected def lookupMany(ids: Seq[String]): Task[Seq[AwsInstance]] = {
@@ -170,14 +183,6 @@ class AwsDiscovery(
     }
   }
 
-  ///////////////////////////// filters /////////////////////////////
-
-  def isFlask(id: String): Task[Boolean] =
-    lookupOne(id).map(isFlask)
-
-  def isFlask(i: AwsInstance): Boolean =
-    i.application.map(_.name.startsWith("flask")).getOrElse(false)
-
   ///////////////////////////// internal api /////////////////////////////
 
   /**
@@ -205,17 +210,18 @@ class AwsDiscovery(
    * This is the main work-horse function of discovery and provides a mechanism
    * to find all the instances that are contained within an auto-scaling group.
    */
-  private def instances(f: AwsInstance => Boolean): Task[Seq[AwsInstance]] =
+  private def instances(g: Classification => Boolean): Task[Seq[AwsInstance]] =
     for {
       a <- readAutoScallingGroups
+      b <- classifier.task.map(_ andThen g)
       // apply the specified filter if we want to remove specific groups for a reason
-      x  = a.filter(f)
-      _  = log.debug(s"instances, discovered ${x.size} instances (minus ${a.size - x.size} filtered instances).")
-    } yield x
+      c  = a.filter(b(_))
+      _  = log.debug(s"instances, discovered ${c.size} instances (minus ${a.size - c.size} filtered instances).")
+    } yield c
 
   /**
-    * A monadic function that asynchronously filters the passed instances for validity.
-    */
+   * A monadic function that asynchronously filters the passed instances for validity.
+   */
   private def valid(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] = for {
     x <- Task.now(instances)
     // actually reach out to all the discovered hosts and check that their port is reachable

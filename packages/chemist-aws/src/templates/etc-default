@@ -15,7 +15,7 @@
 # -------------------------------------------------
 
 # Setting -Xmx and -Xms in Megabyte for a m3.medium instance
--mem 5120
+-mem 7168
 
 -J-server
 
