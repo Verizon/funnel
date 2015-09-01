@@ -163,12 +163,7 @@ class StatefulRepository extends Repository {
    * Handle the Actions emitted from the Platform
    */
   def platformHandler(a: PlatformEvent): Task[Unit] = {
-    if (a == PlatformEvent.NoOp) {
-      Task.now(())
-    } else {
-      historyStack.push(a)
-    } >>
-    Task.delay {
+    historyStack.push(a).flatMap{ _ =>
       val lifecycle = TargetLifecycle.process(this) _
       a match {
         case PlatformEvent.NewTarget(target) =>
@@ -239,12 +234,12 @@ class StatefulRepository extends Repository {
       }
     }
   }.attempt.flatMap(_.fold(
-    e => Task.delay {
-      log.error(s"Error processing platform event $a: $e")
-      PlatformEventFailures.increment
-    },
-    _ => Task.now(())
-  ))
+      e => Task.delay {
+        log.error(s"Error processing platform event $a: $e")
+        PlatformEventFailures.increment
+      },
+      _ => Task.now(())
+    ))
 
   def processRepoEvent(re: RepoEvent): Task[Unit] =
     for {
