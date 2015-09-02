@@ -3,6 +3,12 @@ package chemist
 package aws
 
 import knobs._
+import funnel.aws._
+import dispatch.Http
+import java.net.InetAddress
+import scalaz.concurrent.Strategy
+import scalaz.stream.async.signalOf
+import concurrent.duration.Duration
 import com.amazonaws.services.sns.AmazonSNS
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.ec2.AmazonEC2
@@ -10,11 +16,6 @@ import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.regions.{Regions,Region}
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import com.amazonaws.services.cloudformation.AmazonCloudFormation
-import dispatch.Http
-import concurrent.duration.Duration
-import funnel.aws._
-import scalaz.stream.async.signalOf
-import scalaz.concurrent.Strategy
 
 /**
  * Settings needed to subscribe ot the appropriate queues
@@ -103,9 +104,9 @@ object AwsConfig {
 
   private def readMachineConfig(cfg: Config): MachineConfig =
     MachineConfig(
-      id = cfg.lookup[String]("aws.instance-id").getOrElse("local"),
+      id = cfg.lookup[String]("aws.instance-id").getOrElse("i-1abc234"),
       location = Location(
-        host = cfg.require[String]("aws.network.local-ipv4"),
+        host = cfg.lookup[String]("aws.network.local-ipv4").getOrElse(InetAddress.getLocalHost.getHostName),
         port = cfg.require[Int]("chemist.network.funnel-port"),
         datacenter = cfg.require[String]("aws.region"),
         intent = LocationIntent.Mirroring,

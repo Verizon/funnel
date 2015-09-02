@@ -292,7 +292,7 @@ class AwsDiscovery(
 
     for {
       a <- toLocation(dns, datacenter, mirrorTemplate, Mirroring)
-      _  = log.debug(s"discovered mirrioring template '$a'")
+      // _  = log.debug(s"discovered mirrioring template '$a'")
 
       b  = toLocation(dns, datacenter, supervisionTemplate, Supervision)
       _  = b.foreach(t => log.debug(s"discovered telemetry template '$t'"))
