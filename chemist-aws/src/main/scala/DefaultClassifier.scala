@@ -20,8 +20,8 @@ import scalaz.concurrent.Task
 object DefaultClassifier extends Classifier[AwsInstance]{
   import Classification._
 
-  private[funnel] val Flask = "Flask"
-  private[funnel] val Chemist = "Chemist"
+  private[funnel] val Flask = "flask"
+  private[funnel] val Chemist = "chemist"
 
   def isApplication(prefix: String)(i: AwsInstance): Boolean =
     i.application.map(_.name.trim.toLowerCase.startsWith(prefix)).getOrElse(false)
