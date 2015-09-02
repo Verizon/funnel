@@ -50,7 +50,7 @@ trait Discovery {
    * @see funnel.chemist.Classifier
    */
   def isMonitorable(c: Classification): Boolean =
-    c != ActiveFlask ||
-    c != InactiveFlask ||
-    c != Unknown
+    c == ActiveTarget ||
+    c == ActiveChemist ||
+    c == InactiveChemist
 }

@@ -213,11 +213,15 @@ class AwsDiscovery(
   private def instances(g: Classification => Boolean): Task[Seq[AwsInstance]] =
     for {
       a <- readAutoScallingGroups
-      b <- classifier.task.map(_ andThen g)
+      b <- classifier.task
+      c  = b andThen g
       // apply the specified filter if we want to remove specific groups for a reason
-      c  = a.filter(b(_))
-      _  = log.debug(s"instances, discovered ${c.size} instances (minus ${a.size - c.size} filtered instances).")
-    } yield c
+      d  = a.filter(c(_))
+      // _  = println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+      // _  = a.filter(c(_)).foreach { i => println(s"i: ${i.application.map(_.name)} -> ${b(i)} -> ${c(i)}") }
+      // _  = println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+      _  = log.debug(s"instances, discovered ${d.size} instances (minus ${a.size - d.size} filtered instances).")
+    } yield d
 
   /**
    * A monadic function that asynchronously filters the passed instances for validity.
@@ -226,6 +230,7 @@ class AwsDiscovery(
     x <- Task.now(instances)
     // actually reach out to all the discovered hosts and check that their port is reachable
     y = x.map(g => validate(g).attempt)
+    // y = x.map(g => Task.now(g).attempt) // FOR LOCAL TESTING
     // run the tasks on the specified thread pool (Server.defaultPool)
     b <- Task.gatherUnordered(y)
     r = b.flatMap(_.toList)
