@@ -56,7 +56,7 @@ class AwsDiscovery(
    * verification that Funnel is running on port 5775 and is network accessible.
    */
   def listTargets: Task[Seq[(TargetID, Set[Target])]] = for {
-    i <- instances(notFlask)
+    i <- instances(isMonitorable)
     v <- valid(i)
   } yield v.map(in => TargetID(in.id) -> in.targets)
 
@@ -67,7 +67,7 @@ class AwsDiscovery(
    */
   def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] =
     for {
-      i <- instances(notFlask)
+      i <- instances(isMonitorable)
       v <- valid(i)
       bad = i.toSet &~ v.toSet
     } yield bad.toList.map(in => TargetID(in.id) -> in.targets)

@@ -104,7 +104,7 @@ object AwsConfig {
 
   private def readMachineConfig(cfg: Config): MachineConfig =
     MachineConfig(
-      id = cfg.lookup[String]("aws.instance-id").getOrElse("i-1abc234"),
+      id = cfg.lookup[String]("aws.instance-id").getOrElse("i-localhost"),
       location = Location(
         host = cfg.lookup[String]("aws.network.local-ipv4").getOrElse(InetAddress.getLocalHost.getHostName),
         port = cfg.require[Int]("chemist.network.funnel-port"),
