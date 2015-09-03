@@ -17,8 +17,9 @@ object Main {
       val config = (for {
         a <- defaultKnobs
         b <- knobs.aws.config
-        _  = log.debug(s"Auto-populated AWS knobs are: $b")
-      } yield AwsConfig.readConfig(a ++ b)).run
+        c  = a ++ b
+        _  = log.debug(s"chemist is being configured with knobs: $c")
+      } yield AwsConfig.readConfig(c)).run
     }
 
     val monitoring = MonitoringServer.start(Monitoring.default, 5775)
