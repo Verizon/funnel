@@ -57,12 +57,15 @@ object Main {
     /**
      * Accepting argument on the command line is really just a
      * convenience for testing and ad-hoc ops trial of the agent.
+     *
+     * Configs are loaded in order; LAST WRITER WINS, as configs
+     * are reduced right to left.
      */
-    val sources = args.toList.map(p =>
-      Optional(FileResource(new File(p)))) :::
-      Required(
+    val sources =
+      List(Required(
         FileResource(new File("/usr/share/funnel-agent/etc/agent.cfg")) or
-        ClassPathResource("oncue/agent.cfg")) :: Nil
+        ClassPathResource("oncue/agent.cfg"))) ++
+      args.toList.map(p => Optional(FileResource(new File(p))))
 
     val config: Task[Config] = for {
       a <- knobs.loadImmutable(sources)
