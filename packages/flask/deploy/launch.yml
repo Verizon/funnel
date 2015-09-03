@@ -3,11 +3,22 @@
   hosts: all
   connection: local
   gather_facts: false
+  vars:
+    environments:
+      imdev:
+        asg_min: "2"
+        asg_max: "5"
+      imqa:
+        asg_min: "4"
+        asg_max: "7"
+      improd:
+        asg_min: "4"
+        asg_max: "10"
   roles:
     - { role: launcher,
         amazon_cf_template: "flask.template",
         amazon_instance_type: m3.xlarge,
-        asg_desired:  "4",
-        asg_min_size: "4",
-        asg_max_size: "10"
+        asg_desired:  "{{ environments[deployment_environment].asg_min }}",
+        asg_min_size: "{{ environments[deployment_environment].asg_min }}",
+        asg_max_size: "{{ environments[deployment_environment].asg_max }}"
       }
