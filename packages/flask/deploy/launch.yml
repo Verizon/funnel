@@ -20,5 +20,5 @@
         amazon_instance_type: m3.xlarge,
         asg_desired:  "{{ environments[deployment_environment].asg_min }}",
         asg_min_size: "{{ environments[deployment_environment].asg_min }}",
-        asg_max_size: "{{ environments[deployment_environment].asg_max }}",
+        asg_max_size: "{{ environments[deployment_environment].asg_max }}"
       }
