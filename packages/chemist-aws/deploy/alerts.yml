@@ -3,6 +3,43 @@
   connection: local
   hosts: localhost
   gather_facts: false
+  vars:
+    tags:
+      - funnel
+      - chemist
+    pagerduty_service: f64f6238b0f74d5198e4b80f2701d462
+    emails:
+      - oncue.monitoring@one.verizon.com
+      - timothy.m.perrett@one.verizon.com
+    environments:
+      imdev:
+        actions:
+          critical:
+            - kind: email
+              recipients: "{{ emails }}"
+          warning:
+            - kind: email
+              recipients: "{{ emails }}"
+      imqa:
+        actions:
+          critical:
+            - kind: email
+              recipients: "{{ emails }}"
+          warning:
+            - kind: email
+              recipients: "{{ emails }}"
+      improd:
+        actions:
+          critical:
+            - kind: pagerduty
+              service: "{{ pagerduty_service }}"
+            - kind: email
+              recipients: "{{ emails }}"
+          warning:
+            - kind: pagerduty
+              service: "{{ pagerduty_service }}"
+            - kind: email
+              recipients: "{{ emails }}"
   tasks:
     - name: chemist | should not have low disk space
       gong:
@@ -14,22 +51,12 @@
         query: "cluster: chemist*"
         critical: "!(disk < 0.9)"
         warning: "!(disk < 0.8)"
-        tags:
-          - funnel
-          - chemist
+        tags: "{{ tags }}"
         aggregations:
           disk:
             op: min
             field: "file_system.%2F.use_percent.numeric.mean"
-        actions:
-          critical:
-            - kind: email
-              recipients:
-                - oncue.monitoring@one.verizon.com
-          warning:
-            - kind: email
-              recipients:
-                - oncue.monitoring@one.verizon.com
+        actions: "{{ environments[application_environment].actions }}"
 
     - name: chemist | should not peg its cpu for 10 minutes
       gong:
@@ -41,19 +68,9 @@
         query: "cluster: chemist*"
         critical: cpu >= 0.95
         warning: cpu >= 0.90
-        tags:
-          - funnel
-          - chemist
+        tags: "{{ tags }}"
         aggregations:
           cpu:
             op: avg
             field: cpu.aggregate.usage.combined.numeric.mean
-        actions:
-          critical:
-            - kind: email
-              recipients:
-                - oncue.monitoring@one.verizon.com
-          warning:
-            - kind: email
-              recipients:
-                - oncue.monitoring@one.verizon.com
+        actions: "{{ environments[application_environment].actions }}"
