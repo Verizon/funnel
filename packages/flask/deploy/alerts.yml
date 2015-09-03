@@ -3,6 +3,43 @@
   connection: local
   hosts: localhost
   gather_facts: false
+  vars:
+    tags:
+      - funnel
+      - flask
+    pagerduty_service: 7ac2bc6607a646e896d574e683d91bff
+    emails:
+      - oncue.monitoring@one.verizon.com
+      - timothy.m.perrett@one.verizon.com
+    environments:
+      imdev:
+        actions:
+          critical:
+            - kind: email
+              recipients: "{{ emails }}"
+          warning:
+            - kind: email
+              recipients: "{{ emails }}"
+      imqa:
+        actions:
+          critical:
+            - kind: email
+              recipients: "{{ emails }}"
+          warning:
+            - kind: email
+              recipients: "{{ emails }}"
+      improd:
+        actions:
+          critical:
+            - kind: pagerduty
+              service: "{{ pagerduty_service }}"
+            - kind: email
+              recipients: "{{ emails }}"
+          warning:
+            - kind: pagerduty
+              service: "{{ pagerduty_service }}"
+            - kind: email
+              recipients: "{{ emails }}"
   tasks:
     - name: flask | should not have low disk space
       gong:
@@ -14,22 +51,12 @@
         query: "cluster: flask*"
         critical: "!(disk < 0.9)"
         warning: "!(disk < 0.8)"
-        tags:
-          - funnel
-          - flask
+        tags: "{{ tags }}"
         aggregations:
           disk:
             op: min
             field: "file_system.%2F.use_percent.numeric.mean"
-        actions:
-          critical:
-            - kind: email
-              recipients:
-                - oncue.monitoring@one.verizon.com
-          warning:
-            - kind: email
-              recipients:
-                - oncue.monitoring@one.verizon.com
+        actions: "{{ environments[application_environment].actions }}"
 
     - name: flask | should not peg its cpu for 10 minutes
       gong:
@@ -41,22 +68,12 @@
         query: "cluster: flask*"
         critical: cpu >= 0.95
         warning: cpu >= 0.90
-        tags:
-          - funnel
-          - flask
+        tags: "{{ tags }}"
         aggregations:
           cpu:
             op: avg
             field: cpu.aggregate.usage.combined.numeric.mean
-        actions:
-          critical:
-            - kind: email
-              recipients:
-                - oncue.monitoring@one.verizon.com
-          warning:
-            - kind: email
-              recipients:
-                - oncue.monitoring@one.verizon.com
+        actions: "{{ environments[application_environment].actions }}"
 
     # purpose of this alert is to provide a negative check
     # and ensure that the datapoints do not drop below a
@@ -73,21 +90,10 @@
         query: "cluster: flask*"
         critical: "datapoints < 500"
         warning: "datapoints < 1000"
-        tags:
-          - funnel
-          - flask
+        tags: "{{ tags }}"
         aggregations:
           datapoints:
             op: max
             field: mirror.datapoints.counter
-        actions:
-          critical:
-            - kind: email
-              recipients:
-                - oncue.monitoring@one.verizon.com
-          warning:
-            - kind: email
-              recipients:
-                - oncue.monitoring@one.verizon.com
-
+        actions: "{{ environments[application_environment].actions }}"
 
