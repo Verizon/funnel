@@ -2,6 +2,7 @@ package funnel
 package chemist
 
 import scalaz.{==>>,Order}
+import scalaz.std.set._
 import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.std.vector._
@@ -101,8 +102,6 @@ object Sharding {
           remote.command(FlaskCommand.Unmonitor(fl, Seq(t)))
         case RepoCommand.Telemetry(fl) =>
           remote.command(FlaskCommand.Telemetry(fl))
-        case RepoCommand.AssignWork(fl) =>
-          repo.unassignedTargets flatMap distribute(repo, sharder, remote, dist)
         case RepoCommand.ReassignWork(fl) =>
           repo.assignedTargets(fl) flatMap distribute(repo, sharder, remote, dist)
       }
@@ -150,12 +149,7 @@ object RandomSharding extends Sharder {
 
       log.debug(s"distribution: work = $work")
 
-      val dist = work.foldLeft(Distribution.empty){ (a,b) =>
-        a.alter(b._1, _ match {
-          case Some(s) => Option(s + b._2)
-          case None    => Option(Set(b._2))
-        })
-      }
+      val dist = work.foldLeft(Distribution.empty) { (a,b) => a.updateAppend(b._1, Set(b._2)) }
 
       log.debug(s"work = $work, dist = $dist")
 
@@ -205,12 +199,7 @@ object LFRRSharding extends Sharder {
 
       log.debug(s"distribution: work = $work")
 
-      val dist = work.foldLeft(Distribution.empty){ (a,b) =>
-        a.alter(b._1, _ match {
-          case Some(s) => Option(s + b._2)
-          case None    => Option(Set(b._2))
-        })
-      }
+      val dist = work.foldLeft(Distribution.empty) { (a,b) => a.updateAppend(b._1, Set(b._2)) }
 
       log.debug(s"work = $work, dist = $dist")
 

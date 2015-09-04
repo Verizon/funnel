@@ -183,6 +183,10 @@ class StatefulRepository extends Repository {
           // This one is a little weird, we are enqueueing this to ourseles
           // we should probably eliminate this re-enqueing
           Task.delay(log.info("platformHandler -- terminated flask: " + i)) >>
+          Task.delay {
+            D.update(_ - i)
+            knownFlasks.update(_ - i)
+          } >>
           repoCommandsQ.enqueueOne(RepoCommand.ReassignWork(i))
 
         case PlatformEvent.TerminatedTarget(i) => {

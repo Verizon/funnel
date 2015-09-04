@@ -8,6 +8,7 @@ import funnel.http.MonitoringServer
 import scalaz.==>>
 import scalaz.std.string._
 import java.net.URI
+import Target._
 import org.scalactic.TypeCheckedTripleEquals
 
 class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
@@ -102,10 +103,14 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
   }
 
   it should "assign all the work when using random sharding" in {
-    // this is a lame test, but because the assignment is random,
-    // its not possible to write a test due to the non-deterministic nature
+    implicit val ordering = orderTarget.toScalaOrdering
     val (s, newdist) = RandomSharding.distribution(i2)(d1)
-    newdist.values.flatten.size should equal (i2.size)
+    newdist.values.flatten.sorted should equal (i2.toList.sorted)
   }
 
+  it should "reassign all the work when a flask is terminated" in {
+    implicit val ordering = orderTarget.toScalaOrdering
+    val (s, newdist) = RandomSharding.distribution(i2)(d1 - d1.keys.head)
+    newdist.values.flatten.sorted should equal (i2.toList.sorted)
+  }
 }

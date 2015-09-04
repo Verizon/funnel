@@ -32,7 +32,6 @@ object RepoCommand {
   case class Monitor(target: Target) extends RepoCommand
   case class Unmonitor(flask: Flask, target: Target) extends RepoCommand
   case class Telemetry(flask: Flask) extends RepoCommand
-  case class AssignWork(flask: Flask) extends RepoCommand
   case class ReassignWork(flask: FlaskID) extends RepoCommand
 }
 
