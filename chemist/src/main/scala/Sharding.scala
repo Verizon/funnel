@@ -130,6 +130,7 @@ object RandomSharding extends Sharder {
   private lazy val log = Logger[RandomSharding.type]
   private val rnd = new scala.util.Random
 
+  // Randomly assigns each target in `s` to a Flask in the distribution `d`.
   private def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)] = {
     val flasks = shards(d)
     val range = flasks.indices
@@ -141,6 +142,18 @@ object RandomSharding extends Sharder {
     }
   }
 
+  /**
+   * Assign the targets in `s` randomly to the distribution in `d`.
+   * Returns a pair of:
+   *   The assignment of targets to flasks
+   *   the new distribution
+   *
+   * Throws away the existing assignments UNLESS `s` is empty,
+   * in which case it leaves `d` unchanged.
+   *
+   * `s`: The targets to distribute
+   * `d`: The existing distribution
+   */
   def distribution(s: Set[Target])(d: Distribution): (Seq[(FlaskID,Target)], Distribution) = {
     if(s.isEmpty) (Seq.empty,d)
     else {
