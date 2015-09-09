@@ -48,21 +48,23 @@ object Housekeeping {
   def gatherUnassignedTargets(discovery: Discovery, repository: Repository): Task[Unit] =
     for {
       // read the state of the existing world
-      d <- repository.distribution
+      i    <- repository.instances
+      uris  = i.map(_._1)
 
       // read the list of all deployed machines
-      l <- discovery.listTargets
-      _  = log.info(s"found a total of ${l.length} deployed, accessable instances...")
+      ts   <- discovery.listTargets
+      _     = log.info(s"found a total of ${ts.length} deployed, accessable instances...")
 
       // figure out given the existing distribution, and the difference between what's been discovered
       // STU: the fact that I'm throwing ID away here is suspect
-      unmonitored = l.foldLeft(Set.empty[Target])(_ ++ _._2) -- d.values.foldLeft(Set.empty[Target])(_ ++ _)
-      _  = log.info(s"located instances: monitorable=${l.size}, unmonitored=${unmonitored.size}")
+
+      unmonitored = ts.foldLeft(Set.empty[Target])(_ ++ _._2).filterNot((t: Target) => uris.contains(t.uri))
+      _     = log.info(s"located instances: monitorable=${ts.size}, unmonitored=${unmonitored.size}")
 
       // action the new targets by putting them in the monitoring lifecycle
       targets = unmonitored.map(t => PlatformEvent.NewTarget(t))
-      _ <- targets.toVector.traverse_(repository.platformHandler)
-      _  = log.info(s"added ${targets.size} targets to the repository...")
+      _    <- targets.toVector.traverse_(repository.platformHandler)
+      _     = log.info(s"added ${targets.size} targets to the repository...")
     } yield ()
 
   /**
