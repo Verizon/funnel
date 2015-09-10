@@ -85,10 +85,12 @@ case class Elastic(M: Monitoring) {
    * Data points grouped by mirror URL, experiment ID, experiment group,
    * and grouping key from config
    */
-  type ESGroup[A] = Map[(String,
-                         Option[SourceURL],
-                         Option[ExperimentID],
-                         Option[GroupID]), Map[Path, Datapoint[A]]]
+  type ESGroup[A] = Map[GroupKey, Map[Path, Datapoint[A]]]
+
+  case class GroupKey(name: String,
+                      source: Option[SourceURL],
+                      experimentID: Option[ExperimentID],
+                      experimentGroup: Option[GroupID])
 
   import Process._
   import scalaz.concurrent.Task
@@ -110,16 +112,16 @@ case class Elastic(M: Monitoring) {
           val experimentGroup = pt.key.attributes.get(AttributeKeys.experimentGroup)
           val grouping = groups.find(name startsWith _) getOrElse ""
           val k = name.drop(grouping.length).split("/").toList.filterNot(_ == "")
-          val host = (grouping, source, experimentID, experimentGroup)
-          m.get(host) match {
+          val groupKey = GroupKey(grouping, source, experimentID, experimentGroup)
+          m.get(groupKey) match {
             case Some(g) => g.get(k) match {
               case Some(_) =>
-                emit(m) ++ go(true, Map(host -> Map(k -> pt)))
+                emit(m) ++ go(true, Map(groupKey -> Map(k -> pt)))
               case None =>
-                go(true, m + (host -> (g + (k -> pt))))
+                go(true, m + (groupKey -> (g + (k -> pt))))
             }
             case None =>
-              go(true, m + (host -> Map(k -> pt)))
+              go(true, m + (groupKey -> Map(k -> pt)))
           }
         case None =>                    // No Datapoint this time
           if (sawDatapoint) {           // Saw one last time
@@ -150,12 +152,14 @@ case class Elastic(M: Monitoring) {
   def elasticUngroup[A](flaskName: String, flaskCluster: String): Process1[ESGroup[A], Json] =
     await1[ESGroup[A]].flatMap { g =>
       M.log.debug(s"Publishing ${g.size} elements to ElasticSearch")
-      emitAll(g.toSeq.map { case (name, m) =>
-        ("uri" := name._2.getOrElse(flaskName)) ->:
-        ("host" := name._2.map(u => (new URI(u)).getHost).getOrElse(flaskName)) ->:
+      emitAll(g.toSeq.map { case (groupKey, m) =>
+        ("uri" := groupKey.source.getOrElse(flaskName)) ->:
+        ("host" := groupKey.source.map(u => (new URI(u)).getHost).getOrElse(flaskName)) ->:
+        ("experiment_id" :=? groupKey.experimentID ) ->?:
+        ("experiment_group" :=? groupKey.experimentGroup ) ->?:
         ("@timestamp" :=
           new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ").format(new Date)) ->:
-          m.toList.foldLeft(("group" := name._1) ->: jEmptyObject) {
+          m.toList.foldLeft(("group" := groupKey.name) ->: jEmptyObject) {
             case (o, (ps, dp)) =>
               val attrs = dp.key.attributes
               val kind = attrs.get(AttributeKeys.kind)
