@@ -86,11 +86,8 @@ class Flask(options: Options, val I: Instruments) {
       t <- options.localMetricFrequency
     }{
       implicit val duration = t.seconds
-      Sigar(ISelfie).foreach { s =>
-        s.instrument
-      }
+      Sigar(ISelfie).foreach(_.instrument)
       JVM.instrument(ISelfie)
-      Clocks.instrument(ISelfie)
     }
 
     val Q = async.unboundedQueue[Telemetry](Strategy.Executor(funnel.Monitoring.serverPool))
