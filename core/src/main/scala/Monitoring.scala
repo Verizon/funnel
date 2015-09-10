@@ -145,7 +145,6 @@ trait Monitoring {
     nodeRetries: Names => Event = _ => defaultRetries
   ): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
-    val alive     = signalOf[Unit](())(S)
     val active    = signalOf[Set[URI]](Set.empty)(S)
 
     /**
@@ -185,6 +184,7 @@ trait Monitoring {
               Task.delay(log.info(s"Enqueued monitored $source on telemetry queue"))
             } ++ received.onComplete(Process.eval_ {
               Q.enqueueOne(Problem(source, "")) >>
+              Task.delay(clusterUrls.update(_.map(_ - source))) >>
               Task.delay(log.info(s"Enqueued problem with $source on telemetry queue"))
             })
           }
@@ -193,10 +193,9 @@ trait Monitoring {
         }
         case Discard(source) => for {
           _ <- Task.delay { log.info(s"Attempting to stop monitoring $source...") }
-          _ <- Option(urlSignals.get(source)).traverse(_.close)
+          _ <- Option(urlSignals.get(source)).traverse_(_.close)
         } yield ()
       }.run
-      _ <- alive.close
     } yield ()
   }
 
