@@ -30,6 +30,10 @@ The agent does not have a huge number of configuration options, but what is aval
 ```
 agent {
 
+  enable-system-metrics = true
+
+  enable-jvm-metrics = true
+
   #############################################
   #                   Proxy                   #
   #############################################
