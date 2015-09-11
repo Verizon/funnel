@@ -74,3 +74,22 @@
             op: avg
             field: cpu.aggregate.usage.combined.numeric.mean
         actions: "{{ environments[application_environment].actions }}"
+
+    - name: chemist | repo commands should be in the green state
+      gong:
+        state: present
+        account: "{{ application_environment }}"
+        namespace: "{{ application_name }}"
+        window: 10 minutes
+        name: repo-commands-state
+        query: "cluster: chemist*"
+        critical: "(traffic $ \"red\")"
+        warning: "(traffic $ \"amber\")"
+        tags: "{{ tags }}"
+        aggregations:
+          traffic:
+            op: terms
+            field: lifecycle.repo-events.traffic
+        actions: "{{ environments[application_environment].actions }}"
+
+
