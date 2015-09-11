@@ -92,6 +92,8 @@ object Sharding {
     } <* repo.mergeDistribution(newdist)
   }
 
+  import scalaz.{\/,-\/,\/-}
+
   def handleRepoCommand(repo: Repository, sharder: Sharder, remote: RemoteFlask)(c: RepoCommand): Task[Unit] = {
     Task.delay(log.info(s"handleRepoCommand: $c")) >>
     repo.distribution.flatMap { dist =>
@@ -103,7 +105,10 @@ object Sharding {
         case RepoCommand.Telemetry(fl) =>
           remote.command(FlaskCommand.Telemetry(fl))
         case RepoCommand.ReassignWork(fl) =>
-          repo.assignedTargets(fl) flatMap distribute(repo, sharder, remote, dist)
+          repo.assignedTargets(fl).attempt.flatMap {
+            case \/-(a) => distribute(repo, sharder, remote, dist)(a)
+            case -\/(e) => Task.now(log.warn(s"Unable to reassign work due to $e"))
+          }
       }
     }
   }

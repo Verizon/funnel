@@ -39,7 +39,7 @@ object Server {
     RepoEventsStream.green
 
     val c: Process[Task, RepoCommand] = repo.repoCommands
-    val l: Process[Task, Unit] = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask) _))
+    val l: Process[Task, Unit] = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask)(_)))
     val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
       log.error(s"Error processing repo events: $err")
       Process.eval_(Task.delay(RepoEventsStream.yellow))
