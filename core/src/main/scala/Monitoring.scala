@@ -336,13 +336,12 @@ trait Monitoring {
 
   /** given some predicate, attempt to see how many keys matching that predicate exist */
   def audit(p: Key[Any] => Option[String]): Task[List[(String, Int)]] =
-    keys.compareAndSet(identity).map { k =>
-      val ks: List[Key[Any]] = k.toList.flatten
-      val clusters: List[String] = ks.flatMap(p(_).toSeq).distinct
-      clusters.foldLeft(List.empty[(String, Int)]){ (a,step) =>
-        val items = ks.filter(p(_).isDefined)
-        (step, items.length) :: a
-      }
+    keys.compareAndSet(identity).map { ok: Option[Set[Key[Any]]] =>
+      ok.map { ks: Set[Key[Any]] =>
+        val good: List[String] = ks.toList.map(p).flatten
+        val clusters: List[(String, List[String])] = good.groupBy(identity).toList
+        clusters.map(pair => (pair._1, pair._2.size))
+      } getOrElse List.empty
     }
 
   /** get a count of all metric keys in the system broken down by their logical prefix **/
