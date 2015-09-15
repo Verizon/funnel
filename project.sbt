@@ -15,7 +15,6 @@ lazy val funnel = project.in(file(".")).aggregate(
   http,
   elastic,
   nginx,
-  riemann,
   integration,
   telemetry,
   zeromq,
@@ -46,15 +45,13 @@ lazy val docs = project.dependsOn(core)
 
 lazy val elastic = project.dependsOn(core, http)
 
-lazy val flask = project.dependsOn(riemann, elastic, telemetry, zeromq % "test->test;compile->compile")
+lazy val flask = project.dependsOn(elastic, telemetry, zeromq % "test->test;compile->compile")
 
 lazy val http = project.dependsOn(core)
 
 lazy val integration = project.dependsOn(flask, `chemist-static` % "test->test;compile->compile", chemist % "test->test;compile->compile").configs(MultiJvm)
 
 lazy val nginx = project.dependsOn(core)
-
-lazy val riemann = project.dependsOn(core)
 
 lazy val telemetry = project.dependsOn(zeromq).configs(MultiJvm)
 

@@ -1,7 +1,6 @@
 package funnel
 package flask
 
-import com.aphyr.riemann.client.RiemannClient
 import scala.concurrent.duration._
 import scalaz.concurrent.Strategy
 import scalaz.concurrent.Task
@@ -12,7 +11,6 @@ import scalaz.stream.async.mutable.{Queue,Signal}
 import knobs.{Config, Required, ClassPathResource, FileResource}
 import journal.Logger
 import funnel.{Events,DatapointParser,Datapoint,Names,Sigar,Monitoring,Instruments}
-import funnel.riemann.Riemann
 import funnel.http.{MonitoringServer,SSE}
 import funnel.elastic._
 import funnel.zeromq.Mirror
@@ -44,20 +42,9 @@ class Flask(options: Options, val I: Instruments) {
 
   lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)(Strategy.Executor(Monitoring.serverPool))
 
-  private def shutdown(server: MonitoringServer, R: RiemannClient): Unit = {
+  private def shutdown(server: MonitoringServer): Unit = {
     server.stop()
     signal.set(false).flatMap(_ => signal.close).run
-    R.disconnect
-  }
-
-  private def riemannErrorAndQuit(rm: RiemannCfg, f: () => Unit): Unit = {
-    val msg = s"# Riemann is not running at the specified location (${rm.host}:${rm.port}) #"
-    val padding = "#" * msg.length
-    Console.err.println(padding)
-    Console.err.println(msg)
-    Console.err.println(padding)
-    f()
-    System.exit(1)
   }
 
   private def runAsync(p: Task[Unit]): Unit = p.runAsync(_.fold(e => {
@@ -133,22 +120,6 @@ class Flask(options: Options, val I: Instruments) {
     options.elastic.foreach { elastic =>
       log.info("Booting the elastic search sink...")
       runAsync(Elastic(I.monitoring).publish(flaskName, flaskCluster)(elastic))
-    }
-
-    options.riemann.foreach { riemann =>
-      log.info("Booting the riemann sink...")
-      val R = RiemannClient.tcp(riemann.host, riemann.port)
-      try {
-        R.connect() // urgh. Give me stregth!
-      } catch {
-        case e: java.io.IOException => {
-          riemannErrorAndQuit(riemann, () => shutdown(S,R))
-        }
-      }
-
-      runAsync(Riemann.publishToRiemann(
-        I.monitoring, riemann.ttl.toSeconds.toFloat)(
-        R, s"${riemann.host}:${riemann.port}")(flaskName))
     }
   }
 }
