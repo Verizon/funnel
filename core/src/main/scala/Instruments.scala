@@ -203,7 +203,7 @@ class Instruments(val window: Duration,
 
   /**
    * Return a `TrafficLight`--a gauge whose value can be `Red`, `Amber`,
-   * or `Green`. The initial value is `Red`. The key is `now/$$label`.
+   * or `Green`. The initial value is `Green`. The key is `now/$$label`.
    *
    * @param label The name of the traffic light metric
    * @param description A human-readable descirption of the semantics of this metric
@@ -211,7 +211,7 @@ class Instruments(val window: Duration,
   def trafficLight(label: String,
                    description: String = "",
                    keyMod: Key[String] => Key[String] = identity[Key[String]]): TrafficLight =
-    TrafficLight(gauge(label, TrafficLight.Red, Units.TrafficLight, description, andKind("traffic", keyMod)))
+    TrafficLight(gauge(label, TrafficLight.Green, Units.TrafficLight, description, andKind("traffic", keyMod)))
 
   /**
    * Return a `Gauge` with the given starting value.
