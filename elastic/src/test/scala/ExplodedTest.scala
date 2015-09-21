@@ -3,7 +3,7 @@ package elastic
 
 import org.scalacheck.{Properties => P, _}
 
-object ElasticTest extends P("elastic") {
+object ExplodedTest extends P("elastic") {
   val genName = Gen.oneOf("k1", "k2")
   val genHost = Gen.oneOf("h1", "h2")
 

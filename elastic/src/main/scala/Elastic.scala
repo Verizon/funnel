@@ -176,8 +176,7 @@ object Elastic {
     cfg <- getConfig
     template <- Task.delay(
       cfg.templateLocation.map(scala.io.Source.fromFile) getOrElse
-        scala.io.Source.fromInputStream(
-          getClass.getResourceAsStream("/oncue/elastic-template.json"))).liftKleisli
+        sys.error("no index mapping template specified.")).liftKleisli
     json <- Task.delay(template.mkString).liftKleisli
     turl = url(s"${cfg.url}") / "_template" / cfg.templateName
     _ <- ensureExists(turl, elastic(turl.PUT, json))
