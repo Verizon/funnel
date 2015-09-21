@@ -8,9 +8,11 @@ import scalaz.concurrent.Task
 import scalaz.stream._
 
 class ElasticSpec extends FlatSpec with Matchers {
+  import Elastic.lift
+
   val scheduler = Monitoring.schedulingPool
   val S = Executor(Monitoring.serverPool)
-  val E = Elastic(Monitoring.default)
+  val E = ElasticExploded(Monitoring.default)
 
   import E._
 

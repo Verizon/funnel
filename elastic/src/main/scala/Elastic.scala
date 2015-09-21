@@ -8,7 +8,6 @@ import scalaz.concurrent.Task
 import java.text.SimpleDateFormat
 import scala.util.control.NonFatal
 import scalaz.{\/,Kleisli,Monad,~>,Reader}
-import dispatch.{Req,FunctionHandler,StatusCode}
 import scala.concurrent.{Future,ExecutionContext}
 
 object Elastic {
@@ -25,7 +24,7 @@ object Elastic {
   type Path = List[String]
   type ES[A] = Kleisli[Task, ElasticCfg, A]
 
-  val log = Logger[Elastic.type]
+  private[this] val log = Logger[Elastic.type]
 
   /**
    *
@@ -39,22 +38,6 @@ object Elastic {
    *
    */
   val getConfig: ES[ElasticCfg] = ask[Task, ElasticCfg]
-
-  /**
-   * sadly required as dispatch has a very naïve error handler by default,
-   * and in this case we're looking to output the body of the response to the log
-   * in order to help with debugging in the event documents were not able to be
-   * submitted to the backend. Should function exactly like the default impl
-   * with the addition of the logging.
-   */
-  val handler = new FunctionHandler[String]({ resp =>
-    val status = resp.getStatusCode
-    if((status / 100) == 2) resp.getResponseBody
-    else {
-      log.error(s"Backend returned a code ${resp.getStatusCode} failure. Body response was: ${resp.getResponseBody}")
-      throw StatusCode(status)
-    }
-  })
 
   /**
    * Not in Scalaz until 7.2 so duplicating here.
@@ -80,7 +63,24 @@ object Elastic {
   import dispatch._, Defaults._
 
   /**
-   *
+   * sadly required as dispatch has a very naïve error handler by default,
+   * and in this case we're looking to output the body of the response to the log
+   * in order to help with debugging in the event documents were not able to be
+   * submitted to the backend. Should function exactly like the default impl
+   * with the addition of the logging.
+   */
+  val handler = new FunctionHandler[String]({ resp =>
+    val status = resp.getStatusCode
+    if((status / 100) == 2) resp.getResponseBody
+    else {
+      log.error(s"Backend returned a code ${resp.getStatusCode} failure. Body response was: ${resp.getResponseBody}")
+      throw StatusCode(status)
+    }
+  })
+
+  /**
+   * given a request, and a payload, compresses the payload into a single-line
+   * string and POSTs it to elastic search.
    */
   def elasticJson(req: Req, json: Json): ES[Unit] =
     elastic(req, json.nospaces)
@@ -149,7 +149,8 @@ object Elastic {
     ensureExists(url, createIndex(url))
 
   /**
-   *
+   * ensure the index we are trying to send documents too (defined in the config)
+   * exists in the backend elastic search cluster.
    */
   def ensureExists(url: Req, action: ES[Unit]): ES[Boolean] = for {
     s   <- elasticString(url.HEAD).mapK(_.attempt)
@@ -162,7 +163,7 @@ object Elastic {
   } yield b
 
   /**
-   *
+   * create an index based on the
    */
   def createIndex(url: Req): ES[Unit] = for {
     _   <- elasticJson(url.PUT, Json("settings" := Json("index.cache.query.enable" := true)))

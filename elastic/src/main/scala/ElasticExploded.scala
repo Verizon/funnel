@@ -19,6 +19,10 @@ import scalaz.concurrent.Task
  * search. The names of the metrics on the stream are expected to be delimited
  * by a `/`, which will then be exploded into a tree of fields.
  *
+ * WARNING: Only use this sink if you have a small-medium size system as elastic-
+ * search performs where there is low document-cardinality. This format is convenient
+ * for certain types of use case, but it is not expected that this works at large scale.
+ *
  * The resulting document structure looks like:
  *
  * {

@@ -5,7 +5,6 @@ import org.scalacheck.{Properties => P, _}
 
 object ElasticTest extends P("elastic") {
   val genName = Gen.oneOf("k1", "k2")
-
   val genHost = Gen.oneOf("h1", "h2")
 
   val genKey = for {
@@ -18,7 +17,7 @@ object ElasticTest extends P("elastic") {
     d <- Gen.posNum[Double]
   } yield Option(Datapoint(k, d))
 
-  val E = Elastic(Monitoring.default)
+  val E = ElasticExploded(Monitoring.default)
 
   import E._
 
