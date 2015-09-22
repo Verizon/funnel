@@ -1,15 +1,17 @@
 package funnel
 package flask
 
+import java.io.File
+import journal.Logger
 import scalaz.std.option._
 import scala.concurrent.duration._
 import scalaz.syntax.applicative._
+import knobs.{Config,ClassPathResource,FileResource,Required,Optional}
 
 object Main {
-  import java.io.File
-  import knobs.{Config,FileResource,Required,Optional}
-
   def main(args: Array[String]): Unit = {
+    val log = Logger[Main.type]
+
     /**
      * Accepting argument on the command line is really just a
      * convenience for testing and ad-hoc ops trial of the agent.
@@ -19,10 +21,13 @@ object Main {
      */
     val options: Options = (for {
       a <- knobs.loadImmutable(
-        List(Required(FileResource(new File("/usr/share/oncue/etc/flask.cfg")))
-          ) ++ args.toList.map(p => Optional(FileResource(new File(p)))))
-      b <- knobs.aws.config
-    } yield Options.readConfig(a ++ b)).run
+        List(
+          Required(ClassPathResource("flask/defaults.cfg")),
+          Optional(FileResource(new File("/usr/share/oncue/etc/flask.cfg")))
+        ) ++ args.toList.map(p => Optional(FileResource(new File(p)))))
+    } yield Options.readConfig(a)).run
+
+    log.debug(s"loaded the following configuration settings: $options")
 
     val I = new Instruments(1.minute)
 

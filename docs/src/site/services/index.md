@@ -281,13 +281,6 @@ flask {
 #   partition-date-format = "yyyy.ww"
 #   connection-timeout-in-ms = 5000
 # }
-
-# riemann {
-#   host = "localhost"
-#   port = 5555
-#   ttl-in-minutes = 5
-# }
-
 }
 
 aws {
