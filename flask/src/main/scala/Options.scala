@@ -56,7 +56,6 @@ object Options {
     )
   }
 
-
   private def readElastic(cfg: Config): Option[ElasticCfg] = {
     val elasticURL       = cfg.lookup[String]("url")
     val elasticIx        = cfg.lookup[String]("index-name")

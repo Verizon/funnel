@@ -1,26 +1,31 @@
 package funnel
 package flask
 
-import scala.concurrent.duration._
-import scalaz.concurrent.Task
 import scalaz.std.option._
+import scala.concurrent.duration._
 import scalaz.syntax.applicative._
-import elastic.ElasticCfg
 
 object Main {
   import java.io.File
-  import knobs.{ ClassPathResource, Config, FileResource, Required }
+  import knobs.{Config,FileResource,Required,Optional}
 
-  val options: Options = (for {
-    a <- knobs.loadImmutable(List(Required(
-      FileResource(new File("/usr/share/oncue/etc/flask.cfg")) or
-        ClassPathResource("oncue/flask.cfg"))))
-    b <- knobs.aws.config
-  } yield Options.readConfig(a ++ b)).run
+  def main(args: Array[String]): Unit = {
+    /**
+     * Accepting argument on the command line is really just a
+     * convenience for testing and ad-hoc ops trial of the agent.
+     *
+     * Configs are loaded in order; LAST WRITER WINS, as configs
+     * are reduced right to left.
+     */
+    val options: Options = (for {
+      a <- knobs.loadImmutable(
+        List(Required(FileResource(new File("/usr/share/oncue/etc/flask.cfg")))
+          ) ++ args.toList.map(p => Optional(FileResource(new File(p)))))
+      b <- knobs.aws.config
+    } yield Options.readConfig(a ++ b)).run
 
-  val I = new Instruments(1.minute)
+    val I = new Instruments(1.minute)
 
-  val app = new Flask(options, I)
-
-  def main(args: Array[String]) = app.run(args)
+    val app = new Flask(options, I)
+  }
 }

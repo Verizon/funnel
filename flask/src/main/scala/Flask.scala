@@ -22,11 +22,8 @@ import scalaz.\/
 import telemetry.Telemetry._
 
 /**
-  * How to use: Modify oncue/flask.cfg on the classpath
-  * and run from the command line.
-  *
-  * Or pass the location of the config file as a command line argument.
-  */
+ *
+ */
 class Flask(options: Options, val I: Instruments) {
   import Events.Event
   import scalaz.\/._
