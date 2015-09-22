@@ -3,15 +3,35 @@
   hosts: all
   gather_facts: false
   user: ec2-user
+  vars:
+    environments:
+      imdev:
+        logging:
+          - name: intelmedia.ws
+            level: INFO
+          - name: oncue
+            level: DEBUG
+          - name: funnel
+            level: DEBUG
+      imqa:
+        logging:
+          - name: intelmedia.ws
+            level: WARN
+          - name: oncue
+            level: INFO
+          - name: funnel
+            level: INFO
+      improd:
+        logging:
+          - name: intelmedia.ws
+            level: ERROR
+          - name: oncue
+            level: WARN
+          - name: funnel
+            level: WARN
   roles:
     - role: application
-      loggers:
-        - name: intelmedia.ws
-          level: INFO
-        - name: oncue.svc
-          level: DEBUG
-        - name: funnel
-          level: DEBUG
+      loggers: "{{ environments[application_environment].logging }}"
   tasks:
     - name: flask | override configuration file
       sudo: yes
@@ -26,3 +46,12 @@
         src=files/elastic-template.json
         dest=/usr/share/oncue/etc/elastic-template.json
         owner=root group=root mode=0644
+
+    # this is a gigantic hack, please do not copy this.
+    - name: flask | adjust memory settings
+      sudo: yes
+      lineinfile: >
+        dest=/etc/default/oncue
+        regexp="^-mem 7168"
+        line="-mem 13312"
+      when: application_environment != 'imdev'
