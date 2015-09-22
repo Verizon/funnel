@@ -9,6 +9,9 @@ object Custom {
   val compilation = Seq(
     scalacOptions := Compilation.flags.filterNot(_ == "-Xlint"))
 
+  val resources =
+    unmanagedResourceDirectories in Test <+= baseDirectory(_ / ".." / "etc")
+
   val testing = Seq(
     compile in MultiJvm <<= (compile in MultiJvm) triggeredBy (compile in Test),
     executeTests in Test <<= (executeTests in Test, executeTests in MultiJvm) map {

@@ -95,7 +95,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   "mirrorDatapoints for 2 minutes with 100 HTTP endpoints, half of which die" should "change" in {
-    val n = 100
+    val n = 15
     val ms = (1024 until 1024 + n).map(makeMS)
     val payload = s"""
     [

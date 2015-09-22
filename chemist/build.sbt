@@ -9,6 +9,8 @@ ScalaTest.settings
 
 Custom.compilation
 
+Custom.resources
+
 ContinuousIntegration.produceCoverageReport := false
 
 fork in test := true

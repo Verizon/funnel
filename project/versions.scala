@@ -5,4 +5,5 @@ object V {
   val dispatch = "0.11.2"
   val netty = "4.0.25.Final"
   val aws = "1.10.2"
+  val ermine = "0.2.1-1"
 }
