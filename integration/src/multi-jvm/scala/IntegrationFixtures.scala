@@ -41,7 +41,8 @@ object IntegrationFixtures {
     maxRetries = 0,
     funnelPort = flask1.location.port,
     selfiePort = 7557,
-    telemetryPort = flask1.telemetry.port)
+    telemetryPort = flask1.telemetry.port,
+    environment = "test")
 
   val flask2 = Flask(
     FlaskID("flask2"),
@@ -55,10 +56,11 @@ object IntegrationFixtures {
     maxRetries = 0,
     funnelPort = flask2.location.port,
     selfiePort = 7558,
-    telemetryPort = flask2.telemetry.port)
+    telemetryPort = flask2.telemetry.port,
+    environment = "test")
 
   val flaskOptionsWithES = flask1Options.copy(
-    elastic = Some(elastic.ElasticCfg(
+    elasticExploded = Some(elastic.ElasticCfg(
       url = "http://localhost:9200",
       indexName = "funnel",
       typeName = "metric",

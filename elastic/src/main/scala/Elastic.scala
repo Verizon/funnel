@@ -36,7 +36,7 @@ object Elastic {
   def fromScalaFuture[A](a: => Future[A])(implicit e: ExecutionContext): Task[A] =
     Task async { k =>
       a.onComplete {
-        t => k(\/.fromTryCatchThrowable[A,Throwable](t.get)) }}
+        t => k(\/.fromTryCatchNonFatal[A](t.get)) }}
 
   /**
    *
