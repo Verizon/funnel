@@ -52,7 +52,7 @@ flask {
 {% else %}
     url = "http://imdev-ops-es.svc.oncue.com:9200"
 {% endif %}
-    index-name = "services"
+    index-name = "monitoring"
     type-name = "metric"
     partition-date-format = "yyyy.MM.dd"
     connection-timeout-in-ms = 3000

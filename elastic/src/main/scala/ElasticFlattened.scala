@@ -65,7 +65,11 @@ case class ElasticFlattened(M: Monitoring){
     flaskNameOrHost: String,
     flaskCluster: String
   )(pt: Datapoint[A]): Json = {
-    val name = pt.key.name
+    val keyname = pt.key.name
+    val (window,name) = keyname.split('/') match {
+      case Array(h,t@_*) => (h,t.mkString("."))
+      case _ => ("unknown", keyname) // should not happen; what would it mean?
+    }
     val attrs = pt.key.attributes
     val source: String = attrs.get(AttributeKeys.source).getOrElse(flaskNameOrHost)
     val host: String = attrs.get(AttributeKeys.source
@@ -76,21 +80,34 @@ case class ElasticFlattened(M: Monitoring){
     val cluster: String = attrs.get(AttributeKeys.cluster).getOrElse(flaskCluster)
     val units: String = attrs.get(AttributeKeys.units).map(_.toLowerCase).getOrElse("unknown")
     val edge: Option[String] = attrs.get(AttributeKeys.edge)
+    val keytype: String = attrs.get("type").getOrElse("unknown")
     val partialJson: Json =
       ("environment"      := environment) ->:
       ("stack"            := cluster) ->:
       ("cluster"          := cluster) ->:
       ("uri"              := source) ->:
       ("host"             := host) ->:
+      ("window"           := window) ->:
       ("units"            := units) ->:
       ("name"             := name) ->:
+      ("type"             := keytype) ->:
       ("kind"             :=? kind) ->?:
       ("edge"             :=? edge) ->?:
       ("experiment_id"    :=? experimentId) ->?:
       ("experiment_group" :=? experimentGroup) ->?:
       ("@timestamp"       := (new Date).inUtc) ->: jEmptyObject
 
-    partialJson.deepmerge(Json(kind.get -> (pt.asJson -| "value").get))
+    /**
+     * alright, this is horrible. runar will hate me, sorry, but this is a bit of
+     * future-proofing just to cover the cases where we sometime later add a gauge
+     * that does not fit into our existing scheme, and the field mappings in ES
+     * will not be completely broken. Discussed this at length with ops, and we felt
+     * this was the best path right now. (*sigh*)
+     */
+    partialJson.deepmerge {
+      if(kind == "gauge") Json((s"${kind.get}-${keytype}") -> (pt.asJson -| "value").get)
+      else Json(kind.get -> (pt.asJson -| "value").get)
+    }
   }
 
   /**

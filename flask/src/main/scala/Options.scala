@@ -21,11 +21,15 @@ case class Options(
 )
 
 import knobs.Config
+import journal.Logger
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 
 object Options {
+  val log = Logger[Options.type]
+
   def readConfig(cfg: Config): Options = {
+    log.debug(s"input configuration was: $cfg")
     val name             = cfg.lookup[String]("flask.name")
     val cluster          = cfg.lookup[String]("flask.cluster")
     val environment      = cfg.lookup[String]("flask.environment").getOrElse("unknown")
