@@ -3,8 +3,10 @@ package elastic
 
 import java.net.URI
 import scalaz.stream._
+import concurrent.duration._
 import java.util.{Date,TimeZone}
 import java.text.SimpleDateFormat
+import scalaz.concurrent.Strategy.Executor
 
 /**
  * This class provides a consumer for the funnel montioring stream that takes
@@ -51,13 +53,14 @@ case class ElasticFlattened(M: Monitoring){
     }
   }
 
-  def foooooo[A](environment: String, flaskName: String, flaskCluster: String): Process1[Option[Datapoint[A]], Json] =
+  def render[A](environment: String, flaskNameOrHost: String, flaskCluster: String): Process1[Option[Datapoint[A]], Json] =
     await1[Option[Datapoint[A]]].flatMap { o =>
       emitAll(o.toSeq.map { pt =>
         val name = pt.key.name
         val attrs = pt.key.attributes
-        val source: String = attrs.get(AttributeKeys.source
-          ).map(u => (new URI(u)).getHost).getOrElse(flaskName)
+        val source: String = attrs.get(AttributeKeys.source).getOrElse(flaskNameOrHost)
+        val host: String = attrs.get(AttributeKeys.source
+          ).map(u => (new URI(u)).getHost).getOrElse(flaskNameOrHost)
         val experimentId: Option[String] = attrs.get(AttributeKeys.experimentID)
         val experimentGroup: Option[String] = attrs.get(AttributeKeys.experimentGroup)
         val kind: Option[String] = attrs.get(AttributeKeys.kind)
@@ -65,15 +68,33 @@ case class ElasticFlattened(M: Monitoring){
         ("environment"      := environment) ->:
         ("stack"            := cluster) ->:
         ("cluster"          := cluster) ->:
-        ("uri"              := "uri we were monitoring") ->:
-        ("host"             := "host from the uri") ->:
+        ("uri"              := source) ->:
+        ("host"             := host) ->:
         ("experiment_id"    :=? experimentId) ->?:
         ("experiment_group" :=? experimentGroup) ->?:
         ("@timestamp"       := (new Date).inUtc) ->: jEmptyObject
       })
     }.repeat
 
-  // def publish(flaskName: String, flaskCluster: String): ES[Unit] = {
+  /**
+   *
+   */
+  def publish(
+    environment: String,
+    flaskNameOrHost: String,
+    flaskCluster: String,
+    interval: Duration
+  )(M: Monitoring): ES[Unit] = {
+    val E = Executor(Monitoring.defaultPool)
+    bufferAndPublish(flaskNameOrHost, flaskCluster)(M, E){ cfg =>
+      val subscription = Monitoring.subscribe(M){ k =>
+        cfg.groups.exists(g => k.startsWith(g))}.map(Option.apply)
 
-  // }
+      time.awakeEvery(interval)(E,
+        Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]]
+      ).wye(subscription)(wye.merge)(E) |>
+        render(environment, flaskNameOrHost, flaskCluster)
+    }
+  }
+
 }

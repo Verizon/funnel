@@ -2,15 +2,11 @@ package funnel
 package elastic
 
 import java.net.URI
+import scalaz.Kleisli
 import java.util.Date
 import java.text.SimpleDateFormat
-import scala.util.control.NonFatal
-import scalaz.concurrent.Strategy, Strategy.Executor
-import scalaz.stream._
-import scalaz._
-import syntax.monad._
-import syntax.kleisli._
-import scalaz.concurrent.Task
+import scalaz.concurrent.Strategy.Executor
+import scalaz.stream.{Process1,Process,time,async,wye}
 
 /**
  * This class provides a consumer for the funnel montioring stream that takes
@@ -48,13 +44,11 @@ import scalaz.concurrent.Task
  */
 case class ElasticExploded(M: Monitoring){
 
-  import Kleisli.ask
   import Process._
   import Elastic._
-  import scala.concurrent.duration._
-  import argonaut._, Argonaut._
   import http.JSON._
-  import Events._
+  import argonaut._, Argonaut._
+  import scala.concurrent.duration._
 
   /**
    * Data points grouped by mirror URL, experiment ID, experiment group,
