@@ -13,9 +13,11 @@ object Custom {
   val resources =
     unmanagedResourceDirectories in Test <+= baseDirectory(_ / ".." / "etc" / "classpath" / "test")
 
-  val revolver =
+  val revolver = Seq(
+    javaOptions in Revolver.reStart += s"-Dlogback.configurationFile=${baseDirectory.value}/../etc/classpath/logback.xml",
     Revolver.reStartArgs :=
       (baseDirectory.value / ".." / "etc" / "development" / name.value / "development.cfg").getCanonicalPath :: Nil
+  )
 
   val testing = Seq(
     compile in MultiJvm <<= (compile in MultiJvm) triggeredBy (compile in Test),

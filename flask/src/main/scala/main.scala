@@ -32,5 +32,7 @@ object Main {
     val I = new Instruments(1.minute)
 
     val app = new Flask(options, I)
+
+    app.unsafeRun()
   }
 }

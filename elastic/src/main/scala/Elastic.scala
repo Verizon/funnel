@@ -3,6 +3,7 @@ package elastic
 
 import argonaut._
 import knobs.IORef
+import java.io.File
 import journal.Logger
 import java.util.Date
 import scalaz.concurrent.Task
@@ -220,7 +221,7 @@ object Elastic {
   def ensureTemplate: ES[Unit] = for {
     cfg <- getConfig
     template <- Task.delay(
-      cfg.templateLocation.map(scala.io.Source.fromFile) getOrElse
+      cfg.templateLocation.map(f => scala.io.Source.fromFile(new File(f).getAbsolutePath)) getOrElse
         sys.error("no index mapping template specified.")).liftKleisli
     json <- Task.delay(template.mkString).liftKleisli
     turl = url(s"${cfg.url}") / "_template" / cfg.templateName

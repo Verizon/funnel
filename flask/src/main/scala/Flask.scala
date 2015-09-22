@@ -58,7 +58,7 @@ class Flask(options: Options, val I: Instruments) {
         new RuntimeException(s"Unknown URI scheme submitted. scheme = $unknown"))
     }
 
-  def run(args: Array[String]): Unit = {
+  def unsafeRun(): Unit = {
 
     def countDatapoints: Sink[Task, Datapoint[Any]] =
       channel.lift(_ => Task(mirrorDatapoints.increment))
@@ -107,7 +107,7 @@ class Flask(options: Options, val I: Instruments) {
     log.info("Booting the mirroring process...")
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName, retries))
 
-    log.info("Mirroring own Funnel instance...")
+    log.info("Mirroring my own monitoring server instance...")
     List(s"http://$flaskHost:${options.selfiePort}/stream/previous",
          s"http://$flaskHost:${options.selfiePort}/stream/now?kind=traffic").foreach { s =>
       I.monitoring.mirroringQueue.enqueueOne(funnel.Mirror(new URI(s), flaskCluster)).run
