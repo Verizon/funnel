@@ -10,7 +10,6 @@ import scalaz.stream._
 import scalaz._
 import syntax.monad._
 import syntax.kleisli._
-import knobs.IORef
 import scalaz.concurrent.Task
 
 /**
@@ -63,10 +62,16 @@ case class ElasticExploded(M: Monitoring){
    */
   type ESGroup[A] = Map[GroupKey, Map[Path, Datapoint[A]]]
 
-  case class GroupKey(name: String,
-                      source: Option[SourceURL],
-                      experimentID: Option[ExperimentID],
-                      experimentGroup: Option[GroupID])
+  case class GroupKey(
+    /* name of the group, e.g. now */
+    name: String,
+    /* source of this group, specifically a uri */
+    source: Option[SourceURL],
+    /* if applicable, an experiment id */
+    experimentID: Option[ExperimentID],
+    /* if applicable, an experiment id */
+    experimentGroup: Option[GroupID]
+  )
 
   /**
    * Groups data points by key, mirror URL, and custom grouping from config.
@@ -140,37 +145,19 @@ case class ElasticExploded(M: Monitoring){
     }.repeat
 
   /**
-   * Publishes to an ElasticSearch URL at `esURL`.
+   *
    */
-  def publish(flaskName: String, flaskCluster: String): ES[Unit] = {
+  def publish(flaskName: String, flaskCluster: String, interval: Duration)(M: Monitoring): ES[Unit] = {
     val E = Executor(Monitoring.defaultPool)
-    def doPublish(de: Process[Task, Json], cfg: ElasticCfg): Process[Task, Unit] =
-      de to (constant((json: Json) => for {
-        r <- Task.delay(esURL(cfg))
-        _ <- retry(elasticJson(r.POST, json)(cfg))
-      } yield ()))
-    for {
-      cfg <- getConfig
-      _ = M.log.info(s"Ensuring Elastic template ${cfg.templateName} exists...")
-      _   <- ensureTemplate
-      _ = M.log.info(s"Initializing Elastic buffer of size ${cfg.bufferSize}...")
-      buffer = async.circularBuffer[Json](cfg.bufferSize)(E)
-      ref <- lift(IORef(Set[Key[Any]]()))
-      d   <- duration.lift[Task]
-      timeout = time.awakeEvery(d)(
-        E,
-        Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]])
-      _ = M.log.info(s"Started Elastic subscription")
-      subscription = Monitoring.subscribe(M){ k =>
+    bufferAndPublish(flaskName, flaskCluster)(M, E){ cfg =>
+      val subscription = Monitoring.subscribe(M){ k =>
         cfg.groups.exists(g => k.startsWith(g))}.map(Option.apply)
-      // Reads from the monitoring instance and posts to the publishing queue
-      read = timeout.wye(subscription)(wye.merge)(E) |>
-               elasticGroup(cfg.groups) |>
-               elasticUngroup(flaskName, flaskCluster) to
-               buffer.enqueue
-      // Reads from the publishing queue and writes to ElasticSearch
-      write  = doPublish(buffer.dequeue, cfg)
-      _ <- lift(Task.reduceUnordered[Unit, Unit](Seq(read.run, write.run), true))
-    } yield ()
+
+      time.awakeEvery(interval)(E,
+        Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]]
+      ).wye(subscription)(wye.merge)(E) |>
+      elasticGroup(cfg.groups) |>
+      elasticUngroup(flaskName, flaskCluster)
+    }
   }
 }
