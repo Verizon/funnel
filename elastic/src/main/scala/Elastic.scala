@@ -31,7 +31,7 @@ object Elastic {
   private[this] val log = Logger[Elastic.type]
 
   /**
-   *
+   * Given a scala future, convert it to task when the future completes
    */
   def fromScalaFuture[A](a: => Future[A])(implicit e: ExecutionContext): Task[A] =
     Task async { k =>
@@ -50,14 +50,16 @@ object Elastic {
     Kleisli(a => Monad[M].pure(k(a)))
 
   /**
-   *
+   * natural transformation between task and ES, which is a kleisli
+   * in Task. provided for explicitness, instead of using the `liftKleisli`
+   * syntax all through the code.
    */
   def lift: Task ~> ES = new (Task ~> ES) {
     def apply[A](t: Task[A]) = t.liftKleisli
   }
 
   /**
-   *
+   * get a handle on the subscriptionTimeout without having an ES instance
    */
   def duration: Reader[ElasticCfg, FiniteDuration] =
     Reader { es => es.subscriptionTimeout }
@@ -90,14 +92,18 @@ object Elastic {
     elastic(req, json.nospaces)
 
   /**
+   * build a function that sends string-like inputs to the specified request
+   * using HTTP GET verb which will be handled using the customised `handler`.
    *
+   * @see funnel.elastic.Elastic.handler
    */
   def elasticString(req: Req): ES[String] = {
     getConfig.flatMapK(c => fromScalaFuture(c.http(req > handler)))
   }
 
   /**
-   *
+   * send the supplied json string to the configured elastic search endpoint
+   * using HTTP POST.
    */
   def elastic(req: Req, json: String): ES[Unit] = for {
     es <- getConfig
@@ -163,7 +169,8 @@ object Elastic {
   /****************************** indexing ******************************/
 
   /**
-   *
+   * construct the actual url to send documents to based on the configuration
+   * paramaters, taking into account the index data pattern and prefix.
    */
   def indexURL: Reader[ElasticCfg, Req] = Reader { es =>
     val date = new SimpleDateFormat(es.dateFormat).format(new Date)
@@ -171,7 +178,8 @@ object Elastic {
   }
 
   /**
-   *
+   * given the ES url, make sure that all our requests are properly set with
+   * the application/json content mime type.
    */
   def esURL: Reader[ElasticCfg, Req] = Reader { es =>
     (indexURL(es) / es.typeName).setContentType("application/json", "UTF-8")
@@ -205,7 +213,9 @@ object Elastic {
   } yield ()
 
   /**
-   *
+   * load the template specified in the configuration and send it to the index
+   * to ensure that all the document fields we publish are correctly handled by
+   * elastic search / kibana.
    */
   def ensureTemplate: ES[Unit] = for {
     cfg <- getConfig

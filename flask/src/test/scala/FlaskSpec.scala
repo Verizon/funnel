@@ -24,13 +24,6 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   import knobs.{ ClassPathResource, Config, FileResource, Required }
   import dispatch._
 
-  val cfg: Config = (for {
-    a <- knobs.loadImmutable(List(Required(
-      FileResource(new File("/usr/share/oncue/etc/flask.cfg")) or
-        ClassPathResource("oncue/flask.cfg"))))
-    b <- knobs.aws.config
-  } yield a ++ b).run
-
   val log = Logger[this.type]
 
   val S = Strategy.Executor(Monitoring.serverPool)
