@@ -69,7 +69,7 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val app = new Flask(options, new Instruments(1.minute))
 
-    app.run(Array())
+    app.unsafeRun()
     Http(flaskUrl << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)
     Thread.sleep(1000)
 

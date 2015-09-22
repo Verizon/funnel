@@ -74,7 +74,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
       val app = new Flask(options, is)
 
-      app.run(Array())
+      app.unsafeRun()
       Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
 
       app.ISelfie.monitoring.get(app.mirrorDatapoints.keys.now).discrete.sleepUntil(ready.discrete.once).once.runLast.map(_.get).runAsync { d =>
@@ -113,7 +113,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
     val app = new Flask(options, is)
 
-    app.run(Array())
+    app.unsafeRun()
     Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
     Thread.sleep(1000)
 
@@ -165,7 +165,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
     val app = new Flask(options, is)
 
-    app.run(Array())
+    app.unsafeRun()
     Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
     Thread.sleep(1000)						// Let Flask mirroring catch up
 
