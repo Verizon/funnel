@@ -6,18 +6,21 @@
   vars:
     environments:
       imdev:
-        asg_min: "3"
+        machine_class: m4.xlarge
+        asg_min: "2"
         asg_max: "5"
       imqa:
-        asg_min: "4"
+        machine_class: m4.2xlarge
+        asg_min: "3"
         asg_max: "7"
       improd:
+        machine_class: m4.2xlarge
         asg_min: "4"
         asg_max: "10"
   roles:
     - { role: launcher,
         amazon_cf_template: "flask.template",
-        amazon_instance_type: m3.xlarge,
+        amazon_instance_type: "{{ environments[deployment_environment].machine_class }}",
         asg_desired:  "{{ environments[deployment_environment].asg_min }}",
         asg_min_size: "{{ environments[deployment_environment].asg_min }}",
         asg_max_size: "{{ environments[deployment_environment].asg_max }}"
