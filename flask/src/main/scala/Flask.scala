@@ -66,7 +66,6 @@ class Flask(options: Options, val I: Instruments) {
     def countDatapoints: Sink[Task, Datapoint[Any]] =
       channel.lift(_ => Task(mirrorDatapoints.increment))
 
-
     // Determine whether to generate system statistics for the local host
     for {
       b <- options.collectLocalMetrics
@@ -117,9 +116,14 @@ class Flask(options: Options, val I: Instruments) {
       I.monitoring.mirroringQueue.enqueueOne(funnel.Mirror(new URI(s), flaskCluster)).run
     }
 
-    options.elastic.foreach { elastic =>
-      log.info("Booting the elastic search sink...")
-      runAsync(Elastic(I.monitoring).publish(flaskName, flaskCluster)(elastic))
+    options.elasticExploded.foreach { elastic =>
+      log.info("Booting the elastic-exploded search sink...")
+      runAsync(ElasticExploded(I.monitoring).publish(flaskName, flaskCluster)(elastic))
+    }
+
+    options.elasticFlattened.foreach { elastic =>
+      log.info("Booting the elastic-flattened search sink...")
+      runAsync(ElasticFlattened(I.monitoring).publish(options.environment, flaskName, flaskCluster)(elastic))
     }
   }
 }

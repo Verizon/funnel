@@ -141,13 +141,13 @@ case class ElasticExploded(M: Monitoring){
   /**
    *
    */
-  def publish(flaskName: String, flaskCluster: String, interval: Duration)(M: Monitoring): ES[Unit] = {
+  def publish(flaskName: String, flaskCluster: String): ES[Unit] = {
     val E = Executor(Monitoring.defaultPool)
     bufferAndPublish(flaskName, flaskCluster)(M, E){ cfg =>
       val subscription = Monitoring.subscribe(M){ k =>
         cfg.groups.exists(g => k.startsWith(g))}.map(Option.apply)
 
-      time.awakeEvery(interval)(E,
+      time.awakeEvery(cfg.subscriptionTimeout)(E,
         Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]]
       ).wye(subscription)(wye.merge)(E) |>
       elasticGroup(cfg.groups) |>

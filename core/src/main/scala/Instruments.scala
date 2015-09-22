@@ -182,7 +182,7 @@ class Instruments(val window: Duration,
     origin: Edge.Origin,
     destination: Edge.Destination): Edge = {
       val trimmed = label.trim
-      def addEdge[A](k: Key[A]): Key[A] = k.setAttribute("edge", trimmed)
+      def addEdge[A](k: Key[A]): Key[A] = k.setAttribute(AttributeKeys.edge, trimmed)
       Edge(
         origin = gauge(
           label  = s"$trimmed/origin",

@@ -76,7 +76,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       val alive: Process[Task, Boolean] = Process.emitAll(k)
 
       val is = new Instruments(1.minute)
-      val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5775, 7557, None, 7390)
+      val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5775, 7557, None, 7390, "local")
 
       val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
       val app = new Flask(options, is)
@@ -114,9 +114,9 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       }
     ]
     """
-    
+
     val is = new Instruments(1.minute)
-    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5776, 7558, None, 7391)
+    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5776, 7558, None, 7391, "local")
     val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
     val app = new Flask(options, is)
 
@@ -168,7 +168,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       time.sleep((6 * 30 + 10).seconds)(S, P)			// Increment 1,000 times, die, and timeout
 
     val is = new Instruments(1.minute)
-    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5777, 7559, None, 7392)
+    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5777, 7559, None, 7392, "local")
     val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
     val app = new Flask(options, is)
 
