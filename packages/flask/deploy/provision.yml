@@ -45,7 +45,7 @@
       copy: >
         src={{ item }}
         dest=/usr/share/oncue/etc/
-        owner=root mode=600
+        owner=root mode=775
       with_fileglob:
         - files/*.json
 
