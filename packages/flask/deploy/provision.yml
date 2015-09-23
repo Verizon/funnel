@@ -43,9 +43,11 @@
     - name: flask | copy elastic-template.json into place
       sudo: yes
       copy: >
-        src=files/elastic-template.json
-        dest=/usr/share/oncue/etc/exploded-template.json
-        owner=root group=root mode=0644
+        src={{ item }}
+        dest=/usr/share/oncue/etc/
+        owner=root mode=600
+      with_fileglob:
+        - files/*.json
 
     # this is a gigantic hack, please do not copy this.
     - name: flask | adjust memory settings
