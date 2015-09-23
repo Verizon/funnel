@@ -16,24 +16,26 @@ import scalaz.concurrent.Strategy.Executor
  * which elastic search stores documents and manages in-memory indexing with Lucene.
  *
  * {
- *   "environment": "imdev",
- *   "host": "ip-10-124-10-111",
+ *   "@timestamp": "2015-09-23T17:31:38.965+0000",
  *   "window": "previous",
- *   "stats": {
- *     "count": 2,
- *     "skewness": 0,
- *     "last": 4330.647608,
- *     "standardDeviation": 305.13561600000025,
- *     "variance": 93107.74415169962,
- *     "kurtosis": -2,
- *     "mean": 4025.5119919999997
- *   },
- *   "name": "jvm.memory.total.used",
- *   "units": "Megabytes",
- *   "@timestamp": "2015-09-21T21:06:42.000Z",
- *   "stack": "flask-4.1.405",
+ *   "name": "system.tcp.curr_estab",
+ *   "host": "ip-10-124-30-93.ec2.internal",
+ *   "uri": "http://ip-10-124-30-93.ec2.internal:5775/stream/previous",
+ *   "cluster": "gong-1.1.85-zqhpLpQ",
+ *   "units": "unknown",
+ *   "environment": "dev",
+ *   "stack": "gong-1.1.85-zqhpLpQ",
  *   "kind": "numeric",
- *   "uri": "7557/stream/previous"
+ *   "type": "unknown",
+ *   "numeric": {
+ *     "count": 6,
+ *     "variance": 0.24999999999999992,
+ *     "kurtosis": -2,
+ *     "mean": 10.5,
+ *     "last": 11,
+ *     "skewness": -7.401486830834381E-17,
+ *     "standardDeviation": 0.4999999999999999
+ *   }
  * }
  */
 case class ElasticFlattened(M: Monitoring){
@@ -78,9 +80,9 @@ case class ElasticFlattened(M: Monitoring){
     val experimentGroup: Option[String] = attrs.get(AttributeKeys.experimentGroup)
     val kind: Option[String] = attrs.get(AttributeKeys.kind).map(_.toLowerCase)
     val cluster: String = attrs.get(AttributeKeys.cluster).getOrElse(flaskCluster)
-    val units: String = attrs.get(AttributeKeys.units).map(_.toLowerCase).getOrElse("unknown")
+    val units: String = pt.units.toString.toLowerCase
     val edge: Option[String] = attrs.get(AttributeKeys.edge)
-    val keytype: String = attrs.get("type").getOrElse("unknown")
+    val keytype: String = pt.typeOf.description.toLowerCase
     val partialJson: Json =
       ("environment"      := environment) ->:
       ("stack"            := cluster) ->:
@@ -103,10 +105,23 @@ case class ElasticFlattened(M: Monitoring){
      * that does not fit into our existing scheme, and the field mappings in ES
      * will not be completely broken. Discussed this at length with ops, and we felt
      * this was the best path right now. (*sigh*)
+     *
+     * likewise, the hack here with elapsed, remaining and uptime is because they
+     * are currently inccorectly reporting themselves as kind=timer, which then
+     * screws up the mapping because we expect timers to be a `Stats` instance. To
+     * workaround this bug, i've added this hack until we can migrate users to a
+     * newer version of funnel core in the leaves of our system.
      */
     partialJson.deepmerge {
-      if(kind == "gauge") Json((s"${kind.get}-${keytype}") -> (pt.asJson -| "value").get)
-      else Json(kind.get -> (pt.asJson -| "value").get)
+      kind.map { k =>
+        val value = (pt.asJson -| "value").get
+        if(k == "gauge")
+          Json((s"${kind.get}.${keytype}") -> value)
+        else if(name == "elapsed" || name == "remaining" || name == "uptime")
+          Json(name -> value)
+        else
+          Json(k -> value)
+      }.getOrElse(jEmptyObject)
     }
   }
 
