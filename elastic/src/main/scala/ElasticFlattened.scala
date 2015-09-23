@@ -82,7 +82,7 @@ case class ElasticFlattened(M: Monitoring){
     val cluster: String = attrs.get(AttributeKeys.cluster).getOrElse(flaskCluster)
     val units: String = pt.units.toString.toLowerCase
     val edge: Option[String] = attrs.get(AttributeKeys.edge)
-    val keytype: String = pt.typeOf.description
+    val keytype: String = pt.typeOf.description.toLowerCase
     val partialJson: Json =
       ("environment"      := environment) ->:
       ("stack"            := cluster) ->:
@@ -113,13 +113,15 @@ case class ElasticFlattened(M: Monitoring){
      * newer version of funnel core in the leaves of our system.
      */
     partialJson.deepmerge {
-      val value = (pt.asJson -| "value").get
-      if(kind == "gauge")
-        Json((s"${kind.get}-${keytype}") -> value)
-      else if(name == "elapsed" || name == "remaining" || name == "uptime")
-        Json(name -> value)
-      else
-        Json(kind.get -> value)
+      kind.map { k =>
+        val value = (pt.asJson -| "value").get
+        if(k == "gauge")
+          Json((s"${kind.get}.${keytype}") -> value)
+        else if(name == "elapsed" || name == "remaining" || name == "uptime")
+          Json(name -> value)
+        else
+          Json(k -> value)
+      }.getOrElse(jEmptyObject)
     }
   }
 
