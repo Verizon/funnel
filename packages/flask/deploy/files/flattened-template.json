@@ -1,163 +1,253 @@
 {
-  "template" : "monitoring*",
-  "order" : 10,
-  "mappings": {
-    "_default_" : {
-      "dynamic_templates" : [ {
-        "date_fields" : {
-          "mapping" : {
-            "type" : "date",
-            "doc_values": true,
-            "format" : "dateOptionalTime"
-          },
-          "match_mapping_type" : "date",
-          "match" : "*"
+    "order": 10,
+    "template": "monitoring*",
+    "mappings": {
+        "_default_": {
+            "_all": {
+                "enabled": true
+            },
+            "dynamic_templates": [
+                {
+                    "date_fields": {
+                        "mapping": {
+                            "doc_values": true,
+                            "format": "dateOptionalTime",
+                            "type": "date"
+                        },
+                        "match": "*",
+                        "match_mapping_type": "date"
+                    }
+                },
+                {
+                    "byte_fields": {
+                        "mapping": {
+                            "doc_values": true,
+                            "type": "byte"
+                        },
+                        "match": "*",
+                        "match_mapping_type": "byte"
+                    }
+                },
+                {
+                    "double_fields": {
+                        "mapping": {
+                            "doc_values": true,
+                            "type": "double"
+                        },
+                        "match": "*",
+                        "match_mapping_type": "double"
+                    }
+                },
+                {
+                    "float_fields": {
+                        "mapping": {
+                            "doc_values": true,
+                            "type": "float"
+                        },
+                        "match": "*",
+                        "match_mapping_type": "float"
+                    }
+                },
+                {
+                    "integer_fields": {
+                        "mapping": {
+                            "doc_values": true,
+                            "type": "integer"
+                        },
+                        "match": "*",
+                        "match_mapping_type": "integer"
+                    }
+                },
+                {
+                    "long_fields": {
+                        "mapping": {
+                            "doc_values": true,
+                            "type": "long"
+                        },
+                        "match": "*",
+                        "match_mapping_type": "long"
+                    }
+                },
+                {
+                    "short_fields": {
+                        "mapping": {
+                            "doc_values": true,
+                            "type": "short"
+                        },
+                        "match": "*",
+                        "match_mapping_type": "short"
+                    }
+                },
+                {
+                    "string_fields": {
+                        "mapping": {
+                            "doc_values": true,
+                            "index": "not_analyzed",
+                            "omit_norms": true,
+                            "type": "string"
+                        },
+                        "match": "*",
+                        "match_mapping_type": "string"
+                    }
+                }
+            ],
+            "properties": {
+                "@version": {
+                    "doc_values": true,
+                    "index": "not_analyzed",
+                    "type": "string"
+                }
+            }
+        },
+        "metric": {
+            "dynamic_templates": [],
+            "properties": {
+                "@timestamp": {
+                    "format": "dateOptionalTime",
+                    "type": "date"
+                },
+                "cluster": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "counter": {
+                    "type": "integer"
+                },
+                "edge": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "environment": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "experiment_group": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "experiment_id": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "guage.double": {
+                    "type": "double"
+                },
+                "guage.stats": {
+                    "properties": {
+                        "count": {
+                            "type": "integer"
+                        },
+                        "kurtosis": {
+                            "type": "double"
+                        },
+                        "last": {
+                            "type": "double"
+                        },
+                        "mean": {
+                            "type": "double"
+                        },
+                        "skewness": {
+                            "type": "double"
+                        },
+                        "standardDeviation": {
+                            "type": "double"
+                        },
+                        "variance": {
+                            "type": "double"
+                        }
+                    }
+                },
+                "guage.string": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "host": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "kind": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "name": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "numeric": {
+                    "properties": {
+                        "count": {
+                            "type": "integer"
+                        },
+                        "kurtosis": {
+                            "type": "double"
+                        },
+                        "last": {
+                            "type": "double"
+                        },
+                        "mean": {
+                            "type": "double"
+                        },
+                        "skewness": {
+                            "type": "double"
+                        },
+                        "standardDeviation": {
+                            "type": "double"
+                        },
+                        "variance": {
+                            "type": "double"
+                        }
+                    }
+                },
+                "stack": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "timer": {
+                    "properties": {
+                        "count": {
+                            "type": "integer"
+                        },
+                        "kurtosis": {
+                            "type": "double"
+                        },
+                        "last": {
+                            "type": "double"
+                        },
+                        "mean": {
+                            "type": "double"
+                        },
+                        "skewness": {
+                            "type": "double"
+                        },
+                        "standardDeviation": {
+                            "type": "double"
+                        },
+                        "variance": {
+                            "type": "double"
+                        }
+                    }
+                },
+                "traffic": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "type": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "units": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "uri": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                },
+                "window": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                }
+            }
         }
-      },
-      {
-        "byte_fields" : {
-          "mapping" : {
-            "type" : "byte",
-            "doc_values": true
-          },
-          "match_mapping_type" : "byte",
-          "match" : "*"
-        }
-      },
-      {
-        "double_fields" : {
-          "mapping" : {
-            "type" : "double",
-            "doc_values": true
-          },
-          "match_mapping_type" : "double",
-          "match" : "*"
-        }
-      },
-      {
-        "float_fields" : {
-          "mapping" : {
-            "type" : "float",
-            "doc_values": true
-          },
-          "match_mapping_type" : "float",
-          "match" : "*"
-        }
-      },
-      {
-        "integer_fields" : {
-          "mapping" : {
-            "type" : "integer",
-            "doc_values": true
-          },
-          "match_mapping_type" : "integer",
-          "match" : "*"
-        }
-      },
-      {
-        "long_fields" : {
-          "mapping" : {
-            "type" : "long",
-            "doc_values": true
-          },
-          "match_mapping_type" : "long",
-          "match" : "*"
-        }
-      },
-      {
-        "short_fields" : {
-          "mapping" : {
-            "type" : "short",
-            "doc_values": true
-          },
-          "match_mapping_type" : "short",
-          "match" : "*"
-        }
-      },
-      {
-        "string_fields" : {
-          "mapping" : {
-            "index" : "not_analyzed",
-            "omit_norms" : true,
-            "type" : "string",
-            "doc_values": true
-          },
-          "match_mapping_type" : "string",
-          "match" : "*"
-        }
-      }
-      ],
-      "_all" : {
-        "enabled" : true
-      },
-      "properties" : {
-        "@version" : {
-          "index" : "not_analyzed",
-          "type" : "string",
-          "doc_values": true
-        }
-      }
-    },
-    "metric": {
-      "dynamic_templates": [],
-      "properties": {
-        "@timestamp": {
-          "type": "date",
-          "format": "dateOptionalTime"
-        },
-        "environment": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "host": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "kind": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "name": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "cluster": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "stack": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "units": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "uri": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "window": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "destination": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "edge": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "experiment_id": {
-            "type": "string",
-            "index": "not_analyzed"
-        },
-        "experiment_group": {
-            "type": "string",
-            "index": "not_analyzed"
-        }
-      }
     }
-  }
 }
