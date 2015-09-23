@@ -13,6 +13,8 @@ ContinuousIntegration.produceCoverageReport := false
 
 Custom.compilation
 
+Custom.resources
+
 scalacOptions += "-language:postfixOps"
 
 libraryDependencies ++= Seq(

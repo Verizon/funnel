@@ -1,0 +1,15 @@
+<configuration>
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %highlight([%level]) %logger{30} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <logger name="funnel" level="OFF" />
+  <logger name="com.ning.http.client" level="OFF" />
+
+  <root level="OFF">
+    <appender-ref ref="STDOUT" />
+  </root>
+</configuration>

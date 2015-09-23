@@ -12,6 +12,8 @@ SbtMultiJvm.multiJvmSettings
 
 Custom.testing
 
+Custom.resources
+
 libraryDependencies ++= Seq(
   "org.scodec"      %% "scodec-core"          % "1.7.1",
   "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test"

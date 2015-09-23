@@ -9,7 +9,7 @@ import scalaz.syntax.applicative._
 import scalaz.stream._
 import org.scalatest.{FlatSpec,Matchers,BeforeAndAfterAll}
 import elastic.ElasticCfg
-import flask.{ Flask, Options, RiemannCfg }
+import flask.{Flask,Options}
 import journal.Logger
 import http.MonitoringServer
 import chemist.{ FlaskID, Location, LocationIntent, LocationTemplate, NetworkConfig, NetworkScheme, Sharding, StaticDiscovery }
@@ -20,43 +20,20 @@ import http.JSON._
 import argonaut._, Argonaut._
 
 class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
-  import java.io.File
-  import knobs.{ ClassPathResource, Config, FileResource, Required }
   import dispatch._
 
-  val config: Task[Config] = for {
-    a <- knobs.loadImmutable(List(Required(
-      FileResource(new File("/usr/share/oncue/etc/flask.cfg")) or
-        ClassPathResource("oncue/flask.cfg"))))
-    b <- knobs.aws.config
-  } yield a ++ b
-
-  val (options, cfg) = config.flatMap { cfg =>
-    val name             = cfg.lookup[String]("flask.name")
-    val cluster          = cfg.lookup[String]("flask.cluster")
-    val retriesDuration  = cfg.require[Duration]("flask.retry-schedule.duration")
-    val maxRetries       = cfg.require[Int]("flask.retry-schedule.retries")
-    val elasticURL       = cfg.lookup[String]("flask.elastic-search.url")
-    val elasticIx        = cfg.lookup[String]("flask.elastic-search.index-name")
-    val elasticTy        = cfg.lookup[String]("flask.elastic-search.type-name")
-    val elasticDf        =
-      cfg.lookup[String]("flask.elastic-search.partition-date-format").getOrElse("yyyy.MM.ww")
-    val elasticTimeout   = cfg.lookup[Int]("flask.elastic-search.connection-timeout-in-ms").getOrElse(5000)
-    val esGroups         = cfg.lookup[List[String]]("flask.elastic-search.groups")
-    val riemannHost      = cfg.lookup[String]("flask.riemann.host")
-    val riemannPort      = cfg.lookup[Int]("flask.riemann.port")
-    val ttl              = cfg.lookup[Int]("flask.riemann.ttl-in-minutes").map(_.minutes)
-    val riemann          = (riemannHost |@| riemannPort |@| ttl)(RiemannCfg)
-    val elastic          = (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
-      ElasticCfg(_, _, _, elasticDf, "foo", None, _))
-    val port             = cfg.lookup[Int]("flask.network.port").getOrElse(5775)
-    val telemetry        = cfg.lookup[Int]("flask.network.telemetry-port").getOrElse(7390)
-    val selfiePort       = cfg.lookup[Int]("flask.network.selfie-port").getOrElse(7557)
-    val collectLocal     = cfg.lookup[Boolean]("flask.collect-local-metrics")
-    val localFrequency   = cfg.lookup[Int]("flask.local-metric-frequency")
-
-    Task((Options(name, cluster, retriesDuration, maxRetries, elastic, riemann, collectLocal, localFrequency, port, selfiePort, None, telemetry), cfg))
-  }.run
+  val options = Options(
+    name = Some("flask"),
+    cluster = Some("local-flask"),
+    retriesDuration = 30.seconds,
+    maxRetries = 6,
+    elasticExploded = None,
+    elasticFlattened = None,
+    collectLocalMetrics = Some(true),
+    localMetricFrequency = Some(30),
+    funnelPort = 6777,
+    selfiePort = 7557,
+    metricTTL = None, telemetryPort = 5612, environment ="test")
 
   val flaskUrl = url(s"http://localhost:${options.funnelPort}/mirror").setContentType("application/json", "UTF-8")
 
@@ -92,7 +69,7 @@ class ChemistSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val app = new Flask(options, new Instruments(1.minute))
 
-    app.run(Array())
+    app.unsafeRun()
     Http(flaskUrl << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)
     Thread.sleep(1000)
 

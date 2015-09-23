@@ -13,11 +13,13 @@ SbtMultiJvm.multiJvmSettings
 
 Custom.testing
 
+Custom.resources
+
 // pure-java implementation:
 // libraryDependencies += "org.zeromq" % "jeromq" % "0.3.4"
 // native c++ implementation with jni:
 libraryDependencies ++= Seq(
   "org.zeromq"      % "jzmq"                  % "3.1.0",
   "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test",
-  "oncue.ermine"    %% "scala-parsers"        % "0.2.1-1"
+  "oncue.ermine"    %% "scala-parsers"        % V.ermine
 )

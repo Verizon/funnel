@@ -24,13 +24,6 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   import knobs.{ ClassPathResource, Config, FileResource, Required }
   import dispatch._
 
-  val cfg: Config = (for {
-    a <- knobs.loadImmutable(List(Required(
-      FileResource(new File("/usr/share/oncue/etc/flask.cfg")) or
-        ClassPathResource("oncue/flask.cfg"))))
-    b <- knobs.aws.config
-  } yield a ++ b).run
-
   val log = Logger[this.type]
 
   val S = Strategy.Executor(Monitoring.serverPool)
@@ -76,12 +69,12 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       val alive: Process[Task, Boolean] = Process.emitAll(k)
 
       val is = new Instruments(1.minute)
-      val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5775, 7557, None, 7390)
+      val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5775, 7557, None, 7390, "local")
 
       val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
       val app = new Flask(options, is)
 
-      app.run(Array())
+      app.unsafeRun()
       Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
 
       app.ISelfie.monitoring.get(app.mirrorDatapoints.keys.now).discrete.sleepUntil(ready.discrete.once).once.runLast.map(_.get).runAsync { d =>
@@ -102,7 +95,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   "mirrorDatapoints for 2 minutes with 100 HTTP endpoints, half of which die" should "change" in {
-    val n = 100
+    val n = 15
     val ms = (1024 until 1024 + n).map(makeMS)
     val payload = s"""
     [
@@ -114,13 +107,13 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       }
     ]
     """
-    
+
     val is = new Instruments(1.minute)
-    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5776, 7558, None, 7391)
+    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5776, 7558, None, 7391, "local")
     val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
     val app = new Flask(options, is)
 
-    app.run(Array())
+    app.unsafeRun()
     Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
     Thread.sleep(1000)
 
@@ -168,11 +161,11 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       time.sleep((6 * 30 + 10).seconds)(S, P)			// Increment 1,000 times, die, and timeout
 
     val is = new Instruments(1.minute)
-    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5777, 7559, None, 7392)
+    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5777, 7559, None, 7392, "local")
     val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
     val app = new Flask(options, is)
 
-    app.run(Array())
+    app.unsafeRun()
     Http(flaskUrl / "mirror" << payload OK as.String)(concurrent.ExecutionContext.Implicits.global)()
     Thread.sleep(1000)						// Let Flask mirroring catch up
 

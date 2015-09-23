@@ -7,12 +7,12 @@ import scalaz.concurrent.Strategy.Executor
 import scalaz.concurrent.Task
 import scalaz.stream._
 
-class ElasticSpec extends FlatSpec with Matchers {
+class ExplodedSpec extends FlatSpec with Matchers {
+  import Elastic.lift
+
   val scheduler = Monitoring.schedulingPool
   val S = Executor(Monitoring.serverPool)
-  val E = Elastic(Monitoring.default)
-
-  import E._
+  val E = ElasticExploded(Monitoring.default)
 
   "elasticGroup" should "emit on timeout" in {
     val cfg = ElasticCfg("localhost", "index", "type", "dateFormat", "template", None, List("k"), 5.seconds, 5.seconds)
@@ -24,7 +24,7 @@ class ElasticSpec extends FlatSpec with Matchers {
       time.sleep(5.seconds)(S, scheduler) ++
       Process(Option.empty[Datapoint[Any]])
     val input = timeout.wye(dps ++ time.sleep(15.seconds)(S, scheduler))(wye.merge)(S).translate(lift)
-    val ogs = input |> elasticGroup(List("k"))
+    val ogs = input |> E.elasticGroup(List("k"))
     val result = ogs.runLast.run(cfg).run
     result should be ('defined)
     val gs = result.get

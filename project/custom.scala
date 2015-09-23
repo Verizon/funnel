@@ -3,11 +3,21 @@ import sbt._, Keys._
 import oncue.build.Compilation
 import com.typesafe.sbt.SbtMultiJvm
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
+import spray.revolver.RevolverPlugin._
 
 object Custom {
 
   val compilation = Seq(
     scalacOptions := Compilation.flags.filterNot(_ == "-Xlint"))
+
+  val resources =
+    unmanagedResourceDirectories in Test <+= baseDirectory(_ / ".." / "etc" / "classpath" / "test")
+
+  val revolver = Seq(
+    javaOptions in Revolver.reStart += s"-Dlogback.configurationFile=${baseDirectory.value}/../etc/classpath/logback.xml",
+    Revolver.reStartArgs :=
+      (baseDirectory.value / ".." / "etc" / "development" / name.value / "development.cfg").getCanonicalPath :: Nil
+  )
 
   val testing = Seq(
     compile in MultiJvm <<= (compile in MultiJvm) triggeredBy (compile in Test),

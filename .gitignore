@@ -24,5 +24,4 @@ sbt
 *~
 tags
 _site
-logback-test.xml
 *.local.yml

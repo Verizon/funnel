@@ -10,6 +10,8 @@ ScalaTest.settings
 
 Custom.compilation
 
+Custom.resources
+
 libraryDependencies ++= Seq(
   "com.amazonaws" % "aws-java-sdk-ec2"            % V.aws,
   "com.amazonaws" % "aws-java-sdk-autoscaling"    % V.aws,

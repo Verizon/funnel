@@ -6,10 +6,13 @@
     </encoder>
   </appender>
 
+  <logger name="org.apache.http" level="WARN" />
+  <logger name="com.amazonaws" level="WARN" />
+  <logger name="io.netty" level="WARN" />
+  <logger name="com.ning.http" level="WARN" />
   <logger name="funnel" level="DEBUG" />
-  <logger name="com.ning.http.client" level="OFF" />
 
-  <root level="OFF">
+  <root level="INFO">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>

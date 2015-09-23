@@ -11,4 +11,6 @@ object AttributeKeys {
   val kind = "kind"
   val experimentID = "experiment_id"
   val experimentGroup = "experiment_group"
+  val units = "units"
+  val edge = "edge"
 }

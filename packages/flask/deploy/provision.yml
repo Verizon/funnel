@@ -44,7 +44,7 @@
       sudo: yes
       copy: >
         src=files/elastic-template.json
-        dest=/usr/share/oncue/etc/elastic-template.json
+        dest=/usr/share/oncue/etc/exploded-template.json
         owner=root group=root mode=0644
 
     # this is a gigantic hack, please do not copy this.

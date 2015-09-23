@@ -22,11 +22,8 @@ import scalaz.\/
 import telemetry.Telemetry._
 
 /**
-  * How to use: Modify oncue/flask.cfg on the classpath
-  * and run from the command line.
-  *
-  * Or pass the location of the config file as a command line argument.
-  */
+ *
+ */
 class Flask(options: Options, val I: Instruments) {
   import Events.Event
   import scalaz.\/._
@@ -49,7 +46,7 @@ class Flask(options: Options, val I: Instruments) {
 
   private def runAsync(p: Task[Unit]): Unit = p.runAsync(_.fold(e => {
     e.printStackTrace()
-    log.error(s"Flask error in runAsync(): Exception $e - ${e.getMessage}")
+    log.error(s"[FATAL]: error in runAsync(): error=$e msg=${e.getMessage}")
     log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
   }, identity _))
 
@@ -61,11 +58,10 @@ class Flask(options: Options, val I: Instruments) {
         new RuntimeException(s"Unknown URI scheme submitted. scheme = $unknown"))
     }
 
-  def run(args: Array[String]): Unit = {
+  def unsafeRun(): Unit = {
 
     def countDatapoints: Sink[Task, Datapoint[Any]] =
       channel.lift(_ => Task(mirrorDatapoints.increment))
-
 
     // Determine whether to generate system statistics for the local host
     for {
@@ -111,15 +107,20 @@ class Flask(options: Options, val I: Instruments) {
     log.info("Booting the mirroring process...")
     runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName, retries))
 
-    log.info("Mirroring own Funnel instance...")
+    log.info("Mirroring my own monitoring server instance...")
     List(s"http://$flaskHost:${options.selfiePort}/stream/previous",
          s"http://$flaskHost:${options.selfiePort}/stream/now?kind=traffic").foreach { s =>
       I.monitoring.mirroringQueue.enqueueOne(funnel.Mirror(new URI(s), flaskCluster)).run
     }
 
-    options.elastic.foreach { elastic =>
-      log.info("Booting the elastic search sink...")
-      runAsync(Elastic(I.monitoring).publish(flaskName, flaskCluster)(elastic))
+    options.elasticExploded.foreach { elastic =>
+      log.info("Booting the elastic-exploded search sink...")
+      runAsync(ElasticExploded(I.monitoring).publish(flaskName, flaskCluster)(elastic))
+    }
+
+    options.elasticFlattened.foreach { elastic =>
+      log.info("Booting the elastic-flattened search sink...")
+      runAsync(ElasticFlattened(I.monitoring).publish(options.environment, flaskName, flaskCluster)(elastic))
     }
   }
 }
