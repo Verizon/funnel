@@ -107,6 +107,11 @@
           "type": "date",
           "doc_values": true
         },
+        "flask": {
+          "index": "not_analyzed",
+          "type": "string",
+          "doc_values": true
+        },
         "cluster": {
           "index": "not_analyzed",
           "type": "string",

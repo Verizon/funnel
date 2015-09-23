@@ -85,6 +85,7 @@ case class ElasticFlattened(M: Monitoring){
     val keytype: String = pt.typeOf.description.toLowerCase
     val partialJson: Json =
       ("environment"      := environment) ->:
+      ("flask"            := flaskNameOrHost) ->:
       ("stack"            := cluster) ->:
       ("cluster"          := cluster) ->:
       ("uri"              := source) ->:
