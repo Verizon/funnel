@@ -91,7 +91,7 @@ class Instruments(val window: Duration,
   private[funnel] def currentElapsed(label: String,
                                      desc: String,
                                      keyMod: Key[Double] => Key[Double] = identity): Gauge[Continuous[Double], Unit] = {
-    val kinded = andKind("timer", keyMod)
+    val kinded = andKind("elapsed", keyMod)
     val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds, desc, kinded)(
       B.currentElapsed(window).map(_.toSeconds.toDouble)).map(_.run)
     val g = new Gauge[Continuous[Double], Unit] {
@@ -109,7 +109,7 @@ class Instruments(val window: Duration,
    */
   private[funnel] def currentRemaining(label: String,
                                        desc: String): Gauge[Continuous[Double], Unit] = {
-    val kinded = andKind("timer", identity[Key[Double]])
+    val kinded = andKind("remaining", identity[Key[Double]])
     val (k, snk) = monitoring.topic[Unit,Double](label, Units.Seconds, desc, kinded)(
       B.currentRemaining(window).map(_.toSeconds.toDouble)).map(_.run)
     val g = new Gauge[Continuous[Double], Unit] {
@@ -125,7 +125,7 @@ class Instruments(val window: Duration,
    * been running whenver the returned `Gauge` is set. See `Elapsed.scala`.
    */
   private[funnel] def uptime(label: String): Gauge[Continuous[Double], Unit] = {
-    val kinded = andKind("timer", identity[Key[Double]])
+    val kinded = andKind("uptime", identity[Key[Double]])
     val (k, snk) = monitoring.topic[Unit,Double](label.trim,
                                                  Units.Minutes,
                                                  "Time elapsed since monitoring started",
