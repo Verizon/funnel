@@ -116,7 +116,7 @@ case class ElasticFlattened(M: Monitoring){
       kind.map { k =>
         val value = (pt.asJson -| "value").get
         if(k == "gauge")
-          Json((s"${kind.get}.${keytype}") -> value)
+          Json((s"${kind.get}-${keytype}") -> value)
         else if(name == "elapsed" || name == "remaining" || name == "uptime")
           Json(name -> value)
         else
