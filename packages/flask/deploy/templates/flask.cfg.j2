@@ -12,6 +12,8 @@ flask {
 
   local-metric-frequency = 30
 
+  environment = "{{ application_environment }}"
+
   network {
     host = "127.0.0.1"
     http-port = 5775
