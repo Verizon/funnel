@@ -3,7 +3,9 @@ package elastic
 
 import java.net.URI
 import scalaz.stream._
+import java.net.URLDecoder
 import concurrent.duration._
+import java.nio.charset.Charset
 import java.util.{Date,TimeZone}
 import java.text.SimpleDateFormat
 import scalaz.concurrent.Strategy.Executor
@@ -92,8 +94,8 @@ case class ElasticFlattened(M: Monitoring){
       ("host"             := host) ->:
       ("window"           := window) ->:
       ("units"            := units) ->:
-      ("name"             := name) ->:
       ("type"             := keytype) ->:
+      ("name"             :=? Decode.utf8(name)) ->?:
       ("kind"             :=? kind) ->?:
       ("edge"             :=? edge) ->?:
       ("experiment_id"    :=? experimentId) ->?:
