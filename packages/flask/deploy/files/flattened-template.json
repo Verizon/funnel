@@ -112,6 +112,18 @@
           "type": "string",
           "doc_values": true
         },
+        "elapsed": {
+          "type": "double",
+          "doc_values": true
+        },
+        "remaining": {
+          "type": "double",
+          "doc_values": true
+        },
+        "uptime": {
+          "type": "double",
+          "doc_values": true
+        },
         "cluster": {
           "index": "not_analyzed",
           "type": "string",
