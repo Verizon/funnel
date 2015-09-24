@@ -3,9 +3,7 @@ package elastic
 
 import java.net.URI
 import scalaz.stream._
-import java.net.URLDecoder
 import concurrent.duration._
-import java.nio.charset.Charset
 import java.util.{Date,TimeZone}
 import java.text.SimpleDateFormat
 import scalaz.concurrent.Strategy.Executor
