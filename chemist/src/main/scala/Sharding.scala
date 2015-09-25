@@ -60,25 +60,6 @@ object Sharding {
       case other => other.reduceLeft(_ ++ _)
     }
 
-  /**
-   * Given a set of inputs, check against the current known set of urls
-   * that we're not already monitoring the inputs (thus ensuring that
-   * the cluster is not having duplicated monitoring items)
-   */
-  private[chemist] def deduplicate(next: Set[Target])(d: Distribution): Set[Target] = {
-    // get the full list of targets we currently know about
-    val existing = targets(d)
-
-    // determine if any of the supplied urls are existing targets
-    val delta = next.map(_.uri) &~ existing.map(_.uri)
-
-    // having computed the targets that we actually care about,
-    // rehydrae a `Set[Target]` from the given `Set[SafeURL]`
-    delta.foldLeft(Set.empty[Target]){ (a,b) =>
-      a ++ next.filter(_.uri == b)
-    }
-  }
-
   ///////////////////////// IO functions ///////////////////////////
 
   def distribute(repo: Repository, sharder: Sharder, remote: RemoteFlask, dist: Distribution)(ts: Set[Target]): Task[Unit] = {
@@ -190,13 +171,9 @@ object LFRRSharding extends Sharder {
   import Sharding._
   private lazy val log = Logger[LFRRSharding.type]
 
-  private def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)] = {
-    val servers: Seq[FlaskID] = shards(d)
-    val ss                    = servers.size
-    val input: Set[Target]    = deduplicate(s)(d)
-
+  private def calculate(input: Set[Target])(servers: Seq[FlaskID]): Seq[(FlaskID,Target)] = {
+    val ss = servers.size
     log.debug(s"calculating the target distribution: servers=$servers, input=$input")
-
     if(ss == 0) {
       log.warn("there are no flask servers currently registered to distribute work too.")
       Nil // needed for when there are no Flask's in-memory; causes SOE.
@@ -213,7 +190,8 @@ object LFRRSharding extends Sharder {
     if(s.isEmpty) (Seq.empty,d)
     else {
       log.debug(s"distribution: attempting to distribute targets '${s.mkString(",")}'")
-      val work = calculate(s)(d)
+
+      val work = calculate(s)(servers = shards(d))
 
       log.debug(s"distribution: work = $work")
 
