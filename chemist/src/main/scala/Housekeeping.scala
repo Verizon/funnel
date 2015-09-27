@@ -2,7 +2,7 @@ package funnel
 package chemist
 
 import java.net.URI
-import scalaz.{\/,-\/,\/-}
+import scalaz.{\/,-\/,\/-,Nondeterminism}
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.{Process, time}
 import scalaz.std.string._
@@ -75,7 +75,7 @@ object Housekeeping {
    */
   def gatherAssignedTargets(flasks: Seq[Flask])(http: dispatch.Http): Task[Distribution] = {
     val d = (for {
-       a <- Task.gatherUnordered(flasks.map(
+       a <- Nondeterminism[Task].gatherUnordered(flasks.map(
          f => requestAssignedTargets(f.location)(http).map(f -> _).flatMap { t =>
            Task.delay {
              log.debug(s"Read targets $t from flask $f")
@@ -154,7 +154,7 @@ object Housekeeping {
     for {
       sm   <- r.states
       scs   = sm(TargetState.Investigating).values.toSeq
-      _    <- Task.gatherUnordered(scs.map(go(_, r)))
+      _    <- Nondeterminism[Task].gatherUnordered(scs.map(go(_, r)))
     } yield ()
   }
 }

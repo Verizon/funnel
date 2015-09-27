@@ -6,7 +6,7 @@ import java.net.{ InetSocketAddress, Socket, URI }
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scalaz.concurrent.Task
-import scalaz.{\/,NonEmptyList}
+import scalaz.{\/,NonEmptyList,Nondeterminism}
 import scalaz.std.vector._
 import scalaz.stream.Process
 import scalaz.syntax.monadPlus._
@@ -232,7 +232,7 @@ class AwsDiscovery(
     y = x.map(g => validate(g).attempt)
     // y = x.map(g => Task.now(g).attempt) // FOR LOCAL TESTING
     // run the tasks on the specified thread pool (Server.defaultPool)
-    b <- Task.gatherUnordered(y)
+    b <- Nondeterminism[Task].gatherUnordered(y)
     r = b.flatMap(_.toList)
     _ = log.debug(s"valid, validated instance list: ${r.map(_.id).mkString(", ")}")
   } yield r

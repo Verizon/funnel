@@ -3,7 +3,7 @@ package agent
 
 import scalaz.concurrent.Task
 import java.util.concurrent.ConcurrentHashMap
-import scalaz.\/
+import scalaz.{\/,Nondeterminism}
 
 object RemoteInstruments {
   import collection.JavaConverters._
@@ -25,10 +25,10 @@ object RemoteInstruments {
 
   def metricsFromRequest(r: InstrumentRequest)(I: Instruments): Task[Unit] = {
     for {
-      _ <- Task.gatherUnordered(r.counters.map(counter(_)(I)))
-      _ <- Task.gatherUnordered(r.timers.map(timer(_)(I)))
-      _ <- Task.gatherUnordered(r.stringGauges.map(gaugeString(_)(I)))
-      _ <- Task.gatherUnordered(r.doubleGauges.map(gaugeDouble(_)(I)))
+      _ <- Nondeterminism[Task].gatherUnordered(r.counters.map(counter(_)(I)))
+      _ <- Nondeterminism[Task].gatherUnordered(r.timers.map(timer(_)(I)))
+      _ <- Nondeterminism[Task].gatherUnordered(r.stringGauges.map(gaugeString(_)(I)))
+      _ <- Nondeterminism[Task].gatherUnordered(r.doubleGauges.map(gaugeDouble(_)(I)))
     } yield ()
   }
 
