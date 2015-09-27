@@ -7,7 +7,7 @@
     environments:
       imdev:
         machine_class: m4.xlarge
-        asg_min: "2"
+        asg_min: "3"
         asg_max: "5"
       imqa:
         machine_class: m4.2xlarge
