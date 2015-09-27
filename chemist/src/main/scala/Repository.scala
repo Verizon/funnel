@@ -319,16 +319,8 @@ class StatefulRepository extends Repository {
   def distribution: Task[Distribution] =
     Task.now(D.get)
 
-  /**
-   * Given the new distribution we want to merge with, remove all of its values
-   * from our existing distribution, otherwise we'll end up with duplicate
-   * assignments. Given:
-   * `foo -> Set(1,2,3), bar -> Set(4,5,6)` merging with `foo -> Set(5,7)`,
-   * the expected outcome would be: `foo -> Set(1,2,3,5,7), bar -> Set(4,6)`
-   */
   def mergeDistribution(d: Distribution): Task[Distribution] =
-    Task.delay(D.update(_.map(_ -- d.values.toSet.flatten
-      ).unionWith(d)(_ ++ _)))
+    Task.delay(D.update(_.unionWith(d)(_ ++ _)))
 
   def mergeExistingDistribution(d: Distribution): Task[Distribution] =
     Task.delay {
