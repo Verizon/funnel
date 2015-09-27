@@ -50,10 +50,11 @@
         - files/*.json
 
     # this is a gigantic hack, please do not copy this.
+    # currently targeting m4.2xlarge
     - name: flask | adjust memory settings
       sudo: yes
       lineinfile: >
         dest=/etc/default/oncue
         regexp="^-mem 7168"
-        line="-mem 13312"
+        line="-mem 26214"
       when: application_environment != 'imdev'
