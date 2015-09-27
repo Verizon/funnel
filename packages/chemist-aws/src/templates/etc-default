@@ -27,4 +27,6 @@
 
 -J-XX:+UseG1GC
 
+-J-XX:+UseStringDeduplication
+
 -Dlogback.configurationFile=${{chdir}}/etc/logback.xml
