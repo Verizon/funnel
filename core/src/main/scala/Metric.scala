@@ -4,7 +4,7 @@ import scala.concurrent.duration._
 import scala.language.higherKinds
 import scalaz.{~>, Monad}
 
-trait Metric[+A] {
+sealed trait Metric[+A] {
   import Metric._
 
   def flatMap[B](f: A => Metric[B]): Metric[B] = this match {
