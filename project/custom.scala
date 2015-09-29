@@ -1,8 +1,10 @@
 
 import sbt._, Keys._
-import oncue.build.Compilation
+import oncue.build.{Compilation, Versioning}
 import com.typesafe.sbt.SbtMultiJvm
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
+import com.typesafe.tools.mima.plugin.MimaPlugin.mimaDefaultSettings
+import com.typesafe.tools.mima.plugin.MimaKeys.previousArtifact
 import spray.revolver.RevolverPlugin._
 
 object Custom {
@@ -48,4 +50,12 @@ object Custom {
       major.toInt == 1 && minor.toInt < 7
     }
   }
+
+  val binaryCompatibility: Seq[Setting[_]] =
+    mimaDefaultSettings ++
+    Seq(
+      previousArtifact := Some(
+        "oncue.svc.funnel" %%
+        name.value %
+        Versioning.buildNumber(micro = Some("+")).getOrElse(sys.error(s"invalid version number in version.sbt"))))
 }

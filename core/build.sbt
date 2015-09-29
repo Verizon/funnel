@@ -15,6 +15,8 @@ Custom.compilation
 
 Custom.resources
 
+Custom.binaryCompatibility
+
 scalacOptions += "-language:postfixOps"
 
 libraryDependencies ++= Seq(
