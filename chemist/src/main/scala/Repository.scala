@@ -320,7 +320,13 @@ class StatefulRepository extends Repository {
     Task.now(D.get)
 
   def mergeDistribution(d: Distribution): Task[Distribution] =
-    Task.delay(D.update(_.unionWith(d)(_ ++ _)))
+    Task.delay{
+      val newTargets: Set[Target] = d.values.flatten.toSet
+      val mapWithDeletes: Distribution = D.get.map { targets =>
+        targets -- newTargets
+      }
+      D.update(_ => mapWithDeletes.unionWith(d)(_ ++ _))
+    }
 
   def mergeExistingDistribution(d: Distribution): Task[Distribution] =
     Task.delay {
