@@ -4,13 +4,13 @@ package elastic
 import argonaut._
 import knobs.IORef
 import java.io.File
+import instruments._
 import journal.Logger
 import java.util.Date
-import scalaz.concurrent.Task
 import java.text.SimpleDateFormat
-import scalaz.concurrent.Strategy
 import scala.util.control.NonFatal
 import scalaz.stream.{async,time,wye}
+import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.Process, Process.constant
 import scala.concurrent.{Future,ExecutionContext}
 import scalaz.{\/,Kleisli,Monad,~>,Reader,Nondeterminism}
@@ -21,6 +21,7 @@ object Elastic {
   import scalaz.syntax.kleisli._
   import scalaz.syntax.monad._ // pulls in *>
   import concurrent.duration._
+  import metrics._
 
   type SourceURL = String
   type ExperimentID = String
@@ -122,15 +123,22 @@ object Elastic {
     val schedule = Stream.iterate(2)(_ * 2).take(30).map(_.seconds)
     val t = task.attempt.flatMap(_.fold(
       e => e match {
-        case StatusCode(_) => Task.fail(e)
+        case StatusCode(digits) =>
+          Task.delay {
+            val r: Int = digits / 100
+            if(r == 5) HttpResponse5xx.increment
+            else if (r == 4) HttpResponse4xx.increment
+          }.flatMap(_ => Task.fail(e))
         case _ =>
-          Task.delay(log.error(s"Error contacting ElasticSearch: ${e}.\nRetrying...")) >>=
-          (_ => Task.fail(e))
+          Task.delay {
+            log.error(s"Error contacting ElasticSearch: ${e}.\nRetrying...")
+            NonHttpErrors.increment
+          } >>= (_ => Task.fail(e))
       },
       a => Task.now(a)
     ))
     t.retry(schedule, (e: Throwable) => e.getCause match {
-      case StatusCode(_) => false
+      case StatusCode(code) => false
       case NonFatal(_) => true
       case _ => false
     })
@@ -148,7 +156,7 @@ object Elastic {
     def doPublish(de: Process[Task, Json], cfg: ElasticCfg): Process[Task, Unit] =
       de to (constant((json: Json) => for {
         r <- Task.delay(esURL(cfg))
-        _ <- retry(elasticJson(r.POST, json)(cfg))
+        _ <- retry( HttpResponse2xx.timeTask(elasticJson(r.POST, json)(cfg)) )
       } yield ()))
     for {
       cfg <- getConfig
@@ -209,9 +217,10 @@ object Elastic {
   /**
    * create an index based on the
    */
-  def createIndex(url: Req): ES[Unit] = for {
-    _   <- elasticJson(url.PUT, Json("settings" := Json("index.cache.query.enable" := true)))
-  } yield ()
+  def createIndex(url: Req): ES[Unit] =
+    for {
+      _ <- elasticJson(url.PUT, Json("settings" := Json("index.cache.query.enable" := true)))
+    } yield ()
 
   /**
    * load the template specified in the configuration and send it to the index
