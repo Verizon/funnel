@@ -15,6 +15,8 @@ Custom.testing
 
 Custom.resources
 
+Custom.binaryCompatibility
+
 // pure-java implementation:
 // libraryDependencies += "org.zeromq" % "jeromq" % "0.3.4"
 // native c++ implementation with jni:
