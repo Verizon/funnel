@@ -8,10 +8,24 @@ section: "getting-started"
 
 This document outlines the various steps required to migrate from one version of funnel to another.
 
+* [4.0 to 4.1](#40to41)
 * [3.2 to 4.0](#32to40)
 * [3.0 to 3.2](#30to32)
 * [2.1 to 3.0](#21to30)
 * [1.7 to 2.x](#17to20)
+
+<a name="40to41"></a>
+
+# 4.0 to 4.1
+
+* Upgraded scalaz-stream to 0.7.3a. This is a binary compatible version with 0.7.1a that we were previously including. 
+* Added the `lapTimer` instrument, which is a compound instrument providing both a timer and a counter (needed for certain cases where users care about atomic counts)
+* Updated the names of `edge` keys (implementation detail)
+* `MonitoringServer` now supports a `/version` URL in the `http` module. Should be entirely compatible with 4.0 as services do not depend on services, so including 4.0 library with 4.1 server will work just fine.
+
+Other things of note in this release cycle (does not affect migration):
+
+* Mass changes to the funnel infrastructure as we move to fix bugs and harden the system.
 
 <a name="32to40"></a>
 

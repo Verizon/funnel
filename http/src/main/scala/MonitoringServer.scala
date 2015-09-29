@@ -169,6 +169,13 @@ class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
     )
   }
 
+  private def handleVersion(req: HttpExchange): Unit = {
+    import argonaut._, Argonaut._
+    flush(200, Json(
+      "version" -> jString(BuildInfo.version),
+      "git-revision" -> jString(BuildInfo.gitRevision)).nospaces.getBytes, req)
+  }
+
   private def post(req: HttpExchange)(f: String => Unit): Unit = {
     import scala.io.Source
     if(req.getRequestMethod.toLowerCase == "post"){
@@ -220,16 +227,17 @@ class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
         case p   => p.split("/").toList.tail
       }
       path match {
-        case Nil                          => handleIndex(req)
-        case "audit"  :: Nil              => handleAudit(M, None, req)
-        case "audit"  :: attr :: Nil      => handleAudit(M, Option(attr), req)
-        case "halt"   :: Nil              => handleHaltMirroringURLs(M, req)
-        case "mirror" :: Nil              => handleAddMirroringURLs(M, req)
-        case "mirror" :: "sources" :: Nil => handleListMirroringURLs(M, req)
-        case "keys"   :: tl               => handleKeys(M, tl.mkString("/"), req)
-        case "stream" :: "keys" :: Nil    => handleKeysStream(M, req)
-        case "stream" :: tl               => handleStream(M, tl.mkString("/"), req)
-        case now                          => handleNow(M, now.mkString("/"), req)
+        case Nil                           => handleIndex(req)
+        case "version" :: Nil              => handleVersion(req)
+        case "audit"   :: Nil              => handleAudit(M, None, req)
+        case "audit"   :: attr :: Nil      => handleAudit(M, Option(attr), req)
+        case "halt"    :: Nil              => handleHaltMirroringURLs(M, req)
+        case "mirror"  :: Nil              => handleAddMirroringURLs(M, req)
+        case "mirror"  :: "sources" :: Nil => handleListMirroringURLs(M, req)
+        case "keys"    :: tl               => handleKeys(M, tl.mkString("/"), req)
+        case "stream"  :: "keys" :: Nil    => handleKeysStream(M, req)
+        case "stream"  :: tl               => handleStream(M, tl.mkString("/"), req)
+        case now                           => handleNow(M, now.mkString("/"), req)
       }
     }
     catch {
