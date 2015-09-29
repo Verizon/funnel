@@ -4,17 +4,16 @@ package elastic
 import argonaut._
 import knobs.IORef
 import java.io.File
+import instruments._
 import journal.Logger
 import java.util.Date
-import scalaz.concurrent.Task
 import java.text.SimpleDateFormat
 import scala.util.control.NonFatal
 import scalaz.stream.{async,time,wye}
-import scalaz.{\/,Kleisli,Monad,~>,Reader}
+import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.Process, Process.constant
 import scala.concurrent.{Future,ExecutionContext}
-import scalaz.concurrent.Strategy
-import instruments._
+import scalaz.{\/,Kleisli,Monad,~>,Reader,Nondeterminism}
 
 object Elastic {
   import Argonaut._
@@ -172,7 +171,7 @@ object Elastic {
       read = jsonStream(cfg).to(buffer.enqueue)
       // Reads from the publishing queue and writes to ElasticSearch
       write  = doPublish(buffer.dequeue, cfg)
-      _ <- lift(Task.reduceUnordered[Unit, Unit](Seq(read.run, write.run), true))
+      _ <- lift(Nondeterminism[Task].reduceUnordered[Unit, Unit](Seq(read.run, write.run)))
     } yield ()
   }
 
