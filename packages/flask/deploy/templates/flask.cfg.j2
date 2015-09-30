@@ -26,26 +26,6 @@ flask {
     retries = 6
   }
 
-  elastic-search-exploded {
-{% if application_environment == 'improd' %}
-    url = "http://improd-ops-es.svc.oncue.com:9200"
-{% elif application_environment == 'imqa' %}
-    url = "http://imqa-ops-es.svc.oncue.com:9200"
-{% else %}
-    url = "http://imdev-ops-es.svc.oncue.com:9200"
-{% endif %}
-    index-name = "funnel"
-    type-name = "metric"
-    partition-date-format = "yyyy.ww"
-    connection-timeout-in-ms = 3000
-    minimum-publish-frequency = 10 minutes
-    groups = [ "previous/jvm", "previous/system", "previous", "now" ]
-    template {
-      name = "flask"
-      location = "/usr/share/oncue/etc/exploded-template.json"
-    }
-  }
-
   elastic-search-flattened {
 {% if application_environment == 'improd' %}
     url = "http://improd-ops-es.svc.oncue.com:9200"
