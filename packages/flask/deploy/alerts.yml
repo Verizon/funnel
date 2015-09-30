@@ -49,8 +49,6 @@
         name: "{{ item.name }}"
         query: "cluster: {{ application_name }}* AND name:({{ item.filter }})"
         tags: "{{ tags }}"
-        index_name: monitoring
-        type_name: metric
         aggregations:
           target:
             op: "{{ item.aggregation }}"
