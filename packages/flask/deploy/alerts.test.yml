@@ -43,10 +43,10 @@
     - gong:
         state: present
         account: "{{ application_environment }}"
-        namespace: "{{ application_name }}"
+        namespace: timothy
         window: "{{ item.window }}"
-        name: tim
-        query: "cluster: {{ application_name }}* AND name:({{ item.filter }})"
+        name: testing
+        query: "cluster: flask* AND name:({{ item.filter }})"
         tags: "{{ tags }}"
         aggregations:
           target:
