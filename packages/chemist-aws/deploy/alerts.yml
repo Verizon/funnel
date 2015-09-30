@@ -41,55 +41,40 @@
             - kind: email
               recipients: "{{ emails }}"
   tasks:
-    - name: chemist | should not have low disk space
-      gong:
-        state: "present"
-        account: "{{ application_environment }}"
-        namespace: "{{ application_name }}"
-        window: 10 minutes
-        name: low-disk-space
-        query: "cluster: chemist*"
-        critical: "!(disk < 0.9)"
-        warning: "!(disk < 0.8)"
-        tags: "{{ tags }}"
-        aggregations:
-          disk:
-            op: min
-            field: "file_system.%2F.use_percent.numeric.mean"
-        actions: "{{ environments[application_environment].actions }}"
-
-    - name: chemist | should not peg its cpu for 10 minutes
-      gong:
+    - gong:
         state: present
         account: "{{ application_environment }}"
         namespace: "{{ application_name }}"
-        window: 10 minutes
-        name: high-cpu
-        query: "cluster: chemist*"
-        critical: cpu >= 0.95
-        warning: cpu >= 0.90
+        window: "{{ item.window }}"
+        name: "{{ item.name }}"
+        query: "cluster: {{ application_name }}* AND name:({{ item.filter }})"
         tags: "{{ tags }}"
         aggregations:
-          cpu:
-            op: avg
-            field: cpu.aggregate.usage.combined.numeric.mean
+          target:
+            op: "{{ item.aggregation }}"
+            field: "{{ item.field }}"
+        critical: "{{ item.critical }}"
+        warning: "{{ item.warning }}"
         actions: "{{ environments[application_environment].actions }}"
-
-    - name: chemist | repo commands should be in the green state
-      gong:
-        state: present
-        account: "{{ application_environment }}"
-        namespace: "{{ application_name }}"
-        window: 10 minutes
-        name: repo-commands-state
-        query: "cluster: chemist*"
-        critical: "(traffic $ \"red\")"
-        warning: "(traffic $ \"amber\")"
-        tags: "{{ tags }}"
-        aggregations:
-          traffic:
-            op: terms
-            field: lifecycle.repo-events.traffic
-        actions: "{{ environments[application_environment].actions }}"
-
-
+      with_items:
+        - name: low-disk-space
+          window: 10 minutes
+          filter: system.file_system./.use_percent
+          field: numeric.mean
+          critical: "!(target < 0.9)"
+          warning: "!(target < 0.8)"
+          aggregation: max
+        - name: high-cpu
+          window: 10 minutes
+          filter: system.cpu.aggregate.usage.combined
+          field: numeric.mean
+          critical: target >= 0.95
+          warning: target >= 0.90
+          aggregation: avg
+        - name: repo-commands-state
+          window: 5 minutes
+          filter: lifecycle.repo-events
+          field: traffic
+          critical: "(target $ \"red\")"
+          warning: "(target $ \"amber\")"
+          aggregation: terms
