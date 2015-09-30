@@ -59,7 +59,7 @@
       with_items:
         - name: low-disk-space
           window: 10 minutes
-          filter: system.file_system./.use_percent
+          filter: system.file_system.\/.use_percent
           field: numeric.mean
           critical: "!(target < 0.9)"
           warning: "!(target < 0.8)"
