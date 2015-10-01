@@ -1,0 +1,74 @@
+---
+- name: chemist-static | configure alerts
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  vars:
+    tags:
+      - funnel
+      - chemist-static
+    pagerduty_service: f64f6238b0f74d5198e4b80f2701d462
+    emails:
+      - oncue.monitoring@one.verizon.com
+      - timothy.m.perrett@one.verizon.com
+      - meher.garda@one.verizon.com
+    environments:
+      imdev:
+        actions:
+          critical:
+            - kind: email
+              recipients: "{{ emails }}"
+          warning:
+            - kind: email
+              recipients: "{{ emails }}"
+      imqa:
+        actions:
+          critical:
+            - kind: email
+              recipients: "{{ emails }}"
+          warning:
+            - kind: email
+              recipients: "{{ emails }}"
+      improd:
+        actions:
+          critical:
+            - kind: pagerduty
+              service: "{{ pagerduty_service }}"
+            - kind: email
+              recipients: "{{ emails }}"
+          warning:
+            - kind: pagerduty
+              service: "{{ pagerduty_service }}"
+            - kind: email
+              recipients: "{{ emails }}"
+  tasks:
+    - gong:
+        state: present
+        account: "{{ application_environment }}"
+        namespace: "{{ application_name }}"
+        window: "{{ item.window }}"
+        name: "{{ item.name }}"
+        query: "cluster: {{ application_name }}* AND name:({{ item.filter }})"
+        tags: "{{ tags }}"
+        aggregations:
+          target:
+            op: "{{ item.aggregation }}"
+            field: "{{ item.field }}"
+        critical: "{{ item.critical }}"
+        warning: "{{ item.warning }}"
+        actions: "{{ environments[application_environment].actions }}"
+      with_items:
+        - name: low-disk-space
+          window: 10 minutes
+          filter: system.file_system.\/.use_percent
+          field: numeric.mean
+          critical: "!(target < 0.9)"
+          warning: "!(target < 0.8)"
+          aggregation: max
+        - name: high-cpu
+          window: 10 minutes
+          filter: system.cpu.aggregate.usage.combined
+          field: numeric.mean
+          critical: target >= 0.95
+          warning: target >= 0.90
+          aggregation: avg
