@@ -36,6 +36,7 @@ class AwsDiscovery(
   cacheMaxSize: Int = 2000
 ) extends Discovery {
   import Chemist.contact
+  import metrics.discovery._
 
   type AwsInstanceId = String
 
@@ -55,10 +56,13 @@ class AwsDiscovery(
    * List all of the instances in the given AWS account that respond to a rudimentry
    * verification that Funnel is running on port 5775 and is network accessible.
    */
-  def listTargets: Task[Seq[(TargetID, Set[Target])]] = for {
-    i <- instances(isMonitorable)
-    v <- valid(i)
-  } yield v.map(in => TargetID(in.id) -> in.targets)
+  def listTargets: Task[Seq[(TargetID, Set[Target])]] =
+    ListMonitorable.timeTask {
+      for {
+        i <- instances(isMonitorable)
+        v <- valid(i)
+      } yield v.map(in => TargetID(in.id) -> in.targets)
+    }
 
   /**
    * List all of the instances that failed basic network reachability validation.
@@ -66,11 +70,13 @@ class AwsDiscovery(
    * and valid ones.
    */
   def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] =
-    for {
-      i <- instances(isMonitorable)
-      v <- valid(i)
-      bad = i.toSet &~ v.toSet
-    } yield bad.toList.map(in => TargetID(in.id) -> in.targets)
+    ListUnmonitorable.timeTask {
+      for {
+        i <- instances(isMonitorable)
+        v <- valid(i)
+        bad = i.toSet &~ v.toSet
+      } yield bad.toList.map(in => TargetID(in.id) -> in.targets)
+    }
 
   /**
    * List all of the instances in the given AWS account and figure out which ones of
@@ -78,10 +84,12 @@ class AwsDiscovery(
    * an active flask.
    */
   def listActiveFlasks: Task[Seq[Flask]] =
-    for {
-      a <- instances(isActiveFlask)
-      b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
-    } yield b
+    ListFlasks.timeTask {
+      for {
+        a <- instances(isActiveFlask)
+        b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
+      } yield b
+    }
 
   /**
    * List all instances that clsasify as a flask, regardless of working state.
@@ -89,10 +97,12 @@ class AwsDiscovery(
    * leader chemist.
    */
   def listAllFlasks: Task[Seq[Flask]] =
-    for {
-      a <- instances(isFlask)
-      b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
-    } yield b
+    ListFlasks.timeTask {
+      for {
+        a <- instances(isFlask)
+        b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
+      } yield b
+    }
 
   /**
    * Lookup the `AwsInstance` for a given `InstanceID`; `AwsInstance` returned contains all
@@ -146,15 +156,17 @@ class AwsDiscovery(
         }
 
     def lookInAws(specificIds: Seq[String]): Task[Seq[AwsInstance]] =
-      for {
-        a <- EC2.reservations(specificIds)(ec2)
-        _  = log.debug(s"lookupMany, reservations = ${a.length}")
-        b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
-        (fails,successes) = b.toVector.separate
-        _  = log.info(s"lookupMany, failed to validate ${fails.length} instances.")
-        _  = log.debug(s"lookupMany, validated ${successes.length} instances.")
-        _  = fails.foreach(x => log.error(s"lookupMany, failed to validate '$x'"))
-      } yield successes
+      LookupManyAws.timeTask {
+        for {
+          a <- EC2.reservations(specificIds)(ec2)
+          _  = log.debug(s"lookupMany, reservations = ${a.length}")
+          b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
+          (fails,successes) = b.toVector.separate
+          _  = log.info(s"lookupMany, failed to validate ${fails.length} instances.")
+          _  = log.debug(s"lookupMany, validated ${successes.length} instances.")
+          _  = fails.foreach(x => log.error(s"lookupMany, failed to validate '$x'"))
+        } yield successes
+      }
 
     def updateCache(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] =
       Task.delay {
@@ -190,21 +202,22 @@ class AwsDiscovery(
    * by the supplied group `g`, are in fact running a funnel instance and it is
    * ready to start sending metrics if we connect to its `/stream` function.
    */
-  private def validate(instance: AwsInstance): Task[AwsInstance] = {
-    /**
-     * Do a naieve check to see if the socket is even network accessible.
-     * Given that funnel is using multiple protocols we can't assume that
-     * any given protocol at this point in time, so we just try to see if
-     * its even avalible on the port the discovery flow said it was.
-     *
-     * This mainly guards against miss-configuration of the network setup,
-     * LAN-ACLs, firewalls etc.
-     */
-    for {
-      a <- Task(contact(instance.location.uri))(Chemist.serverPool)
-      b <- a.fold(e => Task.fail(e), o => Task.now(o))
-    } yield instance
-  }
+  private def validate(instance: AwsInstance): Task[AwsInstance] =
+    ValidateLatency.timeTask {
+      /**
+       * Do a naieve check to see if the socket is even network accessible.
+       * Given that funnel is using multiple protocols we can't assume that
+       * any given protocol at this point in time, so we just try to see if
+       * its even avalible on the port the discovery flow said it was.
+       *
+       * This mainly guards against miss-configuration of the network setup,
+       * LAN-ACLs, firewalls etc.
+       */
+      for {
+        a <- Task(contact(instance.location.uri))(Chemist.serverPool)
+        b <- a.fold(e => Task.fail(e), o => Task.now(o))
+      } yield instance
+    }
 
   /**
    * This is the main work-horse function of discovery and provides a mechanism

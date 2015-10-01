@@ -40,5 +40,12 @@ object metrics {
 
   // telemetry
   val DroppedCommands = counter("telemetry/commands/dropped")
-  val TotalCommands = counter("telemetry/commands/total")
+
+  // housekeeping
+  val GatherAssignedLatency = lapTimer("housekeeping/gather-assigned-latency")
+  val GatherUnassignedLatency = lapTimer("housekeeping/gather-unassigned-latency")
+  val InvestigatingLatency = lapTimer("housekeeping/investigating-latency")
+
+  // remote flask
+  val CommandCount = counter("commands/total")
 }
