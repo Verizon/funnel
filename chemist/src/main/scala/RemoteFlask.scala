@@ -47,7 +47,7 @@ class HttpFlask(http: dispatch.Http, repo: Repository, signal: Signal[Boolean]) 
   }
 
   def command(c: FlaskCommand): Task[Unit] = {
-    metrics.TotalCommands.increment
+    metrics.CommandCount.increment
     c match {
       case Telemetry(flask) =>
         val t = monitorTelemetry(flask, keys, errors, lifecycle, signal)

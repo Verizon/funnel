@@ -16,6 +16,7 @@ import scalaz.std.option._
 import journal.Logger
 import TargetLifecycle.{ Investigate, TargetMessage, TargetState }
 import RepoEvent.StateChange
+import metrics._
 
 object Housekeeping {
   import Chemist.contact
@@ -34,7 +35,7 @@ object Housekeeping {
    */
   def periodic(delay: Duration)(maxRetries: Int)(d: Discovery, r: Repository): Process[Task, Unit] =
     time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
-      (gatherUnassignedTargets(d, r) <* handleInvestigating(maxRetries)(r)).attempt.map {
+      (gatherUnassignedTargets(d, r) <* InvestigatingLatency.timeTask(handleInvestigating(maxRetries)(r)) ).attempt.map {
         case \/-(_) => ()
         case -\/(e) => log.warn(s"failed running housekeeping itteration due to $e")
       }
@@ -46,7 +47,7 @@ object Housekeeping {
    * distribution, and assign any outliers. This is a fall back mechinism.
    */
   def gatherUnassignedTargets(discovery: Discovery, repository: Repository): Task[Unit] =
-    for {
+    GatherUnassignedLatency.timeTask(for {
       // read the state of the existing world
       i    <- repository.instances
       uris  = i.map(_._1)
@@ -65,7 +66,7 @@ object Housekeeping {
       targets = unmonitored.map(t => PlatformEvent.NewTarget(t))
       _    <- targets.toVector.traverse_(repository.platformHandler)
       _     = log.info(s"added ${targets.size} targets to the repository...")
-    } yield ()
+    } yield ())
 
   /**
    * Given a collection of flask instances, find out what exactly they are already
@@ -89,7 +90,8 @@ object Housekeeping {
       log.debug(s"Gathered distribution $dis")
       dis
     }
-    d or Task.now(Distribution.empty)
+
+    GatherAssignedLatency.timeTask(d) or Task.now(Distribution.empty)
   }
 
   import funnel.http.{Cluster,JSON => HJSON}
