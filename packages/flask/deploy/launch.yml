@@ -15,7 +15,7 @@
         asg_max: "8"
       improd:
         machine_class: m4.2xlarge
-        asg_min: "15"
+        asg_min: "10"
         asg_max: "25"
   roles:
     - { role: launcher,
