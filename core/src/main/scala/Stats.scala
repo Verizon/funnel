@@ -20,6 +20,9 @@ class Stats(moments: Moments, val last: Option[Double]) {
 
   def ++(ds: Seq[Double]): Stats =
     this ++ Stats.reduce(ds)
+
+  override def toString: String =
+    s"Stats(count = $count, mean = $mean, variance = $variance, standardDeviation = $standardDeviation, skewness = $skewness, kurtosis = $kurtosis)"
 }
 
 object Stats {
