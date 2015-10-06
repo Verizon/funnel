@@ -58,9 +58,9 @@ trait Monitoring {
   def remove[O](k: Key[O]): Task[Unit]
 
   /** Convience function to publish a metric under a newly created key. */
-  def publish[O:Reportable](name: String, units: Units)(e: Event)(
-                            f: Metric[O]): Task[Key[O]] =
-    publish(Key(name, units))(e)(f)
+  def publish[O:Reportable](name: String, units: Units
+    )(e: Event)(f: Metric[O]): Task[Key[O]] =
+      publish(Key(name, units))(e)(f)
 
   /**
    * Like `publish`, but if `key` is preexisting, sends updates
@@ -69,7 +69,8 @@ trait Monitoring {
   def republish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = Task.suspend {
     val refresh: Task[O] = eval(f)
     // Whenever `event` generates a new value, refresh the signal
-    val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(refresh))
+    val proc: Process[Task, O] = e(this).flatMap(_ =>
+      Process.eval(refresh)).evalMap(x => Task.delay { println(x.toString); x })
     // Republish these values to a new topic
     for {
       _ <- proc.evalMap((o: O) => for {
@@ -91,11 +92,7 @@ trait Monitoring {
    * preexisting `key` is not an error condition.
    */
   def publish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] =
-    for {
-      b <- exists(key)
-      k <- if (b) Task.fail(new Exception(s"key not unique, use republish if this is indented: $key"))
-           else republish(key)(e)(f)
-    } yield k
+    republish(key)(e)(f)
 
   /** Compute the current value for the given `Metric`. */
   def eval[A](f: Metric[A]): Task[A] = {
