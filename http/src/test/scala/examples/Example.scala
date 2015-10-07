@@ -27,7 +27,7 @@ object Example {
               db &&
               t.mean < 20
 
-      healthy.publishEvery(5.seconds)("status")
+//      healthy.publishEvery(5.seconds)("status")
     }
 
     metrics.query.time {

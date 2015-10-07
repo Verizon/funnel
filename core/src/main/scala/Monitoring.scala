@@ -5,7 +5,7 @@ import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorServic
 import scala.concurrent.duration._
 import scala.language.higherKinds
 import scalaz.concurrent.{Actor,Strategy,Task}
-import scalaz.{Nondeterminism,==>>}
+import scalaz.{Free,Nondeterminism,==>>}
 import scalaz.stream._
 import scalaz.stream.merge._
 import scalaz.stream.async
@@ -76,7 +76,7 @@ trait Monitoring {
       _ <- proc.evalMap((o: O) => for {
         b <- exists(key)
         _ <- if (b) Task.delay(Task.fork(update(key, o))(defaultPool).runAsync(_ => ()))
-             else Task(topic[O,O](key)(Buffers.ignoreTime(process1.id)))(defaultPool)
+             else Task.fork(topic[O,O](key)(Buffers.ignoreTime(process1.id)))(defaultPool)
       } yield ()).run
     } yield key
   }
@@ -102,7 +102,7 @@ trait Monitoring {
       def apply[A](k: Key[A]): Task[A] = latest(k)
     }
     // Invoke Metric interpreter, giving it function from Key to Task
-    f.run(trans)
+    Free.runFC(f)(trans)
   }
 
   /**
