@@ -5,7 +5,7 @@ import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorServic
 import scala.concurrent.duration._
 import scala.language.higherKinds
 import scalaz.concurrent.{Actor,Strategy,Task}
-import scalaz.{Free,Nondeterminism,==>>}
+import scalaz.{Nondeterminism,==>>}
 import scalaz.stream._
 import scalaz.stream.merge._
 import scalaz.stream.async
@@ -58,9 +58,9 @@ trait Monitoring {
   def remove[O](k: Key[O]): Task[Unit]
 
   /** Convience function to publish a metric under a newly created key. */
-  def publish[O:Reportable](name: String, units: Units
-    )(e: Event)(f: Metric[O]): Task[Key[O]] =
-      publish(Key(name, units))(e)(f)
+  def publish[O:Reportable](name: String, units: Units)(e: Event)(
+                            f: Metric[O]): Task[Key[O]] =
+    publish(Key(name, units))(e)(f)
 
   /**
    * Like `publish`, but if `key` is preexisting, sends updates
@@ -69,14 +69,13 @@ trait Monitoring {
   def republish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = Task.suspend {
     val refresh: Task[O] = eval(f)
     // Whenever `event` generates a new value, refresh the signal
-    val proc: Process[Task, O] = e(this).flatMap(_ =>
-      Process.eval(refresh)).evalMap(x => Task.delay { println(x.toString); x })
+    val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(refresh))
     // Republish these values to a new topic
     for {
       _ <- proc.evalMap((o: O) => for {
         b <- exists(key)
         _ <- if (b) Task.delay(Task.fork(update(key, o))(defaultPool).runAsync(_ => ()))
-             else Task.fork(topic[O,O](key)(Buffers.ignoreTime(process1.id)))(defaultPool)
+             else Task(topic[O,O](key)(Buffers.ignoreTime(process1.id)))(defaultPool)
       } yield ()).run
     } yield key
   }
@@ -92,7 +91,11 @@ trait Monitoring {
    * preexisting `key` is not an error condition.
    */
   def publish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] =
-    republish(key)(e)(f)
+    for {
+      b <- exists(key)
+      k <- if (b) Task.fail(new Exception(s"key not unique, use republish if this is indented: $key"))
+           else republish(key)(e)(f)
+    } yield k
 
   /** Compute the current value for the given `Metric`. */
   def eval[A](f: Metric[A]): Task[A] = {
@@ -102,7 +105,7 @@ trait Monitoring {
       def apply[A](k: Key[A]): Task[A] = latest(k)
     }
     // Invoke Metric interpreter, giving it function from Key to Task
-    Free.runFC(f)(trans)
+    f.run(trans)
   }
 
   /**

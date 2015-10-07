@@ -10,14 +10,12 @@ package funnel {
   }
 }
 
-import scalaz.Free.FreeC
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scalaz.Monoid
 import com.twitter.algebird.Group
 
 package object funnel {
-  type Metric[A] = FreeC[Key, A]
   type DatapointParser    = java.net.URI => Process[Task,Datapoint[Any]]
   type ClusterName        = String
   type ContinuousGauge[A] = Gauge[Continuous[A],A]
