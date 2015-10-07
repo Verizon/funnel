@@ -47,7 +47,7 @@
         namespace: "{{ application_name }}"
         window: "{{ item.window }}"
         name: "{{ item.name }}"
-        query: "cluster: {{ application_name }}*"
+        query: "cluster: {{ application_name }}* AND NOT stack: flask-4.1.428*"
         tags: "{{ tags }}"
         aggregations:
           target:
