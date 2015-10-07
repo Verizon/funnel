@@ -411,6 +411,22 @@ object MonitoringSpec extends Properties("monitoring") {
     go(15)
   }*/
 
+  val bools = for {
+    n <- Gen.choose(0,25000)
+    bs <- Gen.listOfN(n, arbitrary[Boolean])
+  } yield bs
+
+  property("Metric.bsequence") = forAll(bools) { bs =>
+    import scalaz.std.option._
+    import scalaz.~>
+    val alwaysNone = new (Key ~> Option) { def apply[A](k: Key[A]) = None }
+    val expected = Policies.majority(bs)
+    Metric.bsequence(bs.map(Metric.point(_)))
+          .map(Policies.majority)
+          .run(alwaysNone)
+          .get == expected
+  }
+
   // Commenting out since I don't know what this is testing
   // and it doesn't seem to work. -- Runar
   /*property("aggregate") = secure {

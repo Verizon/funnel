@@ -4,7 +4,7 @@ package funnel
  * A type, `A`, constained to be either `Int`,
  * `Double`, `String`, or `Stats`.
  */
-sealed trait Reportable[+A] { self =>
+sealed trait Reportable[+A] {
   def read(a: Any): Option[A]
   def description: String
   def cast[B](R: Reportable[B]): Option[Reportable[B]] =

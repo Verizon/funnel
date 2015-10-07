@@ -1,7 +1,5 @@
 package funnel
 
-import scalaz.{ Functor, Free }
-
 /**
  * A `Key` represents a variable from Funnel that changes over time.
  * It can be used to get a value from the stream at any given
@@ -58,6 +56,7 @@ final case class Key[+A] private[funnel](name: String,
 }
 
 object Key {
+
   def StartsWith(prefix: String) = new Function1[Key[Any],Boolean] {
     def apply(k: Key[Any]) = k.startsWith(prefix)
     override def toString = "Key.StartsWith("+prefix+")"
@@ -70,5 +69,5 @@ object Key {
   def apply[A](name: String, units: Units, desc: String = "", attribs: Map[String, String] = Map())(
     implicit R: Reportable[A]): Key[A] = Key(name, R, units, desc, attribs)
 
-  implicit def keyToMetric[A](k: Key[A]): Metric[A] = Free.liftFC(k)
+  implicit def keyToMetric[A](k: Key[A]): Metric[A] = Metric.key(k)
 }
