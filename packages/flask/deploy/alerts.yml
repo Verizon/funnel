@@ -47,26 +47,27 @@
         namespace: "{{ application_name }}"
         window: "{{ item.window }}"
         name: "{{ item.name }}"
-        query: "cluster: {{ application_name }}* AND name:({{ item.filter }})"
+        query: "cluster: {{ application_name }}* AND NOT stack: flask-4.1.428*"
         tags: "{{ tags }}"
         aggregations:
           target:
             op: "{{ item.aggregation }}"
             field: "{{ item.field }}"
+            filter: "name:({{ item.constraint }})"
         critical: "{{ item.critical }}"
         warning: "{{ item.warning }}"
         actions: "{{ environments[application_environment].actions }}"
       with_items:
         - name: low-disk-space
           window: 10 minutes
-          filter: system.file_system.\/.use_percent
+          constraint: system.file_system.\/.use_percent
           field: numeric.mean
           critical: "!(target < 0.9)"
           warning: "!(target < 0.8)"
           aggregation: max
         - name: high-cpu
           window: 10 minutes
-          filter: system.cpu.aggregate.usage.combined
+          constraint: system.cpu.aggregate.usage.combined
           field: numeric.mean
           critical: target >= 0.95
           warning: target >= 0.90
