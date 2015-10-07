@@ -179,7 +179,7 @@ object Chemist {
     \/.fromTryCatchThrowable[Unit, Exception]{
       val s = new Socket
       // timeout in 300ms to keep the overhead reasonable
-      try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 300)
+      try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 1000)
       finally s.close // whatever the outcome, close the socket to prevent leaks.
     }
 }
