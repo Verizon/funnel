@@ -69,8 +69,7 @@ trait Monitoring {
   def republish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = Task.suspend {
     val refresh: Task[O] = eval(f)
     // Whenever `event` generates a new value, refresh the signal
-    val proc: Process[Task, O] = e(this).flatMap(_ =>
-      Process.eval(refresh)).evalMap(x => Task.delay { println(x.toString); x })
+    val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(refresh))
     // Republish these values to a new topic
     for {
       _ <- proc.evalMap((o: O) => for {
