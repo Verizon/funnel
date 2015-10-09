@@ -49,7 +49,7 @@ class Instruments(val window: Duration,
       val c = new PeriodicGauge[O] {
         val (ks, f) = nowPrevSliding(
           B.accum[O,O](init)(O.plus), identity[O],
-          label, units, description, init, kinded).map(_.run)
+          label, units, description, kinded).map(_.run)
         def append(n: O): Unit = {
           runLogging(f(n))
         }
@@ -59,6 +59,25 @@ class Instruments(val window: Duration,
   }
 
   import scalaz.stream._
+
+  def periodicBuffers[I,O:Reportable:Group](
+    nowBuf: Process1[I,O],
+    unit: I => O,
+    label: String,
+    units: Units = Units.None,
+    description: String,
+    keyMod: Key[O] => Key[O] = identity[Key[O]] _
+  ): (Periodic[O], Three[Process1[(I,Duration),O]]) = {
+    val trimmed = label.trim // to prevent trailing spaces
+    val O = implicitly[Group[O]]
+    val now = B.resetEvery(window)(nowBuf)
+    val prev = B.emitEvery(window)(now)
+    val sliding = B.sliding(window)(unit)(O)
+    val periodic = Periodic(Three(("now", nowL _), ("previous", previousL _), ("sliding", slidingL _)).map {
+      case (name, desc) => keyMod(Key[O](s"$name/$trimmed", units, desc(description)))
+    })
+    (periodic, Three(now, prev, sliding))
+  }
 
   /**
    * Only for the advanced use case of creating new instrument types or complex composite metrics.
@@ -70,27 +89,19 @@ class Instruments(val window: Duration,
   def nowPrevSliding[I,O:Reportable:Group](
     nowBuf: Process1[I,O],
     unit: I => O,
-    label: String, units: Units = Units.None, description: String, init: O,
-    keyMod: Key[O] => Key[O] = identity[Key[O]] _): (Periodic[O], Task[I => Task[Unit]]) = {
-      import scalaz._
-      import Scalaz.{init => _, _}
-      val O = implicitly[Group[O]]
-      val trimmed = label.trim // to prevent trailing spaces
-      val now = B.resetEvery(window)(nowBuf)
-      val prev = B.emitEvery(window)(now)
-      val sliding = B.sliding(window)(unit)(O)
-      val (nowK, incrNow) =
-        monitoring.topic[I,O](
-          s"now/$trimmed", units, nowL(description), keyMod)(now)
-      val (prevK, incrPrev) =
-        monitoring.topic[I,O](
-          s"previous/$trimmed", units, previousL(description), keyMod)(prev)
-      val (slidingK, incrSliding) =
-        monitoring.topic[I,O](
-          s"sliding/$trimmed", units, slidingL(description), keyMod)(sliding)
-      (Periodic[O](nowK, prevK, slidingK),
-       List(incrNow, incrPrev, incrSliding).traverse(_.map(Kleisli(_))).map(_.traverseU_(identity)))
-    }
+    label: String,
+    units: Units = Units.None,
+    description: String,
+    keyMod: Key[O] => Key[O] = identity[Key[O]] _
+  ): (Periodic[O], Task[I => Task[Unit]]) = {
+    import scalaz._
+    import Scalaz._
+    val (ks, nps) =
+      periodicBuffers(nowBuf, unit, label, units, description, keyMod)
+    val t = ks.toThree.zipWith(nps)(monitoring.topic(_)(_)).toList.traverse(
+      _.map(Kleisli(_))).map(_.traverseU_(identity)).map(_.run)
+    (ks, t)
+  }
 
   /**
    * Return a `Counter` with the given starting count.
@@ -252,8 +263,7 @@ class Instruments(val window: Duration,
     val kinded = andKind("numeric", keyMod)
     val g = new Gauge[Periodic[Stats],Double] {
       val (ks, f) =
-        nowPrevSliding(B.stats, Stats(_:Double), label, units, description,
-                       Stats.statsGroup.zero, kinded).map(_.run)
+        nowPrevSliding(B.stats, Stats(_:Double), label, units, description, kinded).map(_.run)
       def keys = ks
       def set(d: Double): Unit = runLogging(f(d))
       set(init)
@@ -276,8 +286,7 @@ class Instruments(val window: Duration,
       val slidingTimer = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
       val u: Units = Units.Duration(TimeUnit.MILLISECONDS)
       val (ks, f) =
-        nowPrevSliding(B.stats, Stats(_:Double), label, u, description,
-                       Stats.statsGroup.zero, kinded).map(_.run)
+        nowPrevSliding(B.stats, Stats(_:Double), label, u, description, kinded).map(_.run)
       def keys = ks
       def recordNanos(nanos: Long): Unit = {
         // record time in milliseconds

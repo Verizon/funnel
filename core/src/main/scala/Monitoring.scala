@@ -42,7 +42,7 @@ trait Monitoring {
     (k, topic(k)(buf))
   }
 
-  protected def topic[I,O](key: Key[O])(buf: Process1[(I,Duration),O]): Task[I => Task[Unit]]
+  def topic[I,O](key: Key[O])(buf: Process1[(I,Duration),O]): Task[I => Task[Unit]]
 
   /**
    * Return the continuously updated signal of the current value
