@@ -57,6 +57,7 @@
         critical: "{{ item.critical }}"
         warning: "{{ item.warning }}"
         actions: "{{ environments[application_environment].actions }}"
+        description: "{{ item.description }}"
       with_items:
         - name: low-disk-space
           window: 10 minutes
@@ -65,6 +66,12 @@
           critical: "!(target < 0.9)"
           warning: "!(target < 0.8)"
           aggregation: max
+          description: >
+            logs more than likley filled up the disks - flask does not typically
+            emit a large number of logs, so check the log settings in provision.yml
+            to make sure that debug is OFF. In addition, ensure there are no
+            critical errors in said logs.
+
         - name: high-cpu
           window: 10 minutes
           constraint: system.cpu.aggregate.usage.combined
@@ -72,16 +79,20 @@
           critical: target >= 0.95
           warning: target >= 0.90
           aggregation: avg
-        # purpose of this alert is to provide a negative check
-        # and ensure that the datapoints do not drop below a
-        # known reasonable threshold. Anything less than a
-        # couple thousand datapoints a minute means the flasks
-        # dont have appropriate workload.
+          description: >
+            if this alert sounds, flask is under a lot of CPU pressure.
+            more often than not this means that there are not enough flasks
+            running to evenly seperate the load.
+
         - name: low-mirror-datapoints
           window: 10 minutes
-          filter: mirror.datapoints
+          constraint: mirror.datapoints
           field: counter
           critical: target < 500
           warning: target < 1000
           aggregation: avg
-
+          description: >
+            purpose of this alert is to provide a negative check and ensure
+            that the datapoints do not drop below a known reasonable threshold.
+            Anything less than a couple thousand datapoints a minute means the flasks
+            dont have appropriate workload, or their workload
