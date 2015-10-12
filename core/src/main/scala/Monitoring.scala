@@ -33,10 +33,10 @@ trait Monitoring {
 
   /**
    * Create a new topic with the given name and units,
-   * using a stream transducer to
+   * using a stream transducer to buffer updates.
    */
   def topic[I, O:Reportable](
-      name: String, units: Units, description: String, keyMod: Key[O] => Key[O])(
+      name: String, units: Units, description: String, keyMod: Key[O] => Key[O] = identity[Key[O]] _)(
       buf: Process1[(I,Duration),O]): (Key[O], Task[I => Task[Unit]]) = {
     val k = keyMod(Key[O](name, units, description))
     (k, topic(k)(buf))

@@ -315,7 +315,7 @@ object MonitoringSpec extends Properties("monitoring") {
   /** Check that when publishing, we get the count that was published. */
   property("pub/sub") = forAll(Gen.nonEmptyListOf(Gen.choose(1,10))) { a =>
     val M = Monitoring.default
-    val (k, snk) = M.topic[Long,Double]("count", Units.Count, "", identity)(B.ignoreTime(B.counter(0))).map(_.run)
+    val (k, snk) = M.topic[Long,Double]("count", Units.Count, "")(B.ignoreTime(B.counter(0))).map(_.run)
     val count = M.get(k)
     a.traverse_(x => snk(x)).run
     val expected = a.sum
