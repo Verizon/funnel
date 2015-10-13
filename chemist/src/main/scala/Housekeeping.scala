@@ -37,7 +37,9 @@ object Housekeeping {
     time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
       (gatherUnassignedTargets(d, r) <* InvestigatingLatency.timeTask(handleInvestigating(maxRetries)(r)) ).attempt.map {
         case \/-(_) => ()
-        case -\/(e) => log.warn(s"failed running housekeeping itteration due to $e")
+        case -\/(e) =>
+          log.warn(s"failed running housekeeping itteration due to $e")
+          e.printStackTrace
       }
     )
 
