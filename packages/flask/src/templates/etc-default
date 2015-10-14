@@ -23,10 +23,12 @@
 
 -J-XX:+UseNUMA
 
--J-XX:SurvivorRatio=2
-
 -J-XX:+UseG1GC
 
+-J-XX:MaxGCPauseMillis=600
+
+# using this option results in massive decreases in both gc
+# latency and frequency.
 -J-XX:+UseStringDeduplication
 
 -Dlogback.configurationFile=${{chdir}}/etc/logback.xml
