@@ -10,6 +10,8 @@ import scalaz.std.list._
 import scalaz.std.tuple._
 import scalaz.syntax.foldable._
 import scalaz.syntax.functor._
+import scalaz.stream.{Process,Process1}
+import scalaz.concurrent.Task
 
 /**
  * Provider of counters, gauges, and timers, tied to some
@@ -46,9 +48,9 @@ class Instruments(val window: Duration,
       val kinded = andKind("periodic", keyMod)
       val trimmed = label.trim // to prevent trailing spaces
       val c = new PeriodicGauge[O] {
-        val now = B.resetEvery(window)(B.accum[O,O](init)(O.plus))
-        val prev = B.emitEvery(window)(now)
-        val sliding = B.sliding(window)(identity[O])(O)
+        val now: Process1[(O,Duration), O] = B.resetEvery(window)(B.accum[O,O](init)(O.plus))
+        val prev: Process1[(O,Duration), O] = B.emitEvery(window)(now)
+        val sliding: Process1[(O,Duration), O] = B.sliding(window)(identity[O])(O)
         val (nowK, incrNow) =
           monitoring.topic[O,O](
             s"now/$trimmed", units, nowL(description), kinded)(now).map(_.run)
