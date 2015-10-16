@@ -18,12 +18,13 @@ Custom.compilation
 Custom.revolver
 
 libraryDependencies ++= Seq(
-  "net.databinder"  %% "unfiltered-filter"       % V.unfiltered,
-  "net.databinder"  %% "unfiltered-netty-server" % V.unfiltered,
-  "oncue.knobs"     %% "core"                    % V.knobs,
-  "io.netty"         % "netty-handler"           % V.netty,
-  "io.netty"         % "netty-codec"             % V.netty,
-  "com.github.cjmx" %% "cjmx"                    % "2.2.+" exclude("org.scala-sbt","completion") exclude("com.google.code.gson","gson")
+  "net.databinder"    %% "unfiltered-filter"       % V.unfiltered,
+  "net.databinder"    %% "unfiltered-netty-server" % V.unfiltered,
+  "oncue.knobs"       %% "core"                    % V.knobs,
+  "io.netty"           % "netty-handler"           % V.netty,
+  "io.netty"           % "netty-codec"             % V.netty,
+  "com.github.cjmx"   %% "cjmx"                    % "2.2.+" exclude("org.scala-sbt","completion") exclude("com.google.code.gson","gson"),
+  "org.apache.curator" % "curator-test"            % "2.9.0"       % "test"
 )
 
 mainClass in Revolver.reStart := Some("funnel.agent.Main")
