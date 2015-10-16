@@ -229,7 +229,7 @@ object Main {
           (s: String) => a(s) || b(s)
         },
         config.name
-      )(new java.util.concurrent.ConcurrentHashMap, I)(config.frequency).run.runAsync {
+      )(new java.util.concurrent.ConcurrentHashMap, I)(config.frequency).attempt().stripW.run.runAsync {
         case -\/(e) => log.error(s"Fatal error with the JMX import from ${config.uri}. $e")
         case _      => ()
       }

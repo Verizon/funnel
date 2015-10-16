@@ -11,6 +11,8 @@ import scalaz.std.list._
 import scalaz.std.tuple._
 import scalaz.syntax.foldable._
 import scalaz.syntax.functor._
+import scalaz.stream.{Process,Process1}
+import scalaz.concurrent.Task
 
 import scalaz.concurrent.Task
 
