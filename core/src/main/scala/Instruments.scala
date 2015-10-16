@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.twitter.algebird.Group
 import funnel.{Buffers => B}
+import funnel.Buffers.TBuffer
 
 import scala.concurrent.duration._
 import scalaz.std.list._
@@ -67,15 +68,18 @@ class Instruments(val window: Duration,
     units: Units = Units.None,
     description: String,
     keyMod: Key[O] => Key[O] = identity[Key[O]] _
-  ): (Periodic[O], Three[Process1[(I,Duration),O]]) = {
+  ): (Periodic[O], Three[TBuffer[Option[I],O]]) = {
     val trimmed = label.trim // to prevent trailing spaces
     val O = implicitly[Group[O]]
-    val now = B.resetEvery(window)(nowBuf)
-    val prev = B.emitEvery(window)(now)
-    val sliding = B.sliding(window)(unit)(O)
-    val periodic = Periodic(Three(("now", nowL _), ("previous", previousL _), ("sliding", slidingL _)).map {
-      case (name, desc) => keyMod(Key[O](s"$name/$trimmed", units, desc(description)))
-    })
+    val nowP = B.resetEvery(window)(nowBuf)
+    val now = B.ignoreTick(nowP)
+    val prev = B.emitEvery(window)(nowP)
+    val sliding = B.ignoreTick(B.sliding(window)(unit)(O))
+    val periodic =
+      Periodic(Three(("now", nowL _), ("previous", previousL _), ("sliding", slidingL _)).map {
+        case (name, desc) => keyMod(Key[O](s"$name/$trimmed", units, desc(description)))
+      })
+
     (periodic, Three(now, prev, sliding))
   }
 
@@ -188,7 +192,8 @@ class Instruments(val window: Duration,
                           keyMod: Key[A] => Key[A] = identity[Key[A]] _): Gauge[Continuous[A],A] = {
     val kinded = andKind("gauge",keyMod)
     val g = new Gauge[Continuous[A],A] {
-      val (key, snk) = monitoring.topic(s"now/${label.trim}", units, description, kinded)(B.resetEvery(window)(B.variable(init))).map(_.run)
+      val (key, snk) = monitoring.topic(s"now/${label.trim}", units, description, kinded)(
+        B.ignoreTick(B.resetEvery(window)(B.variable(init)))).map(_.run)
       def set(a: A) = runLogging(snk(_ => a))
       def keys = Continuous(key)
 

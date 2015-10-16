@@ -14,19 +14,35 @@ import com.twitter.algebird.Group
  */
 object Buffers {
 
+  type Buffer[T,I,O] = Process1[(I,T),O]
+  type TBuffer[I,O] = Buffer[Duration,I,O]
+
   /** Promote a `Process1[A,B]` to one that ignores time. */
-  def ignoreTime[A,B](p: Process1[A,B]): Process1[(A,Any), B] =
+  def ignoreTime[A,B](p: Process1[A,B]): Buffer[Any,A,B] =
     process1.id[(A,Any)].map(_._1).pipe(p)
 
+  def ignoreTickAndTime[A,B](p: Process1[A,B]): TBuffer[Option[A],B] =
+    ignoreTick(ignoreTime(p))
+
+  /**
+   * Promote a buffer to one that ignores empty inputs.
+   * We use empty inputs as a signal that the buffer should be flushed.
+   */
+  def ignoreTick[A,B](p: TBuffer[A,B]): TBuffer[Option[A],B] =
+    process1.id[(Option[A],Duration)].flatMap {
+      case (Some(a), t) => Process.emit(a -> t)
+      case _ => Process.halt
+    } pipe p
+
   /** Emit the input duration. */
-  def elapsed: Process1[(Any,Duration), Duration] =
+  def elapsed: TBuffer[Any,Duration] =
     process1.id[(Any,Duration)].map(_._2)
 
   /**
    * Emit the elapsed time in the current period, where periods are
    * of `step` duration.
    */
-  def currentElapsed(step: Duration): Process1[(Any,Duration), Duration] =
+  def currentElapsed(step: Duration): TBuffer[Any,Duration] =
     process1.id[(Any,Duration)].map { case (_, d) =>
       val d0 = floorDuration(d, step)
       d - d0
@@ -36,7 +52,7 @@ object Buffers {
    * Emit the remaining time in the current period, where periods are
    * of `step` duration.
    */
-  def currentRemaining(step: Duration): Process1[(Any,Duration), Duration] =
+  def currentRemaining(step: Duration): TBuffer[Any,Duration] =
     process1.lift { (p: (Any,Duration)) =>
       val d = p._2
       val d1 = ceilingDuration(d, step)
@@ -80,13 +96,13 @@ object Buffers {
   }
 
   /** Reset the buffer `p` after `d0, 2*d0, 3*d0, ...` elapsed duration. */
-  def resetEvery[I,O](d0: Duration)(p: Process1[I,O]): Process1[(I,Duration),O] = {
+  def resetEvery[I,O](d0: Duration)(p: Process1[I,O]): TBuffer[I,O] = {
     def flush(cur: Process1[I,O], expiration: Duration):
         Process1[(I,Duration),O] = {
       val (h, t) = cur.unemit
       Process.emitAll(h) ++ go(t, expiration)
     }
-    def go(cur: Process1[I,O], expiration: Duration): Process1[(I,Duration),O] =
+    def go(cur: Process1[I,O], expiration: Duration): TBuffer[I,O] =
       P.await1[(I,Duration)].flatMap { case (i,d) =>
         if (d >= expiration)
           flush(process1.feed1(i)(p), ceilingDuration(d, d0))
@@ -96,28 +112,35 @@ object Buffers {
     flush(p, d0)
   }
 
-  /** Only emit a value after `d0, 2*d0, 3*d0, ...` elapsed duration. */
-  def emitEvery[I,O](d0: Duration)(p: Process1[(I,Duration),O]): Process1[(I,Duration),O] = {
-    def flush(last: Option[O], unmask: Boolean, cur: Process1[(I,Duration),O], expiration: Duration):
-        Process1[(I,Duration),O] = {
+  /**
+   * Only emit a value after `d0, 2*d0, 3*d0, ...` elapsed duration.
+   * Takes `Option[I]` to allow for the clock to tick independently of the inputs,
+   * so we can flush the buffer on a schedule if there is no input for a while.
+   */
+  def emitEvery[I,O](d0: Duration)(p: TBuffer[I,O]): TBuffer[Option[I],O] = {
+    def flush(last: Option[O], unmask: Boolean, cur: TBuffer[I,O], expiration: Duration):
+        TBuffer[Option[I],O] = {
       val (h, t) = cur.unemit
-      val last2 = h.lastOption orElse last
+      val last2 = h.lastOption
       if (unmask) Process.emitAll(last.toSeq) ++ go(last2, t, expiration)
-      else go(last2, t, expiration)
+      else go(last2 orElse last, t, expiration)
     }
-    def go(last: Option[O], cur: Process1[(I,Duration),O], expiration: Duration): Process1[(I,Duration),O] =
-      P.await1[(I,Duration)].flatMap { case (i,d) =>
-        if (d >= expiration)
-          flush(last, true, process1.feed1(i -> d)(p), ceilingDuration(d, d0))
-        else
-          flush(last, false, process1.feed1(i -> d)(cur), expiration)
+    def go(last: Option[O], cur: TBuffer[I,O], expiration: Duration): TBuffer[Option[I],O] =
+      P.await1[(Option[I],Duration)].flatMap {
+        case (x, d) =>
+          if (d >= expiration)
+            flush(last, true,
+                  x.map(i => process1.feed1(i -> d)(p)).getOrElse(cur),
+                  ceilingDuration(d, d0))
+          else
+            flush(last, false, x.map(i => process1.feed1(i -> d)(cur)).getOrElse(cur), expiration)
       }
     flush(None, false, p, d0)
   }
 
   /** Produce a sliding window output from all inputs in the last `d0` duration. */
-  def sliding[I,O](d0: Duration)(to: I => O)(G: Group[O]): Process1[(I,Duration), O] = {
-    def go(window: Vector[(O, Duration)], cur: O): Process1[(I,Duration), O] =
+  def sliding[I,O](d0: Duration)(to: I => O)(G: Group[O]): TBuffer[I,O] = {
+    def go(window: Vector[(O, Duration)], cur: O): TBuffer[I,O] =
       P.await1[(I,Duration)].flatMap { case (i,d) =>
         val (out, in) = window.span(d - _._2 > d0)
         val io = to(i)
@@ -140,7 +163,7 @@ object Buffers {
   def floorDuration(d: Duration, step: Duration): Duration =
     ceilingDuration(d, step) - step
 
-  def resettingRate(d: Duration): Process1[(Long,Duration),Double] =
+  def resettingRate(d: Duration): TBuffer[Long,Double] =
     resetEvery(d)(counter(0))
 
   def stats: Process1[Double, Stats] =
