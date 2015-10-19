@@ -67,7 +67,7 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
       // now the queues are setup with the right permissions,
       // start the lifecycle listener
       _ <- Lifecycle.run(cfg.queue.topicName, signalOf(true)
-            )(cfg.repository, cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery).liftKleisli
+            )(cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery).liftKleisli
       _  = log.debug("lifecycle process started")
 
       _ <- Task.delay(log.info(">>>>>>>>>>>> initilization complete <<<<<<<<<<<<")).liftKleisli

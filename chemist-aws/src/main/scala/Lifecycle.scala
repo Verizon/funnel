@@ -14,7 +14,6 @@ import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import funnel.aws._
-import telemetry.Telemetry._
 import java.net.URI
 
 /**
@@ -83,15 +82,6 @@ object Lifecycle {
     } yield c
   }
 
-  def lifecycleActor(repo: Repository): Actor[PlatformEvent] =
-    Actor[PlatformEvent](a => repo.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
-
-  def errorActor(repo: Repository): Actor[Error] =
-    Actor[Error](e => repo.errorSink(e).run)(Strategy.Executor(Chemist.serverPool))
-
-  def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] =
-    Actor[(URI, Set[Key[Any]])]{ case (fl, keys) => repo.keySink(fl, keys).run }(Strategy.Executor(Chemist.serverPool))
-
   def interpreter(e: AutoScalingEvent, signal: Signal[Boolean]
     )(asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Seq[PlatformEvent]] = {
@@ -156,7 +146,7 @@ object Lifecycle {
    * the world.
    */
   def run(queueName: String, signal: Signal[Boolean]
-    )(repo: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+    )(sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
   ): Task[Unit] = {
     val ourWorld = stream(queueName, signal)(sqs,asg,ec2,dsc).flatMap(logErrors) to Process.constant(repo.platformHandler _)
     ourWorld.run.onFinish(_ => signal.set(false))

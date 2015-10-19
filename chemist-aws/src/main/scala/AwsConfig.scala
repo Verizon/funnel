@@ -55,15 +55,13 @@ case class AwsConfig(
 
   val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, classifier, templates)
 
-  val repository: Repository = new StatefulRepository
-
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
 
   val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
 
-  val remoteFlask = new HttpFlask(http, repository, signal)
+  val remoteFlask = new HttpFlask(http, signal)
 }
 
 object AwsConfig {

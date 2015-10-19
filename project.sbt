@@ -33,7 +33,7 @@ lazy val funnel = project.in(file(".")).aggregate(
 
 lazy val agent = project.dependsOn(zeromq % "test->test;compile->compile", http, nginx).configs(MultiJvm)
 
-lazy val chemist = project.dependsOn(core, http, telemetry)
+lazy val chemist = project.dependsOn(core, http, zeromq)
 
 lazy val `chemist-aws` = project.dependsOn(chemist % "test->test;compile->compile")
 
@@ -45,7 +45,7 @@ lazy val docs = project.dependsOn(core)
 
 lazy val elastic = project.dependsOn(core, http)
 
-lazy val flask = project.dependsOn(elastic, telemetry, zeromq % "test->test;compile->compile")
+lazy val flask = project.dependsOn(elastic, zeromq % "test->test;compile->compile")
 
 lazy val http = project.dependsOn(core)
 

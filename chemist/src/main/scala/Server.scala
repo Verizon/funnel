@@ -33,25 +33,25 @@ object Server {
     import metrics.RepoEventsStream
     import server.{platform,chemist}
     val disco   = platform.config.discovery
-    val repo    = platform.config.repository
+    // val repo    = platform.config.repository
     val sharder = platform.config.sharder
 
     RepoEventsStream.green
 
-    val c: Process[Task, RepoCommand] = repo.repoCommands
-    val l: Process[Task, Unit] = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask)(_)))
-    val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
-      log.error(s"Error processing repo events: $err")
-      Process.eval_(Task.delay(RepoEventsStream.yellow))
-    }
-    a.stripW.run.runAsync {
-      case -\/(err) =>
-        log.error(s"Error starting processing of Platform events: $err")
-        err.printStackTrace
-        RepoEventsStream.red
+    // val c: Process[Task, RepoCommand] = repo.repoCommands
+    // val l: Process[Task, Unit] = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask)(_)))
+    // val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
+    //   log.error(s"Error processing repo events: $err")
+    //   Process.eval_(Task.delay(RepoEventsStream.yellow))
+    // }
+    // a.stripW.run.runAsync {
+    //   case -\/(err) =>
+    //     log.error(s"Error starting processing of Platform events: $err")
+    //     err.printStackTrace
+    //     RepoEventsStream.red
 
-      case \/-(t)   => log.info(s"result of platform processing $t")
-    }
+    //   case \/-(t)   => log.info(s"result of platform processing $t")
+    // }
 
     chemist.bootstrap(platform).runAsync {
       case -\/(err) =>
@@ -69,7 +69,7 @@ object Server {
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
-    Housekeeping.periodic(5.minutes)(platform.config.maxInvestigatingRetries)(disco, repo).run.runAsync {
+    Housekeeping.periodic(5.minutes)(platform.config.maxInvestigatingRetries)(disco).run.runAsync {
       case -\/(err) =>
         log.error(s"Terminal failure when running the periodic housekeeping tasks. Error was: $err")
         err.printStackTrace
@@ -114,24 +114,21 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
     case GET(Path("/status")) =>
       GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
-    case GET(Path("/errors")) =>
-      GetErrors.time(json(chemist.errors.map(_.toList)))
-
     case GET(Path("/distribution")) =>
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
 
     case GET(Path("/unmonitorable")) =>
       GetUnmonitorable.time(json(chemist.listUnmonitorableTargets))
 
-    case GET(Path("/lifecycle/history")) =>
-      GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
+    // case GET(Path("/lifecycle/history")) =>
+    //   GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
 
-    case GET(Path("/lifecycle/states")) =>
-      GetLifecycleStates.time(json(chemist.states.map(
-        _.toList.map { case (k,v) => k -> v.toList })))
+    // case GET(Path("/lifecycle/states")) =>
+    //   GetLifecycleStates.time(json(chemist.states.map(
+    //     _.toList.map { case (k,v) => k -> v.toList })))
 
-    case GET(Path("/platform/history")) =>
-      GetPlatformHistory.time(json(chemist.platformHistory.map(_.toList)))
+    // case GET(Path("/platform/history")) =>
+    //   GetPlatformHistory.time(json(chemist.platformHistory.map(_.toList)))
 
     case POST(Path("/distribute")) =>
       PostDistribute.time(NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)"))
