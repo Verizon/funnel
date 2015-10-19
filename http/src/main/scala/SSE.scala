@@ -119,7 +119,7 @@ object SSE {
    * Return a stream of all events from the given URL.
    * Example: `readEvents("http://localhost:8001/stream/sliding/jvm")`.
    */
-  def readEvents(uri: URI, Q: Queue[Telemetry])(implicit S: ExecutorService = Monitoring.serverPool):
+  def readEvents(uri: URI)(implicit S: ExecutorService = Monitoring.serverPool):
       Process[Task, Datapoint[Any]] = {
     urlLinesR(uri.toURL)(S).attempt().pipeO(blockParser.map {
       case (_,data) => parseOrThrow[Datapoint[Any]](data)

@@ -40,17 +40,11 @@ object Mirror {
     }
   }
 
-  def from(alive: Signal[Boolean], Q: Queue[Telemetry])(uri: URI): Process[Task, Datapoint[Any]] = {
+  def from(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] = {
     val discriminator = parseURI(uri)
     val t = if(discriminator.isEmpty) topics.all else topics.specific(discriminator)
-    Endpoint(subscribe &&& (connect ~ t), uri).fold({e =>
-                                                      Q.enqueueOne(Unmonitored(uri)).run
-                                                      Process.fail(e)
-                                                    }, {l =>
-                                                      Q.enqueueOne(Monitored(uri)).run
-                                                      Ø.link(l)(alive)(Ø.receive).pipe(fromTransported)
-                                                    }
-    )
+    Endpoint(subscribe &&& (connect ~ t), uri)
+      .fold(Process.fail, l => Ø.link(l)(alive)(Ø.receive).pipe(fromTransported))
   }
 
   val fromTransported : Process1[Transported, Datapoint[Any]] = Process.receive1 { (t:Transported) =>

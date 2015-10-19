@@ -140,7 +140,6 @@ trait Monitoring {
 
   def processMirroringEvents(
     parse: DatapointParser,
-    Q: Queue[Telemetry],
     myName: String = "Funnel Mirror",
     nodeRetries: Names => Event = _ => defaultRetries
   ): Task[Unit] = {
@@ -178,15 +177,7 @@ trait Monitoring {
               log.info(s"Skipping $source, already mirrored")
               Process.halt
             }
-            else Process.eval_ {
-              modifyActive(cluster, _ + source) >>
-              Q.enqueueOne(Monitored(source)) >>
-              Task.delay(log.info(s"Enqueued monitored $source on telemetry queue"))
-            } ++ received.onComplete(Process.eval_ {
-              Q.enqueueOne(Problem(source, "")) >>
-              Task.delay(clusterUrls.update(_.map(_ - source))) >>
-              Task.delay(log.info(s"Enqueued problem with $source on telemetry queue"))
-            })
+            else Process.eval_(modifyActive(cluster, _ + source)) ++ received
           }
 
           Task.delay(logErrors(Task.fork(receivedIdempotent.run)(defaultPool)).runAsync(_ => ()))
