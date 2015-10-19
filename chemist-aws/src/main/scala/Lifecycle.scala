@@ -32,7 +32,7 @@ object Lifecycle {
   import metrics._
   import PlatformEvent._
 
-  private implicit val log = Logger[Lifecycle.type]
+  private val log = Logger[Lifecycle.type]
   private val noop = \/-(Seq(NoOp))
 
   /**
