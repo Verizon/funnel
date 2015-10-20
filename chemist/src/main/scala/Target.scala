@@ -18,10 +18,7 @@ case class Target(
   cluster: ClusterName,
   /* the location this target can be reached. follow the RFC spec for
      guidence on how to properly encode schemes and paths. */
-  uri: URI,
-  /* This can probally go away, but is a simple indicator if this
-     `Target` instance is on a private or public network */
-  isPrivateNetwork: Boolean
+  uri: URI
 )
 
 object Target {

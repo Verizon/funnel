@@ -112,7 +112,7 @@ object Housekeeping {
           log.debug(s"Received cluster $cluster from $a")
           cluster
         }.foldLeft(Set.empty[Target]){ (a,b) =>
-          b.urls.map(s => Target(b.label, new URI(s), false)).toSet
+          b.urls.map(s => Target(b.label, new URI(s))).toSet
         }
       }
     }
