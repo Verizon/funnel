@@ -147,8 +147,12 @@ object Main {
       }
     }
 
-    log.info("Launching the funnel HTTP server on 5775.")
-    funnel.http.MonitoringServer.start(Monitoring.default, 5775)
+    if(options.zeromq.isEmpty){
+      log.info("Launching the funnel HTTP server on 5775.")
+      funnel.http.MonitoringServer.start(Monitoring.default, 5775)
+    } else {
+      log.info("Disabling the HTTP sink that usually runs on port 5775 as we're in mutli-tennant mode.")
+    }
 
     /**
      * Attempt to create and bind endpoints for both the domain socket
