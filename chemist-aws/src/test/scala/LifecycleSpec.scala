@@ -33,24 +33,23 @@ class LifecycleSpec extends FlatSpec with Matchers {
 
   val signal: Signal[Boolean] = signalOf(true)(Strategy.Executor(Chemist.serverPool))
 
-  private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): Throwable \/ Seq[PlatformEvent] =
+  private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): PlatformEvent =
     Lifecycle.stream("name-of-queue", signal)(sqs, asg, ec2, dsc
       ).until(Process.emit(false)).runLast.run.get // never do this anywhere but tests
 
   behavior of "the stream"
 
   it should "side-effect and update the repository when a new flask is launched" in {
-    val \/-(Seq(NewFlask(f))) = fromStream(sqs1, asg1)
+    val NewFlask(f) = fromStream(sqs1, asg1)
     f.id.value should equal( "i-flaskAAA")
   }
 
   it should "side-effect and update the repository when a flask is terminated" in {
-    fromStream(sqs2, asg1) should equal (
-      \/-(Seq(TerminatedFlask(FlaskID("i-flaskAAA"))))) // empty because there is no work
+    fromStream(sqs2, asg1) should equal (TerminatedFlask(FlaskID("i-flaskAAA")))
   }
 
   it should "produce a parse exception in the event the message on SQS cannot be parsed" in {
-    fromStream(sqs3, asg1).swap.toOption.get shouldBe a [MessageParseException]
+    fromStream(sqs3, asg1) should equal (true)
   }
 
   behavior of "Lifecycle.interpreter"

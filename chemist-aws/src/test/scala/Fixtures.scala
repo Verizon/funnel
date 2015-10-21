@@ -29,9 +29,7 @@ object Fixtures {
     instance("i-dx947af7") ::
     instance("i-15807647") ::
     instance("i-flaskAAA",
-      tags = Vector(
-        AwsTagKeys.name -> "flask",
-        AwsTagKeys.supervisionTemplate -> "zeromq+tcp://localhost:7390/")
+      tags = Vector(AwsTagKeys.name -> "flask")
     ) :: Nil
 
   val localhost: Location =
@@ -41,15 +39,6 @@ object Fixtures {
       datacenter = "local",
       protocol = NetworkScheme.Http,
       intent = LocationIntent.Mirroring,
-      templates = defaultTemplates)
-
-  val telemetryLocalhost: Location =
-    Location(
-      host = "127.0.0.1",
-      port = 7390,
-      datacenter = "local",
-      protocol = NetworkScheme.Zmtp(TCP),
-      intent = LocationIntent.Supervision,
       templates = defaultTemplates)
 
   def asgEvent(
