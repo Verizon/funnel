@@ -20,12 +20,11 @@ object LoggingRemote extends RemoteFlask {
 
   def flaskTemplate(path: String) =
     LocationTemplate(s"http://@host:@port/$path")
-  def command(c: FlaskCommand): Task[Unit] = {
+
+  def command(c: FlaskCommand): Task[Unit] =
     Task.delay {
       log.info("LoggingRemote recieved: " + c)
     }
-  }
-
 }
 
 class HttpFlask(http: dispatch.Http, signal: Signal[Boolean]) extends RemoteFlask {
@@ -70,8 +69,6 @@ class HttpFlask(http: dispatch.Http, signal: Signal[Boolean]) extends RemoteFlas
     import argonaut._, Argonaut._
     import JSON.ClustersToJSON
 
-    // FIXME: "safe" because we know we're passing in the default localhost
-    // val host: HostAndPort = to.dns.map(_ + ":" + to.port).get
     val payload: Map[ClusterName, List[URI]] =
       targets.groupBy(_.cluster).mapValues(_.map(_.uri).toList)
 

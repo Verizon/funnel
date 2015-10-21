@@ -25,48 +25,6 @@ object Housekeeping {
   private lazy val defaultPool = Strategy.Executor(Chemist.defaultPool)
 
   /**
-   * This is a collection of the tasks that are needed to run on a periodic basis.
-   * Specifically this involves the following:
-   * 1. ensuring that we pickup any target instances that we were not already moniotring
-   * 2. ensuring that targets that are stuck in the assigned state for more than a given
-   *    period are reaped, and re-assigned to another flask (NOT IMPLEMENTED.)
-   */
-  def periodic(delay: Duration)(maxRetries: Int)(d: Discovery): Process[Task, Unit] =
-    time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
-      (gatherUnassignedTargets(d) <* InvestigatingLatency.timeTask(handleInvestigating(maxRetries)) ).attempt.map {
-        case \/-(_) => ()
-        case -\/(e) => log.warn(s"failed running housekeeping itteration due to $e")
-      }
-    )
-
-  /**
-   * Gather up all the targets that are for reasons unknown sitting in the unassigned
-   * target state. We'll read the list of the whole world, and delta that against the known
-   * distribution, and assign any outliers. This is a fall back mechinism.
-   */
-  def gatherUnassignedTargets(discovery: Discovery): Task[Unit] = ???
-    // GatherUnassignedLatency.timeTask(for {
-    //   // read the state of the existing world
-    //   i    <- repository.instances
-    //   uris  = i.map(_._1)
-
-    //   // read the list of all deployed machines
-    //   ts   <- discovery.listTargets
-    //   _     = log.info(s"found a total of ${ts.length} deployed, accessable instances...")
-
-    //   // figure out given the existing distribution, and the difference between what's been discovered
-    //   // STU: the fact that I'm throwing ID away here is suspect
-
-    //   unmonitored = ts.foldLeft(Set.empty[Target])(_ ++ _._2).filterNot((t: Target) => uris.contains(t.uri))
-    //   _     = log.info(s"located instances: monitorable=${ts.size}, unmonitored=${unmonitored.size}")
-
-    //   // action the new targets by putting them in the monitoring lifecycle
-    //   targets = unmonitored.map(t => PlatformEvent.NewTarget(t))
-    //   _    <- targets.toVector.traverse_(repository.platformHandler)
-    //   _     = log.info(s"added ${targets.size} targets to the repository...")
-    // } yield ())
-
-  /**
    * Given a collection of flask instances, find out what exactly they are already
    * mirroring and absorb that into the view of the world.
    *
@@ -117,44 +75,4 @@ object Housekeeping {
       }
     }
   }
-
-  private def handleInvestigating(maxRetries: Int): Task[Unit] = ???
-  //   def go(sc: StateChange, r: Repository): Task[Unit] = {
-  //     val i = sc.msg.asInstanceOf[Investigate]
-
-  //     if (i.retryCount < maxRetries) {			// TODO: make max retries oonfigurable?
-  //       val now = System.currentTimeMillis
-  //       val later = i.time + math.pow(2.0, i.retryCount.toDouble).toInt.minutes.toMillis
-  //       if (now >= later) {				// Not done retrying; time to retry
-  //         Task.fromDisjunction(contact(i.target.uri)).onFinish { ot => ot match {
-  //           case Some(t) => Task.delay {		// Retry failed with Throwable t
-  //             log.debug(s"Failed retrying target ${i.target} for the ${i.retryCount}th time, with Throwable $t")
-  //           } <* r.updateState(
-  //             i.target.uri,
-  //             TargetState.Investigating,
-  //             sc.copy(msg = Investigate(i.target, now, i.retryCount + 1))
-  //           )
-  //           case None    => Task.delay {		// Retry succeeded;
-  //             log.debug(s"Succeeded retrying target ${i.target} for the ${i.retryCount}th time")
-  //           } <* r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri)) <*
-  //                r.platformHandler(PlatformEvent.NewTarget(i.target))
-  //         }}
-  //       } else {					// Not done retrying but not time to retry yet
-  //         Task.delay {
-  //           log.debug(s"Target ${i.target} is being investigated, but it's not time to retry it right now")
-  //         }
-  //       }
-  //     } else {						// Too many retries; ultimate failure
-  //       Task.delay {
-  //         log.debug(s"Target ${i.target} was retried too many times and is being terminated")
-  //       } <* r.platformHandler(PlatformEvent.TerminatedTarget(i.target.uri))
-  //     }
-  //   }
-
-  //   for {
-  //     sm   <- r.states
-  //     scs   = sm(TargetState.Investigating).values.toSeq
-  //     _    <- Nondeterminism[Task].gatherUnordered(scs.map(go(_, r)))
-  //   } yield ()
-  // }
 }

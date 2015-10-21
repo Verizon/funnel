@@ -36,23 +36,6 @@ object Server {
     // val repo    = platform.config.repository
     val sharder = platform.config.sharder
 
-    RepoEventsStream.green
-
-    // val c: Process[Task, RepoCommand] = repo.repoCommands
-    // val l: Process[Task, Unit] = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask)(_)))
-    // val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
-    //   log.error(s"Error processing repo events: $err")
-    //   Process.eval_(Task.delay(RepoEventsStream.yellow))
-    // }
-    // a.stripW.run.runAsync {
-    //   case -\/(err) =>
-    //     log.error(s"Error starting processing of Platform events: $err")
-    //     err.printStackTrace
-    //     RepoEventsStream.red
-
-    //   case \/-(t)   => log.info(s"result of platform processing $t")
-    // }
-
     chemist.bootstrap(platform).runAsync {
       case -\/(err) =>
         log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
@@ -69,13 +52,13 @@ object Server {
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
-    Housekeeping.periodic(5.minutes)(platform.config.maxInvestigatingRetries)(disco).run.runAsync {
-      case -\/(err) =>
-        log.error(s"Terminal failure when running the periodic housekeeping tasks. Error was: $err")
-        err.printStackTrace
+    // Housekeeping.periodic(5.minutes)(platform.config.maxInvestigatingRetries)(disco).run.runAsync {
+    //   case -\/(err) =>
+    //     log.error(s"Terminal failure when running the periodic housekeeping tasks. Error was: $err")
+    //     err.printStackTrace
 
-      case \/-(_)   => log.warn("Completed the periodic housekeeping tasks. The stream may have terminated early which is not desirable.")
-    }
+    //   case \/-(_)   => log.warn("Completed the periodic housekeeping tasks. The stream may have terminated early which is not desirable.")
+    // }
 
     val p = this.getClass.getResource("/oncue/www/")
     log.info(s"Setting web resource path to '$p'")

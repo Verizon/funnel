@@ -1,7 +1,7 @@
 package funnel
 package chemist
 
-import scalaz.stream.{Process,Process1,Sink,time,async,wye,sink}
+import scalaz.stream.{Process,Process1,Sink,async,time,channel,wye,sink}
 import scalaz.stream.async.mutable.Signal
 import scalaz.concurrent.{Task,Strategy}
 import scala.concurrent.duration._
@@ -38,7 +38,7 @@ object Prototype {
     }
 
     // lifecycle
-    val p2: Flow[PlatformEvent] =
+    val lifecycle: Flow[PlatformEvent] =
       time.awakeEvery(40.seconds)(s1, Chemist.schedulingPool
         ).evalMap(d => Task.delay {
           Context[PlatformEvent](Distribution.empty, NewTarget(Target(s"test-${d.toMillis}", new URI("http://google.com"))))
@@ -69,8 +69,8 @@ object Prototype {
     }
 
     // routing
-    def partition(dsc: Discovery, shd: Sharder)(lifecycle: Flow[PlatformEvent]): Flow[Plan] = {
-      join(dsc)(lifecycle).map {
+    def partition(dsc: Discovery, shd: Sharder)(p1: Flow[PlatformEvent]): Flow[Plan] =
+      p1.map {
         case Context(d,NewTarget(target)) =>
           val (all,work) = handle.newTarget(target)(d)
           Context(all, Distribute(work))
@@ -90,12 +90,23 @@ object Prototype {
         case Context(d,NoOp) =>
           Context(d, Ignore)
       }
+
+    val action: Sink[Task, Context[Plan]] = sink.lift {
+      case Context(d, Distribute(work)) => Task.delay(()) // itterate the work and do I/O to send to flask
+      case Context(d, Ignore)           => Task.delay(())
     }
 
-    val action: Sink[Task, Plan] = sink.lift {
-      case Distribute(work) => Task.delay(()) // itterate the work and do I/O to send to flask
-      case Ignore           => Task.delay(())
-    }
+    val caches: Sink[Task, Context[Plan]] =
+      sink.lift { c =>
+        for {
+          _ <- MemoryStateCache.plan(c.value)
+          _ <- MemoryStateCache.distribution(c.distribution)
+        } yield ()
+      }
+
+    // needs error handling
+    def program(dsc: Discovery, shd: Sharder, cache: StateCache): Task[Unit] =
+      partition(dsc,shd)(join(dsc)(lifecycle)).observe(caches).to(action).run
   }
 }
 
