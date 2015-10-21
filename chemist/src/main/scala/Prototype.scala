@@ -101,7 +101,7 @@ object Prototype {
     }
 
   // needs error handling
-  def program(dsc: Discovery, shd: Sharder, cache: StateCache): Task[Unit] =
+  def program(dsc: Discovery, shd: Sharder): Task[Unit] =
     partition(dsc,shd)(join(dsc)(lifecycle)).observe(caches).to(action).run
 }
 

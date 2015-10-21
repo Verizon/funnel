@@ -41,18 +41,14 @@ trait Chemist[A <: Platform]{
   /**
    * list all the shards currently known by chemist.
    */
-  def shards: ChemistK[Set[Flask]] = ???
-    // distribution.map(_.toList.flatMap(id => cfg.repository.flask(id)).toSet)
-    // for {
-    //   cfg <- config
-    //   a <- cfg.repository.distribution.map(Sharding.shards).liftKleisli
-    // } yield a.toList.flatMap(id => cfg.repository.flask(id)).toSet
+  def shards: ChemistK[Set[Flask]] =
+    distribution.map(_.toList.map(_._1).toSet)
 
   /**
    * display all known node information about a specific shard
    */
-  def shard(id: FlaskID): ChemistK[Option[Flask]] = ???
-    // config.map(_.repository.flask(id))
+  def shard(id: FlaskID): ChemistK[Option[Flask]] =
+    shards.map(_.find(_.id == id))
 
   /**
    * Instruct flask to specifcally take a given shard out of service and
@@ -78,8 +74,8 @@ trait Chemist[A <: Platform]{
     // } yield ()
 
   /**
-    * List the unmonitorable targets.
-    */
+   * List the unmonitorable targets.
+   */
   def listUnmonitorableTargets: ChemistK[List[Target]] =
     config.flatMapK( cfg =>
       cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2)))
@@ -91,7 +87,7 @@ trait Chemist[A <: Platform]{
   def bootstrap: ChemistK[Unit] =
     for {
       cfg <- config
-      _   <- Prototype.program(cfg.discovery, cfg.sharder, cfg.state).liftKleisli
+      _   <- Prototype.program(cfg.discovery, cfg.sharder).liftKleisli
       _   <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
     } yield ()
 
@@ -108,7 +104,6 @@ trait Chemist[A <: Platform]{
 
   protected val config: ChemistK[A#Config] =
     platform.map(_.config)
-
 }
 
 object Chemist {
