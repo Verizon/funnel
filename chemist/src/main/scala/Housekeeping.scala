@@ -23,6 +23,9 @@ object Housekeeping {
   import Sharding._
   import concurrent.duration._
 
+  // Hack to initialize instruments
+  val _ = metrics.CommandCount
+
   private lazy val log = Logger[Housekeeping.type]
   private lazy val defaultPool = Strategy.Executor(Chemist.defaultPool)
 
