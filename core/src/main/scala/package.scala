@@ -1,8 +1,6 @@
 package funnel {
 
-  import scala.concurrent.duration._
-
-  package object instruments extends Instruments(1 minute) with DefaultKeys {
+  package object instruments extends Instruments(funnel.defaultWindow) with DefaultKeys {
 
     Clocks.instrument(this)
     JVM.instrument(this)
@@ -10,15 +8,21 @@ package funnel {
   }
 }
 
+import scalaz.Free.FreeC
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scalaz.Monoid
 import com.twitter.algebird.Group
 
 package object funnel {
+  import scala.concurrent.duration._
+
+  type Metric[A] = FreeC[Key, A]
   type DatapointParser    = java.net.URI => Process[Task,Datapoint[Any]]
   type ClusterName        = String
   type ContinuousGauge[A] = Gauge[Continuous[A],A]
+
+  val defaultWindow = 1 minute
 
   implicit def GroupMonoid[A](implicit G: Group[A]): Monoid[A] = new Monoid[A] {
     val zero = G.zero

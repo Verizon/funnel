@@ -5,7 +5,7 @@ import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorServic
 import scala.concurrent.duration._
 import scala.language.higherKinds
 import scalaz.concurrent.{Actor,Strategy,Task}
-import scalaz.{Nondeterminism,==>>}
+import scalaz.{Free,Nondeterminism,==>>}
 import scalaz.stream._
 import scalaz.stream.merge._
 import scalaz.stream.async
@@ -21,6 +21,8 @@ import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.{signalOf,signalUnset}
 import journal.Logger
 import internals._
+import funnel.{Buffers => B}
+import funnel.Buffers.TBuffer
 
 /**
  * A hub for publishing and subscribing to streams
@@ -33,16 +35,16 @@ trait Monitoring {
 
   /**
    * Create a new topic with the given name and units,
-   * using a stream transducer to
+   * using a stream transducer to buffer updates.
    */
   def topic[I, O:Reportable](
-      name: String, units: Units, description: String, keyMod: Key[O] => Key[O])(
-      buf: Process1[(I,Duration),O]): (Key[O], Task[I => Task[Unit]]) = {
+      name: String, units: Units, description: String, keyMod: Key[O] => Key[O] = identity[Key[O]] _)(
+      buf: TBuffer[Option[I],O], timeout: Duration = defaultWindow): (Key[O], Task[I => Task[Unit]]) = {
     val k = keyMod(Key[O](name, units, description))
-    (k, topic(k)(buf))
+    (k, topic(k)(buf, timeout))
   }
 
-  protected def topic[I,O](key: Key[O])(buf: Process1[(I,Duration),O]): Task[I => Task[Unit]]
+  def topic[I,O](key: Key[O])(buf: TBuffer[Option[I],O], timeout: Duration = defaultWindow): Task[I => Task[Unit]]
 
   /**
    * Return the continuously updated signal of the current value
@@ -58,9 +60,9 @@ trait Monitoring {
   def remove[O](k: Key[O]): Task[Unit]
 
   /** Convience function to publish a metric under a newly created key. */
-  def publish[O:Reportable](name: String, units: Units)(e: Event)(
-                            f: Metric[O]): Task[Key[O]] =
-    publish(Key(name, units))(e)(f)
+  def publish[O:Reportable](name: String, units: Units
+    )(e: Event)(f: Metric[O]): Task[Key[O]] =
+      publish(Key(name, units))(e)(f)
 
   /**
    * Like `publish`, but if `key` is preexisting, sends updates
@@ -75,7 +77,7 @@ trait Monitoring {
       _ <- proc.evalMap((o: O) => for {
         b <- exists(key)
         _ <- if (b) Task.delay(Task.fork(update(key, o))(defaultPool).runAsync(_ => ()))
-             else Task(topic[O,O](key)(Buffers.ignoreTime(process1.id)))(defaultPool)
+             else Task.fork(topic[O,O](key)(B.ignoreTickAndTime(process1.id)))(defaultPool)
       } yield ()).run
     } yield key
   }
@@ -91,11 +93,7 @@ trait Monitoring {
    * preexisting `key` is not an error condition.
    */
   def publish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] =
-    for {
-      b <- exists(key)
-      k <- if (b) Task.fail(new Exception(s"key not unique, use republish if this is indented: $key"))
-           else republish(key)(e)(f)
-    } yield k
+    republish(key)(e)(f)
 
   /** Compute the current value for the given `Metric`. */
   def eval[A](f: Metric[A]): Task[A] = {
@@ -105,7 +103,7 @@ trait Monitoring {
       def apply[A](k: Key[A]): Task[A] = latest(k)
     }
     // Invoke Metric interpreter, giving it function from Key to Task
-    f.run(trans)
+    Free.runFC(f)(trans)
   }
 
   /**
@@ -218,7 +216,7 @@ trait Monitoring {
           update(k, pt.value)
         } else for {
           _ <- Task.delay(log.debug(s"$msg new key: $k"))
-          snk <- topic[Any,Any](k)(Buffers.ignoreTime(process1.id))
+          snk <- topic[Any,Any](k)(B.ignoreTickAndTime(process1.id))
           r <- snk(pt.value)
         } yield r
       } yield ()
@@ -246,7 +244,7 @@ trait Monitoring {
   private def initialize[O](key: Key[O]): Task[Unit] = for {
     e <- exists(key)
     _ <- if (e) Task.delay {
-      topic[O,O](key)(Buffers.ignoreTime(process1.id))
+      topic[O,O](key)(B.ignoreTickAndTime(process1.id))
     } else Task((o: O) => ())(defaultPool)
   } yield ()
 
@@ -373,7 +371,7 @@ trait Monitoring {
   /** Create a new topic with the given name and discard the key. */
   def topic_[I, O:Reportable](
     name: String, units: Units, description: String,
-    buf: Process1[(I,Duration),O]): Task[I => Task[Unit]] =
+    buf: TBuffer[Option[I],O]): Task[I => Task[Unit]] =
       topic(name, units, description, identity[Key[O]])(buf)._2
 
   def filterKeys(f: Key[Any] => Boolean): Process[Task, List[Key[Any]]] =
@@ -436,6 +434,7 @@ object Monitoring {
     implicit val S = Strategy.Executor(ES)
     val P = Process
     val keys_ = signalOf[Set[Key[Any]]](Set.empty)(S)
+    val now = Task.delay(Duration.fromNanos(System.nanoTime - t0))
 
     case class Topic[I,O](
       publish: ((I,Duration)) => Task[Unit],
@@ -451,13 +450,16 @@ object Monitoring {
 
       def keys = keys_
 
-      def topic[I,O](k: Key[O])(buf: Process1[(I,Duration),O]): Task[I => Task[Unit]] = for {
+      def topic[I,O](k: Key[O])(buf: TBuffer[Option[I],O],
+                                timeout: Duration = defaultWindow): Task[I => Task[Unit]] = for {
         p <- bufferedSignal(buf)(ES)
         (pub, v) = p
         _ <- Task.delay(topics += (k -> eraseTopic(Topic(pub, v))))
         t = (k.typeOf, k.units)
         _ <- keys_.compareAndSet(_.map(_ + k))
-      } yield i => pub(i -> Duration.fromNanos(System.nanoTime - t0))
+        _ <- Task.delay(time.awakeEvery(timeout)(S, schedulingPool).evalMap(_ =>
+               now flatMap (t => pub(None -> t))).run.runAsync(_ => ()))
+      } yield (i: I) => now flatMap (t => pub(Some(i) -> t))
 
       protected def update[O](k: Key[O], v: O): Task[Unit] =
         topics.get(k).map(_.current.set(v)).getOrElse(Task(())(defaultPool)).map(_ => ())

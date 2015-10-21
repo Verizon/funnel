@@ -12,7 +12,13 @@ package funnel
  * the last 5 minutes (or whatever the window size)
  * on a rolling basis.
  */
-case class Periodic[+A](now: Key[A], previous: Key[A], sliding: Key[A])
+case class Periodic[+A](now: Key[A], previous: Key[A], sliding: Key[A]) {
+  def toThree: Three[Key[A]] = Three(now, previous, sliding)
+}
+
+object Periodic {
+  def apply[A](keys: Three[Key[A]]): Periodic[A] = Periodic(keys.one, keys.two, keys.three)
+}
 
 /**
  * A key set for a metric defined only in the present.

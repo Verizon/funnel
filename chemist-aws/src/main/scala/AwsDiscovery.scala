@@ -38,6 +38,9 @@ class AwsDiscovery(
   import Chemist.contact
   import metrics.discovery._
 
+  // Hack to make instruments init themselves up front
+  val _ = metrics.discovery.ValidateLatency
+
   type AwsInstanceId = String
 
   private val log = Logger[AwsDiscovery]

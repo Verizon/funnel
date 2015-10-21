@@ -23,6 +23,9 @@ object Housekeeping {
   import Sharding._
   import concurrent.duration._
 
+  // Hack to initialize instruments
+  val _ = metrics.CommandCount
+
   private lazy val log = Logger[Housekeeping.type]
   private lazy val defaultPool = Strategy.Executor(Chemist.defaultPool)
 
@@ -37,7 +40,9 @@ object Housekeeping {
     time.awakeEvery(delay)(defaultPool, Chemist.schedulingPool).evalMap(_ =>
       (gatherUnassignedTargets(d, r) <* InvestigatingLatency.timeTask(handleInvestigating(maxRetries)(r)) ).attempt.map {
         case \/-(_) => ()
-        case -\/(e) => log.warn(s"failed running housekeeping itteration due to $e")
+        case -\/(e) =>
+          log.warn(s"failed running housekeeping itteration due to $e")
+          e.printStackTrace
       }
     )
 

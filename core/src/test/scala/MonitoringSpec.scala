@@ -63,6 +63,7 @@ object MonitoringSpec extends Properties("monitoring") {
    * Check that `resetEvery` properly resets the stream
    * transducer after the elapsed time. Check that `emitEvery`
    * only emits a value at period boundaries.
+   * Also check that `emitEvery` emits when it sees two `None` values.
    */
   property("reset/emitEvery") = forAll { (h: Long, t: List[Long]) =>
     val xs = h :: t
@@ -72,6 +73,9 @@ object MonitoringSpec extends Properties("monitoring") {
     val input: Process[Task,(Long,Duration)] =
       Process.emitAll(xs.map((_, 0.minutes))) ++
       Process.emitAll(xs.map((_, 5.minutes)))
+    val input3: Process[Task,(Option[Long],Duration)] =
+      Process.emitAll(xs.map(x => (Some(x), 0.minutes))) ++
+      Process.emitAll(xs.map(x => (Some(x), 1.minutes)))
     val out = input.pipe(c).runLog.run
     require(out.length % 2 == 0, "length of output should be even")
     val (now, later) = out.splitAt(out.length / 2)
@@ -81,8 +85,15 @@ object MonitoringSpec extends Properties("monitoring") {
     // end of the first period, and one at the end of the second
     val c2 = B.emitEvery(5.minutes)(c)
     val input2 = input ++ Process(1L -> (11.minutes))
-    val out2 = input2.pipe(c2).runLog.run
-    ok && out2.length === 2 && out2(0) === xs.sum && out2(1) === xs.sum
+    val out2 = input2.map{ case (x, y) => (Some(x), y) }.pipe(c2).runLog.run
+
+    val out3 = (input3 ++ Process(None -> 2.minutes, None -> 11.minutes)).pipe(c2).runLog.run
+
+    ok &&
+    out2.length === 2 &&
+    out2(0) === xs.sum &&
+    out2(1) === xs.sum &&
+    out3(0) === xs.sum * 2
   }
 
 
@@ -315,7 +326,7 @@ object MonitoringSpec extends Properties("monitoring") {
   /** Check that when publishing, we get the count that was published. */
   property("pub/sub") = forAll(Gen.nonEmptyListOf(Gen.choose(1,10))) { a =>
     val M = Monitoring.default
-    val (k, snk) = M.topic[Long,Double]("count", Units.Count, "", identity)(B.ignoreTime(B.counter(0))).map(_.run)
+    val (k, snk) = M.topic[Long,Double]("count", Units.Count, "")(B.ignoreTickAndTime(B.counter(0))).map(_.run)
     val count = M.get(k)
     a.traverse_(x => snk(x)).run
     val expected = a.sum
@@ -410,22 +421,6 @@ object MonitoringSpec extends Properties("monitoring") {
     }
     go(15)
   }*/
-
-  val bools = for {
-    n <- Gen.choose(0,25000)
-    bs <- Gen.listOfN(n, arbitrary[Boolean])
-  } yield bs
-
-  property("Metric.bsequence") = forAll(bools) { bs =>
-    import scalaz.std.option._
-    import scalaz.~>
-    val alwaysNone = new (Key ~> Option) { def apply[A](k: Key[A]) = None }
-    val expected = Policies.majority(bs)
-    Metric.bsequence(bs.map(Metric.point(_)))
-          .map(Policies.majority)
-          .run(alwaysNone)
-          .get == expected
-  }
 
   // Commenting out since I don't know what this is testing
   // and it doesn't seem to work. -- Runar

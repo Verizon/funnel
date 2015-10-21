@@ -20,6 +20,6 @@ libraryDependencies ++= Seq(
   "com.amazonaws" % "aws-java-sdk-cloudformation" % V.aws
 )
 
-fork in Test := true
+fork in Test := false
 
 mainClass in Revolver.reStart := Some("funnel.chemist.aws.Main")
