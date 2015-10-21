@@ -20,11 +20,6 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
   private val log = Logger[AwsChemist[_]]
 
   /**
-   * used to stop our sockets listening to telemetry on all the flasks
-   */
-  private val signal: Signal[Boolean] = signalOf(true)
-
-  /**
    * Initilize the chemist serivce by trying to create the various AWS resources
    * that are required to operate. Once complete, execute the init.
    *
@@ -67,7 +62,7 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
       // now the queues are setup with the right permissions,
       // start the lifecycle listener
       _ <- Prototype.program(cfg.discovery, cfg.sharder
-            )(Lifecycle.stream(cfg.queue.topicName, signal
+            )(Lifecycle.stream(cfg.queue.topicName
             )(cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery
             ).map(Prototype.contextualise)).liftKleisli
 
@@ -77,40 +72,3 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
     } yield ()
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

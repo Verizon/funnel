@@ -31,25 +31,23 @@ class LifecycleSpec extends FlatSpec with Matchers {
   val k1 = "i-dx947af7"
   val k2 = "i-15807647"
 
-  val signal: Signal[Boolean] = signalOf(true)(Strategy.Executor(Chemist.serverPool))
-
-  private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): PlatformEvent =
-    Lifecycle.stream("name-of-queue", signal)(sqs, asg, ec2, dsc
-      ).until(Process.emit(false)).runLast.run.get // never do this anywhere but tests
+  private def fromStream(sqs: AmazonSQS, asg: AmazonAutoScaling): Option[PlatformEvent] =
+    Lifecycle.stream("name-of-queue", Process.emit(1))(sqs, asg, ec2, dsc
+      ).runLast.run // never do this anywhere but tests
 
   behavior of "the stream"
 
-  it should "side-effect and update the repository when a new flask is launched" in {
-    val NewFlask(f) = fromStream(sqs1, asg1)
+  it should "produce the right platform even when a new flask is launched" in {
+    val NewFlask(f) = fromStream(sqs1, asg1).get
     f.id.value should equal( "i-flaskAAA")
   }
 
-  it should "side-effect and update the repository when a flask is terminated" in {
-    fromStream(sqs2, asg1) should equal (TerminatedFlask(FlaskID("i-flaskAAA")))
+  it should "produce the right platform event when a flask is terminated" in {
+    fromStream(sqs2, asg1).get should equal (TerminatedFlask(FlaskID("i-flaskAAA")))
   }
 
   it should "produce a parse exception in the event the message on SQS cannot be parsed" in {
-    fromStream(sqs3, asg1) should equal (true)
+    fromStream(sqs3, asg1) should equal (None)
   }
 
   behavior of "Lifecycle.interpreter"
@@ -60,38 +58,11 @@ class LifecycleSpec extends FlatSpec with Matchers {
 
   def check(json: String): Task[Throwable \/ Seq[PlatformEvent]] =
     Lifecycle.parseMessage(TestMessage(json)
-      ).traverse(Lifecycle.interpreter(_, signal)(asg1, ec2, dsc))
+      ).traverse(Lifecycle.interpreter(_)(asg1, ec2, dsc))
 
   it should "parse messages and produce the right action" in {
     val \/-(Seq(NewFlask(f))) = check(Fixtures.asgEvent(Launch, instanceId = "i-flaskAAA")).run
     f.id.value should equal("i-flaskAAA")
     check("INVALID-MESSAGE").map(_ => true).run should equal (true)
   }
-
-  // TODO: finish refactoring this.
-  // it should "produce a Redistributed when given a flask launch task" in {
-  //   Lifecycle.interpreter(AutoScalingEvent("i-xxx", Launch), Nil
-  //     )(r, asg1, ec2, dsc).run should equal (true)
-  // }
-
-  // it should "Lifecycle.toSink should compute and update state given 'AddCapacity' command" in {
-  //   effect(AddCapacity(k1), s)
-  //   r.assignedTargets(k1).run should equal (Set.empty[Target])
-
-  //   effect(AddCapacity(k2), s)
-  //   r.assignedTargets(k1).run should equal (Set.empty[Target])
-  //   r.assignedTargets(k2).run should equal (Set.empty[Target])
-  // }
-
-
-  // it should "2. Lifecycle.toSink should compute and update state given 'Redistribute' command" in {
-  //   val target = Target("foo", SafeURL("http://bar.internal"))
-  //   r.mergeDistribution(Distribution.empty.insert(k1, Set(target))).run
-
-  //   val stream: Process[Task, Action] = Process.emit(Redistribute(k1))
-  //   val x: Option[Action] = stream.evalMap(Lifecycle.transform(_,r)).runLast.run
-
-  //   x should equal ( Some(Redistributed(Map(Location(Some("foo.ext.amazonaws.com"), "",5775,"us-east-1b",false) -> List(target)))) )
-  // }
-
 }

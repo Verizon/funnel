@@ -28,7 +28,7 @@ object SQS {
     "GetQueueAttributes",
     "GetQueueUrl")
 
-  private val readInterval = 12.seconds
+  private[funnel] val readInterval = 12.seconds
 
   def client(
     credentials: BasicAWSCredentials,
@@ -99,15 +99,14 @@ object SQS {
 
   import scalaz.stream.{Process,time}
 
-  def subscribe(
+  def subscribe[A](
     url: String,
-    tick: Duration = readInterval,
-    visibilityTimeout: Duration = 20.seconds
-  )(client: AmazonSQS)(
-    pool: ExecutorService,
-    schedulingPool: ScheduledExecutorService
+    visibilityTimeout: Duration = 20.seconds,
+    ticker: Process[Task,A]
+  )(client: AmazonSQS
+  )(pool: ExecutorService
   ): Process[Task, List[Message]] = {
-    time.awakeEvery(tick)(Strategy.Executor(pool), schedulingPool).evalMap { _ =>
+    ticker.evalMap { _ =>
       Task {
         val req = (new ReceiveMessageRequest
           ).withQueueUrl(url
