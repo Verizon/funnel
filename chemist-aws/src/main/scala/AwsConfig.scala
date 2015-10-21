@@ -47,13 +47,14 @@ case class AwsConfig(
   asg: AmazonAutoScaling,
   cfn: AmazonCloudFormation,
   commandTimeout: Duration,
-  includeVpcTargets: Boolean,
   sharder: Sharder,
   classifier: Classifier[AwsInstance],
-  maxInvestigatingRetries: Int
+  maxInvestigatingRetries: Int,
+  state: StateCache
 ) extends PlatformConfig {
 
-  val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, classifier, templates)
+  val discovery: AwsDiscovery =
+    new AwsDiscovery(ec2, asg, classifier, templates)
 
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
@@ -72,8 +73,8 @@ object AwsConfig {
     val aws       = cfg.subconfig("aws")
     val network   = cfg.subconfig("chemist.network")
     val timeout   = cfg.require[Duration]("chemist.command-timeout")
-    val usevpc    = cfg.lookup[Boolean]("chemist.include-vpc-targets").getOrElse(false)
     val sharding  = cfg.lookup[String]("chemist.sharding-strategy")
+    val cachetype = cfg.lookup[String]("chemist.state-cache")
     val classifiy = cfg.lookup[String]("chemist.classification-stratagy")
     val retries   = cfg.require[Int]("chemist.max-investigating-retries")
     AwsConfig(
@@ -88,9 +89,9 @@ object AwsConfig {
       sharder                 = readSharder(sharding),
       classifier              = readClassifier(classifiy),
       commandTimeout          = timeout,
-      includeVpcTargets       = usevpc,
       machine                 = readMachineConfig(cfg),
-      maxInvestigatingRetries = retries
+      maxInvestigatingRetries = retries,
+      state                   = readStateCache(cachetype)
     )
   }
 
@@ -111,6 +112,12 @@ object AwsConfig {
         templates = Nil
       )
     )
+
+  private def readStateCache(c: Option[String]): StateCache =
+    c match {
+      case Some("memory") => MemoryStateCache
+      case _              => MemoryStateCache
+    }
 
   private def readSharder(c: Option[String]): Sharder =
     c match {

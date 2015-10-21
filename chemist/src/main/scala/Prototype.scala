@@ -40,6 +40,9 @@ object Prototype {
         Context[PlatformEvent](Distribution.empty, NewTarget(Target(s"test-${d.toMillis}", new URI("http://google.com"))))
       })
 
+  def contextualise[A](a: A): Context[A] =
+    Context(Distribution.empty, a)
+
   // purpose of this function is to grab the existing work from the shards,
   // and update the distribution - our view of the world as it is right now
   def collect(flasks: Distribution): Distribution = ???
@@ -101,7 +104,7 @@ object Prototype {
     }
 
   // needs error handling
-  def program(dsc: Discovery, shd: Sharder): Task[Unit] =
-    partition(dsc,shd)(join(dsc)(lifecycle)).observe(caches).to(action).run
+  def program(dsc: Discovery, shd: Sharder)(p2: Flow[PlatformEvent]): Task[Unit] =
+    partition(dsc,shd)(join(dsc)(p2)).observe(caches).to(action).run
 }
 

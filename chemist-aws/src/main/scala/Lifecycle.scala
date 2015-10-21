@@ -51,7 +51,7 @@ object Lifecycle {
    */
   def stream(queueName: String, signal: Signal[Boolean]
     )(sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
-    ): Process[Task, Throwable \/ Seq[PlatformEvent]] = {
+    ): Process[Task, PlatformEvent] = {
       // adding this function to ensure that parse errors do not get
       // lifted into errors that will later fail the stream, and that
       // any errors in the interpreter are properly handled.
@@ -76,10 +76,11 @@ object Lifecycle {
       // _ <- Process.eval(Task(log.debug(s"stream, number messages recieved: ${a.length}")))
       b <- Process.emitAll(a)
       _ <- Process.eval(Task(log.debug(s"stream, raw message recieved: $b")))
-      c <- Process.eval(go(b))
+      c <- Process.eval(go(b)).stripW
+      d <- Process.emitAll(c)
       _ <- Process.eval(Task(log.debug(s"stream, computed action: $c")))
       _ <- SQS.deleteMessages(queueName, a)(sqs)
-    } yield c
+    } yield d
   }
 
   def interpreter(e: AutoScalingEvent, signal: Signal[Boolean]
@@ -145,10 +146,10 @@ object Lifecycle {
    * init method for chemist so that the SQS/SNS lifecycle is started from the edge of
    * the world.
    */
-  def run(queueName: String, signal: Signal[Boolean]
-    )(sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
-  ): Task[Unit] = {
-    val ourWorld = stream(queueName, signal)(sqs,asg,ec2,dsc).flatMap(logErrors) to Process.constant(repo.platformHandler _)
-    ourWorld.run.onFinish(_ => signal.set(false))
-  }
+  // def run(queueName: String, signal: Signal[Boolean]
+  //   )(sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
+  // ): Task[Unit] = {
+  //   val ourWorld = stream(queueName, signal)(sqs,asg,ec2,dsc).flatMap(logErrors) to Process.constant(repo.platformHandler _)
+  //   ourWorld.run.onFinish(_ => signal.set(false))
+  // }
 }

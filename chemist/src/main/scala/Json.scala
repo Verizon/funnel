@@ -71,7 +71,6 @@ object JSON {
       ("port" := l.port) ->:
       ("datacenter" := l.datacenter) ->:
       ("protocol" := l.protocol.toString) ->:
-      ("is-private-network" := l.isPrivateNetwork) ->:
       jEmptyObject
     }
 

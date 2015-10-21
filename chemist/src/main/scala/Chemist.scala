@@ -84,12 +84,12 @@ trait Chemist[A <: Platform]{
    * Force chemist to re-read the world from AWS. Useful if for some reason
    * Chemist gets into a weird state at runtime.
    */
-  def bootstrap: ChemistK[Unit] =
-    for {
-      cfg <- config
-      _   <- Prototype.program(cfg.discovery, cfg.sharder).liftKleisli
-      _   <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
-    } yield ()
+  // def bootstrap: ChemistK[Unit] =
+  //   for {
+  //     cfg <- config
+  //     _   <- Prototype.program(cfg.discovery, cfg.sharder).liftKleisli
+  //     _   <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
+  //   } yield ()
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources

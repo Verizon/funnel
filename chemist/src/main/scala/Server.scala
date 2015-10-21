@@ -36,13 +36,13 @@ object Server {
     // val repo    = platform.config.repository
     val sharder = platform.config.sharder
 
-    chemist.bootstrap(platform).runAsync {
-      case -\/(err) =>
-        log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
-        err.printStackTrace
+    // chemist.bootstrap(platform).runAsync {
+    //   case -\/(err) =>
+    //     log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
+    //     err.printStackTrace
 
-      case \/-(_)   => log.info("Sucsessfully bootstrap chemist at startup.")
-    }
+    //   case \/-(_)   => log.info("Sucsessfully bootstrap chemist at startup.")
+    // }
 
     chemist.init(platform).runAsync {
       case -\/(err) =>
@@ -104,8 +104,8 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
     case POST(Path("/distribute")) =>
       PostDistribute.time(NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)"))
 
-    case POST(Path("/bootstrap")) =>
-      PostBootstrap.time(json(chemist.bootstrap))
+    // case POST(Path("/bootstrap")) =>
+    //   PostBootstrap.time(json(chemist.bootstrap))
 
     case GET(Path(Seg("shards" :: Nil))) =>
       GetShards.time(json(chemist.shards))
