@@ -13,5 +13,5 @@ class TestConfig extends PlatformConfig {
   def http: dispatch.Http = ???
   val sharder: Sharder = RandomSharding
   val maxInvestigatingRetries = 6
-  val caches: StateCache = MemoryStateCache
+  val state: StateCache = MemoryStateCache
 }

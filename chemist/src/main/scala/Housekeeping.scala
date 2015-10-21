@@ -41,7 +41,7 @@ object Housekeeping {
          }
        ))
     } yield a.foldLeft(Distribution.empty){ (a,b) =>
-      a.updateAppend(b._1.id, b._2)
+      a.updateAppend(b._1, b._2)
     }).map { dis =>
       log.debug(s"Gathered distribution $dis")
       dis

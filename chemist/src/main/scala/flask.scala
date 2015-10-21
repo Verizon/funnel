@@ -10,9 +10,7 @@ object FlaskID {
   implicit val flaskIdOrder: Order[FlaskID] = implicitly[Order[String]].contramap[FlaskID](_.value)
 }
 
-case class Flask(id: FlaskID,
-                 location: Location,
-                 telemetry: Location)
+case class Flask(id: FlaskID, location: Location)
 
 object Flask {
   import FlaskID._

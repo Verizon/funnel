@@ -17,7 +17,7 @@ import journal.Logger
 
 object Sharding {
 
-  type Distribution = FlaskID ==>> Set[Target]
+  type Distribution = Flask ==>> Set[Target]
 
   object Distribution {
     def empty: Distribution = ==>>()
@@ -29,7 +29,7 @@ object Sharding {
    * obtain a list of flasks ordered by flasks with the least
    * assigned work first.
    */
-  def shards(d: Distribution): IndexedSeq[FlaskID] =
+  def shards(d: Distribution): IndexedSeq[Flask] =
     sorted(d).map(_._1).toIndexedSeq
 
   /**
@@ -38,14 +38,14 @@ object Sharding {
    * snapshot is ordered by flasks with least assigned
    * work first.
    */
-  def sorted(d: Distribution): Seq[(FlaskID, Set[Target])] =
+  def sorted(d: Distribution): Seq[(Flask, Set[Target])] =
     d.toList.sortBy(_._2.size)
 
   /**
    * dump out the current snapshot of how chemist believes work
    * has been assigned to flasks.
    */
-  def snapshot(d: Distribution): Map[FlaskID, Map[ClusterName, List[URI]]] =
+  def snapshot(d: Distribution): Map[Flask, Map[ClusterName, List[URI]]] =
     d.toList.map { case (i,s) =>
       i -> s.groupBy(_.cluster).mapValues(_.toList.map(_.uri))
     }.toMap
@@ -92,7 +92,7 @@ trait Sharder {
    * 2. `Distribution` is that same sequence folded into a `Distribution` instance which can
    *     then be added to the existing state of the world.
    */
-  def distribution(s: Set[Target])(d: Distribution): (Seq[(FlaskID,Target)], Distribution)
+  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution)
 }
 
 object RandomSharding extends Sharder {
@@ -102,7 +102,7 @@ object RandomSharding extends Sharder {
   private val rnd = new scala.util.Random
 
   // Randomly assigns each target in `s` to a Flask in the distribution `d`.
-  private def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)] = {
+  private def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
     val flasks = shards(d)
     val range = flasks.indices
     if(flasks.size == 0) Nil
@@ -125,7 +125,7 @@ object RandomSharding extends Sharder {
    * `s`: The targets to distribute
    * `d`: The existing distribution
    */
-  def distribution(s: Set[Target])(d: Distribution): (Seq[(FlaskID,Target)], Distribution) = {
+  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution) = {
     if(s.isEmpty) (Seq.empty,d)
     else {
       log.debug(s"distribution: attempting to distribute targets '${s.mkString(",")}'")
@@ -156,8 +156,8 @@ object LFRRSharding extends Sharder {
   import Sharding._
   private lazy val log = Logger[LFRRSharding.type]
 
-  private def calculate(s: Set[Target])(d: Distribution): Seq[(FlaskID,Target)] = {
-    val servers: Seq[FlaskID] = shards(d)
+  private def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
+    val servers: IndexedSeq[Flask] = shards(d)
     val ss                    = servers.size
     val input: Set[Target]    = deduplicate(s)(d)
 
@@ -173,7 +173,7 @@ object LFRRSharding extends Sharder {
     }
   }
 
-  def distribution(s: Set[Target])(d: Distribution): (Seq[(FlaskID,Target)], Distribution) = {
+  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution) = {
     // this check is needed as otherwise the fold gets stuck in a gnarly
     // infinate loop, and this function never completes.
     if(s.isEmpty) (Seq.empty,d)

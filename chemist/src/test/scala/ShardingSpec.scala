@@ -26,25 +26,16 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
       intent = LocationIntent.Mirroring,
       templates = Seq.empty)
 
-  val telemetryLocalhost: Location =
-    Location(
-      host = "127.0.0.1",
-      port = 7390,
-      datacenter = "local",
-      protocol = NetworkScheme.Zmtp(TCP),
-      intent = LocationIntent.Supervision,
-      templates = Seq.empty)
-
   implicit def tuple2target(in: (String,String)): Target =
     Target(in._1, new URI(in._2))
 
-  def fakeFlask(id: String) = Flask(FlaskID(id), localhost, telemetryLocalhost)
+  def fakeFlask(id: String) = Flask(FlaskID(id), localhost)
 
   val d1: Distribution = ==>>(
-    (fakeFlask("a").id, Set(("z","http://one.internal"))),
-    (fakeFlask("d").id, Set(("y","http://two.internal"), ("w","http://three.internal"), ("v","http://four.internal"))),
-    (fakeFlask("c").id, Set(("x","http://five.internal"))),
-    (fakeFlask("b").id, Set(("z","http://two.internal"), ("u","http://six.internal")))
+    (fakeFlask("a"), Set(("z","http://one.internal"))),
+    (fakeFlask("d"), Set(("y","http://two.internal"), ("w","http://three.internal"), ("v","http://four.internal"))),
+    (fakeFlask("c"), Set(("x","http://five.internal"))),
+    (fakeFlask("b"), Set(("z","http://two.internal"), ("u","http://six.internal")))
   )
 
   val i1: Set[Target] = Set(
@@ -67,11 +58,11 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
   )
 
   it should "correctly sort the map and return the flasks in order of their set length" in {
-    Sharding.shards(d1).map(_.value) should equal (Seq("a", "c", "b", "d"))
+    Sharding.shards(d1).map(_.id.value) should equal (Seq("a", "c", "b", "d"))
   }
 
   it should "snapshot the exsiting shard distribution" in {
-    Sharding.sorted(d1).map(_._1.value) should equal (Seq("a", "c", "b", "d"))
+    Sharding.sorted(d1).map(_._1.id.value) should equal (Seq("a", "c", "b", "d"))
   }
 
   it should "correctly remove urls that are already being monitored" in {
@@ -84,7 +75,7 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
   it should "correctly calculate how the new request should be sharded over known flasks" in {
     val (s, newdist) = LFRRSharding.distribution(i1)(d1)
     s.map {
-      case (x,y) => x.value -> y
+      case (x,y) => x.id.value -> y
     }.toSet should === (Set(
                           "a" -> Target("u",new URI("http://eight.internal")),
                           "c" -> Target("v",new URI("http://nine.internal"))))
