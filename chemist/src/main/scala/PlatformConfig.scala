@@ -11,4 +11,5 @@ trait PlatformConfig {
   def remoteFlask: RemoteFlask
   def http: Http
   def maxInvestigatingRetries: Int
+  def caches: StateCache
 }

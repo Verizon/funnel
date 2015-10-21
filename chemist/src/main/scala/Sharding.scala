@@ -78,40 +78,6 @@ object Sharding {
       a ++ next.filter(_.uri == b)
     }
   }
-
-  ///////////////////////// IO functions ///////////////////////////
-
-  // def distribute(repo: Repository, sharder: Sharder, remote: RemoteFlask, dist: Distribution)(ts: Set[Target]): Task[Unit] = {
-  //   val (s,newdist) = sharder.distribution(ts)(dist)
-  //   s.toVector.traverse_ { x =>
-  //     val flask = repo.flask(x._1)
-  //     flask.fold(Task.delay(log.error("asked to assign to an unknown flask: " + x._1))){ f =>
-  //       repo.platformHandler(PlatformEvent.Assigned(x._1, x._2)) >>
-  //       remote.command(FlaskCommand.Monitor(f,Seq(x._2)))
-  //     }
-  //   } <* repo.mergeDistribution(newdist)
-  // }
-
-  // import scalaz.{\/,-\/,\/-}
-
-  // def handleRepoCommand(repo: Repository, sharder: Sharder, remote: RemoteFlask)(c: RepoCommand): Task[Unit] = {
-  //   Task.delay(log.info(s"handleRepoCommand: $c")) >>
-  //   repo.distribution.flatMap { dist =>
-  //     c match {
-  //       case RepoCommand.Monitor(t) =>
-  //         distribute(repo, sharder, remote, dist)(Set(t))
-  //       case RepoCommand.Unmonitor(fl, t) =>
-  //         remote.command(FlaskCommand.Unmonitor(fl, Seq(t)))
-  //       case RepoCommand.Telemetry(fl) =>
-  //         remote.command(FlaskCommand.Telemetry(fl))
-  //       case RepoCommand.ReassignWork(fl) =>
-  //         repo.assignedTargets(fl).attempt.flatMap {
-  //           case \/-(a) => distribute(repo, sharder, remote, dist)(a)
-  //           case -\/(e) => Task.now(log.warn(s"Unable to reassign work due to $e"))
-  //         }
-  //     }
-  //   }
-  // }
 }
 
 trait Sharder {

@@ -13,26 +13,41 @@ import scalaz.concurrent.Task
  */
 trait StateCache {
   def event(e: PlatformEvent): Task[Unit]
+  def events: Task[Seq[PlatformEvent]]
+
   def distribution(d: Distribution): Task[Unit]
+  def distributions: Task[Distribution]
+
   def plan(p: Plan): Task[Unit]
+  def plans: Task[Seq[Plan]]
 }
 
 object MemoryStateCache extends StateCache {
-  private[funnel] val history: BoundedStack[PlatformEvent] =
+  private[funnel] val _history: BoundedStack[PlatformEvent] =
     new BoundedStack[PlatformEvent](2000)
 
-  private[funnel] val distribution: Ref[Distribution] =
+  private[funnel] val _distribution: Ref[Distribution] =
     new Ref(Distribution.empty)
 
-  private[funnel] val plans: BoundedStack[Plan] =
+  private[funnel] val _plans: BoundedStack[Plan] =
     new BoundedStack[Plan](2000)
 
   def event(e: PlatformEvent): Task[Unit] =
-    Task.delay(history.push(e))
+    Task.delay(_history.push(e))
+
+  def events: Task[Seq[PlatformEvent]] =
+    Task.delay(_history.toSeq)
 
   def distribution(d: Distribution): Task[Unit] =
-    Task.delay(distribution.update(_ => d))
+    Task.delay(_distribution.update(_ => d))
+
+  def distributions: Task[Distribution] =
+    Task.delay(_distribution.get)
 
   def plan(p: Plan): Task[Unit] =
-    Task.delay(plans.push(p))
+    Task.delay(_plans.push(p))
+
+  def plans: Task[Seq[Plan]] =
+    Task.delay(_plans.toSeq)
+
 }

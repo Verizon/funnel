@@ -27,7 +27,9 @@ trait Chemist[A <: Platform]{
    * Of all known monitorable services, dispaly the current work assignments
    * of funnel -> flask.
    */
-  def distribution: ChemistK[Map[FlaskID, Map[ClusterName, List[URI]]]] = ???
+  def distribution: ChemistK[Map[FlaskID, Map[ClusterName, List[URI]]]] =
+    config.flatMapK(_.caches.distributions.map(Sharding.snapshot))
+
     // config.flatMapK(_.repository.distribution.map(Sharding.snapshot))
 
   /**

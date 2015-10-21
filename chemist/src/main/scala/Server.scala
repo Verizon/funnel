@@ -52,14 +52,6 @@ object Server {
       case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
     }
 
-    // Housekeeping.periodic(5.minutes)(platform.config.maxInvestigatingRetries)(disco).run.runAsync {
-    //   case -\/(err) =>
-    //     log.error(s"Terminal failure when running the periodic housekeeping tasks. Error was: $err")
-    //     err.printStackTrace
-
-    //   case \/-(_)   => log.warn("Completed the periodic housekeeping tasks. The stream may have terminated early which is not desirable.")
-    // }
-
     val p = this.getClass.getResource("/oncue/www/")
     log.info(s"Setting web resource path to '$p'")
 
@@ -105,10 +97,6 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
 
     // case GET(Path("/lifecycle/history")) =>
     //   GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
-
-    // case GET(Path("/lifecycle/states")) =>
-    //   GetLifecycleStates.time(json(chemist.states.map(
-    //     _.toList.map { case (k,v) => k -> v.toList })))
 
     // case GET(Path("/platform/history")) =>
     //   GetPlatformHistory.time(json(chemist.platformHistory.map(_.toList)))

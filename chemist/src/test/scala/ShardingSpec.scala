@@ -36,7 +36,7 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
       templates = Seq.empty)
 
   implicit def tuple2target(in: (String,String)): Target =
-    Target(in._1, new URI(in._2), false)
+    Target(in._1, new URI(in._2))
 
   def fakeFlask(id: String) = Flask(FlaskID(id), localhost, telemetryLocalhost)
 
@@ -86,20 +86,20 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
     s.map {
       case (x,y) => x.value -> y
     }.toSet should === (Set(
-                          "a" -> Target("u",new URI("http://eight.internal"), false),
-                          "c" -> Target("v",new URI("http://nine.internal"), false)))
+                          "a" -> Target("u",new URI("http://eight.internal")),
+                          "c" -> Target("v",new URI("http://nine.internal"))))
 
     val (s2,newdist2) = LFRRSharding.distribution(i2)(d1)
     s2.map(_._2).toSet should === (Set(
-                                     Target("v",new URI("http://omega.internal"), false),
-                                     Target("w",new URI("http://alpha.internal"), false),
-                                     Target("r",new URI("http://epsilon.internal"), false),
-                                     Target("z",new URI("http://gamma.internal"), false),
-                                     Target("u",new URI("http://beta.internal"), false),
-                                     Target("z",new URI("http://omicron.internal"), false),
-                                     Target("r",new URI("http://kappa.internal"), false),
-                                     Target("r",new URI("http://theta.internal"), false),
-                                     Target("p",new URI("http://zeta.internal"), false)))
+                                     Target("v",new URI("http://omega.internal")),
+                                     Target("w",new URI("http://alpha.internal")),
+                                     Target("r",new URI("http://epsilon.internal")),
+                                     Target("z",new URI("http://gamma.internal")),
+                                     Target("u",new URI("http://beta.internal")),
+                                     Target("z",new URI("http://omicron.internal")),
+                                     Target("r",new URI("http://kappa.internal")),
+                                     Target("r",new URI("http://theta.internal")),
+                                     Target("p",new URI("http://zeta.internal"))))
   }
 
   it should "assign all the work when using random sharding" in {
