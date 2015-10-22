@@ -61,10 +61,10 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
 
       // now the queues are setup with the right permissions,
       // start the lifecycle listener
-      _ <- Prototype.program(cfg.discovery, cfg.sharder
+      _ <- Pipeline.program(cfg.discovery, cfg.sharder
             )(Lifecycle.stream(cfg.queue.topicName
             )(cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery
-            ).map(Prototype.contextualise)).liftKleisli
+            ).map(Pipeline.contextualise)).liftKleisli
 
       _  = log.debug("lifecycle process started")
 
