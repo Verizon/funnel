@@ -1,16 +1,19 @@
 package funnel
 package chemist
 
-import scalaz.stream.{Process,Process1,Sink,async,time,channel,wye,sink}
-import scalaz.concurrent.{Task,Strategy}
-import scala.concurrent.duration._
-import Sharding.Distribution
-import scalaz.{\/,\/-}
 import java.net.URI
+import journal.Logger
+import scalaz.{\/,\/-}
+import scala.concurrent.duration._
+import scalaz.concurrent.{Task,Strategy}
+import scalaz.stream.{Process,Process1,Sink,time,channel,wye,sink}
 
 object Pipeline {
   import Chemist.{Context,Flow}
+  import Sharding.Distribution
   import PlatformEvent._
+
+  private[this] val log = Logger[Pipeline.type]
 
   // discovery
   def discover(dsc: Discovery, interval: Duration): Flow[Target] = {
@@ -39,7 +42,12 @@ object Pipeline {
     def newTarget(target: Target, sharder: Sharder)(d: Distribution): Distribution =
       sharder.distribution(Set(target))(d)._2 // drop the seq, as its not needed
 
-    def newFlask(e: NewFlask)(d: Distribution): Distribution = ???
+    /**
+     * TODO: we need to add some logic to rebalance the cluster somehow,
+     * as otherwise getting a new flask online will not aid in balencing the
+     * overall workload of the cluster.
+     */
+    def newFlask(flask: Flask)(d: Distribution): Distribution = d
 
     def terminatedTarget(e: TerminatedTarget)(d: Distribution): Distribution = ???
 
@@ -53,17 +61,25 @@ object Pipeline {
         val work = handle.newTarget(target, shd)(d)
         Context(d, Distribute(work))
 
-      case Context(d,NewFlask(flask)) =>
-        sys.error("not implemented")
+      case Context(d,NewFlask(f)) =>
+        Context(d, Redistribute(Distribution.empty, Distribution.empty))
 
       case Context(d,TerminatedTarget(uri)) =>
-        sys.error("not implemented")
+        Context(d, Ignore)
 
-      case Context(d,TerminatedFlask(flaskid)) =>
-        sys.error("not implemented")
+      // TIM: this is an interesting case. when we recieve a terminated flask
+      // message... we don't know what the work that was previous assigned
+      // to that flask, because that flask is now dead.
+      // consider zipping another queue into the lifecycle stream, and having
+      // the plan effect be emmitted a "discover now" message onto the stream,
+      // forcing all the unmonitored targets to get monitored right away.
+      case Context(d,TerminatedFlask(flask)) =>
+        log.warn(s"encountered a terminated flask. oh shit, we didnt implement this yet!")
+        Context(d, Ignore)
 
-      case Context(d,Unmonitored(flaskid, uri)) =>
-        sys.error("not implemented")
+      case Context(d,s@Unmonitored(flaskid, uri)) =>
+        log.warn(s"encountered an unexpected platform event state $s")
+        Context(d, Ignore)
 
       case Context(d,NoOp) =>
         Context(d, Ignore)
@@ -73,8 +89,9 @@ object Pipeline {
     discover(d, interval).evalMap { case Context(a,b) =>
       for(dist <- gather(a)) yield {
         val current: Vector[Target] = dist.values.toVector.flatten
-        val event: PlatformEvent = if(current.exists(_ == b)) NoOp
-                                   else NewTarget(b)
+        val event: PlatformEvent =
+          if(current.exists(_ == b)) NoOp
+          else NewTarget(b)
         Context(dist, event)
       }
     }
