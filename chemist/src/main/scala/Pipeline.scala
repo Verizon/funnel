@@ -2,7 +2,6 @@ package funnel
 package chemist
 
 import scalaz.stream.{Process,Process1,Sink,async,time,channel,wye,sink}
-import scalaz.stream.async.mutable.Signal
 import scalaz.concurrent.{Task,Strategy}
 import scala.concurrent.duration._
 import Sharding.Distribution
@@ -10,19 +9,15 @@ import scalaz.{\/,\/-}
 import PlatformEvent._
 import java.net.URI
 
-
-object Prototype {
-
-  val s1 = Strategy.Executor(Chemist.serverPool)
-  val signal: Signal[Boolean] = async.signalOf(true)
-
-  case class Context[A](distribution: Distribution, value: A)
+object Pipeline {
 
   type Flow[A] = Process[Task,Context[A]]
 
+  case class Context[A](distribution: Distribution, value: A)
+
   // discovery
   def discover(dsc: Discovery): Flow[Target] = {
-    time.awakeEvery(10.seconds)(s1, Chemist.schedulingPool).flatMap { _ =>
+    time.awakeEvery(10.seconds)(Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool).flatMap { _ =>
       val task: Task[Seq[Context[Target]]] = for {
         a <- dsc.listActiveFlasks
         b <- dsc.listTargets.map(_.map(_._2).flatten)
@@ -33,32 +28,12 @@ object Prototype {
     }
   }
 
-  // lifecycle
-  val lifecycle: Flow[PlatformEvent] =
-    time.awakeEvery(40.seconds)(s1, Chemist.schedulingPool
-      ).evalMap(d => Task.delay {
-        Context[PlatformEvent](Distribution.empty, NewTarget(Target(s"test-${d.toMillis}", new URI("http://google.com"))))
-      })
-
   def contextualise[A](a: A): Context[A] =
     Context(Distribution.empty, a)
 
   // purpose of this function is to grab the existing work from the shards,
   // and update the distribution - our view of the world as it is right now
-  def collect(flasks: Distribution): Distribution = ???
-
-  // merge
-  def join(d: Discovery)(p2: Flow[PlatformEvent]): Flow[PlatformEvent] = {
-    val p1: Process[Task,Context[PlatformEvent]] =
-      discover(d).map { case Context(a,b) =>
-        val dist = collect(a)
-        val current: Vector[Target] = dist.values.toVector.flatten
-        val event: PlatformEvent = if(current.exists(_ == b)) NoOp
-                                   else NewTarget(b)
-        Context(dist, event)
-      }
-    p1.wye(p2)(wye.merge)
-  }
+  def collect(flasks: Distribution): Task[Distribution] = ???
 
   object handle {
     def newTarget(target: Target)(d: Distribution): (Distribution, Distribution) = ???
@@ -68,8 +43,8 @@ object Prototype {
   }
 
   // routing
-  def partition(dsc: Discovery, shd: Sharder)(p1: Flow[PlatformEvent]): Flow[Plan] =
-    p1.map {
+  def partition(dsc: Discovery, shd: Sharder)(c: Context[PlatformEvent]): Context[Plan] =
+    c match {
       case Context(d,NewTarget(target)) =>
         val (all,work) = handle.newTarget(target)(d)
         Context(all, Distribute(work))
@@ -103,8 +78,29 @@ object Prototype {
       } yield ()
     }
 
-  // needs error handling
-  def program(dsc: Discovery, shd: Sharder)(p2: Flow[PlatformEvent]): Task[Unit] =
-    partition(dsc,shd)(join(dsc)(p2)).observe(caches).to(action).run
-}
+  def discovery(d: Discovery, gather: Distribution => Task[Distribution]): Process[Task,Context[PlatformEvent]] =
+    discover(d).evalMap { case Context(a,b) =>
+      for(dist <- gather(a)) yield {
+        val current: Vector[Target] = dist.values.toVector.flatten
+        val event: PlatformEvent = if(current.exists(_ == b)) NoOp
+                                   else NewTarget(b)
+        Context(dist, event)
+      }
+    }
 
+  /********* edge of the world *********/
+
+  // needs error handling
+  def program(
+    lifecycle: Flow[PlatformEvent]
+  )(dsc: Discovery,
+    shd: Sharder,
+    caches: Sink[Task, Context[Plan]],
+    effects: Sink[Task, Context[Plan]]
+  ): Task[Unit] =
+    discovery(dsc, collect _)
+      .wye(lifecycle)(wye.merge)
+      .map(partition(dsc,shd))
+      .observe(caches)
+      .to(effects).run
+}
