@@ -12,8 +12,10 @@ object Custom {
   val compilation = Seq(
     scalacOptions := Compilation.flags.filterNot(_ == "-Xlint"))
 
-  val resources =
-    unmanagedResourceDirectories in Test <+= baseDirectory(_ / ".." / "etc" / "classpath" / "test")
+  val resources = Seq(
+    unmanagedResourceDirectories in Test <+= baseDirectory(_ / ".." / "etc" / "classpath" / "test"),
+    unmanagedResourceDirectories in MultiJvm <+= baseDirectory(_ / ".." / "etc" / "classpath" / "test")
+  )
 
   val revolver = Seq(
     javaOptions in Revolver.reStart += s"-Dlogback.configurationFile=${baseDirectory.value}/../etc/classpath/logback.xml",

@@ -33,16 +33,10 @@ object Server {
     import metrics.RepoEventsStream
     import server.{platform,chemist}
     val disco   = platform.config.discovery
-    // val repo    = platform.config.repository
     val sharder = platform.config.sharder
 
-    // chemist.bootstrap(platform).runAsync {
-    //   case -\/(err) =>
-    //     log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
-    //     err.printStackTrace
-
-    //   case \/-(_)   => log.info("Sucsessfully bootstrap chemist at startup.")
-    // }
+    // do the ASCII art
+    log.info(Banner.text)
 
     chemist.init(platform).runAsync {
       case -\/(err) =>

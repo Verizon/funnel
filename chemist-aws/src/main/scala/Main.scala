@@ -11,9 +11,6 @@ object Main {
   def main(args: Array[String]): Unit = {
     val log = Logger[Main.type]
 
-    // do the ASCII art
-    log.info(Banner.text)
-
     val chemist = new AwsChemist[DefaultAws]
 
     val aws = new DefaultAws {

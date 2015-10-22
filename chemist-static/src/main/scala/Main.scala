@@ -11,10 +11,6 @@ import knobs.{FileResource,ClassPathResource,Optional,Pattern,Required}
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val log = Logger[Main.type]
-
-    log.info(Banner.text)
-
     val chemist = new StaticChemist[Static]
 
     val k = knobs.load(
