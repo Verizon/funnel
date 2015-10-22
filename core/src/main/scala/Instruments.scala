@@ -87,7 +87,7 @@ class Instruments(val window: Duration,
 
   /**
    * Only for the advanced use case of creating new instrument types or complex composite metrics.
-   * Creates three topics with names `$prefix/label` where `$prefix` is {`now`, `previous`, `sliding`}.
+   * Creates three topics with names `prefix/label` where `prefix` is {`now`, `previous`, `sliding`}.
    * Publishes to `now` according to `nowBuf`, `prev` every `window`, and `sliding` continuously
    * while removing values when they are `window` old, according to the semantics of the `Group`.
    * Returns a composite `Periodic` key and a `Task` that publishes to all 3 topics.
