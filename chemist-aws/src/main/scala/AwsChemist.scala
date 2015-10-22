@@ -61,10 +61,12 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
 
       // now the queues are setup with the right permissions,
       // start the lifecycle listener
-      _ <- Pipeline.program(cfg.discovery, cfg.sharder
-            )(Lifecycle.stream(cfg.queue.topicName
-            )(cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery
-            ).map(Pipeline.contextualise)).liftKleisli
+      _ <- Pipeline.task(
+             Lifecycle.stream(cfg.queue.topicName
+               )(cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery
+               ).map(Pipeline.contextualise),
+             cfg.rediscoveryInterval
+           )(cfg.discovery, cfg.sharder, sinks.caching(cfg.state), sinks.unsafeNetworkIO).liftKleisli
 
       _  = log.debug("lifecycle process started")
 

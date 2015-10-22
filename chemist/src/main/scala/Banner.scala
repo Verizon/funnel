@@ -19,7 +19,7 @@ object Banner {
   |""".stripMargin
 
   private val suffix = s"""
-  | Version ${BuildInfo.version} (${BuildInfo.gitRevision})
+  | ${Chemist.version}
   | Built at ${BuildInfo.buildDate} with SBT ${BuildInfo.sbtVersion}
   | """.stripMargin
 

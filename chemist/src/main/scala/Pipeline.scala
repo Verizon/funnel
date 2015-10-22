@@ -6,18 +6,15 @@ import scalaz.concurrent.{Task,Strategy}
 import scala.concurrent.duration._
 import Sharding.Distribution
 import scalaz.{\/,\/-}
-import PlatformEvent._
 import java.net.URI
 
 object Pipeline {
-
-  type Flow[A] = Process[Task,Context[A]]
-
-  case class Context[A](distribution: Distribution, value: A)
+  import Chemist.{Context,Flow}
+  import PlatformEvent._
 
   // discovery
-  def discover(dsc: Discovery): Flow[Target] = {
-    time.awakeEvery(10.seconds)(Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool).flatMap { _ =>
+  def discover(dsc: Discovery, interval: Duration): Flow[Target] = {
+    time.awakeEvery(interval)(Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool).flatMap { _ =>
       val task: Task[Seq[Context[Target]]] = for {
         a <- dsc.listActiveFlasks
         b <- dsc.listTargets.map(_.map(_._2).flatten)
@@ -36,18 +33,25 @@ object Pipeline {
   def collect(flasks: Distribution): Task[Distribution] = ???
 
   object handle {
-    def newTarget(target: Target)(d: Distribution): (Distribution, Distribution) = ???
-    def newFlask(e: NewFlask)(d: Distribution): (Distribution, Distribution) = ???
-    def terminatedTarget(e: TerminatedTarget)(d: Distribution): (Distribution, Distribution) = ???
-    def unmonitored(e: Unmonitored)(d: Distribution): (Distribution, Distribution) = ???
+    /**
+     * distribution is the specific work that needs to take place, represented as a distribution
+     */
+    def newTarget(target: Target, sharder: Sharder)(d: Distribution): Distribution =
+      sharder.distribution(Set(target))(d)._2 // drop the seq, as its not needed
+
+    def newFlask(e: NewFlask)(d: Distribution): Distribution = ???
+
+    def terminatedTarget(e: TerminatedTarget)(d: Distribution): Distribution = ???
+
+    def unmonitored(e: Unmonitored)(d: Distribution): Distribution = ???
   }
 
   // routing
   def partition(dsc: Discovery, shd: Sharder)(c: Context[PlatformEvent]): Context[Plan] =
     c match {
       case Context(d,NewTarget(target)) =>
-        val (all,work) = handle.newTarget(target)(d)
-        Context(all, Distribute(work))
+        val work = handle.newTarget(target, shd)(d)
+        Context(d, Distribute(work))
 
       case Context(d,NewFlask(flask)) =>
         sys.error("not implemented")
@@ -65,21 +69,8 @@ object Pipeline {
         Context(d, Ignore)
     }
 
-  val action: Sink[Task, Context[Plan]] = sink.lift {
-    case Context(d, Distribute(work)) => Task.delay(()) // itterate the work and do I/O to send to flask
-    case Context(d, Ignore)           => Task.delay(())
-  }
-
-  val caches: Sink[Task, Context[Plan]] =
-    sink.lift { c =>
-      for {
-        _ <- MemoryStateCache.plan(c.value)
-        _ <- MemoryStateCache.distribution(c.distribution)
-      } yield ()
-    }
-
-  def discovery(d: Discovery, gather: Distribution => Task[Distribution]): Process[Task,Context[PlatformEvent]] =
-    discover(d).evalMap { case Context(a,b) =>
+  def discovery(interval: Duration)(d: Discovery, gather: Distribution => Task[Distribution]): Process[Task,Context[PlatformEvent]] =
+    discover(d, interval).evalMap { case Context(a,b) =>
       for(dist <- gather(a)) yield {
         val current: Vector[Target] = dist.values.toVector.flatten
         val event: PlatformEvent = if(current.exists(_ == b)) NoOp
@@ -90,17 +81,26 @@ object Pipeline {
 
   /********* edge of the world *********/
 
+  def process(
+    lifecycle: Flow[PlatformEvent],
+    pollInterval: Duration
+  )(dsc: Discovery,
+    shd: Sharder
+  ): Process[Task, Context[Plan]] =
+    discovery(pollInterval)(dsc, collect _)
+      .wye(lifecycle)(wye.merge)
+      .map(partition(dsc,shd))
+
   // needs error handling
-  def program(
-    lifecycle: Flow[PlatformEvent]
+  def task(
+    lifecycle: Flow[PlatformEvent],
+    pollInterval: Duration
   )(dsc: Discovery,
     shd: Sharder,
     caches: Sink[Task, Context[Plan]],
     effects: Sink[Task, Context[Plan]]
   ): Task[Unit] =
-    discovery(dsc, collect _)
-      .wye(lifecycle)(wye.merge)
-      .map(partition(dsc,shd))
+    process(lifecycle, pollInterval)(dsc,shd)
       .observe(caches)
       .to(effects).run
 }

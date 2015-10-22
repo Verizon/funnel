@@ -49,8 +49,8 @@ case class AwsConfig(
   commandTimeout: Duration,
   sharder: Sharder,
   classifier: Classifier[AwsInstance],
-  maxInvestigatingRetries: Int,
-  state: StateCache
+  state: StateCache,
+  rediscoveryInterval: Duration
 ) extends PlatformConfig {
 
   val discovery: AwsDiscovery =
@@ -60,9 +60,7 @@ case class AwsConfig(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
 
-  val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
-
-  val remoteFlask = new HttpFlask(http, signal)
+  val remoteFlask = new HttpFlask(http)
 }
 
 object AwsConfig {
@@ -76,22 +74,22 @@ object AwsConfig {
     val sharding  = cfg.lookup[String]("chemist.sharding-strategy")
     val cachetype = cfg.lookup[String]("chemist.state-cache")
     val classifiy = cfg.lookup[String]("chemist.classification-stratagy")
-    val retries   = cfg.require[Int]("chemist.max-investigating-retries")
+    val interval  = cfg.require[Duration]("chemist.rediscovery-interval")
     AwsConfig(
-      templates 		          = templates.map(LocationTemplate),
-      network                 = readNetwork(network),
-      queue                   = QueueConfig(topic, queue),
-      sns                     = readSNS(aws),
-      sqs                     = readSQS(aws),
-      ec2                     = readEC2(aws),
-      asg                     = readASG(aws),
-      cfn                     = readCFN(aws),
-      sharder                 = readSharder(sharding),
-      classifier              = readClassifier(classifiy),
-      commandTimeout          = timeout,
-      machine                 = readMachineConfig(cfg),
-      maxInvestigatingRetries = retries,
-      state                   = readStateCache(cachetype)
+      templates 		      = templates.map(LocationTemplate),
+      network             = readNetwork(network),
+      queue               = QueueConfig(topic, queue),
+      sns                 = readSNS(aws),
+      sqs                 = readSQS(aws),
+      ec2                 = readEC2(aws),
+      asg                 = readASG(aws),
+      cfn                 = readCFN(aws),
+      sharder             = readSharder(sharding),
+      classifier          = readClassifier(classifiy),
+      commandTimeout      = timeout,
+      machine             = readMachineConfig(cfg),
+      rediscoveryInterval = interval,
+      state               = readStateCache(cachetype)
     )
   }
 

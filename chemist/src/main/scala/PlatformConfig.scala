@@ -10,6 +10,5 @@ trait PlatformConfig {
   def sharder: Sharder
   def remoteFlask: RemoteFlask
   def http: Http
-  def maxInvestigatingRetries: Int
   def state: StateCache
 }

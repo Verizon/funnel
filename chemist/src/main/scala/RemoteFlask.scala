@@ -27,7 +27,7 @@ object LoggingRemote extends RemoteFlask {
     }
 }
 
-class HttpFlask(http: dispatch.Http, signal: Signal[Boolean]) extends RemoteFlask {
+class HttpFlask(http: dispatch.Http) extends RemoteFlask {
   import FlaskCommand._
   import LoggingRemote.flaskTemplate
 
