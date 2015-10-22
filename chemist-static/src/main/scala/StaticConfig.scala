@@ -17,16 +17,16 @@ case class StaticConfig(
   network: NetworkConfig,
   commandTimeout: Duration,
   targets: Map[TargetID, Set[Target]],
-  flasks: Map[FlaskID, Flask]
+  flasks: Map[FlaskID, Flask],
+  state: StateCache
 ) extends PlatformConfig {
   val discovery: Discovery = new StaticDiscovery(targets, flasks)
-  val repository: Repository = new StatefulRepository
   val sharder = RandomSharding
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
   val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
-  val remoteFlask = new HttpFlask(http, repository, signal)
+  val remoteFlask = new HttpFlask(http)
   val templates = List.empty
   val maxInvestigatingRetries = 6
 }
@@ -35,18 +35,26 @@ object Config {
   def readConfig(cfg: MutableConfig): Task[StaticConfig] = for {
     network     <- readNetwork(cfg.subconfig("chemist.network"))
     timeout     <- cfg.require[Duration]("chemist.command-timeout")
+    cachetype   <- cfg.lookup[String]("chemist.state-cache")
     subi        <- cfg.base.at("chemist.instances")
     subf        <- cfg.base.at("chemist.flasks")
-    instances   =  readInstances(subi)
-    flasks      =  readFlasks(subf)
-  } yield StaticConfig(network, timeout, instances, flasks)
+    instances    = readInstances(subi)
+    flasks       = readFlasks(subf)
+    statecache   = readStateCache(cachetype)
+  } yield StaticConfig(network, timeout, instances, flasks, statecache)
 
-  private[static] def readNetwork(cfg: MutableConfig): Task[NetworkConfig] = for {
+  private def readNetwork(cfg: MutableConfig): Task[NetworkConfig] = for {
     host   <- cfg.require[String]("host")
     port   <- cfg.require[Int]("port")
   } yield NetworkConfig(host, port)
 
-  def readLocation(cfg: Config): Location =
+  private def readStateCache(c: Option[String]): StateCache =
+    c match {
+      case Some("memory") => MemoryStateCache
+      case _              => MemoryStateCache
+    }
+
+  private def readLocation(cfg: Config): Location =
     Location(
       host             = cfg.require[String]("host"),
       port             = cfg.require[Int]("port"),
@@ -54,29 +62,27 @@ object Config {
       protocol         = cfg.lookup[String]("protocol"
         ).flatMap(NetworkScheme.fromString
         ).getOrElse(NetworkScheme.Http),
-      isPrivateNetwork = true,
       intent = LocationIntent.fromString(
         cfg.require[String]("intent")
         ).getOrElse(LocationIntent.Mirroring),
       templates        = cfg.require[List[String]]("target-resource-templates").map(LocationTemplate)
     )
 
-  private[static] def readFlasks(cfg: Config): Map[FlaskID, Flask] = {
+  private def readFlasks(cfg: Config): Map[FlaskID, Flask] = {
     val ids: Vector[String] = cfg.env.keys.map(_.toString.split('.')(0)).toVector
     ids.toVector.map { id =>
       val loc = readLocation(cfg.subconfig(s"$id.location"))
-      val locT = readLocation(cfg.subconfig(s"$id.telemetry"))
-      FlaskID(id) -> Flask(FlaskID(id), loc, locT)
+      FlaskID(id) -> Flask(FlaskID(id), loc)
     }.toMap
   }
 
-  private[static] def readInstances(cfg: Config): Map[TargetID, Set[Target]]= {
+  private def readInstances(cfg: Config): Map[TargetID, Set[Target]]= {
     val ids: Vector[String] = cfg.env.keys.map(_.toString.split('.')(0)).toVector
     ids.toVector.map { id =>
       val sub = cfg.subconfig(id)
       val cn = sub.require[String]("clusterName")
       val uris = sub.require[List[String]]("uris")
-      TargetID(id) -> uris.map(u => Target(cn, new URI(u), false)).toSet
+      TargetID(id) -> uris.map(u => Target(cn, new URI(u))).toSet
     }.toMap
   }
 }

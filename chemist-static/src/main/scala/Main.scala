@@ -11,7 +11,7 @@ import knobs.{FileResource,ClassPathResource,Optional,Pattern,Required}
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val log = Logger[Main]
+    val log = Logger[Main.type]
 
     log.info(Banner.text)
 
@@ -20,13 +20,17 @@ object Main {
     val k = knobs.load(
       Required(ClassPathResource("oncue/chemist.cfg")) ::
       Optional(FileResource(new File("/usr/share/oncue/etc/chemist.cfg"))) :: Nil).run
+
     val s = new Static { val config = Config.readConfig(k).run }
 
-    k.subscribe(Pattern("*.*"), {
-      case _ => chemist.bootstrap.run(new Static {
-        val config = Config.readConfig(k).run
-      })
-    })
+    // TIM: best I can tell, this didnt actually work beforehand
+    // as we're running this on a  prototype and it doesn't
+    // seem to reload.
+    // k.subscribe(Pattern("*.*"), {
+    //   case (name, optvalue) => chemist.bootstrap.run(new Static {
+    //     val config = Config.readConfig(k).run
+    //   })
+    // })
 
     val monitoring = MonitoringServer.start(Monitoring.default, 5775)
 

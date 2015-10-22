@@ -13,9 +13,7 @@ import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorServic
 
 class StaticChemist[A <: Static] extends Chemist[A]{
 
-  val log = Logger[this.type]
-
-  def filterTargets(instances: Seq[(TargetID, Set[Target])]): ChemistK[(Seq[(TargetID, Set[Target])], Seq[(TargetID, Set[Target])])] = Applicative[ChemistK].point((instances, Seq()))
+  private[this] val log = Logger[this.type]
 
   /* Initilize the chemist serivce by trying to create the various resources
    * that are required to operate. Once complete, execute the boostrap. */
