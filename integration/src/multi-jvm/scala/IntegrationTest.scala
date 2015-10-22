@@ -78,7 +78,7 @@ class MultiNodeIntegrationSpecMultiJvmNode6 extends MultiNodeIntegration
 
 import akka.remote.testconductor.{RoleName,Controller}
 import concurrent.{Future,ExecutionContext}
-import chemist.{Server,FlaskID,PlatformEvent,TargetLifecycle,RepoEvent}
+import chemist.{Server,FlaskID,PlatformEvent}
 import java.util.concurrent.{CountDownLatch,TimeUnit}
 import concurrent.duration._
 
@@ -86,7 +86,7 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
   with STMultiNodeSpec
   with ImplicitSender {
   import MultiNodeIntegrationConfig._
-  import PlatformEvent._, TargetLifecycle._
+  import PlatformEvent._
 
   def printObnoxiously[A](a: => A): Unit = {
     println(">>>>>>>>>>>>>>>>>>>>>>>>>>>")
@@ -124,8 +124,8 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
   def initialParticipants =
     roles.size
 
-  def countForState(s: TargetLifecycle.TargetState): Int =
-    ichemist.states.map(_.apply(s).keys.size).exe
+  // def countForState(s: TargetLifecycle.TargetState): Int =
+  //   ichemist.states.map(_.apply(s).keys.size).exe
 
   it should "wait for all nodes to enter startup barrier" in {
     enterBarrier(Startup)
@@ -174,15 +174,15 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
       // just adding this to make sure that in future, the json does not get fubared.
       // fetch("/distribution") should equal ("""[{"targets":[{"urls":["http://localhost:4001/stream/now"],"cluster":"target01"},{"urls":["http://localhost:4003/stream/now"],"cluster":"target03"},{"urls":["http://localhost:4002/stream/now"],"cluster":"target02"}],"shard":"flask1"}]""")
       printObnoxiously(fetch("/distribution"))
-      printObnoxiously(fetch("/lifecycle/states"))
+      // printObnoxiously(fetch("/lifecycle/states"))
       printObnoxiously(fetch("/shards/flask1/sources"))
       printObnoxiously(fetch("/shards/flask1/distribution"))
 
-      countForState(TargetState.Monitored) should equal (7)
+      // countForState(TargetState.Monitored) should equal (7)
 
-      countForState(TargetState.Assigned) should equal (0)
+      // countForState(TargetState.Assigned) should equal (0)
 
-      countForState(TargetState.DoubleMonitored) should equal (0)
+      // countForState(TargetState.DoubleMonitored) should equal (0)
     }
   }
 
@@ -190,21 +190,6 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
     runOn(chemist01){
       val history = ichemist.platformHistory.exe
       history.size should be > 0
-    }
-  }
-
-  it should "have recieved the problem event via the telemetry socket" in {
-    import org.scalatest.OptionValues._
-    runOn(chemist01){
-      enterBarrier(PhaseTwo)
-
-      val errors = ichemist.errors.exe
-
-      errors.size should be > 0
-
-      errors.collectFirst {
-        case Error(Names(_, _, u)) => u
-      } should be (Some(IntegrationFixtures.target03.uri))
     }
   }
 

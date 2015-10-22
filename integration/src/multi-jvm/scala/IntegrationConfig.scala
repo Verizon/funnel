@@ -12,11 +12,8 @@ class IntegrationConfig extends PlatformConfig {
     List(LocationTemplate("http://@host:@port/stream/previous"))
   val network = NetworkConfig("127.0.0.1",64529)
   val discovery: Discovery = new IntegrationDiscovery
-  val statefulRepository: StatefulRepository = new StatefulRepository
-  val repository: Repository = statefulRepository
   val http = Http.configure(_.setAllowPoolingConnection(true).setConnectionTimeoutInMs(30000))
-  val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
-  val sharder: funnel.chemist.Sharder = RandomSharding
-  val remoteFlask: RemoteFlask = new HttpFlask(http, repository, signal)
-  val maxInvestigatingRetries = 6
+  val sharder: chemist.Sharder = RandomSharding
+  val remoteFlask: RemoteFlask = new HttpFlask(http)
+  val state = chemist.MemoryStateCache
 }
