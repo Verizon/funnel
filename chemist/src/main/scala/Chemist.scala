@@ -64,29 +64,6 @@ trait Chemist[A <: Platform]{
       cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2)))
 
   /**
-   * Instruct flask to specifcally take a given shard out of service and
-   * repartiion its given load to the rest of the system.
-   */
-  def exclude(shard: FlaskID): ChemistK[Unit] = ???
-    // for {
-    //   cfg <- config
-    //   _ <- cfg.repository.platformHandler(PlatformEvent.TerminatedFlask(shard)).liftKleisli
-    // } yield ()
-
-  /**
-   * Instruct flask to specifcally "launch" a given shard and
-   * start sending new load to the "new" shard.
-   *
-   * NOTE: Assumes all added instances here are free of work already.
-   */
-  def include(id: FlaskID): ChemistK[Unit] = ???
-    // for {
-    //   cfg <- config
-    //   flask <- cfg.discovery.lookupFlask(id).liftKleisli
-    //   _ <- cfg.repository.platformHandler(PlatformEvent.NewFlask(flask)).liftKleisli
-    // } yield ()
-
-  /**
    * Initilize the chemist serivce by trying to create the various AWS resources
    * that are required to operate. Once complete, execute the boostrap.
    */

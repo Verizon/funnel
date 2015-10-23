@@ -116,12 +116,5 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
         })
       }
     }
-
-    // case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
-    //   PostShardExclude.time(json(chemist.exclude(FlaskID(id))))
-
-    // case POST(Path(Seg("shards" :: id :: "include" :: Nil))) =>
-    //   PostShardInclude.time(json(chemist.include(FlaskID(id))))
-
   }
 }
