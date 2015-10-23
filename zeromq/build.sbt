@@ -22,6 +22,7 @@ Custom.binaryCompatibility
 // native c++ implementation with jni:
 libraryDependencies ++= Seq(
   "org.zeromq"      % "jzmq"                  % "3.1.0",
-  "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test",
-  "oncue.ermine"    %% "scala-parsers"        % V.ermine
+  "org.scodec"      %% "scodec-core"          % "1.7.1",
+  "oncue.ermine"    %% "scala-parsers"        % V.ermine,
+  "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test"
 )

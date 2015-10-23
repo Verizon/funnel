@@ -33,6 +33,9 @@ object sinks {
       Nondeterminism[Task].gatherUnordered(tasks).map(_ => ())
     }
 
+    case Context(d, p@Redistribute(stop, start)) =>
+      Task.delay(log.info("recieved redistribute command (not implemented): $p"))
+
     case Context(d, Ignore) =>
       Task.delay(())
   }

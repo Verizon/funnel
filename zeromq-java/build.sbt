@@ -7,6 +7,7 @@ OnCue.baseSettings
 
 libraryDependencies ++= Seq(
   "org.zeromq"       % "jeromq"               % "0.3.4",
+  "org.scodec"      %% "scodec-core"          % "1.7.1",
   "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test",
   "oncue.ermine"    %% "scala-parsers"        % V.ermine
 )

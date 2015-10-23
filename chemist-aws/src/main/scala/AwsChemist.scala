@@ -70,7 +70,7 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
              cfg.sharder,
              cfg.http,
              sinks.caching(cfg.state),
-             sinks.unsafeNetworkIO
+             sinks.unsafeNetworkIO(cfg.remoteFlask)
             ).liftKleisli
 
       _  = log.debug("lifecycle process started")
