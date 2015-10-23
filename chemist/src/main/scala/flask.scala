@@ -44,9 +44,9 @@ object Flask {
            }
          }
        ))
-    } yield a.foldLeft(Distribution.empty){ (a,b) =>
-      a.updateAppend(b._1, b._2)
-    }).map { dis =>
+    } yield a.foldLeft(Distribution.empty)(
+      (a,b) => a.updateAppend(b._1, b._2))
+    ).map { dis =>
       log.debug(s"Gathered distribution $dis")
       dis
     }
@@ -74,7 +74,7 @@ object Flask {
           log.debug(s"Received cluster $cluster from $a")
           cluster
         }.foldLeft(Set.empty[Target]){ (a,b) =>
-          b.urls.map(s => Target(b.label, new URI(s))).toSet
+          a ++ b.urls.map(s => Target(b.label, new URI(s))).toSet
         }
       }
     }
