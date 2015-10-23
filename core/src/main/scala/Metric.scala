@@ -1,76 +1,43 @@
 package funnel
 
 import scala.concurrent.duration._
-import com.twitter.algebird.Group
-import scalaz.Free._
-import scalaz.syntax.applicative._
+import scalaz._
+import scalaz.concurrent.Task
+import scalaz.std.tuple._
 
-object Metric {
-  /**
-   * Combines two periodic instruments with keys `a` and `b` into one metric
-   * using the function `f`.
-   */
-  def combinePeriodic[A:Reportable,B:Reportable,C:Reportable:Group](
-    a: Periodic[A],
-    b: Periodic[B],
-    label: String,
-    units: Units,
-    description: String = "",
-    M: Monitoring = Monitoring.default,
-    keyMod: Key[C] => Key[C] = identity[Key[C]] _)(f: (A, B) => C): Periodic[C] = {
-      val C = implicitly[Group[C]]
-      val (ks, _) =
-        instruments.periodicBuffers(Buffers.sum(GroupMonoid(C)), (c: C) => c, label, units, description, keyMod)
-      val metrics = a.toThree.zipWith(b.toThree) {
-        case (k1, k2) => for { x <- liftFC(k1); y <- liftFC(k2) } yield f(x, y)
-      }
-      Periodic(ks.toThree.zip(metrics).map {
-        case (k, m) => M.publish(k)(Events.changed(k))(m).run
-      })
-  }
+import Events._
 
-  /**
-   * Combines two periodic instruments with keys `a` and `b` into one metric
-   * using the function `f`.
-   */
-  def combineInstruments[A:Reportable,B:Reportable,C:Reportable:Group](
-    a: Instrument[Periodic[A]],
-    b: Instrument[Periodic[B]],
-    label: String,
-    units: Units,
-    description: String = "",
-    M: Monitoring = Monitoring.default,
-    keyMod: Key[C] => Key[C])(f: (A, B) => C) {
-      combinePeriodic(a.keys, b.keys, label, units, description, M, keyMod)(f)
-  }
-
+trait Metrics {
   /** Infix syntax for `Metric`. */
-  implicit class MetricSyntax[A](self: Metric[A]) {
-    import Events.Event
+  implicit class MetricOps[A](self: Metric[A]) {
 
-    /** Publish this `Metric` to `M` whenever `ticks` emits a value. */
-    def publish(ticks: Event)(label: String, units: Units = Units.None)(
-                implicit R: Reportable[A],
-                M: Monitoring = Monitoring.default): Key[A] =
-      M.publish(label, units)(ticks)(self).run
+    def eval(M: Monitoring = Monitoring.default): (Event, OneOrThree[Task[A]]) =
+      self.foldMap[λ[α => (Event,OneOrThree[Task[α]])]](new (KeySet ~> λ[α => (Event,OneOrThree[Task[α]])]) {
+        def apply[A](a: KeySet[A]) = a match {
+          case One(k) => (changed(k), One(M latest k))
+          case Three(now, prev, sliding) =>
+            (or(changed(now), or(changed(prev),changed(sliding))),
+             Three(M latest now, M latest prev, M latest sliding))
+        }
+      })(tuple2Monad[Event] compose Applicative[OneOrThree] compose Applicative[Task])
 
-    /** Publish this `Metric` to `M` every `d` elapsed time. */
-    def publishEvery(d: Duration)(label: String, units: Units = Units.None)(
-                     implicit R: Reportable[A],
-                     M: Monitoring = Monitoring.default): Key[A] =
-      publish(Events.every(d))(label, units)
-
-    /** Publish this `Metric` to `M` when `k` is updated. */
-    def publishOnChange(k: Key[Any])(label: String, units: Units = Units.None)(
-                        implicit R: Reportable[A],
-                        M: Monitoring = Monitoring.default): Key[A] =
-      publish(Events.changed(k))(label, units)
-
-    /** Publish this `Metric` to `M` when either `k` or `k2` is updated. */
-    def publishOnChanges(k: Key[Any], k2: Key[Any])(
-                         label: String, units: Units = Units.None)(
-                         implicit R: Reportable[A],
-                         M: Monitoring = Monitoring.default): Key[A] =
-      publish(Events.or(Events.changed(k), Events.changed(k2)))(label, units)
+    def publish(label: String,
+                units: Units = Units.None,
+                description: String = "",
+                M: Monitoring = Monitoring.default,
+                I: Instruments = instruments.instance,
+                keyMod: Key[A] => Key[A] = identity[Key[A]] _)(
+                implicit R: Reportable[A]): Task[KeySet[A]] = {
+      val keys = I.periodicKeys(label, units, description, keyMod)
+      val (ev, oot) = eval(M)
+      oot match {
+        case One(t) => M.publish(keys.now)(ev)(t).map(One(_))
+        case Three(now, prev, sliding) => for {
+          n <- M.publish(keys.now)(ev)(now)
+          p <- M.publish(keys.previous)(ev)(prev)
+          s <- M.publish(keys.sliding)(ev)(sliding)
+        } yield Three(n, p, s)
+      }
+    }
   }
 }

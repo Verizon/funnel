@@ -70,5 +70,5 @@ object Key {
   def apply[A](name: String, units: Units, desc: String = "", attribs: Map[String, String] = Map())(
     implicit R: Reportable[A]): Key[A] = Key(name, R, units, desc, attribs)
 
-  implicit def keyToMetric[A](k: Key[A]): Metric[A] = Free.liftFC(k)
+  implicit def keyToMetric[A](k: Key[A]): Metric[A] = FreeAp.lift[KeySet,A](One(k))
 }

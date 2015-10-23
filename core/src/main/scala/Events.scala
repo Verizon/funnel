@@ -5,6 +5,7 @@ import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.Process
 import scalaz.stream.time.awakeEvery
+import scalaz.Monoid
 
 object Events {
 
@@ -14,7 +15,12 @@ object Events {
    */
   type Event = Monitoring => Process[Task, Unit]
 
-  /** 
+  implicit def eventMonoid = new Monoid[Event] {
+    def append(x: Event, y: => Event) = or(x, y)
+    def zero = _ => Process.halt
+  }
+
+  /**
    * An event which fires at the supplied regular interval.
    * Because this drives the schedule for attemptRepeatedly(),
    * it uses the Naive concurrency Strategy, which assigns a

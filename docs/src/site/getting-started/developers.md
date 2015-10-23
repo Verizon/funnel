@@ -304,7 +304,7 @@ trait SomeFun {
 }
 ```
 
-### Edge
+#### Edge
 
 An `Edge` instrument provides inter-service telemetry. Its purpose is to
 monitor the status and timings of service-to-service connections. It's just
@@ -344,7 +344,7 @@ val anEdge = edge("myservice/otherservice",
 ```
 
 
-### LapTimer
+#### LapTimer
 
 A `LapTimer` instrument is a compound instrument, which combines Timer and Counter instruments. It adds counter to all the timer operations.
 
@@ -396,6 +396,23 @@ trait SomeFun {
 }
 ```
 
+### Derived Metrics
+
+Funnel provides an API for combining metrics via the `funnel.Metric` datatype. For example, to make a metric that tracks a ratio between the present value of two timers:
+
+``` scala
+import funnel.instruments._
+
+val timer1 = timer("t1")
+val timer2 = timer("t2")
+
+val ratio: Metric[Double] = for {
+  t1 <- timer1.key
+  t2 <- timer2.key
+} yield t1 + t2
+
+
+```
 
 ### Monitoring Server
 
