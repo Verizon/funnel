@@ -47,7 +47,7 @@ class HttpFlask(http: dispatch.Http) extends RemoteFlask {
   /**
    * Touch the network and do the I/O using Dispatch.
    */
-  private def monitor(to: Location, targets: Seq[Target]): Task[String] = {
+  private def monitor(to: Location, targets: Set[Target]): Task[String] = {
     import dispatch._, Defaults._
     import argonaut._, Argonaut._
     import JSON.ClustersToJSON
@@ -64,7 +64,7 @@ class HttpFlask(http: dispatch.Http) extends RemoteFlask {
   /**
    * Touch the network and do the I/O using Dispatch.
    */
-  private def unmonitor(to: Location, targets: Seq[Target]): Task[String] = {
+  private def unmonitor(to: Location, targets: Set[Target]): Task[String] = {
     import dispatch._, Defaults._
     import argonaut._, Argonaut._
     import JSON.ClustersToJSON

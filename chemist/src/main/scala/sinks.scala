@@ -1,13 +1,15 @@
 package funnel
 package chemist
 
-import Sharding.Distribution
+import scalaz.Nondeterminism
 import scalaz.concurrent.Task
 import scalaz.stream.{Sink,sink}
 import journal.Logger
 
 object sinks {
+  import Sharding.Distribution
   import Chemist.Context
+  import FlaskCommand._
 
   val log = Logger[sinks.type]
 
@@ -23,8 +25,15 @@ object sinks {
   val logging: Sink[Task, Context[Plan]] =
     sink.lift(c => Task.delay(log.debug(s"recieved $c")))
 
-  val unsafeNetworkIO: Sink[Task, Context[Plan]] = sink.lift {
-    case Context(d, Distribute(work)) => Task.delay(()) // itterate the work and do I/O to send to flask
-    case Context(d, Ignore)           => Task.delay(())
+  def unsafeNetworkIO(f: RemoteFlask): Sink[Task, Context[Plan]] = sink.lift {
+    case Context(d, Distribute(work)) => {
+      val tasks = work.fold(List.empty[Task[Unit]]){ (a,b,c) =>
+        c :+ f.command(Monitor(a,b))
+      }
+      Nondeterminism[Task].gatherUnordered(tasks).map(_ => ())
+    }
+
+    case Context(d, Ignore) =>
+      Task.delay(())
   }
 }

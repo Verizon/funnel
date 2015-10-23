@@ -33,7 +33,8 @@ object Pipeline {
 
   // purpose of this function is to grab the existing work from the shards,
   // and update the distribution - our view of the world as it is right now
-  def collect(flasks: Distribution): Task[Distribution] = ???
+  def collect(http: dispatch.Http)(d: Distribution): Task[Distribution] =
+    Flask.gatherAssignedTargets(Sharding.shards(d))(http)
 
   object handle {
     /**
@@ -49,9 +50,9 @@ object Pipeline {
      */
     def newFlask(flask: Flask)(d: Distribution): Distribution = d
 
-    def terminatedTarget(e: TerminatedTarget)(d: Distribution): Distribution = ???
+    def terminatedTarget(e: TerminatedTarget)(d: Distribution): Distribution = d
 
-    def unmonitored(e: Unmonitored)(d: Distribution): Distribution = ???
+    def unmonitored(e: Unmonitored)(d: Distribution): Distribution = d
   }
 
   // routing
@@ -102,9 +103,10 @@ object Pipeline {
     lifecycle: Flow[PlatformEvent],
     pollInterval: Duration
   )(dsc: Discovery,
-    shd: Sharder
+    shd: Sharder,
+    http: dispatch.Http
   ): Process[Task, Context[Plan]] =
-    discovery(pollInterval)(dsc, collect _)
+    discovery(pollInterval)(dsc, collect(http)(_))
       .wye(lifecycle)(wye.merge)
       .map(partition(dsc,shd))
 
@@ -114,10 +116,11 @@ object Pipeline {
     pollInterval: Duration
   )(dsc: Discovery,
     shd: Sharder,
+    http: dispatch.Http,
     caches: Sink[Task, Context[Plan]],
     effects: Sink[Task, Context[Plan]]
   ): Task[Unit] =
-    process(lifecycle, pollInterval)(dsc,shd)
+    process(lifecycle, pollInterval)(dsc,shd,http)
       .observe(caches)
       .to(effects).run
 }

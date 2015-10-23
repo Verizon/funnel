@@ -66,7 +66,12 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
                )(cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery
                ).map(Pipeline.contextualise),
              cfg.rediscoveryInterval
-           )(cfg.discovery, cfg.sharder, sinks.caching(cfg.state), sinks.unsafeNetworkIO).liftKleisli
+           )(cfg.discovery,
+             cfg.sharder,
+             cfg.http,
+             sinks.caching(cfg.state),
+             sinks.unsafeNetworkIO
+            ).liftKleisli
 
       _  = log.debug("lifecycle process started")
 
