@@ -30,7 +30,6 @@ object Server {
   // there seems to be a bug in Task that makes doing what we previously had here
   // not possible. The server gets into a hang/deadlock situation.
   def unsafeStart[U <: Platform](server: Server[U]): Unit = {
-    import metrics.RepoEventsStream
     import server.{platform,chemist}
     val disco   = platform.config.discovery
     val sharder = platform.config.sharder

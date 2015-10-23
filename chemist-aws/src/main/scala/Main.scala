@@ -6,6 +6,7 @@ import scalaz.concurrent.Task
 import scalaz.syntax.monad._
 import http.MonitoringServer
 import journal.Logger
+import knobs._
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -17,9 +18,11 @@ object Main {
       val config = (for {
         a <- defaultKnobs
         b <- knobs.aws.config
-        c  = a ++ b
-        _  = log.debug(s"chemist is being configured with knobs: $c")
-      } yield AwsConfig.readConfig(c)).run
+        c <- knobs.loadImmutable(Required(
+          ClassPathResource("oncue/chemist-aws.defaults.cfg")) :: Nil)
+        d  = a ++ b ++ c
+        _  = log.debug(s"chemist is being configured with knobs: $d")
+      } yield AwsConfig.readConfig(d)).run
     }
 
     val monitoring = MonitoringServer.start(Monitoring.default, 5775)

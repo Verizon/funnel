@@ -44,7 +44,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       [
         {
           "cluster": "datapoints-1.0-us-east",
-          "urls": [
+          "uris": [
             "${Settings.tcp}"
           ]
         }
@@ -101,7 +101,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     [
       {
         "cluster": "datapoints-1.0-us-east",
-        "urls": [
+        "uris": [
           ${(1024 until 1024 + n).map(p => "\"http://localhost:" + p + "/stream/now\"").mkString(",\n")}
         ]
       }
@@ -138,7 +138,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     [
       {
         "cluster": "datapoints-1.0-us-east",
-        "urls": [
+        "uris": [
           ${(1024 until 1025).map(p => "\"http://localhost:" + p + "/stream/previous\"").mkString(",\n")}
         ]
       }

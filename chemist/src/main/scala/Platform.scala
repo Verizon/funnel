@@ -6,7 +6,9 @@ import knobs.{Config => KConfig}
 import java.io.File
 
 /**
- *
+ * A `Platform` is somewhere that hosts your application. Examples
+ * of a platform would be Amazon Web Services, Mesos, your internal
+ * datacenter etc.
  */
 trait Platform {
   type Config <: PlatformConfig
@@ -14,8 +16,7 @@ trait Platform {
   lazy val defaultKnobs =
     knobs.loadImmutable(Required(
       FileResource(new File("/usr/share/oncue/etc/chemist.cfg")) or
-      ClassPathResource("oncue/chemist.cfg")) :: Nil)
+      ClassPathResource("oncue/chemist.defaults.cfg")) :: Nil)
 
-  // def knobs: KConfig
   def config: Config
 }
