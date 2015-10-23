@@ -89,9 +89,6 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
     case GET(Path("/unmonitorable")) =>
       GetUnmonitorable.time(json(chemist.listUnmonitorableTargets))
 
-    // case GET(Path("/lifecycle/history")) =>
-    //   GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
-
     // case GET(Path("/platform/history")) =>
     //   GetPlatformHistory.time(json(chemist.platformHistory.map(_.toList)))
 
@@ -106,13 +103,6 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
 
     case GET(Path(Seg("shards" :: id :: Nil))) =>
       GetShardById.time(json(chemist.shard(FlaskID(id))))
-
-    // case GET(Path(Seg("shards" :: id :: "distribution" :: Nil))) =>
-    //   GetShardDistribution.time(json {
-    //     chemist.distribution.flatMapK { map =>
-    //       Task.delay(map.get(FlaskID(id)).toList.flatMap(identity))
-    //     }
-    //   })
 
     case GET(Path(Seg("shards" :: id :: "sources" :: Nil))) => GetShardSources.time {
       import dispatch._, Defaults._
