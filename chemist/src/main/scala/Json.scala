@@ -37,7 +37,7 @@ object JSON {
    *   "targets": [
    *     {
    *       "cluster": "testing",
-   *       "urls": [
+   *       "uris": [
    *         "http://...:5775/stream/sliding",
    *         "http://...:5775/stream/sliding"
    *       ]
@@ -80,7 +80,7 @@ object JSON {
    *[
    *  {
    *    "cluster": "imqa-maestro-1-0-261-QmUo7Js",
-   *    "urls": [
+   *    "uris": [
    *      "http://ec2-23-20-119-134.compute-1.amazonaws.com:5775/stream/sliding",
    *      "http://ec2-23-20-119-134.compute-1.amazonaws.com:5775/stream/uptime",
    *      "http://ec2-54-81-136-185.compute-1.amazonaws.com:5775/stream/sliding",
@@ -92,7 +92,7 @@ object JSON {
   implicit val ClustersToJSON: EncodeJson[(String, List[URI])] =
     EncodeJson((t: (String, List[URI])) =>
       ("cluster" := t._1) ->:
-      ("urls"   := t._2 ) ->: jEmptyObject
+      ("uris"   := t._2 ) ->: jEmptyObject
     )
 
   ////////////////////// lifecycle events //////////////////////

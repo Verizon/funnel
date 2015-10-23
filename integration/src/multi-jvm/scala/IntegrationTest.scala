@@ -89,9 +89,9 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
   import PlatformEvent._
 
   def printObnoxiously[A](id: String)(a: => A): Unit = {
-    println(s">>>> $id >>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    println(s">>>> start $id >>>>>>>>>>>>>>>>>>>>>>>>>>>")
     println(a)
-    println(s"<<<< $id <<<<<<<<<<<<<<<<<<<<<<<<<<<")
+    println(s"<<<< end $id <<<<<<<<<<<<<<<<<<<<<<<<<<<")
   }
 
   def fetch(path: String) = {
@@ -185,5 +185,4 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
   it should "complete the testing" in {
     enterBarrier(Finished)
   }
-
 }

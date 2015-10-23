@@ -37,9 +37,9 @@ object Sharding {
    * dump out the current snapshot of how chemist believes work
    * has been assigned to flasks.
    */
-  def snapshot(d: Distribution): Map[Flask, Map[ClusterName, List[URI]]] =
+  def snapshot(d: Distribution): Map[FlaskID, Map[ClusterName, List[URI]]] =
     d.toList.map { case (i,s) =>
-      i -> s.groupBy(_.cluster).mapValues(_.toList.map(_.uri))
+      i.id -> s.groupBy(_.cluster).mapValues(_.toList.map(_.uri))
     }.toMap
 
   /**

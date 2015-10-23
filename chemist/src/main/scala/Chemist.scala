@@ -27,7 +27,7 @@ trait Chemist[A <: Platform]{
    * Of all known monitorable services, dispaly the current work assignments
    * of funnel -> flask.
    */
-  def distribution: ChemistK[Map[Flask, Map[ClusterName, List[URI]]]] =
+  def distribution: ChemistK[Map[FlaskID, Map[ClusterName, List[URI]]]] =
     config.flatMapK(_.state.distributions.map(Sharding.snapshot))
 
   /**
@@ -41,8 +41,8 @@ trait Chemist[A <: Platform]{
   /**
    * list all the shards currently known by chemist.
    */
-  def shards: ChemistK[Set[Flask]] =
-    distribution.map(_.toList.map(_._1).toSet)
+  def shards: ChemistK[Seq[Flask]] =
+    config.flatMapK(_.state.distributions.map(Sharding.shards))
 
   /**
    * display all known node information about a specific shard
