@@ -51,6 +51,19 @@ trait Chemist[A <: Platform]{
     shards.map(_.find(_.id == id))
 
   /**
+   * List out the last 100 lifecycle events that this chemist has seen.
+   */
+  def platformHistory: ChemistK[Seq[PlatformEvent]] =
+    config.flatMapK(_.state.events.map(_.filterNot(_ == PlatformEvent.NoOp)))
+
+  /**
+   * List the unmonitorable targets.
+   */
+  def listUnmonitorableTargets: ChemistK[List[Target]] =
+    config.flatMapK( cfg =>
+      cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2)))
+
+  /**
    * Instruct flask to specifcally take a given shard out of service and
    * repartiion its given load to the rest of the system.
    */
@@ -72,30 +85,6 @@ trait Chemist[A <: Platform]{
     //   flask <- cfg.discovery.lookupFlask(id).liftKleisli
     //   _ <- cfg.repository.platformHandler(PlatformEvent.NewFlask(flask)).liftKleisli
     // } yield ()
-
-  /**
-   * List out the last 100 lifecycle events that this chemist has seen.
-   */
-  def platformHistory: ChemistK[Seq[PlatformEvent]] =
-    config.flatMapK(_.state.events.map(_.filterNot(_ == PlatformEvent.NoOp)))
-
-  /**
-   * List the unmonitorable targets.
-   */
-  def listUnmonitorableTargets: ChemistK[List[Target]] =
-    config.flatMapK( cfg =>
-      cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2)))
-
-  /**
-   * Force chemist to re-read the world from AWS. Useful if for some reason
-   * Chemist gets into a weird state at runtime.
-   */
-  // def bootstrap: ChemistK[Unit] =
-  //   for {
-  //     cfg <- config
-  //     _   <- Prototype.program(cfg.discovery, cfg.sharder).liftKleisli
-  //     _   <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
-  //   } yield ()
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources

@@ -12,14 +12,14 @@ import journal.Logger
 import java.net.URI
 
 trait RemoteFlask {
+  protected def flaskTemplate(path: String) =
+    LocationTemplate(s"http://@host:@port/$path")
+
   def command(c: FlaskCommand): Task[Unit]
 }
 
 object LoggingRemote extends RemoteFlask {
-  private lazy val log = Logger[HttpFlask]
-
-  def flaskTemplate(path: String) =
-    LocationTemplate(s"http://@host:@port/$path")
+  private[this] val log = Logger[HttpFlask]
 
   def command(c: FlaskCommand): Task[Unit] =
     Task.delay {
@@ -29,9 +29,8 @@ object LoggingRemote extends RemoteFlask {
 
 class HttpFlask(http: dispatch.Http) extends RemoteFlask {
   import FlaskCommand._
-  import LoggingRemote.flaskTemplate
 
-  private lazy val log = Logger[HttpFlask]
+  private[this] val log = Logger[HttpFlask]
 
   def command(c: FlaskCommand): Task[Unit] = {
     metrics.CommandCount.increment

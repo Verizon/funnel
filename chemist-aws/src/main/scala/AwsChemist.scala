@@ -2,22 +2,17 @@ package funnel
 package chemist
 package aws
 
-import knobs.{loadImmutable,Required,FileResource,ClassPathResource}
-import java.io.File
 import journal.Logger
-import scalaz.{\/,-\/,\/-,Kleisli}
 import scalaz.syntax.kleisli._
-import scalaz.concurrent.Task
-import scalaz.std.vector._
-import scalaz.syntax.traverse._
-import scalaz.syntax.id._
-import scalaz.stream.async.signalOf
-import scalaz.stream.async.mutable.Signal
-import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
-import funnel.aws._
+import scalaz.concurrent.{Task,Strategy}
+import scalaz.stream.async.boundedQueue
+import funnel.aws.{SNS,CFN}
 
 class AwsChemist[A <: Aws] extends Chemist[A]{
   private val log = Logger[AwsChemist[_]]
+
+  private val queue = boundedQueue[PlatformEvent](100)(
+    Strategy.Executor(Chemist.serverPool))
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources
@@ -65,12 +60,13 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
              Lifecycle.stream(cfg.queue.topicName
                )(cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery
                ).map(Pipeline.contextualise),
+             queue,
              cfg.rediscoveryInterval
            )(cfg.discovery,
              cfg.sharder,
              cfg.http,
              sinks.caching(cfg.state),
-             sinks.unsafeNetworkIO(cfg.remoteFlask)
+             sinks.unsafeNetworkIO(cfg.remoteFlask, queue)
             ).liftKleisli
 
       _  = log.debug("lifecycle process started")

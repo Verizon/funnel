@@ -29,14 +29,6 @@ object LocationIntent {
   case object Mirroring extends LocationIntent
 
   /**
-   * location destined for supervision are only for use
-   * between flask and chemist components. Supervision
-   * locations provide a channel for the administrative
-   * state and control messages chemist needs to operate.
-   */
-  // case object Supervision extends LocationIntent
-
-  /**
    * locations that are meant to be ignored are few and far
    * between, but this is supplied for completeness. One
    * case where `Ignored` is useful is when running multiple

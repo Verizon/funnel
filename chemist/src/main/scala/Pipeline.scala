@@ -6,6 +6,7 @@ import journal.Logger
 import scalaz.{\/,\/-}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Task,Strategy}
+import scalaz.stream.async.mutable.Queue
 import scalaz.stream.{Process,Process1,Sink,time,channel,wye,sink}
 
 object Pipeline {
@@ -101,18 +102,23 @@ object Pipeline {
 
   def process(
     lifecycle: Flow[PlatformEvent],
+    queue: Queue[PlatformEvent],
     pollInterval: Duration
   )(dsc: Discovery,
     shd: Sharder,
     http: dispatch.Http
-  ): Process[Task, Context[Plan]] =
+  ): Process[Task, Context[Plan]] = {
+    val p2: Flow[PlatformEvent] =
+      lifecycle.wye(queue.dequeue.map(contextualise))(wye.merge)
     discovery(pollInterval)(dsc, collect(http)(_))
-      .wye(lifecycle)(wye.merge)
+      .wye(p2)(wye.merge)
       .map(partition(dsc,shd))
+  }
 
   // needs error handling
   def task(
     lifecycle: Flow[PlatformEvent],
+    queue: Queue[PlatformEvent],
     pollInterval: Duration
   )(dsc: Discovery,
     shd: Sharder,
@@ -120,7 +126,7 @@ object Pipeline {
     caches: Sink[Task, Context[Plan]],
     effects: Sink[Task, Context[Plan]]
   ): Task[Unit] =
-    process(lifecycle, pollInterval)(dsc,shd,http)
+    process(lifecycle, queue, pollInterval)(dsc,shd,http)
       .observe(caches)
       .to(effects).run
 }
