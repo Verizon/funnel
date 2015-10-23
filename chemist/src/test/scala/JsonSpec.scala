@@ -11,10 +11,10 @@ class JsonSpec extends FlatSpec with Matchers {
 
   it should "serilizes the clusters into JSON" in {
     val A1 = ("test", List(new URI("foo.tv"), new URI("bar.com")))
-    A1.asJson.nospaces should equal ("""{"urls":["foo.tv","bar.com"],"cluster":"test"}""")
+    A1.asJson.nospaces should equal ("""{"uris":["foo.tv","bar.com"],"cluster":"test"}""")
 
     val A2 = List(A1, A1)
     A2.asJson.nospaces should equal (
-      """[{"urls":["foo.tv","bar.com"],"cluster":"test"},{"urls":["foo.tv","bar.com"],"cluster":"test"}]""")
+      """[{"uris":["foo.tv","bar.com"],"cluster":"test"},{"uris":["foo.tv","bar.com"],"cluster":"test"}]""")
   }
 }
