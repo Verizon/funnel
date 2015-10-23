@@ -109,9 +109,6 @@ class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
 
   protected def handleAddMirroringURLs(M: Monitoring, req: HttpExchange): Unit = {
     import JSON._; import argonaut.Parse;
-
-    M.log.debug(s"handleAddMirroringURLs($M, $req)")
-
     post(req){ json =>
       M.log.debug(s"POST: $json")
       Parse.decodeEither[List[Cluster]](json).fold(

@@ -12,7 +12,7 @@ import journal.Logger
 import java.net.URI
 
 trait RemoteFlask {
-  protected def flaskTemplate(path: String) =
+  def flaskTemplate(path: String) =
     LocationTemplate(s"http://@host:@port/$path")
 
   def command(c: FlaskCommand): Task[Unit]
