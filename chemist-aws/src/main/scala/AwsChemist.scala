@@ -11,8 +11,8 @@ import funnel.aws.{SNS,CFN}
 class AwsChemist[A <: Aws] extends Chemist[A]{
   private val log = Logger[AwsChemist[_]]
 
-  private val queue = boundedQueue[PlatformEvent](100)(
-    Strategy.Executor(Chemist.serverPool))
+  // private val queue = boundedQueue[PlatformEvent](100)(
+  //   Strategy.Executor(Chemist.serverPool))
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources
@@ -60,13 +60,12 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
              Lifecycle.stream(cfg.queue.topicName
                )(cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery
                ).map(Pipeline.contextualise),
-             queue,
              cfg.rediscoveryInterval
            )(cfg.discovery,
              cfg.sharder,
              cfg.http,
              sinks.caching(cfg.state),
-             sinks.unsafeNetworkIO(cfg.remoteFlask, queue)
+             sinks.unsafeNetworkIO(cfg.remoteFlask)
             ).liftKleisli
 
       _  = log.debug("lifecycle process started")

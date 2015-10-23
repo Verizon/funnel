@@ -63,6 +63,8 @@ object Pipeline {
         val work = handle.newTarget(target, shd)(d)
         Context(d, Distribute(work))
 
+      // TIM: here we need to re-compute all the cluster distributions and
+      // then break it down into a set of work that needs doing.
       case Context(d,NewFlask(f)) =>
         Context(d, Redistribute(Distribution.empty, Distribution.empty))
 
@@ -102,23 +104,18 @@ object Pipeline {
 
   def process(
     lifecycle: Flow[PlatformEvent],
-    queue: Queue[PlatformEvent],
     pollInterval: Duration
   )(dsc: Discovery,
     shd: Sharder,
     http: dispatch.Http
-  ): Process[Task, Context[Plan]] = {
-    val p2: Flow[PlatformEvent] =
-      lifecycle.wye(queue.dequeue.map(contextualise))(wye.merge)
+  ): Process[Task, Context[Plan]] =
     discovery(pollInterval)(dsc, collect(http)(_))
-      .wye(p2)(wye.merge)
+      .wye(lifecycle)(wye.merge)
       .map(partition(dsc,shd))
-  }
 
   // needs error handling
   def task(
     lifecycle: Flow[PlatformEvent],
-    queue: Queue[PlatformEvent],
     pollInterval: Duration
   )(dsc: Discovery,
     shd: Sharder,
@@ -126,7 +123,7 @@ object Pipeline {
     caches: Sink[Task, Context[Plan]],
     effects: Sink[Task, Context[Plan]]
   ): Task[Unit] =
-    process(lifecycle, queue, pollInterval)(dsc,shd,http)
+    process(lifecycle, pollInterval)(dsc,shd,http)
       .observe(caches)
       .to(effects).run
 }

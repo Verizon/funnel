@@ -4,7 +4,6 @@ package chemist
 import scalaz.Nondeterminism
 import scalaz.concurrent.Task
 import scalaz.stream.{Sink,sink}
-import scalaz.stream.async.mutable.Queue
 import journal.Logger
 
 object sinks {
@@ -26,7 +25,7 @@ object sinks {
   val logging: Sink[Task, Context[Plan]] =
     sink.lift(c => Task.delay(log.debug(s"recieved $c")))
 
-  def unsafeNetworkIO(f: RemoteFlask, queue: Queue[PlatformEvent]): Sink[Task, Context[Plan]] = sink.lift {
+  def unsafeNetworkIO(f: RemoteFlask): Sink[Task, Context[Plan]] = sink.lift {
     case Context(d, Distribute(work)) => {
       val tasks = work.fold(List.empty[Task[Unit]]){ (a,b,c) =>
         c :+ f.command(Monitor(a,b))
