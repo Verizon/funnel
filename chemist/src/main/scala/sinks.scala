@@ -12,7 +12,7 @@ object sinks {
   import FlaskCommand._
   import scalaz.syntax.apply._
 
-  val log = Logger[sinks.type]
+  private[this] val log = Logger[sinks.type]
 
   def caching(to: StateCache): Sink[Task, Context[Plan]] =
     sink.lift { c =>

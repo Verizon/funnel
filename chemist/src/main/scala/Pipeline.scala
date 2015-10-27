@@ -54,32 +54,30 @@ object Pipeline {
      * overall workload of the cluster.
      */
     def newFlask(flask: Flask, shd: Sharder)(old: Distribution): (Distribution, Redistribute) = {
-      val flasks  = Sharding.shards(old)
-      val targets = Sharding.targets(old)
-      val empty: Distribution = flasks.foldLeft(Distribution.empty)((a,b) => a.insert(b, Set.empty))
+      val flasks: IndexedSeq[Flask] = Sharding.shards(old)
+      val targets: Set[Target] = Sharding.targets(old)
+      val empty: Distribution = flasks.foldLeft(Distribution.empty)(
+        (a,b) => a.insert(b, Set.empty)).insert(flask, Set.empty)
+
       val proposed: Distribution = shd.distribution(targets)(empty)._2
 
-      val r = old.fold(Redistribute.empty){ (flk, tgs, r) =>
-        // lookup the proposed state of the flask targets
-        val next: Set[Target] = proposed.lookup(flk).getOrElse(Set.empty[Target])
-        // of those targets, see what work is already assigned to
-        // the very same shard, and ignore it as its already good
-        // where it is. any work that didnt match (i.e. wasn't on
-        // this shard in the new state should be stopped for this
-        // particular shard).
-        val (ignore, relocated) = next.partition(t => tgs.contains(t))
-        // using the desired state, only start work on this shard
-        // that is not already assigned there.
-        val starting = next -- ignore
-        // produce the redistribution for this flask
-        r.update(flk, relocated, starting)
+      val r1 = proposed.fold(Redistribute.empty){ (f, t, r) =>
+        if(f.id == flask.id) r.update(f, stopping = Set.empty, starting = t)
+        else {
+          // targets previously assigned to this flask
+          val previous = old.lookup(f).getOrElse(Set.empty[Target])
+          // of those targets, see what work is already assigned to
+          // the very same shard, and ignore it as its already good
+          // where it is. any work that didnt match (i.e. wasn't on
+          // this shard in the new state should be stopped for this
+          // particular shard).
+          val (ignore,_) = t.partition(t => previous.contains(t))
+          // produce the redistribution for this flask
+          r.update(f, previous -- ignore, t -- ignore)
+        }
       }
-
-      (proposed, r)
+      (proposed, r1)
     }
-
-    // def terminatedTarget(e: TerminatedTarget)(d: Distribution): Distribution = d
-    // def unmonitored(e: Unmonitored)(d: Distribution): Distribution = d
   }
 
   // routing
