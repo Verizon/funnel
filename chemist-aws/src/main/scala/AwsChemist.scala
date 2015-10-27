@@ -69,7 +69,7 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
              queue,
              cfg.sharder,
              cfg.http,
-             sinks.caching(cfg.state),
+             cfg.state,
              sinks.unsafeNetworkIO(cfg.remoteFlask, queue)
             ).liftKleisli
 

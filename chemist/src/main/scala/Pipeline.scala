@@ -7,7 +7,7 @@ import scalaz.{\/,\/-}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.async.mutable.Queue
-import scalaz.stream.{Process,Process1,Sink,time,channel,wye,sink}
+import scalaz.stream.{Process,Process1,Sink,time,channel,wye}
 
 object Pipeline {
   import Chemist.{Context,Flow}
@@ -17,7 +17,9 @@ object Pipeline {
   private[this] val log = Logger[Pipeline.type]
 
   /**
-   * discovery
+   * periodically wake up and call the platform discovery system. doing this
+   * ensures that we capture any outliers, despite having the more event-based
+   * platform lifecycle stream (which could periodically fail).
    */
   def discover(dsc: Discovery, interval: Duration): Flow[Target] = {
     time.awakeEvery(interval)(Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool).flatMap { _ =>
@@ -101,14 +103,7 @@ object Pipeline {
       case Context(d,TerminatedTarget(uri)) =>
         Context(d, Ignore)
 
-      // TIM: this is an interesting case. when we recieve a terminated flask
-      // message... we don't know what the work that was previous assigned
-      // to that flask, because that flask is now dead.
-      // consider zipping another queue into the lifecycle stream, and having
-      // the plan effect be emmitted a "discover now" message onto the stream,
-      // forcing all the unmonitored targets to get monitored right away.
       case Context(d,TerminatedFlask(flask)) =>
-        log.warn(s"encountered a terminated flask. oh shit, we didnt implement this yet!")
         val tasks: Task[Seq[PlatformEvent]] =
           for {
             a <- dsc.listTargets
@@ -121,6 +116,13 @@ object Pipeline {
         Context(d, Ignore)
     }
 
+  /**
+   * create the discovery stream by calling the discovery system and also
+   * gathering a list of all the known work assigned to the flask as of
+   * right now. difference the discovered work with the known work and then
+   * produce `NewTarget` events for any remain, as they are not currently
+   * being monitored.
+   */
   def discovery(
     interval: Duration
   )(dsc: Discovery,
@@ -162,13 +164,21 @@ object Pipeline {
     que: Queue[PlatformEvent],
     shd: Sharder,
     http: dispatch.Http,
-    caches: Sink[Task, Context[Plan]],
+    state: StateCache,
     effects: Sink[Task, Context[Plan]]
   ): Task[Unit] = {
+    val ec: Sink[Task, Context[PlatformEvent]] =
+      sinks.caching[PlatformEvent](state)
+
+    val pc: Sink[Task, Context[Plan]] =
+      sinks.caching[Plan](state)
+
     val lp = que.dequeue.map(contextualise)
       .wye(lifecycle)(wye.merge)(Chemist.defaultExecutor)
+      .observe(ec)
+
     process(lp, pollInterval)(dsc,shd,http)
-      .observe(caches)
+      .observe(pc)
       .to(effects).run
   }
 }

@@ -15,12 +15,9 @@ object sinks {
 
   private[this] val log = Logger[sinks.type]
 
-  def caching(to: StateCache): Sink[Task, Context[Plan]] =
+  def caching[A : Cacheable](to: StateCache): Sink[Task, Context[A]] =
     sink.lift { c =>
-      for {
-        _ <- to.plan(c.value)
-        _ <- to.distribution(c.distribution)
-      } yield ()
+      implicitly[Cacheable[A]].cache(c,to)
     }
 
   /**
