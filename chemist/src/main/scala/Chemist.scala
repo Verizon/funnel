@@ -51,6 +51,28 @@ trait Chemist[A <: Platform]{
     shards.map(_.find(_.id == id))
 
   /**
+   * display the monitoring data sources for a specific shard
+   */
+  import http.Cluster
+  def sources(id: FlaskID): ChemistK[List[Cluster]] = {
+    import concurrent.ExecutionContext
+    import dispatch._, Defaults._
+    import dispatch.Http
+    import LoggingRemote.flaskTemplate
+    import scalaz.syntax.either._
+    import argonaut._, Argonaut._
+    import http.JSON._
+    shard(id).flatMapK(fo => Task.delay {
+      val a = fo.getOrElse(throw new RuntimeException(s"Shard not found: ${id.value}"))
+      val uri = a.location.uriFromTemplate(flaskTemplate(path = "mirror/sources"))
+      val b = Http(url(uri.toString) OK as.String)(ExecutionContext.fromExecutorService(
+        Chemist.defaultPool
+      ))()
+      Parse.decodeEither[List[Cluster]](b).fold(e => throw new RuntimeException(e), identity)
+    })
+  }
+
+  /**
    * List out the last 100 lifecycle events that this chemist has seen.
    */
   def platformHistory: ChemistK[Seq[PlatformEvent]] =
