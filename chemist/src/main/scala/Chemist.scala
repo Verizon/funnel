@@ -62,14 +62,15 @@ trait Chemist[A <: Platform]{
     import scalaz.syntax.either._
     import argonaut._, Argonaut._
     import http.JSON._
-    shard(id).flatMapK(fo => Task.delay {
-      val a = fo.getOrElse(throw new RuntimeException(s"Shard not found: ${id.value}"))
-      val uri = a.location.uriFromTemplate(flaskTemplate(path = "mirror/sources"))
-      val b = Http(url(uri.toString) OK as.String)(ExecutionContext.fromExecutorService(
+    for {
+      cfg <- config
+      f   <- shard(id).map(_.getOrElse(throw new RuntimeException(s"Couldn't find shard ${id.value}")))
+      uri = f.location.uriFromTemplate(flaskTemplate(path = "mirror/sources"))
+      r   = cfg.http(url(uri.toString) OK as.String)(ExecutionContext.fromExecutorService(
         Chemist.defaultPool
       ))()
-      Parse.decodeEither[List[Cluster]](b).fold(e => throw new RuntimeException(e), identity)
-    })
+      cl  = Parse.decodeEither[List[Cluster]](r).fold(e => throw new RuntimeException(e), identity)
+    } yield cl
   }
 
   /**
