@@ -66,9 +66,8 @@ trait Chemist[A <: Platform]{
       cfg <- config
       f   <- shard(id).map(_.getOrElse(throw new RuntimeException(s"Couldn't find shard ${id.value}")))
       uri = f.location.uriFromTemplate(flaskTemplate(path = "mirror/sources"))
-      r   = cfg.http(url(uri.toString) OK as.String)(ExecutionContext.fromExecutorService(
-        Chemist.defaultPool
-      ))()
+      ec  = ExecutionContext.fromExecutorService(Chemist.defaultPool)
+      r   <- fromScalaFuture(cfg.http(url(uri.toString) OK as.String)(ec)).liftKleisli
       cl  = Parse.decodeEither[List[Cluster]](r).fold(e => throw new RuntimeException(e), identity)
     } yield cl
   }
