@@ -22,7 +22,6 @@ import com.amazonaws.services.cloudformation.AmazonCloudFormation
  * used by Chemist in AWS.
  */
 case class QueueConfig(
-  queueName: String,
   topicName: String
 )
 
@@ -66,7 +65,6 @@ case class AwsConfig(
 object AwsConfig {
   def readConfig(cfg: Config): AwsConfig = {
     val topic     = cfg.require[String]("chemist.sns-topic-name")
-    val queue     = cfg.require[String]("chemist.sqs-queue-name")
     val templates = cfg.require[List[String]]("chemist.target-resource-templates")
     val aws       = cfg.subconfig("aws")
     val network   = cfg.subconfig("chemist.network")
@@ -78,7 +76,7 @@ object AwsConfig {
     AwsConfig(
       templates 		      = templates.map(LocationTemplate),
       network             = readNetwork(network),
-      queue               = QueueConfig(topic, queue),
+      queue               = QueueConfig(topic),
       sns                 = readSNS(aws),
       sqs                 = readSQS(aws),
       ec2                 = readEC2(aws),

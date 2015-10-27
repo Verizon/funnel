@@ -88,10 +88,13 @@ class PipelineSpec extends FlatSpec with Matchers {
       .insert(flask01, t1.toSet)
       .insert(flask02, t2.toSet)
 
-    val (n, r) = handle.newFlask(flask03, RandomSharding)(d)
+    val (n, r) = handle.newFlask(flask03, LFRRSharding)(d)
 
     Sharding.shards(n).size should equal (d.keys.size + 1)
     Sharding.targets(n).size should equal (t1.size + t2.size)
+
+    // println("\n\n >>>>> origional")
+    // d.pretty()
 
     // println("\n\n >>>>> stopping")
     // r.stop.pretty()

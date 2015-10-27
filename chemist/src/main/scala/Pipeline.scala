@@ -86,7 +86,7 @@ object Pipeline {
    * a simple transducer that converts `PlatformEvent` into a `Plan` so that
    * the stream can be fed to whatever sink has been wired to this process.
    * this function should only ever be indicating what the intended actions
-   * are, not actually doing any effectful I/O itself. 
+   * are, not actually doing any effectful I/O itself.
    */
   def transform(dsc: Discovery, shd: Sharder)(c: Context[PlatformEvent]): Context[Plan] =
     c match {

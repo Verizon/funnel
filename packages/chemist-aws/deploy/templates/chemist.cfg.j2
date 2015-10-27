@@ -9,7 +9,12 @@ chemist {
     funnel-port = 5775
   }
 
-  sharding-strategy = "random"
+  # what sharding stratagy should we use? there are
+  # currently several options, each with its own
+  # caveats and trade-offs. please see the docuementation
+  # for more specific information.
+  sharding-strategy = "least-first-round-robin"
+  # sharding-strategy = "random"
 
   # where should chemist store is stale view of the
   # world? really only used for answering http queries
