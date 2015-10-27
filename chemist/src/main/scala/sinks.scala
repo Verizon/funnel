@@ -1,10 +1,11 @@
 package funnel
 package chemist
 
+import journal.Logger
 import scalaz.Nondeterminism
 import scalaz.concurrent.Task
 import scalaz.stream.{Sink,sink}
-import journal.Logger
+import scalaz.stream.async.mutable.Queue
 
 object sinks {
   import Sharding.Distribution
@@ -22,16 +23,24 @@ object sinks {
       } yield ()
     }
 
-  // really only used for testing purposes
+  /**
+   * really only used for testing purposes; doesnt serve any
+   * useful function other than for debugging.
+   */
   val logging: Sink[Task, Context[Plan]] =
     sink.lift(c => Task.delay(log.debug(s"recieved $c")))
 
-  def unsafeNetworkIO(f: RemoteFlask): Sink[Task, Context[Plan]] = sink.lift {
+  /**
+   * this should really only be used in proudction or integration
+   * testing as it will actually reach out on the wire and do the
+   * network I/O.
+   */
+  def unsafeNetworkIO(f: RemoteFlask, q: Queue[PlatformEvent]): Sink[Task, Context[Plan]] = sink.lift {
     case Context(d, Distribute(work)) => {
       val tasks = work.fold(List.empty[Task[Unit]]
         ){ (a,b,c) => c :+ f.command(Monitor(a,b)) }
 
-      Task.delay(log.info("distributing")) <*
+      Task.delay(log.info("distributing work...")) <*
       Nondeterminism[Task].gatherUnordered(tasks)
     }
 
@@ -47,7 +56,11 @@ object sinks {
       Nondeterminism[Task].gatherUnordered(starting)
     }
 
-    case Context(d, Ignore) =>
+    case Context(d, Produce(task)) =>
+      Task.delay(log.debug("pushing synthetic platform events onto our own queue")) <*
+      task.flatMap(q.enqueueAll(_))
+
+    case Context(d, _) =>
       Task.delay(())
   }
 }

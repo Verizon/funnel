@@ -1,9 +1,9 @@
 package funnel
 package chemist
 
-import knobs.{FileResource,ClassPathResource,Required}
-import knobs.{Config => KConfig}
 import java.io.File
+import knobs.{Config => KConfig}
+import knobs.{FileResource,ClassPathResource,Required}
 
 /**
  * A `Platform` is somewhere that hosts your application. Examples

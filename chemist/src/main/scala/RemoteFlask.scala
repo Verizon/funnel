@@ -1,15 +1,13 @@
 package funnel
 package chemist
 
-import scalaz.concurrent.Strategy
-import scalaz.concurrent.Task
-import scalaz.stream.{Process, Sink, async}
-import async.mutable.Signal
-import scalaz.syntax.apply._
-import scalaz.{-\/,\/,\/-, Either3,Left3,Middle3,Right3}
-import scalaz.concurrent.Actor
-import journal.Logger
 import java.net.URI
+import journal.Logger
+import scalaz.syntax.apply._
+import scalaz.concurrent.{Task,Strategy}
+import scalaz.stream.{Process,Sink}
+import scalaz.stream.async.mutable.Signal
+import scalaz.{-\/,\/,\/-, Either3,Left3,Middle3,Right3}
 
 trait RemoteFlask {
   def flaskTemplate(path: String) =

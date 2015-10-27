@@ -144,14 +144,6 @@ object JSON {
     jEmptyObject
   }
 
-  def encodeUnmonitored(f: FlaskID, u: URI, time: Date): Json = {
-    ("type" := "Unmonitored") ->:
-    ("flask" := f.value) ->:
-    ("uri" := u) ->:
-    ("time" := time) ->:
-    jEmptyObject
-  }
-
   def encodeAssigned(f: FlaskID, t: Target, time: Date): Json = {
     ("type" := "Assigned") ->:
     ("flask" := f.value) ->:
@@ -167,7 +159,6 @@ object JSON {
       case e @ PlatformEvent.NewFlask(f) => encodeNewFlask(f, e.time)
       case e @ PlatformEvent.TerminatedTarget(u) => encodeTerminatedTarget(u, e.time)
       case e @ PlatformEvent.TerminatedFlask(f) => encodeTerminatedFlask(f, e.time)
-      case e @ PlatformEvent.Unmonitored(f, u) => encodeUnmonitored(f, u, e.time)
       case e @ PlatformEvent.NoOp => ("type" := "NoOp") ->: ("time" := e.time) ->: jEmptyObject
     }
 }

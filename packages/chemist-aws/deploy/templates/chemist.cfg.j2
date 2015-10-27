@@ -41,11 +41,10 @@ chemist {
   # value (assuming you have the lifecycle streams setup
   # correctly it should be possible to get away with a
   # higher value here).
-  rediscovery-interval = 6 minutes
+  rediscovery-interval = 30 minutes
 
   # the names used to find the sqs and sns queues
   sns-topic-name = "ops-chemist"
-  sqs-queue-name = "ops-chemist"
 
   # based on these templates, chemist will figure
   # out how to communicate with a given target.

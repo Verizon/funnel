@@ -109,18 +109,24 @@ object Pipeline {
       // forcing all the unmonitored targets to get monitored right away.
       case Context(d,TerminatedFlask(flask)) =>
         log.warn(s"encountered a terminated flask. oh shit, we didnt implement this yet!")
-        Context(d, Ignore)
-
-      case Context(d,s@Unmonitored(flaskid, uri)) =>
-        log.warn(s"encountered an unexpected platform event state $s")
-        Context(d, Ignore)
+        val tasks: Task[Seq[PlatformEvent]] =
+          for {
+            a <- dsc.listTargets
+            b  = a.map(_._2).flatten
+            c  = b.map(NewTarget(_))
+          } yield c
+        Context(d, Produce(tasks))
 
       case Context(d,NoOp) =>
         Context(d, Ignore)
     }
 
-  def discovery(interval: Duration)(d: Discovery, gather: Distribution => Task[Distribution]): Process[Task,Context[PlatformEvent]] =
-    discover(d, interval).evalMap { case Context(a,b) =>
+  def discovery(
+    interval: Duration
+  )(dsc: Discovery,
+    gather: Distribution => Task[Distribution]
+  ): Process[Task,Context[PlatformEvent]] =
+    discover(dsc, interval).evalMap { case Context(a,b) =>
       for(dist <- gather(a)) yield {
         val current: Vector[Target] = dist.values.toVector.flatten
         val event: PlatformEvent =
@@ -153,12 +159,16 @@ object Pipeline {
     lifecycle: Flow[PlatformEvent],
     pollInterval: Duration
   )(dsc: Discovery,
+    que: Queue[PlatformEvent],
     shd: Sharder,
     http: dispatch.Http,
     caches: Sink[Task, Context[Plan]],
     effects: Sink[Task, Context[Plan]]
-  ): Task[Unit] =
-    process(lifecycle, pollInterval)(dsc,shd,http)
+  ): Task[Unit] = {
+    val lp = que.dequeue.map(contextualise)
+      .wye(lifecycle)(wye.merge)(Chemist.defaultExecutor)
+    process(lp, pollInterval)(dsc,shd,http)
       .observe(caches)
       .to(effects).run
+  }
 }

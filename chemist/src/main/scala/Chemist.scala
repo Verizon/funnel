@@ -12,7 +12,7 @@ import scalaz.syntax.traverse._
 import scalaz.syntax.id._
 import scalaz.std.vector._
 import scalaz.std.option._
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.{Process,Process0, Sink}
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 
@@ -102,8 +102,14 @@ object Chemist {
   val defaultPool: ExecutorService =
     Executors.newFixedThreadPool(4, daemonThreads("chemist-thread"))
 
+  val defaultExecutor: Strategy =
+    Strategy.Executor(defaultPool)
+
   val serverPool: ExecutorService =
     Executors.newCachedThreadPool(daemonThreads("chemist-server"))
+
+  val serverExecutor: Strategy =
+    Strategy.Executor(serverPool)
 
   val schedulingPool: ScheduledExecutorService =
     Executors.newScheduledThreadPool(2, daemonThreads("chemist-scheduled-tasks"))

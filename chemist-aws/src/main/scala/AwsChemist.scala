@@ -11,8 +11,12 @@ import funnel.aws.{SNS,CFN}
 class AwsChemist[A <: Aws] extends Chemist[A]{
   private val log = Logger[AwsChemist[_]]
 
-  // private val queue = boundedQueue[PlatformEvent](100)(
-  //   Strategy.Executor(Chemist.serverPool))
+  /**
+   * selection of 2000 is fairly arbitrary, but seems like a reasonable number
+   * as its unlikley that a single flask would ever be monitoring 2k hosts,
+   * or that 2k hosts would be launched in such a short order.
+   */
+  private val queue = boundedQueue[PlatformEvent](2048)(Chemist.defaultExecutor)
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources
@@ -62,10 +66,11 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
                ).map(Pipeline.contextualise),
              cfg.rediscoveryInterval
            )(cfg.discovery,
+             queue,
              cfg.sharder,
              cfg.http,
              sinks.caching(cfg.state),
-             sinks.unsafeNetworkIO(cfg.remoteFlask)
+             sinks.unsafeNetworkIO(cfg.remoteFlask, queue)
             ).liftKleisli
 
       _  = log.debug("lifecycle process started")
