@@ -10,7 +10,7 @@ class PipelineSpec extends FlatSpec with Matchers {
   import PlatformEvent._
   import Chemist.{Flow,Context}
   import Sharding.Distribution
-  import Pipeline.{contextualise,partition}
+  import Pipeline.{contextualise,transform}
   import Fixtures._
 
   implicit class AsTarget(s: String){
@@ -31,7 +31,7 @@ class PipelineSpec extends FlatSpec with Matchers {
     val p1: Flow[PlatformEvent] =
       List("http://localhost:8888/stream/previous".target).flow
 
-    (p1.map(partition(TestDiscovery, RandomSharding)).runLast.run
+    (p1.map(transform(TestDiscovery, RandomSharding)).runLast.run
       .get.value match {
         case Distribute(d) => d.values.flatMap(identity).length
         case _ => 0
@@ -52,11 +52,17 @@ class PipelineSpec extends FlatSpec with Matchers {
     )
 
     val accum: List[Plan] =
-      p2.flow.map(partition(TestDiscovery, RandomSharding))
+      p2.flow.map(transform(TestDiscovery, RandomSharding))
       .scan(List.empty[Plan])((a,b) => a :+ b.value)
       .runLast.run
       .toList
       .flatten
     accum.length should equal (p2.length)
   }
+
+  // it should "fucking bang" in {
+  //   Pipeline.transform(TestDiscovery, RandomSharding)(contextualise(NewTarget()))
+  // }
+
+
 }

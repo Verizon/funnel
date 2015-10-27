@@ -16,7 +16,9 @@ object Pipeline {
 
   private[this] val log = Logger[Pipeline.type]
 
-  // discovery
+  /**
+   * discovery
+   */
   def discover(dsc: Discovery, interval: Duration): Flow[Target] = {
     time.awakeEvery(interval)(Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool).flatMap { _ =>
       val task: Task[Seq[Context[Target]]] = for {
@@ -32,8 +34,10 @@ object Pipeline {
   def contextualise[A](a: A): Context[A] =
     Context(Distribution.empty, a)
 
-  // purpose of this function is to grab the existing work from the shards,
-  // and update the distribution - our view of the world as it is right now
+  /**
+   * grab the existing work from the shards, and update the distribution;
+   * our view of the world as it is right now (stale and immedietly non-authoritive)
+   */
   def collect(http: dispatch.Http)(d: Distribution): Task[Distribution] =
     Flask.gatherAssignedTargets(Sharding.shards(d))(http)
 
@@ -49,24 +53,45 @@ object Pipeline {
      * as otherwise getting a new flask online will not aid in balencing the
      * overall workload of the cluster.
      */
-    def newFlask(flask: Flask)(d: Distribution): Distribution = d
+    def newFlask(flask: Flask, shd: Sharder)(old: Distribution): (Distribution, Redistribute) = {
+      val flasks  = Sharding.shards(old)
+      val targets = Sharding.targets(old)
+      val empty: Distribution = flasks.foldLeft(Distribution.empty)((a,b) => a.insert(b, Set.empty))
+      val proposed: Distribution = shd.distribution(targets)(empty)._2
 
-    def terminatedTarget(e: TerminatedTarget)(d: Distribution): Distribution = d
+      val r = old.fold(Redistribute.empty){ (flk, tgs, r) =>
+        // lookup the proposed state of the flask targets
+        val next: Set[Target] = proposed.lookup(flk).getOrElse(Set.empty[Target])
+        // of those targets, see what work is already assigned to
+        // the very same shard, and ignore it as its already good
+        // where it is. any work that didnt match (i.e. wasn't on
+        // this shard in the new state should be stopped for this
+        // particular shard).
+        val (ignore, relocated) = next.partition(t => tgs.contains(t))
+        // using the desired state, only start work on this shard
+        // that is not already assigned there.
+        val starting = next -- ignore
+        // produce the redistribution for this flask
+        r.update(flk, relocated, starting)
+      }
 
-    def unmonitored(e: Unmonitored)(d: Distribution): Distribution = d
+      (proposed, r)
+    }
+
+    // def terminatedTarget(e: TerminatedTarget)(d: Distribution): Distribution = d
+    // def unmonitored(e: Unmonitored)(d: Distribution): Distribution = d
   }
 
   // routing
-  def partition(dsc: Discovery, shd: Sharder)(c: Context[PlatformEvent]): Context[Plan] =
+  def transform(dsc: Discovery, shd: Sharder)(c: Context[PlatformEvent]): Context[Plan] =
     c match {
       case Context(d,NewTarget(target)) =>
         val work = handle.newTarget(target, shd)(d)
         Context(d, Distribute(work))
 
-      // TIM: here we need to re-compute all the cluster distributions and
-      // then break it down into a set of work that needs doing.
       case Context(d,NewFlask(f)) =>
-        Context(d, Redistribute(Distribution.empty, Distribution.empty))
+        val (proposed, work) = handle.newFlask(f, shd)(d)
+        Context(proposed, work)
 
       case Context(d,TerminatedTarget(uri)) =>
         Context(d, Ignore)
@@ -102,6 +127,11 @@ object Pipeline {
 
   /********* edge of the world *********/
 
+  /**
+   * create a process that merges the discovery and lifecycle streams into a single
+   * process, and then executes the mapping function to figure out what actions
+   * should be executed (withou actually executing them).
+   */
   def process(
     lifecycle: Flow[PlatformEvent],
     pollInterval: Duration
@@ -111,7 +141,7 @@ object Pipeline {
   ): Process[Task, Context[Plan]] =
     discovery(pollInterval)(dsc, collect(http)(_))
       .wye(lifecycle)(wye.merge)
-      .map(partition(dsc,shd))
+      .map(transform(dsc,shd))
 
   // needs error handling
   def task(
