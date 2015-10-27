@@ -49,9 +49,11 @@ object Pipeline {
       sharder.distribution(Set(target))(d)._2 // drop the seq, as its not needed
 
     /**
-     * TODO: we need to add some logic to rebalance the cluster somehow,
-     * as otherwise getting a new flask online will not aid in balencing the
-     * overall workload of the cluster.
+     * in the event more capacity becomes avalible, rebalence the cluster to take
+     * best advantage of that new capacity using the specified sharder to
+     * redistribute the work. This function is soley responsible for orchestrating
+     * the inputs/outputs of the sharder, and the actual imlpementaiton logic of
+     * what to shard where is entirely encapsulated in the `Sharder`.
      */
     def newFlask(flask: Flask, shd: Sharder)(old: Distribution): (Distribution, Redistribute) = {
       val flasks: IndexedSeq[Flask] = Sharding.shards(old)
@@ -80,7 +82,12 @@ object Pipeline {
     }
   }
 
-  // routing
+  /**
+   * a simple transducer that converts `PlatformEvent` into a `Plan` so that
+   * the stream can be fed to whatever sink has been wired to this process.
+   * this function should only ever be indicating what the intended actions
+   * are, not actually doing any effectful I/O itself. 
+   */
   def transform(dsc: Discovery, shd: Sharder)(c: Context[PlatformEvent]): Context[Plan] =
     c match {
       case Context(d,NewTarget(target)) =>

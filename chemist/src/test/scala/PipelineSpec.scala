@@ -57,52 +57,49 @@ class PipelineSpec extends FlatSpec with Matchers {
 
   /************************ plan checking ************************/
 
-  // it should "correctly distribute the work to one of the flasks" in {
-  //   val p1: Flow[PlatformEvent] =
-  //     List("http://localhost:8888/stream/previous".target).flow
+  it should "correctly distribute the work to one of the flasks" in {
+    val p1: Flow[PlatformEvent] =
+      List("http://localhost:8888/stream/previous".target).flow
 
-  //   (p1.map(transform(TestDiscovery, RandomSharding)).runLast.run
-  //     .get.value match {
-  //       case Distribute(d) => d.values.flatMap(identity).length
-  //       case _ => 0
-  //     }) should equal(1)
-  // }
+    (p1.map(transform(TestDiscovery, RandomSharding)).runLast.run
+      .get.value match {
+        case Distribute(d) => d.values.flatMap(identity).length
+        case _ => 0
+      }) should equal(1)
+  }
 
-  // // this is a little lame
-  // it should "produce a plan for every input target" in {
-  //   val accum: List[Plan] =
-  //     t1.flow.map(transform(TestDiscovery, RandomSharding))
-  //     .scan(List.empty[Plan])((a,b) => a :+ b.value)
-  //     .runLast.run
-  //     .toList
-  //     .flatten
-  //   accum.length should equal (t1.length)
-  // }
+  // this is a little lame
+  it should "produce a plan for every input target" in {
+    val accum: List[Plan] =
+      t1.flow.map(transform(TestDiscovery, RandomSharding))
+      .scan(List.empty[Plan])((a,b) => a :+ b.value)
+      .runLast.run
+      .toList
+      .flatten
+    accum.length should equal (t1.length)
+  }
 
   /************************ handlers ************************/
 
   import Pipeline.handle
 
-  "handle.newFlask" should "redistribute work" in {
+  "handle.newFlask" should "correctly redistribute work" in {
     val d = Distribution.empty
       .insert(flask01, t1.toSet)
       .insert(flask02, t2.toSet)
 
-    println("\n\n>>>>>>> old distribution")
-    d.pretty()
-    println("\n\n")
-
     val (n, r) = handle.newFlask(flask03, RandomSharding)(d)
 
-    println("\n\n >>>>> stopping")
-    r.stop.pretty()
+    Sharding.shards(n).size should equal (d.keys.size + 1)
+    Sharding.targets(n).size should equal (t1.size + t2.size)
 
-    println("\n\n >>>>> starting")
-    r.start.pretty()
+    // println("\n\n >>>>> stopping")
+    // r.stop.pretty()
 
-    println("\n\n >>>>> distribution")
-    n.pretty()
+    // println("\n\n >>>>> starting")
+    // r.start.pretty()
+
+    // println("\n\n >>>>> distribution")
+    // n.pretty()
   }
-
-
 }
