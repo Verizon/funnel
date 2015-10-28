@@ -10,6 +10,7 @@ object Example {
   def main(args: Array[String]): Unit = {
 
     object metrics {
+      import Metric._
       import funnel.instruments._
 
       // Get the Scalaz syntax for the |@| operation
@@ -30,7 +31,7 @@ object Example {
           t.mean < 20
         }
 
-       healthy.publish("healthy", Units.Healthy)
+       healthy.publish("healthy", Units.Healthy).run
     }
 
     metrics.query.time {
