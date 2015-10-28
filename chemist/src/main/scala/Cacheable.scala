@@ -1,8 +1,9 @@
 package funnel
 package chemist
 
-import scalaz.concurrent.Task
+import journal.Logger
 import Chemist.Context
+import scalaz.concurrent.Task
 
 /**
  * a convenience typeclass that allows us to re-use the same
@@ -13,6 +14,10 @@ trait Cacheable[A]{
   def cache(a: Context[A], to: StateCache): Task[Unit]
 }
 object Cacheable {
+  import scalaz.syntax.apply._
+
+  private[this] val log = Logger[Cacheable.type]
+
   implicit val planCachable: Cacheable[Plan] =
     new Cacheable[Plan]{
       def cache(in: Context[Plan], to: StateCache): Task[Unit] =

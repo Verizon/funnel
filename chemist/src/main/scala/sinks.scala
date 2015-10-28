@@ -5,8 +5,13 @@ import journal.Logger
 import scalaz.Nondeterminism
 import scalaz.concurrent.Task
 import scalaz.stream.{Sink,sink}
-import scalaz.stream.async.mutable.Queue
+import scalaz.stream.async.mutable.{Queue,Signal}
 
+/**
+ * module containing the process sinks used by chemist.
+ * these sinks for the end of the world for the streams
+ * and are where all the system effects should be placed.
+ */
 object sinks {
   import Sharding.Distribution
   import Chemist.Context
@@ -15,10 +20,13 @@ object sinks {
 
   private[this] val log = Logger[sinks.type]
 
+  /**
+   * create a caching sink from a `Cacheable[A]`. this is intented as
+   * a simple convenience in creating sinks. Probally overkill, but
+   * you know, whatever.
+   */
   def caching[A : Cacheable](to: StateCache): Sink[Task, Context[A]] =
-    sink.lift { c =>
-      implicitly[Cacheable[A]].cache(c,to)
-    }
+    sink.lift(c => implicitly[Cacheable[A]].cache(c,to))
 
   /**
    * really only used for testing purposes; doesnt serve any
@@ -37,7 +45,7 @@ object sinks {
       val tasks = work.fold(List.empty[Task[Unit]]
         ){ (a,b,c) => c :+ f.command(Monitor(a,b)) }
 
-      Task.delay(log.info("distributing work...")) <*
+      Task.delay(log.debug(s"distributing targets to flasks. work = $work")) <*
       Nondeterminism[Task].gatherUnordered(tasks)
     }
 
@@ -57,7 +65,7 @@ object sinks {
       Task.delay(log.debug("pushing synthetic platform events onto our own queue")) <*
       task.flatMap(q.enqueueAll(_))
 
-    case Context(d, _) =>
-      Task.delay(())
+    case Context(d, a) =>
+      Task.delay(log.debug(s"nothing to see here but $a"))
   }
 }

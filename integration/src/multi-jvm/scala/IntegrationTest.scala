@@ -43,8 +43,10 @@ object MultiNodeIntegrationConfig extends MultiNodeConfig {
   // metrics are flowing around and we're monitoring for
   // a period of time
   val PhaseOne     = "phase-one"
-  // time to tear some shit down and track errors!
+  // time to tear some targets down and track errors!
   val PhaseTwo     = "phase-two"
+  // time to tear a flask
+  val PhaseThree   = "phase-three"
   // test is over
   val Finished     = "finished"
 
@@ -81,12 +83,24 @@ import concurrent.{Future,ExecutionContext}
 import chemist.{Server,FlaskID,PlatformEvent}
 import java.util.concurrent.{CountDownLatch,TimeUnit}
 import concurrent.duration._
+import journal.Logger
 
+/**
+ * this is one big fat integration test and is designed to simulate how the
+ * system actually runs in real life (its a close approxomation, but not entirely
+ * the same due to environmentals). the scenario under test is this:
+ * 1. startup all jvms and initilize the world (targets and flask)
+ * 2. boot chemist and instruct it to monitor the things
+ * 3. after roughly 5 seconds of monitoring the /now resources, target03 will die
+ * 4. we check the distributions and things to ensure they match our expectations.
+*/
 class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
   with STMultiNodeSpec
   with ImplicitSender {
   import MultiNodeIntegrationConfig._
   import PlatformEvent._
+
+  val logger = Logger[MultiNodeIntegration]
 
   def printObnoxiously[A](id: String)(a: => A): Unit = {
     println(s">>>> start $id >>>>>>>>>>>>>>>>>>>>>>>>>>>")
@@ -115,10 +129,20 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
       enterBarrier(PhaseTwo)
     }
 
-  def deployFlask(role: RoleName, opts: flask.Options) =
+  def deployFlask(role: RoleName, opts: flask.Options, failAfter: Option[Duration] = None) =
     runOn(role){
-      IntegrationFlask.start(opts)
+      val latch = new CountDownLatch(1)
+      val shutdown = IntegrationFlask.start(opts)
       enterBarrier(Deployed, PhaseOne, PhaseTwo)
+      failAfter.foreach { d =>
+        latch.await(d.toMillis, TimeUnit.MILLISECONDS)
+        logger.error(s"shutting down $role")
+        shutdown()
+        logger.error(s"synthesizing TerminatedFlask message")
+        ichemist.synthesize(TerminatedFlask(FlaskID(opts.name.get)))
+        Thread.sleep(10.seconds.toMillis)
+      }
+      // enterBarrier(PhaseThree)
     }
 
   def initialParticipants =
@@ -149,7 +173,7 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
 
     deployFlask(flask01, IntegrationFixtures.flask1Options)
 
-    deployFlask(flask02, IntegrationFixtures.flask2Options)
+    deployFlask(flask02, IntegrationFixtures.flask2Options, Option(10.seconds))
   }
 
   it should "list the appropriate flask ids" in {
@@ -174,10 +198,14 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
     }
   }
 
-  it should "have recieved the problem event via the telemetry socket" in {
+  it should "crash flask02" in {
     runOn(chemist01){
       enterBarrier(PhaseTwo)
       true should equal (true)
+
+      printObnoxiously("/platform/history")(fetch("/platform/history"))
+
+      // enterBarrier(PhaseThree)
     }
   }
 

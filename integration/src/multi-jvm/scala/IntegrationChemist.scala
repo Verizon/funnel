@@ -2,34 +2,40 @@ package funnel
 package integration
 
 import scalaz.Scalaz
-import scalaz.stream.async
+import scala.concurrent.duration._
 import scalaz.stream.async.boundedQueue
 import scalaz.concurrent.{Task,Strategy}
+import scalaz.stream.{Process,async,time}
 import chemist.{Chemist,PlatformEvent,Pipeline,sinks}
 
 class IntegrationChemist extends Chemist[IntegrationPlatform]{
   import Scalaz._, PlatformEvent._, Pipeline.contextualise
+  import Chemist.Flow
 
   private[this] val log = journal.Logger[IntegrationChemist]
 
-  private[this] val lifecycle =
-    async.signalOf[PlatformEvent](NoOp)(Strategy.Executor(Chemist.serverPool))
+  val lifecycle: Flow[PlatformEvent] =
+    Process.emitAll(NoOp :: Nil).map(contextualise)
 
-  private[this] val queue =
+  val queue =
     boundedQueue[PlatformEvent](100)(Chemist.defaultExecutor)
 
-  def init: ChemistK[Unit] =
+  def synthesize(e: PlatformEvent): Unit =
+    println(">>>>>>>>>>>>>>>>>>>>>>>>>>>> " + queue.enqueueOne(e).attempt.run)
+
+  val init: ChemistK[Unit] =
     for {
       cfg <- config
       _    = log.info("Initilizing Chemist....")
+      _   <- queue.enqueueOne(TerminatedTarget(new java.net.URI("http://bbc.co.uk/"))).liftKleisli
       _   <- Pipeline.task(
-            lifecycle.discrete.map(contextualise),
+            lifecycle,
             cfg.rediscoveryInterval
           )(cfg.discovery,
             queue,
             cfg.sharder,
             cfg.http,
-            sinks.caching(cfg.state),
+            cfg.state,
             sinks.unsafeNetworkIO(cfg.remoteFlask, queue)
           ).liftKleisli
     } yield ()

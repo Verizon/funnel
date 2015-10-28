@@ -39,10 +39,10 @@ object Server {
 
     chemist.init(platform).runAsync {
       case -\/(err) =>
-        log.error(s"Unable to initilize the chemist service. Failed with error: $err")
+        log.error(s"FATAL: Unable to initilize the chemist service. Failed with error: $err")
         err.printStackTrace
 
-      case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
+      case \/-(_) => log.error("FATAL: Sucsessfully initilized chemist at startup.")
     }
 
     val p = this.getClass.getResource("/oncue/www/")

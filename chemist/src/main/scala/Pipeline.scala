@@ -6,8 +6,8 @@ import journal.Logger
 import scalaz.{\/,\/-}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Task,Strategy}
-import scalaz.stream.async.mutable.Queue
-import scalaz.stream.{Process,Process1,Sink,time,channel,wye}
+import scalaz.stream.async.mutable.{Queue,Signal}
+import scalaz.stream.{Process,Process1,Sink,time,channel,wye,sink,async}
 
 object Pipeline {
   import Chemist.{Context,Flow}
@@ -33,6 +33,10 @@ object Pipeline {
     }
   }
 
+  /**
+   * basically just lift a given A into a Context A... perhaps this would be
+   * better on the Context compantion object?
+   */
   def contextualise[A](a: A): Context[A] =
     Context(Distribution.empty, a)
 
@@ -173,9 +177,10 @@ object Pipeline {
     val pc: Sink[Task, Context[Plan]] =
       sinks.caching[Plan](state)
 
-    val lp = que.dequeue.map(contextualise)
+    val lp: Flow[PlatformEvent] = que.dequeue.map(contextualise)
       .wye(lifecycle)(wye.merge)(Chemist.defaultExecutor)
       .observe(ec)
+      // .observe(sink.lift(a => Task.delay(log.info(s"@@@@ $a"))))
 
     process(lp, pollInterval)(dsc,shd,http)
       .observe(pc)
