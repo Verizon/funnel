@@ -20,9 +20,6 @@ class IntegrationChemist extends Chemist[IntegrationPlatform]{
   val queue =
     boundedQueue[PlatformEvent](100)(Chemist.defaultExecutor)
 
-  def synthesize(e: PlatformEvent): Unit =
-    println(">>>>>>>>>>>>>>>>>>>>>>>>>>>> " + queue.enqueueOne(e).attempt.run)
-
   val init: ChemistK[Unit] =
     for {
       cfg <- config

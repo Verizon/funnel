@@ -22,7 +22,7 @@ object Pipeline {
    * platform lifecycle stream (which could periodically fail).
    */
   def discover(dsc: Discovery, interval: Duration): Flow[Target] = {
-    time.awakeEvery(interval)(Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool).flatMap { _ =>
+    (Process.emit(Duration.Zero) ++ time.awakeEvery(interval)(Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool)).flatMap { _ =>
       val task: Task[Seq[Context[Target]]] = for {
         a <- dsc.listActiveFlasks
         b <- dsc.listTargets.map(_.map(_._2).flatten)
