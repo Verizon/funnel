@@ -80,7 +80,7 @@ Riemann is a great choice for small teams using *Funnel*, but in larger organisa
 
 The [ZeroMQ](http://zeromq.org/) module provides both the ability to publish metrics from a `Monitoring` instance out to a socket (with an arbitrary transport and mode), and the ability to consume metrics from a socket and import them into the specified `Monitoring` instance. 
 
-#### Instalation
+#### Installation
 
 The ZeroMQ module comes in two flavours:
 

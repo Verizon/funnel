@@ -20,7 +20,7 @@ At a high-level, the system can be visualised like this:
 
 Given the different functions of each component, please refer to their specific sections for more information.
 
-## Instalation
+## Installation
 
 Regardless of the *Funnel* service component
 
