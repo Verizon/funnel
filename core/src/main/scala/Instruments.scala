@@ -63,26 +63,31 @@ class Instruments(val window: Duration,
 
   import scalaz.stream._
 
-  def periodicBuffers[I,O:Reportable:Group](
+  def periodicKeys[O:Reportable](
+    label: String,
+    units: Units = Units.None,
+    description: String,
+    keyMod: Key[O] => Key[O] = identity[Key[O]] _) = {
+      val trimmed = label.trim
+      Periodic(Triple(("now", nowL _), ("previous", previousL _), ("sliding", slidingL _)).map {
+        case (name, desc) => keyMod(Key[O](s"$name/$trimmed", units, desc(description)))
+      })
+  }
+
+  def periodicBuffers[I,O:Group:Reportable](
     nowBuf: Process1[I,O],
     unit: I => O,
     label: String,
     units: Units = Units.None,
     description: String,
     keyMod: Key[O] => Key[O] = identity[Key[O]] _
-  ): (Periodic[O], Three[TBuffer[Option[I],O]]) = {
-    val trimmed = label.trim // to prevent trailing spaces
+  ): (Periodic[O], Triple[TBuffer[Option[I],O]]) = {
     val O = implicitly[Group[O]]
     val nowP = B.resetEvery(window)(nowBuf)
     val now = B.ignoreTick(nowP)
     val prev = B.emitEvery(window)(nowP)
     val sliding = B.ignoreTick(B.sliding(window)(unit)(O))
-    val periodic =
-      Periodic(Three(("now", nowL _), ("previous", previousL _), ("sliding", slidingL _)).map {
-        case (name, desc) => keyMod(Key[O](s"$name/$trimmed", units, desc(description)))
-      })
-
-    (periodic, Three(now, prev, sliding))
+    (periodicKeys(label, units, description, keyMod), Triple(now, prev, sliding))
   }
 
   /**
@@ -104,7 +109,7 @@ class Instruments(val window: Duration,
     import Scalaz._
     val (ks, nps) =
       periodicBuffers(nowBuf, unit, label, units, description, keyMod)
-    val t = ks.toThree.zipWith(nps)(monitoring.topic(_)(_)).toList.traverse(
+    val t = ks.toTriple.zipWith(nps)(monitoring.topic(_)(_)).toList.traverse(
       _.map(Kleisli(_))).map(_.traverseU_(identity)).map(_.run)
     (ks, t)
   }
@@ -288,9 +293,6 @@ class Instruments(val window: Duration,
             keyMod: Key[Stats] => Key[Stats] = identity): Timer[Periodic[Stats]] = {
     val kinded = andKind("timer", keyMod)
     val t = new Timer[Periodic[Stats]] {
-      val timer = B.resetEvery(window)(B.stats)
-      val previousTimer = B.emitEvery(window)(timer)
-      val slidingTimer = B.sliding(window)((d: Double) => Stats(d))(Stats.statsGroup)
       val u: Units = Units.Duration(TimeUnit.MILLISECONDS)
       val (ks, f) =
         nowPrevSliding(B.stats, Stats(_:Double), label, u, description, kinded).map(_.run)

@@ -59,51 +59,26 @@ trait Monitoring {
    */
   def remove[O](k: Key[O]): Task[Unit]
 
-  /** Convience function to publish a metric under a newly created key. */
-  def publish[O:Reportable](name: String, units: Units
-    )(e: Event)(f: Metric[O]): Task[Key[O]] =
-      publish(Key(name, units))(e)(f)
-
   /**
-   * Like `publish`, but if `key` is preexisting, sends updates
-   * to it rather than throwing an exception.
-   */
-  def republish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] = Task.suspend {
-    val refresh: Task[O] = eval(f)
-    // Whenever `event` generates a new value, refresh the signal
-    val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(refresh))
-    // Republish these values to a new topic
-    for {
-      _ <- proc.evalMap((o: O) => for {
-        b <- exists(key)
-        _ <- if (b) Task.delay(Task.fork(update(key, o))(defaultPool).runAsync(_ => ()))
-             else Task.fork(topic[O,O](key)(B.ignoreTickAndTime(process1.id)))(defaultPool)
-      } yield ()).run
-    } yield key
-  }
-
-  /**
-   * Publish a metric with the given name on every tick of `events`.
+   * Publish the value of `f` under the given `key` on every tick of the event `e`.
    * See `Events` for various combinators for building up possible
    * arguments to pass here (periodically, when one or more keys
-   * change, etc). Example `publish(k)(Events.every(5 seconds))(
+   * change, etc). Example `publish(k)(Events.every(5 seconds))`
    *
-   * This method checks that the given key is not preexisting and
-   * throws an error if the key already exists. Use `republish` if
-   * preexisting `key` is not an error condition.
+   * This method checks that the given key is pre-existing and
+   * re-uses the key if it already exists.
    */
-  def publish[O](key: Key[O])(e: Event)(f: Metric[O]): Task[Key[O]] =
-    republish(key)(e)(f)
-
-  /** Compute the current value for the given `Metric`. */
-  def eval[A](f: Metric[A]): Task[A] = {
-    // `trans` is a polymorphic fn from `Key` to `Task`, picks out
-    // latest value for that `Key`
-    val trans = new (Key ~> Task) {
-      def apply[A](k: Key[A]): Task[A] = latest(k)
-    }
-    // Invoke Metric interpreter, giving it function from Key to Task
-    Free.runFC(f)(trans)
+  def publish[O](key: Key[O])(e: Event)(f: Task[O]): Task[Unit] = {
+    // Whenever `event` generates a new value, refresh the signal
+    val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(f))
+    // Republish these values to a new topic
+    Task.delay((for {
+      _ <- proc.evalMap((o: O) => for {
+        b <- exists(key)
+        _ <- if (b) update(key, o)
+             else topic[O,O](key)(B.ignoreTickAndTime(process1.id))
+      } yield ()).run
+    } yield key).runAsync(_ => ()))
   }
 
   /**
@@ -385,7 +360,8 @@ trait Monitoring {
   def evalFamily[O](family: Key[O]): Task[Seq[O]] =
     filterKeys(Key.StartsWith(family.name)).once.runLastOr(List()).flatMap { ks =>
       val ksO: Seq[Key[O]] = ks.flatMap(_.cast(family.typeOf, family.units))
-      Nondeterminism[Task].gatherUnordered(ksO.map(k => eval(k)).toSeq)
+      import Metric._
+      Nondeterminism[Task].gatherUnordered(ksO.flatMap(x => toMetric(x).eval(this)._2.toList).toSeq)
     }
 
   /**
@@ -457,9 +433,12 @@ object Monitoring {
         _ <- Task.delay(topics += (k -> eraseTopic(Topic(pub, v))))
         t = (k.typeOf, k.units)
         _ <- keys_.compareAndSet(_.map(_ + k))
-        _ <- Task.delay(time.awakeEvery(timeout)(S, schedulingPool).evalMap(_ =>
-               now flatMap (t => pub(None -> t))).run.runAsync(_ => ()))
+        // // Starts the ticker:
+        //_ <- Task.delay(time.awakeEvery(timeout)(S, schedulingPool).evalMap(_ =>
+        //       now flatMap (t => pub(None -> t))).run.runAsync(_ => ()))
       } yield (i: I) => now flatMap (t => pub(Some(i) -> t))
+
+
 
       protected def update[O](k: Key[O], v: O): Task[Unit] =
         topics.get(k).map(_.current.set(v)).getOrElse(Task(())(defaultPool)).map(_ => ())

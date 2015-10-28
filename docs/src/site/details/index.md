@@ -6,7 +6,7 @@ section: "details"
 
 # Detailed Information
 
-As funnel is a fairly comprehensive system, but its user-level API is fairly constrained, this page adds some additional detail to both some of the internal workings and useful things to know as users.
+As funnel is a fairly comprehensive system, but its user-level API is relatively constrained, this page adds some additional detail to both some of the internal workings and useful things to know as users.
 
 1. [Built-in Metrics](#builtin-metrics)
 1. [Control Server](#control-server)
@@ -15,7 +15,7 @@ As funnel is a fairly comprehensive system, but its user-level API is fairly con
 
 # Built-in Metrics
 
-Using the default instruments, you'll notice that there are a raft of metrics that are being produced by default. These logically fall under two categories:
+Using the default instruments, you'll notice that there's a raft of metrics being produced automatically. These logically fall into two categories:
 
 1. [JVM and Clock Metrics](#jvm-metrics) - list of the built-in JVM metrics
 1. [System Metrics](#system-metrics) - information about the built-in system metrics 
