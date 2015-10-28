@@ -16,5 +16,5 @@ class IntegrationConfig extends PlatformConfig {
   val sharder: chemist.Sharder = RandomSharding
   val remoteFlask: RemoteFlask = new HttpFlask(http)
   val state = chemist.MemoryStateCache
-  val rediscoveryInterval = 8.seconds
+  val rediscoveryInterval = 60.seconds
 }
