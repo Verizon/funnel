@@ -12,7 +12,7 @@ import scalaz.syntax.traverse._
 import scalaz.syntax.id._
 import scalaz.std.vector._
 import scalaz.std.option._
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.{Process,Process0, Sink}
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 
@@ -28,7 +28,7 @@ trait Chemist[A <: Platform]{
    * of funnel -> flask.
    */
   def distribution: ChemistK[Map[FlaskID, Map[ClusterName, List[URI]]]] =
-    config.flatMapK(_.repository.distribution.map(Sharding.snapshot))
+    config.flatMapK(_.state.distributions.map(Sharding.snapshot))
 
   /**
    * manually ask chemist to assign the given urls to a flask in order
@@ -41,100 +41,27 @@ trait Chemist[A <: Platform]{
   /**
    * list all the shards currently known by chemist.
    */
-  def shards: ChemistK[Set[Flask]] =
-    for {
-      cfg <- config
-      a <- cfg.repository.distribution.map(Sharding.shards).liftKleisli
-    } yield a.toList.flatMap(id => cfg.repository.flask(id)).toSet
+  def shards: ChemistK[Seq[Flask]] =
+    config.flatMapK(_.state.distributions.map(Sharding.shards))
 
   /**
    * display all known node information about a specific shard
    */
   def shard(id: FlaskID): ChemistK[Option[Flask]] =
-    config.map(_.repository.flask(id))
-
-  /**
-   * Instruct flask to specifcally take a given shard out of service and
-   * repartiion its given load to the rest of the system.
-   */
-  def exclude(shard: FlaskID): ChemistK[Unit] =
-    for {
-      cfg <- config
-      _ <- cfg.repository.platformHandler(PlatformEvent.TerminatedFlask(shard)).liftKleisli
-    } yield ()
-
-  /**
-   * Instruct flask to specifcally "launch" a given shard and
-   * start sending new load to the "new" shard.
-   *
-   * NOTE: Assumes all added instances here are free of work already.
-   */
-  def include(id: FlaskID): ChemistK[Unit] =
-    for {
-      cfg <- config
-      flask <- cfg.discovery.lookupFlask(id).liftKleisli
-      _ <- cfg.repository.platformHandler(PlatformEvent.NewFlask(flask)).liftKleisli
-    } yield ()
+    shards.map(_.find(_.id == id))
 
   /**
    * List out the last 100 lifecycle events that this chemist has seen.
    */
   def platformHistory: ChemistK[Seq[PlatformEvent]] =
-    config.flatMapK(_.repository.historicalPlatformEvents.map(_.filterNot(_ == PlatformEvent.NoOp)))
+    config.flatMapK(_.state.events.map(_.filterNot(_ == PlatformEvent.NoOp)))
 
   /**
-    * List the unmonitorable targets.
-    */
+   * List the unmonitorable targets.
+   */
   def listUnmonitorableTargets: ChemistK[List[Target]] =
-    config.flatMapK { cfg => cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2))
-  }
-
-  /**
-   * List out the last 100 lifecycle events that this chemist has seen.
-   */
-  def repoHistory: ChemistK[Seq[RepoEvent]] =
-    config.flatMapK(_.repository.historicalRepoEvents)
-
-  /**
-   * List out the all the known Funnels and the state they are in.
-   */
-  def states: ChemistK[Map[TargetLifecycle.TargetState, Map[URI, RepoEvent.StateChange]]] =
-    config.flatMapK(_.repository.states)
-
-  /**
-   * List out the last 100 Errors that this chemist has seen.
-   */
-  def errors: ChemistK[Seq[Error]] =
-    config.flatMapK(_.repository.errors)
-
-  /**
-   * Force chemist to re-read the world from AWS. Useful if for some reason
-   * Chemist gets into a weird state at runtime.
-   */
-  def bootstrap: ChemistK[Unit] = for {
-    cfg <- config
-
-    // from the whole world, figure out which are flask instances
-    f  <- cfg.discovery.listActiveFlasks.liftKleisli
-    _  = log.info(s"found ${f.length} flasks in the running instance list...")
-
-    // ask those flasks for their current work and yield a `Distribution`
-    d <- Housekeeping.gatherAssignedTargets(f)(cfg.http).liftKleisli
-    _  = log.debug(s"read the existing state of assigned work from the remote instances: $d")
-
-    // update the distribution accordingly
-    d2 <- cfg.repository.mergeExistingDistribution(d).liftKleisli
-    _  = log.debug(s"merged the currently assigned work. distribution=$d2")
-
-    // update the distribution with new flask shards
-    _ <- f.toVector.traverse_(flask => cfg.repository.platformHandler(PlatformEvent.NewFlask(flask))).liftKleisli
-    _  = log.debug(s"increased the number of known flasks to ${f.size}")
-
-    _ <- Housekeeping.gatherUnassignedTargets(cfg.discovery, cfg.repository).liftKleisli
-
-    _ <- Task.now(log.info(">>>>>>>>>>>> boostrap complete <<<<<<<<<<<<")).liftKleisli
-
-  } yield ()
+    config.flatMapK( cfg =>
+      cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2)))
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources
@@ -149,10 +76,16 @@ trait Chemist[A <: Platform]{
 
   protected val config: ChemistK[A#Config] =
     platform.map(_.config)
-
 }
 
 object Chemist {
+  type Flow[A] = Process[Task,Context[A]]
+
+  case class Context[A](distribution: Sharding.Distribution, value: A)
+
+  /*********************************************************************************/
+  /********************************** THREADING ************************************/
+  /*********************************************************************************/
 
   private def daemonThreads(name: String) = new ThreadFactory {
     def newThread(r: Runnable) = {
@@ -169,8 +102,14 @@ object Chemist {
   val defaultPool: ExecutorService =
     Executors.newFixedThreadPool(4, daemonThreads("chemist-thread"))
 
+  val defaultExecutor: Strategy =
+    Strategy.Executor(defaultPool)
+
   val serverPool: ExecutorService =
     Executors.newCachedThreadPool(daemonThreads("chemist-server"))
+
+  val serverExecutor: Strategy =
+    Strategy.Executor(serverPool)
 
   val schedulingPool: ScheduledExecutorService =
     Executors.newScheduledThreadPool(2, daemonThreads("chemist-scheduled-tasks"))

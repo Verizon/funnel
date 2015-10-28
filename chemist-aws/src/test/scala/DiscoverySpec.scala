@@ -29,7 +29,6 @@ class DiscoverySpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       port = port,
       datacenter = "local",
       protocol = sch,
-      isPrivateNetwork = true,
       intent = int,
       templates = tmpls).right
 
@@ -38,8 +37,8 @@ class DiscoverySpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   it should s"prove '${t3.get}' can be turned into a Location" in {
-    make(t3, Supervision) should equal (
-      expct(7390, Supervision, Zmtp(TCP), allTemplates.last :: Nil))
+    make(t3, Mirroring) should equal (
+      expct(7390, Mirroring, Zmtp(TCP), allTemplates.last :: Nil))
   }
 
   // this will fail because `toLocation` delibritly does not specifiy @port

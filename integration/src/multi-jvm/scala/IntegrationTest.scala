@@ -43,8 +43,10 @@ object MultiNodeIntegrationConfig extends MultiNodeConfig {
   // metrics are flowing around and we're monitoring for
   // a period of time
   val PhaseOne     = "phase-one"
-  // time to tear some shit down and track errors!
+  // time to tear some targets down and track errors!
   val PhaseTwo     = "phase-two"
+  // time to tear a flask
+  val PhaseThree   = "phase-three"
   // test is over
   val Finished     = "finished"
 
@@ -78,20 +80,32 @@ class MultiNodeIntegrationSpecMultiJvmNode6 extends MultiNodeIntegration
 
 import akka.remote.testconductor.{RoleName,Controller}
 import concurrent.{Future,ExecutionContext}
-import chemist.{Server,FlaskID,PlatformEvent,TargetLifecycle,RepoEvent}
+import chemist.{Server,FlaskID,PlatformEvent}
 import java.util.concurrent.{CountDownLatch,TimeUnit}
 import concurrent.duration._
+import journal.Logger
 
+/**
+ * this is one big fat integration test and is designed to simulate how the
+ * system actually runs in real life (its a close approxomation, but not entirely
+ * the same due to environmentals). the scenario under test is this:
+ * 1. startup all jvms and initilize the world (targets and flask)
+ * 2. boot chemist and instruct it to monitor the things
+ * 3. after roughly 5 seconds of monitoring the /now resources, target03 will die
+ * 4. we check the distributions and things to ensure they match our expectations.
+*/
 class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
   with STMultiNodeSpec
   with ImplicitSender {
   import MultiNodeIntegrationConfig._
-  import PlatformEvent._, TargetLifecycle._
+  import PlatformEvent._
 
-  def printObnoxiously[A](a: => A): Unit = {
-    println(">>>>>>>>>>>>>>>>>>>>>>>>>>>")
+  val logger = Logger[MultiNodeIntegration]
+
+  def printObnoxiously[A](id: String)(a: => A): Unit = {
+    println(s">>>> start $id >>>>>>>>>>>>>>>>>>>>>>>>>>>")
     println(a)
-    println("<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+    println(s"<<<< end $id <<<<<<<<<<<<<<<<<<<<<<<<<<<")
   }
 
   def fetch(path: String) = {
@@ -115,17 +129,24 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
       enterBarrier(PhaseTwo)
     }
 
-  def deployFlask(role: RoleName, opts: flask.Options) =
+  def deployFlask(role: RoleName, opts: flask.Options, failAfter: Option[Duration] = None) =
     runOn(role){
-      IntegrationFlask.start(opts)
+      val latch = new CountDownLatch(1)
+      val shutdown = IntegrationFlask.start(opts)
       enterBarrier(Deployed, PhaseOne, PhaseTwo)
+      failAfter.foreach { d =>
+        latch.await(d.toMillis, TimeUnit.MILLISECONDS)
+        logger.error(s"shutting down $role")
+        shutdown()
+        logger.error(s"synthesizing TerminatedFlask message")
+        ichemist.synthesize(TerminatedFlask(FlaskID(opts.name.get)))
+        Thread.sleep(10.seconds.toMillis)
+      }
+      // enterBarrier(PhaseThree)
     }
 
   def initialParticipants =
     roles.size
-
-  def countForState(s: TargetLifecycle.TargetState): Int =
-    ichemist.states.map(_.apply(s).keys.size).exe
 
   it should "wait for all nodes to enter startup barrier" in {
     enterBarrier(Startup)
@@ -133,14 +154,15 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
 
   it should "setup the world" in {
     runOn(chemist01){
-      enterBarrier(Deployed)
       // just fork the shit out of it so it doesnt block our test.
       Future(Server.unsafeStart(new Server(ichemist, platform))
         )(ExecutionContext.Implicits.global)
 
-      Thread.sleep(5.seconds.toMillis) // give the system time to do its thing
+      // give the system time to do its thing
+      // specifically give it time to the first discovery after booting.
+      Thread.sleep(12.seconds.toMillis)
 
-      enterBarrier(PhaseOne)
+      enterBarrier(Deployed, PhaseOne)
     }
 
     deployTarget(target01, 4001)
@@ -151,7 +173,7 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
 
     deployFlask(flask01, IntegrationFixtures.flask1Options)
 
-    deployFlask(flask02, IntegrationFixtures.flask2Options)
+    deployFlask(flask02, IntegrationFixtures.flask2Options, Option(10.seconds))
   }
 
   it should "list the appropriate flask ids" in {
@@ -170,58 +192,25 @@ class MultiNodeIntegration extends MultiNodeSpec(MultiNodeIntegrationConfig)
 
   it should "show the correct distribution" in {
     runOn(chemist01){
-      Thread.sleep(2.seconds.toMillis) // give chemist time to get the messages from all flasks
-      // just adding this to make sure that in future, the json does not get fubared.
-      // fetch("/distribution") should equal ("""[{"targets":[{"urls":["http://localhost:4001/stream/now"],"cluster":"target01"},{"urls":["http://localhost:4003/stream/now"],"cluster":"target03"},{"urls":["http://localhost:4002/stream/now"],"cluster":"target02"}],"shard":"flask1"}]""")
-      printObnoxiously(fetch("/distribution"))
-      printObnoxiously(fetch("/lifecycle/states"))
-      printObnoxiously(fetch("/shards/flask1/sources"))
-      printObnoxiously(fetch("/shards/flask1/distribution"))
-
-      countForState(TargetState.Monitored) should equal (7)
-
-      countForState(TargetState.Assigned) should equal (0)
-
-      countForState(TargetState.DoubleMonitored) should equal (0)
+      printObnoxiously("/distribution")(fetch("/distribution"))
+      printObnoxiously("/shards")(fetch("/shards"))
+      printObnoxiously("/shards/flask1/sources")(fetch("/shards/flask1/sources"))
     }
   }
 
-  it should "have events in the history" in {
-    runOn(chemist01){
-      val history = ichemist.platformHistory.exe
-      history.size should be > 0
-    }
-  }
-
-  it should "have recieved the problem event via the telemetry socket" in {
-    import org.scalatest.OptionValues._
+  it should "crash flask02" in {
     runOn(chemist01){
       enterBarrier(PhaseTwo)
+      true should equal (true)
 
-      val errors = ichemist.errors.exe
+      printObnoxiously("/platform/history")(fetch("/platform/history"))
 
-      errors.size should be > 0
-
-      errors.collectFirst {
-        case Error(Names(_, _, u)) => u
-      } should be (Some(IntegrationFixtures.target03.uri))
+      // enterBarrier(PhaseThree)
     }
   }
-
-  // it should "be monitoring 1 but not 2" in {
-  //   val U2 = IntegrationFixtures.target02.uri
-  //   val U3 = IntegrationFixtures.target03.uri
-
-  //   val state = platform.config.statefulRepository.stateMaps.get
-  //   log.debug("repository states: " + state)
-  //   log.debug("unmonitored: " + state.lookup(TargetState.Problematic))
-  //   state.lookup(TargetState.Problematic).get.lookup(U3).map(_.msg.target.uri) should be (Some(U3))
-  //   state.lookup(TargetState.Monitored).get.lookup(U2).map(_.msg.target.uri) should be (Some(U2))
-  // }
 
   /// must be the last thing
   it should "complete the testing" in {
     enterBarrier(Finished)
   }
-
 }

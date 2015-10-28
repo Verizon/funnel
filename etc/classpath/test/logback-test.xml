@@ -1,4 +1,7 @@
-<configuration>
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="false" debug="false">
+  <!-- gets rid of all the bullshit logback registration output -->
+  <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
 
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
@@ -6,7 +9,30 @@
     </encoder>
   </appender>
 
-  <logger name="funnel" level="DEBUG" />
+  <!-- chemist -->
+  <logger name="funnel.chemist" level="OFF" />
+  <logger name="funnel.chemist.sinks" level="OFF" />
+  <logger name="funnel.chemist.Server" level="OFF" />
+  <logger name="funnel.chemist.Pipeline" level="OFF" />
+  <logger name="funnel.chemist.Discovery" level="OFF" />
+  <logger name="funnel.chemist.Sharding" level="OFF" />
+  <logger name="funnel.chemist.Cacheable" level="OFF" />
+
+  <!-- integration tests -->
+  <logger name="funnel.integration" level="OFF" />
+
+  <!-- zeromq -->
+  <logger name="funnel.zeromq" level="OFF" />
+
+  <!-- agent -->
+  <logger name="funnel.agent" level="OFF" />
+  <logger name="funnel.agent.http" level="OFF" />
+  <logger name="funnel.agent.jmx" level="OFF" />
+  <logger name="funnel.agent.statsd" level="OFF" />
+  <logger name="funnel.agent.zeromq" level="OFF" />
+  <logger name="funnel.agent.mesos" level="OFF" />
+
+  <!-- other -->
   <logger name="com.ning.http.client" level="OFF" />
 
   <root level="OFF">

@@ -30,51 +30,19 @@ object Server {
   // there seems to be a bug in Task that makes doing what we previously had here
   // not possible. The server gets into a hang/deadlock situation.
   def unsafeStart[U <: Platform](server: Server[U]): Unit = {
-    import metrics.RepoEventsStream
     import server.{platform,chemist}
     val disco   = platform.config.discovery
-    val repo    = platform.config.repository
     val sharder = platform.config.sharder
 
-    RepoEventsStream.green
-
-    val c: Process[Task, RepoCommand] = repo.repoCommands
-    val l: Process[Task, Unit] = (c to Process.constant(Sharding.handleRepoCommand(repo, sharder, platform.config.remoteFlask)(_)))
-    val a: Process[Task, Throwable \/ Unit] = l.attempt { err =>
-      log.error(s"Error processing repo events: $err")
-      Process.eval_(Task.delay(RepoEventsStream.yellow))
-    }
-    a.stripW.run.runAsync {
-      case -\/(err) =>
-        log.error(s"Error starting processing of Platform events: $err")
-        err.printStackTrace
-        RepoEventsStream.red
-
-      case \/-(t)   => log.info(s"result of platform processing $t")
-    }
-
-    chemist.bootstrap(platform).runAsync {
-      case -\/(err) =>
-        log.error(s"Unable to bootstrap the chemist service. Failed with error: $err")
-        err.printStackTrace
-
-      case \/-(_)   => log.info("Sucsessfully bootstrap chemist at startup.")
-    }
+    // do the ASCII art
+    log.info(Banner.text)
 
     chemist.init(platform).runAsync {
       case -\/(err) =>
-        log.error(s"Unable to initilize the chemist service. Failed with error: $err")
+        log.error(s"FATAL: Unable to initilize the chemist service. Failed with error: $err")
         err.printStackTrace
 
-      case \/-(_)   => log.info("Sucsessfully initilized chemist at startup.")
-    }
-
-    Housekeeping.periodic(5.minutes)(platform.config.maxInvestigatingRetries)(disco, repo).run.runAsync {
-      case -\/(err) =>
-        log.error(s"Terminal failure when running the periodic housekeeping tasks. Error was: $err")
-        err.printStackTrace
-
-      case \/-(_)   => log.warn("Completed the periodic housekeeping tasks. The stream may have terminated early which is not desirable.")
+      case \/-(_) => log.error("FATAL: Sucsessfully initilized chemist at startup.")
     }
 
     val p = this.getClass.getResource("/oncue/www/")
@@ -114,21 +82,11 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
     case GET(Path("/status")) =>
       GetStatus.time(Ok ~> JsonResponse(Chemist.version))
 
-    case GET(Path("/errors")) =>
-      GetErrors.time(json(chemist.errors.map(_.toList)))
-
     case GET(Path("/distribution")) =>
       GetDistribution.time(json(chemist.distribution.map(_.toList)))
 
     case GET(Path("/unmonitorable")) =>
       GetUnmonitorable.time(json(chemist.listUnmonitorableTargets))
-
-    case GET(Path("/lifecycle/history")) =>
-      GetLifecycleHistory.time(json(chemist.repoHistory.map(_.toList)))
-
-    case GET(Path("/lifecycle/states")) =>
-      GetLifecycleStates.time(json(chemist.states.map(
-        _.toList.map { case (k,v) => k -> v.toList })))
 
     case GET(Path("/platform/history")) =>
       GetPlatformHistory.time(json(chemist.platformHistory.map(_.toList)))
@@ -136,21 +94,11 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
     case POST(Path("/distribute")) =>
       PostDistribute.time(NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)"))
 
-    case POST(Path("/bootstrap")) =>
-      PostBootstrap.time(json(chemist.bootstrap))
-
     case GET(Path(Seg("shards" :: Nil))) =>
       GetShards.time(json(chemist.shards))
 
     case GET(Path(Seg("shards" :: id :: Nil))) =>
       GetShardById.time(json(chemist.shard(FlaskID(id))))
-
-    case GET(Path(Seg("shards" :: id :: "distribution" :: Nil))) =>
-      GetShardDistribution.time(json {
-        chemist.distribution.flatMapK { map =>
-          Task.delay(map.get(FlaskID(id)).toList.flatMap(identity))
-        }
-      })
 
     case GET(Path(Seg("shards" :: id :: "sources" :: Nil))) => GetShardSources.time {
       import dispatch._, Defaults._
@@ -168,12 +116,5 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
         })
       }
     }
-
-    case POST(Path(Seg("shards" :: id :: "exclude" :: Nil))) =>
-      PostShardExclude.time(json(chemist.exclude(FlaskID(id))))
-
-    case POST(Path(Seg("shards" :: id :: "include" :: Nil))) =>
-      PostShardInclude.time(json(chemist.include(FlaskID(id))))
-
   }
 }

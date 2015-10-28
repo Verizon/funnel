@@ -22,7 +22,6 @@ import com.amazonaws.services.cloudformation.AmazonCloudFormation
  * used by Chemist in AWS.
  */
 case class QueueConfig(
-  queueName: String,
   topicName: String
 )
 
@@ -47,52 +46,48 @@ case class AwsConfig(
   asg: AmazonAutoScaling,
   cfn: AmazonCloudFormation,
   commandTimeout: Duration,
-  includeVpcTargets: Boolean,
   sharder: Sharder,
   classifier: Classifier[AwsInstance],
-  maxInvestigatingRetries: Int
+  state: StateCache,
+  rediscoveryInterval: Duration
 ) extends PlatformConfig {
 
-  val discovery: AwsDiscovery = new AwsDiscovery(ec2, asg, classifier, templates)
-
-  val repository: Repository = new StatefulRepository
+  val discovery: AwsDiscovery =
+    new AwsDiscovery(ec2, asg, classifier, templates)
 
   val http: Http = Http.configure(
     _.setAllowPoolingConnection(true)
      .setConnectionTimeoutInMs(commandTimeout.toMillis.toInt))
 
-  val signal = signalOf(true)(Strategy.Executor(Chemist.serverPool))
-
-  val remoteFlask = new HttpFlask(http, repository, signal)
+  val remoteFlask = new HttpFlask(http)
 }
 
 object AwsConfig {
   def readConfig(cfg: Config): AwsConfig = {
     val topic     = cfg.require[String]("chemist.sns-topic-name")
-    val queue     = cfg.require[String]("chemist.sqs-queue-name")
     val templates = cfg.require[List[String]]("chemist.target-resource-templates")
     val aws       = cfg.subconfig("aws")
     val network   = cfg.subconfig("chemist.network")
     val timeout   = cfg.require[Duration]("chemist.command-timeout")
-    val usevpc    = cfg.lookup[Boolean]("chemist.include-vpc-targets").getOrElse(false)
     val sharding  = cfg.lookup[String]("chemist.sharding-strategy")
+    val cachetype = cfg.lookup[String]("chemist.state-cache")
     val classifiy = cfg.lookup[String]("chemist.classification-stratagy")
-    val retries   = cfg.require[Int]("chemist.max-investigating-retries")
+    val interval  = cfg.require[Duration]("chemist.rediscovery-interval")
     AwsConfig(
-      templates 		          = templates.map(LocationTemplate),
-      network                 = readNetwork(network),
-      queue                   = QueueConfig(topic, queue),
-      sns                     = readSNS(aws),
-      sqs                     = readSQS(aws),
-      ec2                     = readEC2(aws),
-      asg                     = readASG(aws),
-      cfn                     = readCFN(aws),
-      sharder                 = readSharder(sharding),
-      classifier              = readClassifier(classifiy),
-      commandTimeout          = timeout,
-      includeVpcTargets       = usevpc,
-      machine                 = readMachineConfig(cfg),
-      maxInvestigatingRetries = retries
+      templates 		      = templates.map(LocationTemplate),
+      network             = readNetwork(network),
+      queue               = QueueConfig(topic),
+      sns                 = readSNS(aws),
+      sqs                 = readSQS(aws),
+      ec2                 = readEC2(aws),
+      asg                 = readASG(aws),
+      cfn                 = readCFN(aws),
+      sharder             = readSharder(sharding),
+      classifier          = readClassifier(classifiy),
+      commandTimeout      = timeout,
+      machine             = readMachineConfig(cfg),
+      rediscoveryInterval = interval,
+      state               = readStateCache(cachetype)
     )
   }
 
@@ -113,6 +108,12 @@ object AwsConfig {
         templates = Nil
       )
     )
+
+  private def readStateCache(c: Option[String]): StateCache =
+    c match {
+      case Some("memory") => MemoryStateCache
+      case _              => MemoryStateCache
+    }
 
   private def readSharder(c: Option[String]): Sharder =
     c match {

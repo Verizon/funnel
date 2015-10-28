@@ -19,7 +19,7 @@ object LocationIntent {
   def fromString(s: String): Option[LocationIntent] =
     all.find(_.toString.toLowerCase == s.toLowerCase)
 
-  lazy val all = List(Mirroring, Supervision)
+  lazy val all = List(Mirroring, Ignored)
 
   /**
    * locations destined for mirroring, should be
@@ -27,14 +27,6 @@ object LocationIntent {
    * The protocol should be determined by the templates.
    */
   case object Mirroring extends LocationIntent
-
-  /**
-   * location destined for supervision are only for use
-   * between flask and chemist components. Supervision
-   * locations provide a channel for the administrative
-   * state and control messages chemist needs to operate.
-   */
-  case object Supervision extends LocationIntent
 
   /**
    * locations that are meant to be ignored are few and far

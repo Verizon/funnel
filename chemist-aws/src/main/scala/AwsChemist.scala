@@ -2,27 +2,21 @@ package funnel
 package chemist
 package aws
 
-import knobs.{loadImmutable,Required,FileResource,ClassPathResource}
-import java.io.File
 import journal.Logger
-import scalaz.{\/,-\/,\/-,Kleisli}
 import scalaz.syntax.kleisli._
-import scalaz.concurrent.Task
-import scalaz.std.vector._
-import scalaz.syntax.traverse._
-import scalaz.syntax.id._
-import scalaz.stream.async.signalOf
-import scalaz.stream.async.mutable.Signal
-import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
-import funnel.aws._
+import scalaz.concurrent.{Task,Strategy}
+import scalaz.stream.async.boundedQueue
+import funnel.aws.{SNS,CFN}
 
 class AwsChemist[A <: Aws] extends Chemist[A]{
   private val log = Logger[AwsChemist[_]]
 
   /**
-   * used to stop our sockets listening to telemetry on all the flasks
+   * selection of 2000 is fairly arbitrary, but seems like a reasonable number
+   * as its unlikley that a single flask would ever be monitoring 2k hosts,
+   * or that 2k hosts would be launched in such a short order.
    */
-  private val signal: Signal[Boolean] = signalOf(true)
+  private val queue = boundedQueue[PlatformEvent](2048)(Chemist.defaultExecutor)
 
   /**
    * Initilize the chemist serivce by trying to create the various AWS resources
@@ -66,8 +60,19 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
 
       // now the queues are setup with the right permissions,
       // start the lifecycle listener
-      _ <- Lifecycle.run(cfg.queue.topicName, signalOf(true)
-            )(cfg.repository, cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery).liftKleisli
+      _ <- Pipeline.task(
+             Lifecycle.stream(cfg.queue.topicName
+               )(cfg.sqs, cfg.asg, cfg.ec2, cfg.discovery
+               ).map(Pipeline.contextualise),
+             cfg.rediscoveryInterval
+           )(cfg.discovery,
+             queue,
+             cfg.sharder,
+             cfg.http,
+             cfg.state,
+             sinks.unsafeNetworkIO(cfg.remoteFlask, queue)
+            ).liftKleisli
+
       _  = log.debug("lifecycle process started")
 
       _ <- Task.delay(log.info(">>>>>>>>>>>> initilization complete <<<<<<<<<<<<")).liftKleisli

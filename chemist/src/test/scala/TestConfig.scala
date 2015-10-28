@@ -3,20 +3,19 @@ package chemist
 
 import scalaz.stream.async
 import scalaz.stream.async.mutable.Signal
+import scalaz.concurrent.Task
 
 class TestConfig extends PlatformConfig {
   val templates: List[LocationTemplate] =
     List(LocationTemplate("http://@host:@port/stream/previous"))
   val network = NetworkConfig("127.0.0.1",64523)
   val discovery: Discovery = new StaticDiscovery(Map(), Map())
-  val repository: Repository = new StatefulRepository
   val remoteFlask: RemoteFlask = LoggingRemote
   def http: dispatch.Http = ???
   val sharder: Sharder = RandomSharding
   val maxInvestigatingRetries = 6
+  val state: StateCache = MemoryStateCache
 
-
-  import scalaz.concurrent.Task
   class StaticDiscovery(targets: Map[TargetID, Set[Target]], flasks: Map[FlaskID, Flask]) extends Discovery {
     def listTargets: Task[Seq[(TargetID, Set[Target])]] = Task.delay(targets.toSeq)
     def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = Task.now(Seq.empty)

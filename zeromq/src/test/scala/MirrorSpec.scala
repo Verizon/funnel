@@ -15,8 +15,6 @@ class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   lazy val S  = async.signalOf[Boolean](true)(Strategy.Executor(Monitoring.serverPool))
   lazy val W  = 20.seconds
 
-  lazy val Q: Queue[Telemetry] = async.unboundedQueue(Strategy.Executor(Monitoring.serverPool))
-
   lazy val U1 = new URI("zeromq+tcp://127.0.0.1:4578/previous")
   lazy val E1 = Endpoint.unsafeApply(publish &&& bind, U1)
   lazy val M1 = Monitoring.instance
@@ -39,7 +37,7 @@ class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     m.keys.compareAndSet(identity).run.get.filter(_.startsWith("previous")).size
 
   private def mirrorFrom(uri: URI): Unit =
-    MI.mirrorAll(Mirror.from(S, Q)
+    MI.mirrorAll(Mirror.from(S)
       )(uri, Map("uri" -> uri.toString)
       ).run.runAsync(_.fold(e => Ø.log.error(
         s"Error mirroring $uri: ${e.getMessage}"), identity))

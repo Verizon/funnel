@@ -44,8 +44,8 @@ class InstanceSpec extends FlatSpec with Matchers {
         "revision" -> "1.2.3",
         "aws:cloudformation:stack-name" -> "imdev-foo-1.2.3-Fsf42fx")
     ).targets should equal (Set(
-      Target("foo-1.2.3-Fsf42fx",URI.create("http://127.0.0.1:5775/stream/previous"),true),
-      Target("foo-1.2.3-Fsf42fx",URI.create("http://127.0.0.1:5775/stream/now?kind=traffic"),true)))
+      Target("foo-1.2.3-Fsf42fx",URI.create("http://127.0.0.1:5775/stream/previous")),
+      Target("foo-1.2.3-Fsf42fx",URI.create("http://127.0.0.1:5775/stream/now?kind=traffic"))))
   }
 
 }

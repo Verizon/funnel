@@ -16,7 +16,6 @@ lazy val funnel = project.in(file(".")).aggregate(
   elastic,
   nginx,
   integration,
-  telemetry,
   zeromq,
   agent,
   `zeromq-java`,
@@ -33,7 +32,7 @@ lazy val funnel = project.in(file(".")).aggregate(
 
 lazy val agent = project.dependsOn(zeromq % "test->test;compile->compile", http, nginx).configs(MultiJvm)
 
-lazy val chemist = project.dependsOn(core, http, telemetry)
+lazy val chemist = project.dependsOn(core, http, zeromq)
 
 lazy val `chemist-aws` = project.dependsOn(chemist % "test->test;compile->compile")
 
@@ -45,15 +44,13 @@ lazy val docs = project.dependsOn(core)
 
 lazy val elastic = project.dependsOn(core, http)
 
-lazy val flask = project.dependsOn(elastic, telemetry, zeromq % "test->test;compile->compile")
+lazy val flask = project.dependsOn(elastic, zeromq % "test->test;compile->compile")
 
 lazy val http = project.dependsOn(core)
 
-lazy val integration = project.dependsOn(flask, `chemist-static` % "test->test;compile->compile", chemist % "test->test;compile->compile").configs(MultiJvm)
+lazy val integration = project.dependsOn(flask, chemist % "test->test;compile->compile").configs(MultiJvm)
 
 lazy val nginx = project.dependsOn(core)
-
-lazy val telemetry = project.dependsOn(zeromq).configs(MultiJvm)
 
 lazy val zeromq = project.dependsOn(core, http).configs(MultiJvm) // http? this is for http.JSON._, which should be fixed probably
 

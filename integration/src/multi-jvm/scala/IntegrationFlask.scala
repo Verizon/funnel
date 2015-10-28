@@ -9,10 +9,10 @@ object IntegrationFlask {
 
   val log = Logger[IntegrationFlask.type]
 
-  def start(options: FlaskOptions): Unit = {
+  def start(options: FlaskOptions): () => Unit = {
     val I = new Instruments(1.minute)
     val app = new Flask(options, I)
-    // TIM: this is an ugly hack from stews testing. Must remove.
     app.unsafeRun()
+    () => app.shutdown()
   }
 }

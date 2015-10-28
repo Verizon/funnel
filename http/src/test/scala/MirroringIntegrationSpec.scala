@@ -17,7 +17,7 @@ class MirroringIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfte
   }
 
   private def mirrorFrom(port: Int): Unit =
-    MI.mirrorAll(SSE.readEvents(_, Q))(
+    MI.mirrorAll(SSE.readEvents(_))(
       new URI(s"http://localhost:$port/stream/previous"),
       Map("port" -> port.toString)
     ).run.runAsync(_ => ())
@@ -34,8 +34,6 @@ class MirroringIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfte
 
   lazy val M3 = Monitoring.instance
   lazy val I3 = new Instruments(W, M3)
-
-  val Q: Queue[Telemetry] = async.unboundedQueue(Strategy.Executor(Monitoring.serverPool))
 
   val MS1 = MonitoringServer.start(M1, 3001)
   val MS2 = MonitoringServer.start(M2, 3002)

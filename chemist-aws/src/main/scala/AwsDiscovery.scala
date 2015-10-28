@@ -90,7 +90,7 @@ class AwsDiscovery(
     ListFlasks.timeTask {
       for {
         a <- instances(isActiveFlask)
-        b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
+        b  = a.map(i => Flask(FlaskID(i.id), i.location))
       } yield b
     }
 
@@ -103,7 +103,7 @@ class AwsDiscovery(
     ListFlasks.timeTask {
       for {
         a <- instances(isFlask)
-        b  = a.flatMap(i => i.supervision.map(Flask(FlaskID(i.id), i.location, _)))
+        b  = a.map(i => Flask(FlaskID(i.id), i.location))
       } yield b
     }
 
@@ -112,23 +112,19 @@ class AwsDiscovery(
    * of the useful AWS metadata encoded into an internal representation.
    */
   def lookupFlask(id: FlaskID): Task[Flask] =
-    for {
-      a <- lookupOne(id.value)
-      b <- a.supervision.map(Task.now).getOrElse(Task.fail(FlaskMissingSupervision(a)))
-    } yield Flask(FlaskID(a.id), a.location, b)
+    lookupOne(id.value).map(a => Flask(FlaskID(a.id), a.location))
 
   /**
    * Lookup the `AwsInstance` for a given `InstanceID`; `AwsInstance` returned contains all
    * of the useful AWS metadata encoded into an internal representation.
    */
-  def lookupTargets(id: TargetID): Task[Set[Target]] = {
+  def lookupTargets(id: TargetID): Task[Set[Target]] =
     lookupMany(Seq(id.value)).flatMap {
       _.filter(_.id == id.value).headOption match {
         case None    => Task.fail(InstanceNotFoundException(id.value))
         case Some(i) => Task.now(i.targets)
       }
     }
-  }
 
   /**
    * Lookup the `AwsInstance` for a given `InstanceID`; `AwsInstance` returned contains all
@@ -308,19 +304,13 @@ class AwsDiscovery(
     val mirrorTemplate: Option[String] =
       machineTags.get(AwsTagKeys.mirrorTemplate) orElse defaultInstanceTemplate
 
-    val supervisionTemplate: Option[String] =
-      machineTags.get(AwsTagKeys.supervisionTemplate)
-
     for {
       a <- toLocation(dns, datacenter, mirrorTemplate, Mirroring)
       // _  = log.debug(s"discovered mirrioring template '$a'")
-
-      b  = toLocation(dns, datacenter, supervisionTemplate, Supervision)
-      _  = b.foreach(t => log.debug(s"discovered telemetry template '$t'"))
     } yield AwsInstance(
       id = in.getInstanceId,
       tags = machineTags,
-      locations = NonEmptyList(a, b.toList:_*)
+      locations = NonEmptyList(a)
     )
   }
 }

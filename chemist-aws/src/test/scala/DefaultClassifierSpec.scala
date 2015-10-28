@@ -13,7 +13,6 @@ class DefaultClassifierSpec extends FlatSpec with Matchers {
     AwsTagKeys.name -> "flask",
     AwsTagKeys.qualifier -> "Qdf34",
     AwsTagKeys.version -> "1.1.1",
-    AwsTagKeys.supervisionTemplate -> "zeromq+test://@host:7390",
     AwsTagKeys.mirrorTemplate -> "http://@host:5775"
   ), null)
 
@@ -21,7 +20,6 @@ class DefaultClassifierSpec extends FlatSpec with Matchers {
     AwsTagKeys.name -> "accounts",
     AwsTagKeys.qualifier -> "xxfSDdf",
     AwsTagKeys.version -> "1.2.1",
-    AwsTagKeys.supervisionTemplate -> "zeromq+test://@host:7390",
     AwsTagKeys.mirrorTemplate -> "http://@host:5775"
   ), null)
 

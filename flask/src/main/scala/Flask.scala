@@ -19,7 +19,6 @@ import zeromq._
 import sockets._
 import scalaz.stream._
 import scalaz.\/
-import telemetry.Telemetry._
 
 /**
  *
@@ -39,8 +38,9 @@ class Flask(options: Options, val I: Instruments) {
 
   lazy val signal: Signal[Boolean] = scalaz.stream.async.signalOf(true)(Strategy.Executor(Monitoring.serverPool))
 
-  private def shutdown(server: MonitoringServer): Unit = {
-    server.stop()
+  private[funnel] def shutdown(): Unit = {
+    S.stop()
+    SelfServing.stop()
     signal.set(false).flatMap(_ => signal.close).run
   }
 
@@ -50,10 +50,10 @@ class Flask(options: Options, val I: Instruments) {
     log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
   }, identity _))
 
-  private def httpOrZmtp(alive: Signal[Boolean], Q: Queue[Telemetry])(uri: URI): Process[Task,Datapoint[Any]] =
+  private def httpOrZmtp(alive: Signal[Boolean])(uri: URI): Process[Task,Datapoint[Any]] =
     Option(uri.getScheme).map(_.toLowerCase) match {
-      case Some("http")       => SSE.readEvents(uri, Q)
-      case Some("zeromq+tcp") => Mirror.from(alive, Q)(uri)
+      case Some("http")       => SSE.readEvents(uri)
+      case Some("zeromq+tcp") => Mirror.from(alive)(uri)
       case unknown            => Process.fail(
         new RuntimeException(s"Unknown URI scheme submitted. scheme = $unknown"))
     }
@@ -73,29 +73,18 @@ class Flask(options: Options, val I: Instruments) {
       JVM.instrument(ISelfie)
     }
 
-    val Q = async.unboundedQueue[Telemetry](Strategy.Executor(funnel.Monitoring.serverPool))
-
-    log.info("Booting the key mirroring process...")
-    runAsync(
-      telemetryPublishSocket(
-        URI.create(s"zeromq+tcp://0.0.0.0:${options.telemetryPort}"), signal,
-        Q.dequeue)
-    )
-
     def processDatapoints(alive: Signal[Boolean])(uri: URI): Process[Task, Datapoint[Any]] =
-      httpOrZmtp(alive, Q)(uri) observe countDatapoints
+      httpOrZmtp(alive)(uri) observe countDatapoints
 
     def retries(names: Names): Event = {
       val retries = Events.takeEvery(options.retriesDuration, options.maxRetries)
 
-      retries andThen (_ ++ Process.eval[Task, Unit] {
-                         Q.enqueueAll(Seq(Error(names), Problem(names.theirs, "there wasn't an error")))
-                           .flatMap(_ => Task.delay(log.error("stopped mirroring: " + names.toString)))
-                       })
+      retries andThen (_ ++ Process.eval[Task, Unit]{
+        Task.delay(log.error("stopped mirroring: " + names.toString))
+      })
     }
 
-    import java.net.InetAddress
-    val flaskHost = InetAddress.getLocalHost.getHostName
+    val flaskHost = java.net.InetAddress.getLocalHost.getHostName
     val flaskName = options.name.getOrElse(flaskHost)
     val flaskCluster = options.cluster.getOrElse(s"flask-${oncue.svc.funnel.BuildInfo.version}")
 
@@ -105,7 +94,7 @@ class Flask(options: Options, val I: Instruments) {
     }
 
     log.info("Booting the mirroring process...")
-    runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), Q, flaskName, retries))
+    runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), flaskName, retries))
 
     log.info("Mirroring my own monitoring server instance...")
     List(s"http://$flaskHost:${options.selfiePort}/stream/previous",

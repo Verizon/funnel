@@ -20,19 +20,7 @@ object IntegrationFixtures {
       intent = LocationIntent.Mirroring,
       templates = defaultTemplates)
 
-  val telemetryLocalhost: Location =
-    Location(
-      host = "127.0.0.1",
-      port = 7390,
-      datacenter = "local",
-      protocol = NetworkScheme.Zmtp(TCP),
-      intent = LocationIntent.Supervision,
-      templates = defaultTemplates)
-
-  val flask1 = Flask(
-    FlaskID("flask1"),
-    localhost,
-    telemetryLocalhost)
+  val flask1 = Flask(FlaskID("flask1"), localhost)
 
   val flask1Options = Options(
     name = Some(flask1.id.value),
@@ -41,13 +29,9 @@ object IntegrationFixtures {
     maxRetries = 0,
     funnelPort = flask1.location.port,
     selfiePort = 7557,
-    telemetryPort = flask1.telemetry.port,
     environment = "test")
 
-  val flask2 = Flask(
-    FlaskID("flask2"),
-    localhost.copy(port = 5776),
-    telemetryLocalhost.copy(port = 7391))
+  val flask2 = Flask(FlaskID("flask2"), localhost.copy(port = 5776))
 
   val flask2Options = Options(
     name = Some(flask2.id.value),
@@ -56,7 +40,6 @@ object IntegrationFixtures {
     maxRetries = 0,
     funnelPort = flask2.location.port,
     selfiePort = 7558,
-    telemetryPort = flask2.telemetry.port,
     environment = "test")
 
   val flaskOptionsWithES = flask1Options.copy(
@@ -81,18 +64,14 @@ object IntegrationFixtures {
 
   val target01 = Target(
     cluster = "target01",
-    uri = new URI("http://localhost:4001/stream/now"),
-    isPrivateNetwork = true
+    uri = new URI("http://localhost:4001/stream/now")
   )
   val target02 = Target(
     cluster = "target02",
-    uri = new URI("http://localhost:4002/stream/now"),
-    isPrivateNetwork = true
+    uri = new URI("http://localhost:4002/stream/now")
   )
   val target03 = Target(
     cluster = "target03",
-    uri = new URI("http://localhost:4003/stream/now"),
-    isPrivateNetwork = true
+    uri = new URI("http://localhost:4003/stream/now")
   )
-
 }

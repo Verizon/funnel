@@ -44,7 +44,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       [
         {
           "cluster": "datapoints-1.0-us-east",
-          "urls": [
+          "uris": [
             "${Settings.tcp}"
           ]
         }
@@ -69,7 +69,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       val alive: Process[Task, Boolean] = Process.emitAll(k)
 
       val is = new Instruments(1.minute)
-      val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5775, 7557, None, 7390, "local")
+      val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5775, 7557, None, "local")
 
       val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
       val app = new Flask(options, is)
@@ -101,7 +101,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     [
       {
         "cluster": "datapoints-1.0-us-east",
-        "urls": [
+        "uris": [
           ${(1024 until 1024 + n).map(p => "\"http://localhost:" + p + "/stream/now\"").mkString(",\n")}
         ]
       }
@@ -109,7 +109,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     """
 
     val is = new Instruments(1.minute)
-    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5776, 7558, None, 7391, "local")
+    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5776, 7558, None, "local")
     val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
     val app = new Flask(options, is)
 
@@ -138,7 +138,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     [
       {
         "cluster": "datapoints-1.0-us-east",
-        "urls": [
+        "uris": [
           ${(1024 until 1025).map(p => "\"http://localhost:" + p + "/stream/previous\"").mkString(",\n")}
         ]
       }
@@ -161,7 +161,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       time.sleep((6 * 30 + 10).seconds)(S, P)			// Increment 1,000 times, die, and timeout
 
     val is = new Instruments(1.minute)
-    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5777, 7559, None, 7392, "local")
+    val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5777, 7559, None, "local")
     val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
     val app = new Flask(options, is)
 

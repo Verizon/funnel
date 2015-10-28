@@ -18,7 +18,6 @@ class SubscriptionSpec extends FlatSpec
 
   lazy val S  = async.signalOf[Boolean](true)(Strategy.Executor(Monitoring.serverPool))
   lazy val W  = 30.seconds
-  lazy val Q: Queue[Telemetry] = async.unboundedQueue(Strategy.Executor(Monitoring.serverPool))
 
   lazy val U1 = new URI("tcp://127.0.0.1:6478/now/numeric")
   lazy val E1 = Endpoint.unsafeApply(publish &&& bind, U1)
@@ -78,7 +77,7 @@ class SubscriptionSpec extends FlatSpec
   }
 
   private def mirror(uri: URI, to: Monitoring): Unit =
-    to.mirrorAll(Mirror.from(S, Q)
+    to.mirrorAll(Mirror.from(S)
     )(uri, Map("uri" -> uri.toString)
     ).run.runAsync(_.fold(e => Ø.log.error(
                             s"Error mirroring $uri: ${e.getMessage}"), identity))

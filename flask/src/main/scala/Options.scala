@@ -16,7 +16,6 @@ case class Options(
   funnelPort: Int = 5775,
   selfiePort: Int = 7557,
   metricTTL: Option[Duration] = None,
-  telemetryPort: Int = 7390,
   environment: String
 )
 
@@ -39,7 +38,6 @@ object Options {
     val httpPort         = cfg.lookup[Int]("flask.network.http-port").getOrElse(5775)
     val selfiePort       = cfg.lookup[Int]("flask.network.selfie-port").getOrElse(7557)
     val metricTTL        = cfg.lookup[Duration]("flask.metric-ttl")
-    val telemetryPort    = cfg.require[Int]("flask.network.telemetry-port")
     val collectLocal     = cfg.lookup[Boolean]("flask.collect-local-metrics")
     val localFrequency   = cfg.lookup[Int]("flask.local-metric-frequency")
 
@@ -55,7 +53,6 @@ object Options {
       funnelPort           = httpPort,
       selfiePort           = selfiePort,
       metricTTL            = metricTTL,
-      telemetryPort        = telemetryPort,
       environment          = environment
     )
   }

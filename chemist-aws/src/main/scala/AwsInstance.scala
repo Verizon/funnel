@@ -30,9 +30,6 @@ case class AwsInstance(
   def location: Location =
     locations.head
 
-  def supervision: Option[Location] =
-    locations.toZipper.findZ(_.intent == LocationIntent.Supervision).map(_.focus)
-
   def application: Option[Application] = {
     for {
       b <- tags.get(AwsTagKeys.name) orElse tags.get("type") orElse tags.get("Name")
@@ -51,7 +48,7 @@ case class AwsInstance(
       a <- application.toSet[Application]
       b <- findLocation(_.intent == LocationIntent.Mirroring).toSet[Location]
       c <- b.templatedPathURIs
-    } yield Target(a.toString, c, b.isPrivateNetwork)
+    } yield Target(a.toString, c)
 
   private def findLocation(f: Location => Boolean): Seq[Location] =
     locations.list.filter(f)

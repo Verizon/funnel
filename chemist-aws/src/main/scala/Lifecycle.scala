@@ -7,15 +7,15 @@ import scalaz.{\/,-\/,\/-}
 import scalaz.syntax.traverse._
 import scalaz.syntax.monad._
 import scalaz.concurrent.{Actor, Task}
-import scalaz.stream.{Process, Process0, Process1, Sink}
+import scalaz.stream.{Process, Process0, Process1, Sink, time}
 import scalaz.stream.async.mutable.Signal
 import com.amazonaws.services.sqs.model.Message
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import funnel.aws._
-import telemetry.Telemetry._
 import java.net.URI
+import scala.concurrent.duration._
 
 /**
  * The purpose of this object is to manage all the "lifecycle" events
@@ -33,7 +33,7 @@ object Lifecycle {
   import metrics._
   import PlatformEvent._
 
-  private implicit val log = Logger[Lifecycle.type]
+  private val log = Logger[Lifecycle.type]
   private val noop = \/-(Seq(NoOp))
 
   /**
@@ -43,6 +43,9 @@ object Lifecycle {
   def parseMessage(msg: Message): Throwable \/ AutoScalingEvent =
     Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException(_))
 
+  private val defaultTicker: Process[Task,Duration] =
+    time.awakeEvery(12.seconds)(Strategy.Executor(Chemist.defaultPool), Chemist.schedulingPool)
+
   /**
    * This function essentially converts the polling of an SQS queue into a scalaz-stream
    * process. Said process contains Strings being delivered on the SQS queue, which we
@@ -50,14 +53,14 @@ object Lifecycle {
    * we then pass the `AutoScalingEvent` to the `interpreter` function for further processing.
    * In the event the message does not parse to an `AutoScalingEvent`,
    */
-  def stream(queueName: String, signal: Signal[Boolean]
+  def stream[A](queueName: String, ticker: Process[Task,A] = defaultTicker
     )(sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
-    ): Process[Task, Throwable \/ Seq[PlatformEvent]] = {
+    ): Process[Task, PlatformEvent] = {
       // adding this function to ensure that parse errors do not get
       // lifted into errors that will later fail the stream, and that
       // any errors in the interpreter are properly handled.
       def go(m: Message): Task[Throwable \/ Seq[PlatformEvent]] =
-        parseMessage(m).traverseU(interpreter(_, signal)(asg, ec2, dsc)).handle {
+        parseMessage(m).traverseU(interpreter(_)(asg, ec2, dsc)).handle {
           case MessageParseException(err) =>
             log.warn(s"Unexpected recoverable error when parsing lifecycle message: $err")
             noop
@@ -73,26 +76,18 @@ object Lifecycle {
         }
 
     for {
-      a <- SQS.subscribe(queueName)(sqs)(Chemist.defaultPool, Chemist.schedulingPool)
+      a <- SQS.subscribe(queueName, ticker = ticker)(sqs)(Chemist.defaultPool)
       // _ <- Process.eval(Task(log.debug(s"stream, number messages recieved: ${a.length}")))
       b <- Process.emitAll(a)
       _ <- Process.eval(Task(log.debug(s"stream, raw message recieved: $b")))
-      c <- Process.eval(go(b))
+      c <- Process.eval(go(b)).stripW
+      d <- Process.emitAll(c)
       _ <- Process.eval(Task(log.debug(s"stream, computed action: $c")))
       _ <- SQS.deleteMessages(queueName, a)(sqs)
-    } yield c
+    } yield d
   }
 
-  def lifecycleActor(repo: Repository): Actor[PlatformEvent] =
-    Actor[PlatformEvent](a => repo.platformHandler(a).run)(Strategy.Executor(Chemist.serverPool))
-
-  def errorActor(repo: Repository): Actor[Error] =
-    Actor[Error](e => repo.errorSink(e).run)(Strategy.Executor(Chemist.serverPool))
-
-  def keysActor(repo: Repository): Actor[(URI, Set[Key[Any]])] =
-    Actor[(URI, Set[Key[Any]])]{ case (fl, keys) => repo.keySink(fl, keys).run }(Strategy.Executor(Chemist.serverPool))
-
-  def interpreter(e: AutoScalingEvent, signal: Signal[Boolean]
+  def interpreter(e: AutoScalingEvent
     )(asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
     ): Task[Seq[PlatformEvent]] = {
 
@@ -149,16 +144,4 @@ object Lifecycle {
     case \/-(a) => Process.emitAll(a)
   }
 
-  /**
-   * The main method for the lifecycle process. Run the `stream` method and then handle
-   * failures that might occour on the process. This function is primarily used in the
-   * init method for chemist so that the SQS/SNS lifecycle is started from the edge of
-   * the world.
-   */
-  def run(queueName: String, signal: Signal[Boolean]
-    )(repo: Repository, sqs: AmazonSQS, asg: AmazonAutoScaling, ec2: AmazonEC2, dsc: Discovery
-  ): Task[Unit] = {
-    val ourWorld = stream(queueName, signal)(sqs,asg,ec2,dsc).flatMap(logErrors) to Process.constant(repo.platformHandler _)
-    ourWorld.run.onFinish(_ => signal.set(false))
-  }
 }

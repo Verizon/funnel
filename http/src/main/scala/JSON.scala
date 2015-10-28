@@ -18,7 +18,7 @@ import scalaz.stream._
   * [
   *   {
   *     "cluster": "accounts",
-  *     "urls": [
+  *     "uris": [
   *       "http://sdfsd.com/sdf",
   *       "http://improd.dfs/sdfsd"
   *     ]
@@ -39,7 +39,7 @@ object JSON {
   def prettyEncode[A](a: A)(implicit A: EncodeJson[A]): String = A(a).spaces2
 
   implicit val ClusterCodecJson: CodecJson[Cluster] =
-    casecodec2(Cluster.apply, Cluster.unapply)("cluster", "urls")
+    casecodec2(Cluster.apply, Cluster.unapply)("cluster", "uris")
 
   implicit val DoubleEncodeJson =
     jencode1[Double,Option[Double]] {

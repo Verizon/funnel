@@ -3,7 +3,7 @@ package chemist
 
 import scalaz.concurrent.Task
 
-class TestDiscovery extends Discovery {
+object TestDiscovery extends Discovery {
   def listActiveFlasks: Task[Seq[Flask]] = ???
   def listAllFlasks: Task[Seq[Flask]] = ???
   def listTargets: Task[Seq[(TargetID, Set[Target])]] = ???

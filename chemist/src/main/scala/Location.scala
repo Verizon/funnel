@@ -20,7 +20,6 @@ case class Location(
   port: Int,
   datacenter: String,
   protocol: NetworkScheme = NetworkScheme.Http,
-  isPrivateNetwork: Boolean = true,
   intent: LocationIntent,
   templates: Seq[LocationTemplate]
 ){

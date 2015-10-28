@@ -16,10 +16,8 @@ ContinuousIntegration.produceCoverageReport := false
 fork in test := true
 
 initialCommands in console := """
-import funnel._
-import chemist._
-import TargetLifecycle._
-import TargetState._
+import funnel._, chemist._
+import PlatformEvent._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 """
