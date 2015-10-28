@@ -402,16 +402,33 @@ Funnel provides an API for combining metrics via the `funnel.Metric` datatype. F
 
 ``` scala
 import funnel.instruments._
+import funnel.Metric._
+import scalaz.syntax.applicative._
 
 val timer1 = timer("t1")
 val timer2 = timer("t2")
 
-val ratio: Metric[Double] = for {
-  t1 <- timer1.key
-  t2 <- timer2.key
-} yield t1 + t2
+val ratio: Metric[Double] =
+  (timer1.keys |@| timer2.keys)(_ + _)
 
+val _ = ratio.publish("foo/mytimer", Units.Milliseconds).run
+```
 
+We could publish a metric that determines whether our application is "healthy", meaning that we haven't received more than 20,000 requests in the current window, the database is up, and our average query response time is under 20 milliseconds.
+
+``` scala
+val reqs = counter("requests")
+val dbOk = gauge("db-up", true)
+val query = timer("query-speed")
+
+val healthy: Metric[Boolean] =
+  (reqs.keys.now |@| dbOk.keys |@| query.keys) { (n, db, t) =>
+     n < 20000 &&
+     db &&
+     t.mean < 20
+  }
+
+healthy.publish("healthy", Units.Healthy).run
 ```
 
 ### Monitoring Server

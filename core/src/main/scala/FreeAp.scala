@@ -88,6 +88,10 @@ sealed abstract class FreeAp[F[_],A] {
 
   def map2[B,C](b: FreeAp[F,B])(f: (A,B) => C): FreeAp[F,C] =
     b.ap(ap(FreeAp.pure(f.curried)))
+
+  /** Applicative builder syntax */
+  def |@|[B](b: FreeAp[F,B]) =
+    scalaz.syntax.applicative.ToApplyOps[FreeAp[F,?],A](this) |@| b
 }
 
 object FreeAp {

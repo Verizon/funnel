@@ -15,7 +15,7 @@ import scalaz.stream.Process
 import scalaz.Monoid
 import com.twitter.algebird.Group
 
-package object funnel extends Metrics {
+package object funnel {
   import scala.concurrent.duration._
 
   type KeySet[A] = OneOrThree[Key[A]]

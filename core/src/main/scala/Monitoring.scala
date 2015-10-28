@@ -68,17 +68,17 @@ trait Monitoring {
    * This method checks that the given key is pre-existing and
    * re-uses the key if it already exists.
    */
-  def publish[O](key: Key[O])(e: Event)(f: Task[O]): Task[Key[O]] = Task.suspend {
+  def publish[O](key: Key[O])(e: Event)(f: Task[O]): Task[Unit] = {
     // Whenever `event` generates a new value, refresh the signal
     val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(f))
     // Republish these values to a new topic
-    for {
+    Task.delay((for {
       _ <- proc.evalMap((o: O) => for {
         b <- exists(key)
-        _ <- if (b) Task.delay(Task.fork(update(key, o))(defaultPool).runAsync(_ => ()))
-             else Task.fork(topic[O,O](key)(B.ignoreTickAndTime(process1.id)))(defaultPool)
+        _ <- if (b) update(key, o)
+             else topic[O,O](key)(B.ignoreTickAndTime(process1.id))
       } yield ()).run
-    } yield key
+    } yield key).runAsync(_ => ()))
   }
 
   /**
@@ -360,7 +360,8 @@ trait Monitoring {
   def evalFamily[O](family: Key[O]): Task[Seq[O]] =
     filterKeys(Key.StartsWith(family.name)).once.runLastOr(List()).flatMap { ks =>
       val ksO: Seq[Key[O]] = ks.flatMap(_.cast(family.typeOf, family.units))
-      Nondeterminism[Task].gatherUnordered(ksO.flatMap(x => Key.keyToMetric(x).eval(this)._2.toList).toSeq)
+      import Metric._
+      Nondeterminism[Task].gatherUnordered(ksO.flatMap(x => toMetric(x).eval(this)._2.toList).toSeq)
     }
 
   /**
@@ -432,9 +433,12 @@ object Monitoring {
         _ <- Task.delay(topics += (k -> eraseTopic(Topic(pub, v))))
         t = (k.typeOf, k.units)
         _ <- keys_.compareAndSet(_.map(_ + k))
-        _ <- Task.delay(time.awakeEvery(timeout)(S, schedulingPool).evalMap(_ =>
-               now flatMap (t => pub(None -> t))).run.runAsync(_ => ()))
+        // // Starts the ticker:
+        //_ <- Task.delay(time.awakeEvery(timeout)(S, schedulingPool).evalMap(_ =>
+        //       now flatMap (t => pub(None -> t))).run.runAsync(_ => ()))
       } yield (i: I) => now flatMap (t => pub(Some(i) -> t))
+
+
 
       protected def update[O](k: Key[O], v: O): Task[Unit] =
         topics.get(k).map(_.current.set(v)).getOrElse(Task(())(defaultPool)).map(_ => ())
