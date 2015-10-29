@@ -17,6 +17,8 @@ import scalaz.stream.{Process,Process0, Sink}
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 
 trait Chemist[A <: Platform]{
+  import http.Cluster
+
   type ChemistK[U] = Kleisli[Task, A, U]
 
   private val log = Logger[this.type]
@@ -49,6 +51,19 @@ trait Chemist[A <: Platform]{
    */
   def shard(id: FlaskID): ChemistK[Option[Flask]] =
     shards.map(_.find(_.id == id))
+
+  /**
+   * display the monitoring data sources for a specific shard
+   */
+  def sources(id: FlaskID): ChemistK[List[Cluster]] = {
+    for {
+      cfg <- config
+      flk <- shard(id).map(_.getOrElse(throw new RuntimeException(s"Couldn't find shard ${id.value}")))
+      out <- Flask.gatherAssignedTargets(flk :: Nil)(cfg.http).liftKleisli
+    } yield out.toList.headOption.map {
+        case (a,set) => Cluster(a.id.value,set.toList.map(_.uri.toString))
+    }.toList
+  }
 
   /**
    * List out the last 100 lifecycle events that this chemist has seen.
