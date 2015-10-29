@@ -24,7 +24,6 @@ class IntegrationChemist extends Chemist[IntegrationPlatform]{
     for {
       cfg <- config
       _    = log.info("Initilizing Chemist....")
-      _   <- queue.enqueueOne(TerminatedTarget(new java.net.URI("http://bbc.co.uk/"))).liftKleisli
       _   <- Pipeline.task(
             lifecycle,
             cfg.rediscoveryInterval
