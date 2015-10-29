@@ -74,4 +74,12 @@ object PipelineSpecification extends Properties("Pipeline") {
     ("The existing and new Distributions have the same Targets" |:
       Sharding.targets(d) == Sharding.targets(nd))
   }
+
+  property("newTarget works") = forAll { (t: Target, d: Distribution) =>
+    val nd = Pipeline.handle.newTarget(t, RandomSharding)(d)
+    ("The existing Distribution does not contain the Target" |:
+      !Sharding.targets(d).contains(t)) &&
+    ("The new Distribution contains the Target" |:
+      (d.size > 0) ==> Sharding.targets(nd).contains(t))
+  }
 }
