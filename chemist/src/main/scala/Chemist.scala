@@ -17,6 +17,8 @@ import scalaz.stream.{Process,Process0, Sink}
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 
 trait Chemist[A <: Platform]{
+  import http.Cluster
+
   type ChemistK[U] = Kleisli[Task, A, U]
 
   private val log = Logger[this.type]
@@ -53,23 +55,14 @@ trait Chemist[A <: Platform]{
   /**
    * display the monitoring data sources for a specific shard
    */
-  import http.Cluster
   def sources(id: FlaskID): ChemistK[List[Cluster]] = {
-    import concurrent.ExecutionContext
-    import dispatch._, Defaults._
-    import dispatch.Http
-    import LoggingRemote.flaskTemplate
-    import scalaz.syntax.either._
-    import argonaut._, Argonaut._
-    import http.JSON._
     for {
       cfg <- config
-      f   <- shard(id).map(_.getOrElse(throw new RuntimeException(s"Couldn't find shard ${id.value}")))
-      uri = f.location.uriFromTemplate(flaskTemplate(path = "mirror/sources"))
-      ec  = ExecutionContext.fromExecutorService(Chemist.defaultPool)
-      r   <- fromScalaFuture(cfg.http(url(uri.toString) OK as.String)(ec)).liftKleisli
-      cl  = Parse.decodeEither[List[Cluster]](r).fold(e => throw new RuntimeException(e), identity)
-    } yield cl
+      flk <- shard(id).map(_.getOrElse(throw new RuntimeException(s"Couldn't find shard ${id.value}")))
+      out <- Flask.gatherAssignedTargets(flk :: Nil)(cfg.http).liftKleisli
+    } yield out.toList.headOption.map {
+        case (a,set) => Cluster(a.id.value,set.toList.map(_.uri.toString))
+    }.toList
   }
 
   /**
