@@ -4,7 +4,7 @@
     <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
     <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
     <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
-    <title>Chemist &middot; ${BuildInfo.version} &middot; ${BuildInfo.gitRevision}</title>
+    <title>Chemist</title>
     <style type="text/css">
     /* Space out content a bit */
     body {
@@ -85,13 +85,7 @@
         <div class="col-lg-6">
           <h4>Control Resources</h4>
           <p><a href="distribution">GET /distribution</a>: Display the current distribution of shards and associated work.</p>
-          <p><a href="bootstrap">POST /bootstrap</a>: Manually force Chemist to re-read its state of the world from the platform.</p>
-        </div>
-
-        <div class="col-lg-6">
-          <h4>Lifecycle Resources</h4>
-          <p><a href="lifecycle/states">GET /lifecycle/states</a>: View the lifecycle state as the chemist sees it.</p>
-          <p><a href="lifecycle/history">GET /lifecycle/history</a>: View a rolling snapshot of the last lifecycle events to took place.</p>
+          <p><a href="unmonitorable">GET /unmonitorable</a>: Display a list of all the targets that were not monitorable.</p>
           <p><a href="platform/history">GET /platform/history</a>: Audit trail for the events that chemist recieved from the platform.</p>
         </div>
 
@@ -99,14 +93,13 @@
           <h4>Shard Resources</h4>
           <p><a href="shards">GET /shards</a>: List all shards and known information about those hosts</p>
           <p><a href="shard/:id">GET /shard/:id</a>: Displays all known information about a given shard.</p>
-          <p><a href="shard/:id/include">POST /shard/:id/include</a>: Manually specify a machine to use as a load-bearing shard.</p>
-          <p><a href="shard/:id/exclude">POST /shard/:id/exclude</a>: Manually remove a shard from rotation and reshard its work.</p>
+          <p><a href="shard/:id/sources">GET /shard/:id/sources</a>: Reach out to the specified shard and request its workload.</p>
         </div>
 
       </div>
 
       <div class="footer">
-        <p>&copy; Verizon OnCue 2013-2015</p>
+        <p>&copy; Verizon 2013-2015</p>
       </div>
 
     </div>
