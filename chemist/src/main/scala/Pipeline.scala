@@ -180,7 +180,6 @@ object Pipeline {
     val lp: Flow[PlatformEvent] = que.dequeue.map(contextualise)
       .wye(lifecycle)(wye.merge)(Chemist.defaultExecutor)
       .observe(ec)
-      // .observe(sink.lift(a => Task.delay(log.info(s"@@@@ $a"))))
 
     process(lp, pollInterval)(dsc,shd,http)
       .observe(pc)
