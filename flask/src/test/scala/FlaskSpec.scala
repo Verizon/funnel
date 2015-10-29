@@ -32,7 +32,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   private def makeMS(port: Int): (Counter, MonitoringServer) = {
     val L = ((s: String) => log.debug(s))
     val M = Monitoring.instance(Monitoring.serverPool, L)
-    val I = new Instruments(1.minute, M, 200.milliseconds)
+    val I = new Instruments(M, 200.milliseconds)
     val C = I.counter("my_counter", 0, "My counter")
     val ms = MonitoringServer.start(M, port, 36.hours)
     (C, ms)
@@ -68,7 +68,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       val proc: Process[Task, Array[Byte]] = Process.emitAll(seq) ++ Process.eval_(ready.set(true))
       val alive: Process[Task, Boolean] = Process.emitAll(k)
 
-      val is = new Instruments(1.minute)
+      val is = new Instruments()
       val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5775, 7557, None, "local")
 
       val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
@@ -108,7 +108,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
     ]
     """
 
-    val is = new Instruments(1.minute)
+    val is = new Instruments()
     val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5776, 7558, None, "local")
     val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
     val app = new Flask(options, is)
@@ -160,7 +160,7 @@ class FlaskSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
       ) ++
       time.sleep((6 * 30 + 10).seconds)(S, P)			// Increment 1,000 times, die, and timeout
 
-    val is = new Instruments(1.minute)
+    val is = new Instruments()
     val options = Options(None, None, 5.seconds, 2, None, None, None, None, 5777, 7559, None, "local")
     val flaskUrl = url(s"http://localhost:${options.funnelPort}").setContentType("application/json", "UTF-8")
     val app = new Flask(options, is)

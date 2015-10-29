@@ -22,9 +22,10 @@ import scalaz.concurrent.Task
  * may update multiple metrics, see `counter`, `gauge` and
  * `timer` methods for more information.
  */
-class Instruments(val window: Duration,
-                  val monitoring: Monitoring = Monitoring.default,
+class Instruments(val monitoring: Monitoring = Monitoring.default,
                   val bufferTime: Duration = 200 milliseconds) {
+
+  val window = monitoring.window
 
   private def nowL(s: String) = if (s == "") s else s"$s (now)"
   private def previousL(s: String) = if (s == "") s else s"$s ($window ago)"
@@ -109,7 +110,9 @@ class Instruments(val window: Duration,
     import Scalaz._
     val (ks, nps) =
       periodicBuffers(nowBuf, unit, label, units, description, keyMod)
-    val t = ks.toTriple.zipWith(nps)(monitoring.topic(_)(_)).toList.traverse(
+    val t = List(monitoring.topic(ks.now)(nps.one),
+                 monitoring.topic(ks.previous, true)(nps.two),
+                 monitoring.topic(ks.sliding)(nps.three)).traverse(
       _.map(Kleisli(_))).map(_.traverseU_(identity)).map(_.run)
     (ks, t)
   }

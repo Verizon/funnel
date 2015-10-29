@@ -26,14 +26,14 @@ class MirroringIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfte
 
   val W = 30.seconds
 
-  lazy val M1 = Monitoring.instance
-  lazy val I1 = new Instruments(W, M1)
+  lazy val M1 = Monitoring.instance(windowSize = W)
+  lazy val I1 = new Instruments(M1)
 
-  lazy val M2 = Monitoring.instance
-  lazy val I2 = new Instruments(W, M2)
+  lazy val M2 = Monitoring.instance(windowSize = W)
+  lazy val I2 = new Instruments(M2)
 
-  lazy val M3 = Monitoring.instance
-  lazy val I3 = new Instruments(W, M3)
+  lazy val M3 = Monitoring.instance(windowSize = W)
+  lazy val I3 = new Instruments(M3)
 
   val MS1 = MonitoringServer.start(M1, 3001)
   val MS2 = MonitoringServer.start(M2, 3002)

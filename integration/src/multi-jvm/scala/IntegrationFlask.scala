@@ -10,7 +10,7 @@ object IntegrationFlask {
   val log = Logger[IntegrationFlask.type]
 
   def start(options: FlaskOptions): () => Unit = {
-    val I = new Instruments(1.minute)
+    val I = new Instruments()
     val app = new Flask(options, I)
     app.unsafeRun()
     () => app.shutdown()

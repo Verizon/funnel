@@ -1,6 +1,6 @@
 package funnel {
 
-  package object instruments extends Instruments(funnel.defaultWindow) with DefaultKeys {
+  package object instruments extends Instruments() with DefaultKeys {
     val instance = this
 
     Clocks.instrument(this)

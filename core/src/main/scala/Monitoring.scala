@@ -33,18 +33,23 @@ trait Monitoring {
 
   def log: Logger
 
+  def window: Duration
+
   /**
    * Create a new topic with the given name and units,
    * using a stream transducer to buffer updates.
    */
   def topic[I, O:Reportable](
       name: String, units: Units, description: String, keyMod: Key[O] => Key[O] = identity[Key[O]] _)(
-      buf: TBuffer[Option[I],O], timeout: Duration = defaultWindow): (Key[O], Task[I => Task[Unit]]) = {
-    val k = keyMod(Key[O](name, units, description))
-    (k, topic(k)(buf, timeout))
-  }
+      buf: TBuffer[Option[I],O], costive: Boolean = false
+    ): (Key[O], Task[I => Task[Unit]]) = {
+      val k = keyMod(Key[O](name, units, description))
+      (k, topic(k, costive)(buf))
+    }
 
-  def topic[I,O](key: Key[O])(buf: TBuffer[Option[I],O], timeout: Duration = defaultWindow): Task[I => Task[Unit]]
+  def topic[I,O](
+    key: Key[O], costive: Boolean = false)(
+    buf: TBuffer[Option[I],O]): Task[I => Task[Unit]]
 
   /**
    * Return the continuously updated signal of the current value
@@ -361,6 +366,15 @@ trait Monitoring {
    */
   def runLogging(x: Task[Unit]) =
     x.runAsync(_.fold(e => log.error(e.getMessage, e), _ => ()))
+
+  /*
+   * Periodically push a `None` through the set of topics under `costiveKeys`,
+   * to flush any data that might otherwise be stuck in the tubes.
+   */
+  def dataDislodgement: Process[Task, Unit]
+
+  // The time-varying set of keys that need to be periodically disembarrassed
+  val costiveKeys: Signal[Set[Key[Any]]] = signalOf(Set())
 }
 
 object Monitoring {
@@ -394,7 +408,8 @@ object Monitoring {
   }
 
   def instance(implicit ES: ExecutorService = defaultPool,
-               logger: String => Unit = printLog): Monitoring = {
+               logger: String => Unit = printLog,
+               windowSize: Duration = 1.minute): Monitoring = {
     import scala.collection.concurrent.TrieMap
 
     val t0 = System.nanoTime
@@ -417,19 +432,32 @@ object Monitoring {
 
       def keys = keys_
 
-      def topic[I,O](k: Key[O])(buf: TBuffer[Option[I],O],
-                                timeout: Duration = defaultWindow): Task[I => Task[Unit]] = for {
+      def window = windowSize
+
+      def dataDislodgement: Process[Task, Unit] = {
+        val S = Strategy.Executor(Monitoring.defaultPool)
+        import scalaz.std.list._
+        time.awakeEvery(window)(S, Monitoring.schedulingPool).evalMap { _ =>
+          for {
+            ks <- costiveKeys.get
+            _ <- ks.toList.traverse_ { k =>
+              topics.get(k).traverse_ { t => for {
+                tick <- now
+                _ <- t.publish(None -> tick)
+              } yield () }
+            }
+          } yield ()
+        }
+      }
+
+      def topic[I,O](k: Key[O], costive: Boolean = false)(buf: TBuffer[Option[I],O]): Task[I => Task[Unit]] = for {
         p <- bufferedSignal(buf)(ES)
         (pub, v) = p
         _ <- Task.delay(topics += (k -> eraseTopic(Topic(pub, v))))
         t = (k.typeOf, k.units)
         _ <- keys_.compareAndSet(_.map(_ + k))
-        // // Starts the ticker:
-        //_ <- Task.delay(time.awakeEvery(timeout)(S, schedulingPool).evalMap(_ =>
-        //       now flatMap (t => pub(None -> t))).run.runAsync(_ => ()))
+        _ <- costiveKeys.compareAndSet(_.map(_ + k)) whenM costive
       } yield (i: I) => now flatMap (t => pub(Some(i) -> t))
-
-
 
       protected def update[O](k: Key[O], v: O): Task[Unit] =
         topics.get(k).map(_.current.set(v)).getOrElse(Task(())(defaultPool)).map(_ => ())
@@ -439,6 +467,7 @@ object Monitoring {
                      .getOrElse(sys.error("key not found: " + k))
 
       def remove[O](k: Key[O]): Task[Unit] = for {
+        _ <- costiveKeys.compareAndSet(_.map(_ - k))
         _ <- keys_.compareAndSet(_.map(_ - k))
         _ <- topics.get(k).traverse_(_.current.close)
         _ <- Task.delay(topics -= k)

@@ -10,7 +10,7 @@ class JsonSpec extends FlatSpec with Matchers {
   import JSON._
   import scala.concurrent.duration._
 
-  implicit val instruments = new Instruments(1.minute)
+  implicit val instruments = new Instruments()
 
   it should "decode json into an ArbitraryMetric" in {
     val in = """{"name":"ntp/whatever","kind":"counter","value": "123"}"""

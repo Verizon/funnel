@@ -27,7 +27,7 @@ object MirroringExample {
      */
     def activity(M: Monitoring, name: String, port: Int): Unit = {
       val ttl = (math.random * 60).toInt + 30
-      val I = new Instruments(5.minutes, M)
+      val I = new Instruments(M)
       val ok = I.trafficLight("health")
       val reqs = I.counter("reqs")
       val svr = MonitoringServer.start(M, port)
