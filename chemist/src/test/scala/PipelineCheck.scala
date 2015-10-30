@@ -146,9 +146,9 @@ object PipelineSpecification extends Properties("Pipeline") {
     e match {
       case NewTarget(t) => p match {
         case Distribute(w) =>
-          (d.size > 0) ==>
           ("The old Distribution does not contain the new Target" |: !Sharding.targets(d).contains(t)) &&
-          ("The Work does contain the new Target" |: Sharding.targets(w).contains(t))
+          (c.distribution.size > 0) ==>
+            ("The Work does contain the new Target" |: Sharding.targets(w).contains(t))
         case _ => falsified
       }
       case NewFlask(f) => p match {
@@ -156,8 +156,7 @@ object PipelineSpecification extends Properties("Pipeline") {
           ("The new Flask is not in the old Distribution" |: !Sharding.shards(d).contains(f)) &&
           ("The new Flask is in the new Distribution" |: Sharding.shards(start).contains(f)) &&
           ("The Targets in the old Distribution are all in the new Distribution" |:
-            Sharding.targets(d) == Sharding.targets(start)) &&
-          ("All of the Flasks have Work" |: start.values.forall(!_.isEmpty))
+            Sharding.targets(d) == Sharding.targets(start))
         case _ => falsified
       }
       case NoOp => passed
@@ -167,8 +166,8 @@ object PipelineSpecification extends Properties("Pipeline") {
             case NewTarget(t) => t
             case _ => throw new RuntimeException("Not all Produced PlatformEvents were NewTargets")
           }}
-          ("Discovery's Targets are all Produced" |:
-            sd.listTargets.run.flatMap(_._2) == ts.toSet) &&
+          ("The new Distribution's Targets plus the Produced Targets equal the old Distribution's Targets" |:
+            Sharding.targets(nd) ++ ts.toSet == Sharding.targets(d)) &&
           ("The terminated Flask is not in the new Distribution" |: !Sharding.shards(nd).contains(f))
         case _ => falsified
       }
