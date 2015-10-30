@@ -110,9 +110,12 @@ object Pipeline {
       case Context(d,TerminatedFlask(flask)) =>
         val tasks: Task[Seq[PlatformEvent]] =
           for {
+            o <- discover(dsc, 1.second).take(1).runLast
             a <- dsc.listTargets
-            b  = a.map(_._2).flatten
-            c  = b.map(NewTarget(_))
+            b  = a.flatMap(_._2).toSet
+            d  = o.getOrElse(contextualise(Set.empty)).distribution
+            t  = b -- Sharding.targets(d)
+            c  = t.toList.map(NewTarget(_))
           } yield c
         Context(d, Produce(tasks))
 
