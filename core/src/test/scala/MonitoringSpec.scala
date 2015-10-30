@@ -137,6 +137,7 @@ object MonitoringSpec extends Properties("monitoring") {
    * filtering and subscribing.
    */
   property("subscribe") = secure {
+    val M = Monitoring.instance(windowSize = 6.seconds)
     implicit val log = (_:String) => ()
     def listenFor[A](t: Duration)(p: Process[Task, A]): Vector[A] = {
       val b = new java.util.concurrent.atomic.AtomicBoolean(false)
@@ -148,12 +149,12 @@ object MonitoringSpec extends Properties("monitoring") {
       b.set(true)
       v
     }
-    new Instruments(6.seconds) {
+    new Instruments(M) {
       JVM.instrument(this)
     }
-    val b1 = Monitoring.subscribe(Monitoring.default)(_ => true).
+    val b1 = Monitoring.subscribe(M)(_ => true).
       filter(_.key.name.contains("previous/jvm/gc/ParNew/time"))
-    val b2 = Monitoring.subscribe(Monitoring.default)(
+    val b2 = Monitoring.subscribe(M)(
       _.name.contains("previous/jvm/gc/ParNew/time"))
     val xs = listenFor(30.seconds)(b1)
     val ys = listenFor(30.seconds)(b2)
@@ -234,8 +235,8 @@ object MonitoringSpec extends Properties("monitoring") {
     def go: Boolean = {
       val ranges = List(4, 8, 16, 32, 64, 128).map(Range(0, _))
       val times = ranges map { r =>
-        val M = Monitoring.instance
-        val I = new Instruments(30.seconds, M)
+        val M = Monitoring.instance(windowSize = 30.seconds)
+        val I = new Instruments(M)
         import I._
         val counters = r.toList.map(n => counter(s"test$n"))
         val t0 = System.nanoTime
@@ -345,8 +346,8 @@ object MonitoringSpec extends Properties("monitoring") {
   property("concurrent-counters-integration-test") = forAll(Gen.nonEmptyListOf(Gen.choose(-10,10))) { ab =>
     // this test takes about 45 seconds
     val (a,b) = ab.splitAt(ab.length / 2)
-    val M = Monitoring.instance
-    val I = new Instruments(30.seconds, M)
+    val M = Monitoring.instance(windowSize = 30.seconds)
+    val I = new Instruments(M)
     import I._
     val aN = counter("a")
     val bN = counter("b")

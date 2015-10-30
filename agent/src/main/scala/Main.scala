@@ -129,7 +129,7 @@ object Main {
      * Setup the instruments instance that will be used by the remote
      * instrument bridges (e.g. http, statsd etc).
      */
-    val I = new Instruments(1.minute, Monitoring.default)
+    val I = new Instruments(Monitoring.default)
 
     // always add the system clocks so we know how long the agent has
     // actually been running.

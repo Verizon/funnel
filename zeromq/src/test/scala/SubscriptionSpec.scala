@@ -21,13 +21,13 @@ class SubscriptionSpec extends FlatSpec
 
   lazy val U1 = new URI("tcp://127.0.0.1:6478/now/numeric")
   lazy val E1 = Endpoint.unsafeApply(publish &&& bind, U1)
-  lazy val M1 = Monitoring.instance
-  lazy val I1 = new Instruments(W, M1)
+  lazy val M1 = Monitoring.instance(windowSize = W)
+  lazy val I1 = new Instruments(M1)
 
   lazy val U2 = new URI("tcp://127.0.0.1:6479/previous")
   lazy val E2 = Endpoint.unsafeApply(publish &&& bind, U2)
-  lazy val M2 = Monitoring.instance
-  lazy val I2 = new Instruments(W, M2)
+  lazy val M2 = Monitoring.instance(windowSize = W)
+  lazy val I2 = new Instruments(M2)
 
   private def addInstruments(i: Instruments): Unit = {
     Clocks.instrument(i)

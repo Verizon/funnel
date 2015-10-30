@@ -17,16 +17,16 @@ class MirrorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   lazy val U1 = new URI("zeromq+tcp://127.0.0.1:4578/previous")
   lazy val E1 = Endpoint.unsafeApply(publish &&& bind, U1)
-  lazy val M1 = Monitoring.instance
-  lazy val I1 = new Instruments(W, M1)
+  lazy val M1 = Monitoring.instance(windowSize = W)
+  lazy val I1 = new Instruments(M1)
 
   lazy val U2 = new URI("zeromq+tcp://127.0.0.1:4579/previous")
   lazy val E2 = Endpoint.unsafeApply(publish &&& bind, U2)
-  lazy val M2 = Monitoring.instance
-  lazy val I2 = new Instruments(W, M2)
+  lazy val M2 = Monitoring.instance(windowSize = W)
+  lazy val I2 = new Instruments(M2)
 
   // mirror to this instance
-  lazy val MI = Monitoring.instance
+  lazy val MI = Monitoring.instance(windowSize = W)
 
   private def addInstruments(i: Instruments): Unit = {
     Clocks.instrument(i)

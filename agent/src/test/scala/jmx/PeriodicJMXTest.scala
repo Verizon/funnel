@@ -30,7 +30,7 @@ class PeriodicJMXTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val exclusions = (s: String) =>
       Glob("*HistogramMicros").matches(s) ||
       Glob("*Histogram").matches(s)
-    val I = new Instruments(30.seconds, Monitoring.default)
+    val I = new Instruments(Monitoring.instance(windowSize = 30.seconds))
 
     val s = Import.periodically(zookeeper, Vector(zooquery), exclusions, "TestCluster")(cache, I)()
     s.take(3).runLog.run should have length 3

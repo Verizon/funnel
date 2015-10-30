@@ -29,7 +29,7 @@ object Main {
 
     log.debug(s"loaded the following configuration settings: $options")
 
-    val I = new Instruments(1.minute)
+    val I = new Instruments()
 
     val app = new Flask(options, I)
 
