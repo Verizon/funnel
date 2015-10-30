@@ -55,7 +55,7 @@ object RandomSharding extends Sharder {
 
       log.debug(s"distribution: work = $work")
 
-      val dist = work.foldLeft(Distribution.empty) { (a,b) => a.updateAppend(b._1, Set(b._2)) }
+      val dist = work.foldLeft(d) { (a,b) => a.updateAppend(b._1, Set(b._2)) }
 
       log.debug(s"work = $work, dist = $dist")
 
@@ -104,7 +104,7 @@ object LFRRSharding extends Sharder {
 
       log.debug(s"distribution: work = $work")
 
-      val dist = work.foldLeft(Distribution.empty) { (a,b) => a.updateAppend(b._1, Set(b._2)) }
+      val dist = work.foldLeft(d) { (a,b) => a.updateAppend(b._1, Set(b._2)) }
 
       log.debug(s"work = $work, dist = $dist")
 

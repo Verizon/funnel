@@ -27,17 +27,17 @@ object LoggingRemote extends RemoteFlask {
 
 class HttpFlask(http: dispatch.Http) extends RemoteFlask {
   import FlaskCommand._
+  import metrics.{MonitorCommandLatency,UnmonitorCommandLatency}
 
   private[this] val log = Logger[HttpFlask]
 
   def command(c: FlaskCommand): Task[Unit] = {
-    metrics.CommandCount.increment
     c match {
       case Monitor(flask, targets) =>
-        monitor(flask.location, targets).void
+        MonitorCommandLatency.timeTaskSuccess(monitor(flask.location, targets).void)
 
       case Unmonitor(flask, targets) =>
-        unmonitor(flask.location, targets).void
+        UnmonitorCommandLatency.timeTaskSuccess(unmonitor(flask.location, targets).void)
     }
   }
 
