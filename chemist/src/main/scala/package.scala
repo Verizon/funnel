@@ -11,6 +11,10 @@ package object chemist {
 
   implicit val uriOrder: Order[URI] = Order[String].contramap[URI](_.toString)
 
+  implicit class DistributionSyntax(d: Sharding.Distribution){
+    def hasFlasks: Boolean = d.keySet.nonEmpty
+  }
+
   implicit def fromScalaFuture[A](a: Future[A])(implicit e: ExecutionContext): Task[A] =
     Task async { k =>
       a.onComplete {

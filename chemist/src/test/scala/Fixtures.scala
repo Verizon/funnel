@@ -22,6 +22,8 @@ object Fixtures {
   implicit lazy val arbLocation: Arbitrary[Location] = Arbitrary(genLocation)
   implicit lazy val arbFlaskID: Arbitrary[FlaskID] = Arbitrary(genFlaskID)
   implicit lazy val arbFlask: Arbitrary[Flask] = Arbitrary(genFlask)
+  implicit lazy val arbSharder: Arbitrary[Sharder] = Arbitrary(genSharder)
+  implicit val ordering = Target.orderTarget.toScalaOrdering
 
   /** Generates alphanumeric characters */
   def alphaNumStr: Gen[String] =
@@ -42,6 +44,9 @@ object Fixtures {
   def genLocationTemplate: Gen[LocationTemplate] = for {
     template <- alphaNumStr
   } yield LocationTemplate(template)
+
+  def genSharder: Gen[Sharder] =
+    Gen.oneOf(RandomSharding, LFRRSharding)
 
   def genLocation: Gen[Location] = for {
     host <- alphaNumStr

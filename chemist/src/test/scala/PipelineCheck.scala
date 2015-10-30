@@ -3,13 +3,18 @@ package chemist
 
 import java.net.URI
 import java.util.UUID
+
 import scalaz.==>>
+
 import LocationIntent._
 import Sharding.Distribution
-import org.scalacheck.Properties
+
+import org.scalacheck.{ Arbitrary, Gen, Properties }
+import Arbitrary.arbitrary
+import Gen.{ alphaNumChar, listOf, listOfN, oneOf }
 import org.scalacheck.Prop.{ BooleanOperators, forAll }
 
-object PipelineProp extends Properties("Pipeline") {
+object PipelineSpecification extends Properties("Pipeline") {
   import Fixtures._
 
   property("newFlask works") = forAll { (f: Flask, d: Distribution) =>
