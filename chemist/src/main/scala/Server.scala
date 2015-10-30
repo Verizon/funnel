@@ -77,31 +77,31 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
 
   def intent: cycle.Plan.Intent = {
     case GET(Path("/")) =>
-      GetRoot.time(Redirect("index.html"))
+      Redirect("index.html")
 
     case GET(Path("/status")) =>
-      GetStatus.time(Ok ~> JsonResponse(Chemist.version))
+      Ok ~> JsonResponse(Chemist.version)
 
     case GET(Path("/distribution")) =>
-      GetDistribution.time(json(chemist.distribution.map(_.toList)))
+      json(chemist.distribution.map(_.toList))
 
     case GET(Path("/unmonitorable")) =>
-      GetUnmonitorable.time(json(chemist.listUnmonitorableTargets))
+      json(chemist.listUnmonitorableTargets)
 
     case GET(Path("/platform/history")) =>
-      GetPlatformHistory.time(json(chemist.platformHistory.map(_.toList)))
+      json(chemist.platformHistory.map(_.toList))
 
     case POST(Path("/distribute")) =>
-      PostDistribute.time(NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)"))
+      NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)")
 
     case GET(Path(Seg("shards" :: Nil))) =>
-      GetShards.time(json(chemist.shards))
+      json(chemist.shards)
 
     case GET(Path(Seg("shards" :: id :: Nil))) =>
-      GetShardById.time(json(chemist.shard(FlaskID(id))))
+      json(chemist.shard(FlaskID(id)))
 
     case GET(Path(Seg("shards" :: id :: "sources" :: Nil))) =>
       import http.JSON._	// For Cluster codec
-      GetShardSources.time(json(chemist.sources(FlaskID(id))))
+      json(chemist.sources(FlaskID(id)))
   }
 }
