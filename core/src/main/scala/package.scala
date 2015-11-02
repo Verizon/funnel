@@ -1,6 +1,7 @@
 package funnel {
 
   package object instruments extends Instruments(funnel.defaultWindow) with DefaultKeys {
+    val instance = this
 
     Clocks.instrument(this)
     JVM.instrument(this)
@@ -17,7 +18,9 @@ import com.twitter.algebird.Group
 package object funnel {
   import scala.concurrent.duration._
 
-  type Metric[A] = FreeC[Key, A]
+  type KeySet[A] = OneOrThree[Key[A]]
+  type Metric[A] = FreeAp[KeySet,A]
+
   type DatapointParser    = java.net.URI => Process[Task,Datapoint[Any]]
   type ClusterName        = String
   type ContinuousGauge[A] = Gauge[Continuous[A],A]

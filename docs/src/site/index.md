@@ -51,9 +51,9 @@ As with all monitoring systems, understanding the way time periods is handled is
 
 ![image]({{ site.baseurl }}img/time-periods.jpg)
 
-In this diagram, **T** represents time moving left to right. A, B and C respectively illustrate the boundaries of given time periods. The duration of the time period is very arbitrary, but the default setting is for 5 minute periods. In this frame:
+In this diagram, **T** represents time moving left to right. A, B and C respectively illustrate the boundaries of given time periods. The duration of the time period is very arbitrary, but the default setting is for 1 minute periods. In this frame:
 
-* **N** - The "now" time period, representing the current set of metrics that are in flight, and explicitly does not represent a completed period. If 2.5 minutes have elapsed in the current 5 minute period, then **N** only illustrates the metrics collected in 2.5 minutes.
+* **N** - The "now" time period, representing the current set of metrics that are in flight, and explicitly does not represent a completed period. If 0.5 minutes have elapsed in the current 1 minute period, then **N** only illustrates the metrics collected in 0.5 minutes.
 * **P** - The "previous" time period, representing the last "full" window that has elapsed. This can be thought of as a stream that only updates its values once every period duration.
 * **S** - The "sliding" time period, representing the last period duration, irrespective of if that crossed period boundaries defined by N and P. This is a useful system to collect "what happened in the last 5 minutes"-style view.
 

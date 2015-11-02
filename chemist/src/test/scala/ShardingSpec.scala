@@ -14,9 +14,7 @@ import org.scalactic.TypeCheckedTripleEquals
 class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
 
   import Sharding.Distribution
-  import zeromq.TCP
 
-  implicit lazy val log: Logger = Logger("chemist-spec")
   val localhost: Location =
     Location(
       host = "127.0.0.1",
@@ -57,51 +55,24 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
     ("z", "http://omicron.internal")
   )
 
-  it should "correctly sort the map and return the flasks in order of their set length" in {
-    Sharding.shards(d1).map(_.id.value) should equal (Seq("a", "c", "b", "d"))
-  }
-
-  it should "snapshot the exsiting shard distribution" in {
-    Sharding.sorted(d1).map(_._1.id.value) should equal (Seq("a", "c", "b", "d"))
-  }
-
-  it should "correctly remove urls that are already being monitored" in {
-    Sharding.deduplicate(i1)(d1) should equal ( Set[Target](
-      ("v", "http://nine.internal"),
-      ("u", "http://eight.internal"))
-    )
-  }
-
   it should "correctly calculate how the new request should be sharded over known flasks" in {
     val (s, newdist) = LFRRSharding.distribution(i1)(d1)
     s.map {
       case (x,y) => x.id.value -> y
     }.toSet should === (Set(
-                          "a" -> Target("u",new URI("http://eight.internal")),
-                          "c" -> Target("v",new URI("http://nine.internal"))))
+      "a" -> Target("u",new URI("http://eight.internal")),
+      "c" -> Target("v",new URI("http://nine.internal"))))
 
     val (s2,newdist2) = LFRRSharding.distribution(i2)(d1)
     s2.map(_._2).toSet should === (Set(
-                                     Target("v",new URI("http://omega.internal")),
-                                     Target("w",new URI("http://alpha.internal")),
-                                     Target("r",new URI("http://epsilon.internal")),
-                                     Target("z",new URI("http://gamma.internal")),
-                                     Target("u",new URI("http://beta.internal")),
-                                     Target("z",new URI("http://omicron.internal")),
-                                     Target("r",new URI("http://kappa.internal")),
-                                     Target("r",new URI("http://theta.internal")),
-                                     Target("p",new URI("http://zeta.internal"))))
-  }
-
-  it should "assign all the work when using random sharding" in {
-    implicit val ordering = orderTarget.toScalaOrdering
-    val (s, newdist) = RandomSharding.distribution(i2)(d1)
-    newdist.values.flatten.sorted should equal (i2.toList.sorted)
-  }
-
-  it should "reassign all the work when a flask is terminated" in {
-    implicit val ordering = orderTarget.toScalaOrdering
-    val (s, newdist) = RandomSharding.distribution(i2)(d1 - d1.keys.head)
-    newdist.values.flatten.sorted should equal (i2.toList.sorted)
+      Target("v",new URI("http://omega.internal")),
+      Target("w",new URI("http://alpha.internal")),
+      Target("r",new URI("http://epsilon.internal")),
+      Target("z",new URI("http://gamma.internal")),
+      Target("u",new URI("http://beta.internal")),
+      Target("z",new URI("http://omicron.internal")),
+      Target("r",new URI("http://kappa.internal")),
+      Target("r",new URI("http://theta.internal")),
+      Target("p",new URI("http://zeta.internal"))))
   }
 }

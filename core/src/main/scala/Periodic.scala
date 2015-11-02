@@ -13,11 +13,11 @@ package funnel
  * on a rolling basis.
  */
 case class Periodic[+A](now: Key[A], previous: Key[A], sliding: Key[A]) {
-  def toThree: Three[Key[A]] = Three(now, previous, sliding)
+  def toTriple: Triple[Key[A]] = Triple(now, previous, sliding)
 }
 
 object Periodic {
-  def apply[A](keys: Three[Key[A]]): Periodic[A] = Periodic(keys.one, keys.two, keys.three)
+  def apply[A](keys: Triple[Key[A]]): Periodic[A] = Periodic(keys.one, keys.two, keys.three)
 }
 
 /**
@@ -28,5 +28,3 @@ object Periodic {
  */
 case class Continuous[+A](now: Key[A])
 
-// unused
-case class Historical[+A](previous: Key[A])
