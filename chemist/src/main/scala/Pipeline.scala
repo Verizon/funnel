@@ -110,7 +110,7 @@ object Pipeline {
       case Context(d,TerminatedFlask(flask)) =>
         val tasks: Task[Seq[PlatformEvent]] =
           for {
-            o <- discover(dsc, 1.second).take(1).runLast
+            o <- discover(dsc, 1.second).runLog
             a <- dsc.listTargets
             b  = a.flatMap(_._2).toSet
             d  = o.getOrElse(contextualise(Set.empty)).distribution

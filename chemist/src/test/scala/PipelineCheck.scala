@@ -117,9 +117,11 @@ object PipelineSpecification extends Properties("Pipeline") {
           val ts = tasks.run.map { _ match {
             case NewTarget(t) => t
             case _ => throw new RuntimeException("Not all Produced PlatformEvents were NewTargets")
-          }}
-          ("The new Distribution's Targets plus the Produced Targets equal the old Distribution's Targets" |:
-            Sharding.targets(nd) ++ ts.toSet == Sharding.targets(d)) &&
+          }}.toSet
+          val nts = Sharding.targets(nd)
+          val ots = Sharding.targets(d)
+          (s"The new Distribution's Targets ($nts) plus the Produced Targets ($ts) equal the old Distribution's Targets ($ots)" |:
+            nts ++ ts == ots) &&
           ("The terminated Flask is not in the new Distribution" |: !Sharding.shards(nd).contains(f))
         case _ => falsified
       }
