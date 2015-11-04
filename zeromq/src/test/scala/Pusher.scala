@@ -35,6 +35,8 @@ abstract class Pusher(name: String, uri: URI = Settings.uri, size: Int = 1000000
 import scala.concurrent.duration._
 
 abstract class ApplicationPusher(name: String, aliveFor: FiniteDuration = 12.seconds) {
+  val S = Strategy.Executor(Monitoring.defaultPool)
+
   def main(args: Array[String]): Unit = {
     import instruments._
 
@@ -49,7 +51,7 @@ abstract class ApplicationPusher(name: String, aliveFor: FiniteDuration = 12.sec
 
     Publish.toUnixSocket(Settings.uri.toString, Fixtures.signal)
 
-    time.sleep(aliveFor)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
+    time.sleep(aliveFor)(, Monitoring.schedulingPool)
       .onComplete(Process.eval_(Fixtures.signal.get)).run.run
 
     Ø.log.info(s"Stopping the '$name' process...")
