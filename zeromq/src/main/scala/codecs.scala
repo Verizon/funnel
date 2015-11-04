@@ -183,7 +183,10 @@ trait KeyCodecs extends Codecs { self =>
 
   lazy implicit val baseCodec: Codec[Units.Base] = {
     import Units.Base._
-      (codecs.provide(Zero) :+: codecs.provide(Kilo) :+: codecs.provide(Mega) :+: codecs.provide(Giga)).discriminatedByIndex(uint8).as[Units.Base]
+      (codecs.provide(Zero) :+:
+       codecs.provide(Kilo) :+:
+       codecs.provide(Mega) :+:
+       codecs.provide(Giga)).discriminatedByIndex(uint8).as[Units.Base]
   }
 
   val tuToInt: TimeUnit => Int = _ match {

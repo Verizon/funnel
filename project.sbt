@@ -1,6 +1,5 @@
 
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
-import sbtbuildinfo.BuildInfoPlugin, BuildInfoPlugin.BuildInfoKey
 
 common.ignore
 
@@ -38,10 +37,7 @@ lazy val `chemist-static` = project.dependsOn(chemist % "test->test;compile->com
 
 lazy val core = project.enablePlugins(BuildInfoPlugin)
 
-lazy val docs = project.dependsOn(core).settings(
-  buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
-  buildInfoPackage := "funnel"
-)
+lazy val docs = project.dependsOn(core)
 
 lazy val elastic = project.dependsOn(core, http)
 

@@ -14,7 +14,6 @@
 //:   limitations under the License.
 //:
 //: ----------------------------------------------------------------------------
-
 import sbt._, Keys._
 import sbtrelease._
 import sbtrelease.ReleasePlugin.autoImport._

@@ -16,6 +16,6 @@ libraryDependencies ++= Seq(
   "net.databinder"          %% "unfiltered-filter"       % V.unfiltered,
   "net.databinder"          %% "unfiltered-netty-server" % V.unfiltered,
   "com.google.guava"         % "guava"                   % "18.0",
-  "com.google.code.findbugs" % "jsr305"                  % "1.3.+", // needed to provide class javax.annotation.Nullable
-  "oncue.typelevel"         %% "shapeless-scalacheck"    % "0.4.0" % "test"
+  "com.google.code.findbugs" % "jsr305"                  % "1.3.+" //, // needed to provide class javax.annotation.Nullable
+  // "oncue.typelevel"         %% "shapeless-scalacheck"    % "0.4.0" % "test"
 )

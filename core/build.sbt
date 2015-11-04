@@ -1,5 +1,9 @@
 
+import sbtbuildinfo.BuildInfoPlugin, BuildInfoPlugin.BuildInfoKey
+
 common.settings
+
+metadata.settings
 
 // Custom.binaryCompatibility
 

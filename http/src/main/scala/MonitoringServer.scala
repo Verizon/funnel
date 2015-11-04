@@ -26,7 +26,6 @@ import scalaz.stream._
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.signal
 import Events.Event
-import buildinfo.BuildInfo
 
 object MonitoringServer {
 
@@ -49,16 +48,6 @@ object MonitoringServer {
     svr.start()
     svr
   }
-
-  @deprecated("""MonitoringServer.start no longer takes a `log` argument.
-    Use Monitoring.instance to create your Monitoring instance
-    if you want to specify a logger.""", "1.3")
-  def start(M: Monitoring, port: Int, log: String => Unit): MonitoringServer = start(M, port)
-
-  @deprecated("""MonitoringServer.start no longer takes a `log` argument.
-    Use Monitoring.instance to create your Monitoring instance
-    if you want to specify a logger.""", "1.3")
-  def start(M: Monitoring, log: String => Unit): MonitoringServer = start(M)
 }
 
 class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
