@@ -26,7 +26,7 @@ import scalaz.stream._
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.signal
 import Events.Event
-import oncue.svc.funnel.BuildInfo
+import buildinfo.BuildInfo
 
 object MonitoringServer {
 

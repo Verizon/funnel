@@ -1,29 +1,27 @@
-import com.typesafe.sbt.SbtSite.SiteKeys._
-import com.typesafe.sbt.SbtGhPages.GhPagesKeys._
-//import sbtunidoc.Plugin.UnidocKeys._
-import oncue.build._
+// import com.typesafe.sbt.SbtSite.SiteKeys._
+// import com.typesafe.sbt.SbtGhPages.GhPagesKeys._
+// import sbtunidoc.Plugin.UnidocKeys._
+// import oncue.build._
 
-site.settings
+// site.settings
 
-tutSettings
+// tutSettings
 
-site.addMappingsToSiteDir(tut, "tut")
+// site.addMappingsToSiteDir(tut, "tut")
 
-OnCue.baseSettings
+// common.ignore
 
-Publishing.ignore
+// unidocSettings
 
-//unidocSettings
+// //site.addMappingsToSiteDir(mappings in (ScalaUnidoc, packageDoc), "api")
 
-//site.addMappingsToSiteDir(mappings in (ScalaUnidoc, packageDoc), "api")
+// ghpages.settings
 
-ghpages.settings
+// ghpagesNoJekyll := false
 
-ghpagesNoJekyll := false
+// includeFilter in makeSite := "*.html" | "*.css" | "*.png" | "*.jpg" | "*.gif" | "*.js" | "*.swf" | "*.yml" | "*.md"
 
-includeFilter in makeSite := "*.html" | "*.css" | "*.png" | "*.jpg" | "*.gif" | "*.js" | "*.swf" | "*.yml" | "*.md"
-
-git.remoteRepo := "git@github.oncue.verizon.net:IntelMedia/funnel.git"
+// git.remoteRepo := "git@github.oncue.verizon.net:IntelMedia/funnel.git"
 
 /*
 scalacOptions in (ScalaUnidoc, sbtunidoc.Plugin.UnidocKeys.unidoc) ++= Seq(
@@ -32,3 +30,28 @@ scalacOptions in (ScalaUnidoc, sbtunidoc.Plugin.UnidocKeys.unidoc) ++= Seq(
   "-sourcepath", baseDirectory.in(LocalRootProject).value.getAbsolutePath
 )
  */
+
+
+import com.typesafe.sbt.SbtSite.SiteKeys._
+import com.typesafe.sbt.SbtGhPages.GhPagesKeys._
+import sbtunidoc.Plugin.UnidocKeys._
+
+site.settings
+
+tutSettings
+
+site.addMappingsToSiteDir(tut, "tut")
+
+common.ignore
+
+unidocSettings
+
+site.addMappingsToSiteDir(mappings in (ScalaUnidoc, packageDoc), "api")
+
+ghpages.settings
+
+ghpagesNoJekyll := false
+
+includeFilter in makeSite := "*.html" | "*.css" | "*.png" | "*.jpg" | "*.gif" | "*.js" | "*.swf" | "*.yml" | "*.md"
+
+git.remoteRepo := "git@github.com/oncue/funnel.git"

@@ -1,12 +1,12 @@
 
-import oncue.build._
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
+import sbtbuildinfo.BuildInfoPlugin, BuildInfoPlugin.BuildInfoKey
 
-OnCue.baseSettings
+common.ignore
 
-Publishing.ignore
+prompt.settings
 
-organization in Global  := "oncue.svc.funnel"
+organization in Global  := "oncue.funnel"
 
 scalaVersion in Global  := "2.10.5"
 
@@ -36,9 +36,12 @@ lazy val `chemist-aws` = project.dependsOn(chemist % "test->test;compile->compil
 
 lazy val `chemist-static` = project.dependsOn(chemist % "test->test;compile->compile")
 
-lazy val core = project
+lazy val core = project.enablePlugins(BuildInfoPlugin)
 
-lazy val docs = project.dependsOn(core)
+lazy val docs = project.dependsOn(core).settings(
+  buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+  buildInfoPackage := "funnel"
+)
 
 lazy val elastic = project.dependsOn(core, http)
 

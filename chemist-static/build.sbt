@@ -1,13 +1,8 @@
 
-import oncue.build._
-import spray.revolver.RevolverPlugin._
+common.settings
 
-OnCue.baseSettings
-
-Revolver.settings
-
-ScalaTest.settings
+common.revolver
 
 fork in Test := true
 
-mainClass in Revolver.reStart := Some("funnel.chemist.static.Main")
+mainClass in run := Some("funnel.chemist.static.Main")

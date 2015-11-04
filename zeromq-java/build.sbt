@@ -1,15 +1,11 @@
 
-import oncue.build._
-import com.typesafe.sbt.SbtMultiJvm
-import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
-
-OnCue.baseSettings
+common.settings
 
 libraryDependencies ++= Seq(
   "org.zeromq"       % "jeromq"               % "0.3.4",
-  "org.scodec"      %% "scodec-core"          % "1.7.1",
-  "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test",
-  "oncue.ermine"    %% "scala-parsers"        % V.ermine
+  "org.scodec"      %% "scodec-core"          % V.scodec,
+  "oncue.ermine"    %% "ermine-parser"        % V.ermine,
+  "oncue.typelevel" %% "shapeless-scalacheck" % "0.4.0" % "test"
 )
 
 /* this is basically a hack so that the windows agent can be compiled against jeromq */
