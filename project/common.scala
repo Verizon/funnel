@@ -55,9 +55,9 @@ object common {
       "-Xfatal-warnings",
       "-Yno-adapted-args",
       "-Ywarn-dead-code",
+      "-Xfuture"
       // "-Ywarn-numeric-widen",
       // "-Ywarn-value-discard",
-      "-Xfuture"
     )
   )
 
@@ -89,6 +89,11 @@ object common {
     unmanagedResourceDirectories in MultiJvm <+= baseDirectory(_ / ".." / "etc" / "classpath" / "test")
   )
 
+  /**
+   * when using these settings, you need to make sure your module defines
+   * `mainClass in run := Some("foo.bar.Main")` otherwise things will not
+   * work as intended.
+   */
   def revolver = Seq(
     javaOptions in Revolver.reStart += s"-Dlogback.configurationFile=${baseDirectory.value}/../etc/classpath/logback.xml",
     Revolver.reStartArgs :=
