@@ -36,8 +36,8 @@ object PipelineSpecification extends Properties("Pipeline") {
 
   def genDiscovery = for {
     tpairs <- arbitrary[List[(TargetID, Set[Target])]]
-    fpairs <- arbitrary[List[(FlaskID, Flask)]]
-  } yield new StaticDiscovery(tpairs.toMap, fpairs.toMap)
+    flasks <- arbitrary[List[Flask]]
+  } yield new StaticDiscovery(tpairs.toMap, flasks.map(f => (f.id, f)).toMap)
   implicit lazy val arbDiscovery: Arbitrary[StaticDiscovery] = Arbitrary(genDiscovery)
 
   def genNewTarget = for {
@@ -68,10 +68,9 @@ object PipelineSpecification extends Properties("Pipeline") {
   implicit lazy val arbContextOfPlatformEvent: Arbitrary[Context[PlatformEvent]] =
     Arbitrary(genContextOfPlatformEvent)
 
-  implicit lazy val arbSharder: Arbitrary[Sharder] = Arbitrary(oneOf(RandomSharding, LFRRSharding))
-
   property("newFlask works") = forAll { (f: Flask, s: Sharder, d: Distribution) =>
     val (nd, _) = Pipeline.handle.newFlask(f, s)(d)
+    (!Sharding.shards(d).contains(f)) ==>
     ("The existing Distribution does not contain the Flask" |:
       !d.keySet.contains(f)) &&
     ("The new Distribution contains the Flask" |:
@@ -99,16 +98,17 @@ object PipelineSpecification extends Properties("Pipeline") {
       case NewTarget(t) => p match {
         case Distribute(w) =>
           ("The old Distribution does not contain the new Target" |: !Sharding.targets(d).contains(t)) &&
-          (c.distribution.size > 0) ==>
+          (d.size > 0) ==>
             ("The Work does contain the new Target" |: Sharding.targets(w).contains(t))
         case _ => falsified
       }
       case NewFlask(f) => p match {
         case Redistribute(stop, start) =>
+          (!Sharding.shards(d).contains(f)) ==>
           ("The new Flask is not in the old Distribution" |: !Sharding.shards(d).contains(f)) &&
           ("The new Flask is in the new Distribution" |: Sharding.shards(start).contains(f)) &&
           ("The Targets in the old Distribution are all in the new Distribution" |:
-            Sharding.targets(d) == Sharding.targets(start))
+            Sharding.targets(d) == Sharding.targets(nd))
         case _ => falsified
       }
       case NoOp => passed
@@ -120,6 +120,7 @@ object PipelineSpecification extends Properties("Pipeline") {
           }}.toSet
           val nts = Sharding.targets(nd)
           val ots = Sharding.targets(d)
+          (Sharding.shards(d).contains(f)) ==>
           (s"The new Distribution's Targets ($nts) plus the Produced Targets ($ts) equal the old Distribution's Targets ($ots)" |:
             nts ++ ts == ots) &&
           ("The terminated Flask is not in the new Distribution" |: !Sharding.shards(nd).contains(f))
