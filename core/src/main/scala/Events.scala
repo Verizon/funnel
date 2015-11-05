@@ -1,6 +1,6 @@
 package funnel
 
-import java.util.concurrent.{ExecutorService, ScheduledExecutorService}
+import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.Process
@@ -20,17 +20,18 @@ object Events {
     def zero = _ => Process.halt
   }
 
+  val P = Strategy.Executor(Executors.newCachedThreadPool)
+
   /**
    * An event which fires at the supplied regular interval.
    * Because this drives the schedule for attemptRepeatedly(),
-   * it uses the Naive concurrency Strategy, which assigns a
-   * thread per request. This is to accomodate catastrophic
-   * retry scenarios, e.g. when 50+ endpoints unexpectedly
-   * vanish from a Flask.
+   * it uses its own cached thread pool. This is to accomodate
+   * catastrophic retry scenarios, e.g. when 50+ endpoints
+   * unexpectedly vanish from a Flask.
    */
   def every(d: Duration)(
     implicit schedulingPool: ScheduledExecutorService = Monitoring.schedulingPool):
-      Event = _ => awakeEvery(d)(Strategy.Naive, schedulingPool).map(_ => ())
+      Event = _ => awakeEvery(d)(P, schedulingPool).map(_ => ())
 
   /**
    * The first `n` ticks of an event which fires at the supplied
