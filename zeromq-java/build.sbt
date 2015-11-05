@@ -12,3 +12,5 @@ libraryDependencies ++= Seq(
 scalaSource in Compile := baseDirectory.value / ".." / "zeromq" / "src" / "main" / "scala"
 
 scalaSource in Test := baseDirectory.value / ".." / "zeromq" / "src" / "main" / "test"
+
+addCompilerPlugin("org.scalamacros" % "paradise" % "2.0.1" cross CrossVersion.full)

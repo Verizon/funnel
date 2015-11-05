@@ -21,7 +21,6 @@ import knobs.{loadImmutable,Required,FileResource,ClassPathResource}
 import java.io.File
 import java.net.{ InetSocketAddress, Socket, URI, URL }
 import journal.Logger
-import oncue.svc.funnel.BuildInfo
 import scalaz.{\/,-\/,\/-,Kleisli}
 import scalaz.syntax.kleisli._
 import scalaz.syntax.traverse._

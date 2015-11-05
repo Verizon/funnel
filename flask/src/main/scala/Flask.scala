@@ -102,7 +102,7 @@ class Flask(options: Options, val I: Instruments) {
 
     val flaskHost = java.net.InetAddress.getLocalHost.getHostName
     val flaskName = options.name.getOrElse(flaskHost)
-    val flaskCluster = options.cluster.getOrElse(s"flask-${oncue.svc.funnel.BuildInfo.version}")
+    val flaskCluster = options.cluster.getOrElse(s"flask-${BuildInfo.version}")
 
     options.metricTTL.foreach { t =>
       log.info("Booting the key senescence...")
