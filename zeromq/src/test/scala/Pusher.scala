@@ -51,7 +51,7 @@ abstract class ApplicationPusher(name: String, aliveFor: FiniteDuration = 12.sec
 
     Publish.toUnixSocket(Settings.uri.toString, Fixtures.signal)
 
-    time.sleep(aliveFor)(, Monitoring.schedulingPool)
+    time.sleep(aliveFor)(S, Monitoring.schedulingPool)
       .onComplete(Process.eval_(Fixtures.signal.get)).run.run
 
     Ø.log.info(s"Stopping the '$name' process...")
