@@ -17,19 +17,28 @@ object Pipeline {
   private[this] val log = Logger[Pipeline.type]
 
   /**
+    * Discover all the known Targets in a Context.
+    */
+  def targets(dsc: Discovery): Task[Context[Seq[Target]]] = for {
+    dist <- for {
+      a  <- dsc.listActiveFlasks
+      c   = a.foldLeft(Distribution.empty){ (x,y) => x.insert(y, Set.empty[Target]) }
+    } yield c
+    b <- dsc.listTargets.map(_.map(_._2).flatten)
+  } yield Context(dist, b)
+
+  /**
    * periodically wake up and call the platform discovery system. doing this
    * ensures that we capture any outliers, despite having the more event-based
    * platform lifecycle stream (which could periodically fail).
    */
   def discover(dsc: Discovery, interval: Duration): Flow[Target] = {
     (Process.emit(Duration.Zero) ++ time.awakeEvery(interval)(Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool)).flatMap { _ =>
-      val task: Task[Seq[Context[Target]]] = for {
-        a <- dsc.listActiveFlasks
-        b <- dsc.listTargets.map(_.map(_._2).flatten)
-        c  = a.foldLeft(Distribution.empty){ (x,y) => x.insert(y, Set.empty[Target]) }
-      } yield b.map(Context(c,_))
-
-      Process.eval(task).flatMap(Process.emitAll)
+      val ts: Task[Seq[Context[Target]]] = for {
+        ctx <- targets(dsc)
+        ts  <- Task.now(ctx.value.map(Context(ctx.distribution, _)))
+      } yield ts
+      Process.eval(ts).flatMap(Process.emitAll)
     }
   }
 
@@ -110,10 +119,8 @@ object Pipeline {
       case Context(d,TerminatedFlask(flask)) =>
         val tasks: Task[Seq[PlatformEvent]] =
           for {
-            o <- discover(dsc, 1.second).runLog
             a <- dsc.listTargets
             b  = a.flatMap(_._2).toSet
-            d  = o.getOrElse(contextualise(Set.empty)).distribution
             t  = b -- Sharding.targets(d)
             c  = t.toList.map(NewTarget(_))
           } yield c
