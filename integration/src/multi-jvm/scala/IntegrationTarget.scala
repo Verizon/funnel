@@ -10,8 +10,8 @@ object IntegrationTarget {
 
   def start(port: Int): http.MonitoringServer = {
     val W = 10.seconds
-    val M = Monitoring.instance
-    val I = new Instruments(W, M)
+    val M = Monitoring.instance(windowSize = W)
+    val I = new Instruments(M)
     Clocks.instrument(I)
     http.MonitoringServer.start(M, port)
   }

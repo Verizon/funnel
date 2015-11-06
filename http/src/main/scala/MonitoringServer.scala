@@ -62,6 +62,11 @@ class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
       M.log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
     }, identity _))
     M.log.info(s"Metric key TTL is $keyTTL")
+
+    M.dataDislodgement.run.runAsync(_.fold(e => {
+      M.log.error(s"Asynchronous error in data dislodgement process: $e - ${e.getMessage}")
+      M.log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
+    }, identity _))
   }
 
   def stop(): Unit = server.stop(0)

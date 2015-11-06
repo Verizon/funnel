@@ -23,14 +23,12 @@ lazy val funnel = project.in(file(".")).aggregate(
   chemist,
   `chemist-aws`,
   `chemist-static`,
-  `agent-package`,
-  `agent-windows-package`,
-  `flask-package`,
-  `chemist-aws-package`,
-  `chemist-static-package`
+  `agent-windows`
 )
 
 lazy val agent = project.dependsOn(zeromq % "test->test;compile->compile", http, nginx).configs(MultiJvm)
+
+lazy val `agent-windows` = project.dependsOn(`zeromq-java`, http, nginx).configs(MultiJvm)
 
 lazy val chemist = project.dependsOn(core, http, zeromq)
 
@@ -55,20 +53,3 @@ lazy val nginx = project.dependsOn(core)
 lazy val zeromq = project.dependsOn(core, http).configs(MultiJvm) // http? this is for http.JSON._, which should be fixed probably
 
 lazy val `zeromq-java` = project.dependsOn(http).configs(MultiJvm)
-
-//////////////////////////// packages for service deployables ////////////////////////////
-
-lazy val `agent-package` = project.in(
-  file("packages/agent")).dependsOn(agent)
-
-lazy val `agent-windows-package` = project.in(
-  file("packages/agent-windows")).dependsOn(`zeromq-java`, http, nginx).configs(MultiJvm)
-
-lazy val `flask-package` = project.in(
-  file("packages/flask")).dependsOn(flask)
-
-lazy val `chemist-aws-package` = project.in(
-  file("packages/chemist-aws")).dependsOn(`chemist-aws`)
-
-lazy val `chemist-static-package` = project.in(
-  file("packages/chemist-static")).dependsOn(`chemist-static`)

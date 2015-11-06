@@ -30,7 +30,7 @@ class Flask(options: Options, val I: Instruments) {
   val log = Logger[this.type]
 
   val Selfie = Monitoring.instance
-  val ISelfie = new Instruments(1.minute, Selfie)
+  val ISelfie = new Instruments(Selfie)
   val mirrorDatapoints = ISelfie.counter("mirror/datapoints")
 
   val S = MonitoringServer.start(I.monitoring, options.funnelPort)

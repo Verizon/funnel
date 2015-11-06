@@ -56,7 +56,7 @@ object sinks {
       val starting = start.fold(List.empty[Task[Unit]]
         ){ (a,b,c) => c :+ f.command(Monitor(a,b)) }
 
-      Task.delay(log.info("recieved redistribute command: $p")) <*
+      Task.delay(log.info(s"recieved redistribute command: $p")) <*
       Nondeterminism[Task].gatherUnordered(stopping) <*
       Nondeterminism[Task].gatherUnordered(starting)
     }

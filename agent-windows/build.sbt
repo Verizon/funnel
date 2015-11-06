@@ -30,10 +30,6 @@ assemblyMergeStrategy in assembly := {
     oldStrategy(x)
 }
 
-mappings in Universal ++= Seq(
-  file("packages/agent/deploy/etc/agent.cfg") -> "etc/agent.cfg"
-)
-
 unmanagedClasspath in Compile ++= Custom.toolsJar
 
 unmanagedClasspath in Test ++= Custom.toolsJar
