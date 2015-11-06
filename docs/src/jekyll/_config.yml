@@ -1,0 +1,9 @@
+name: Funnel Documentation
+markdown: redcarpet
+# localhost
+baseurl: "/"
+# ghpages
+# baseurl: "/funnel/"
+github:
+  domain: "https://github.com"
+  repo: "/oncue/funnel"
