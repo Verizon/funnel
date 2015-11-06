@@ -26,7 +26,7 @@ class StaticDiscovery(targets: Map[TargetID, Set[Target]], flasks: Map[FlaskID, 
   def lookupTargets(id: TargetID): Task[Set[Target]] = Task.delay(targets(id))	// Can obviously cause the Task to fail
 }
 
-object PipelineSpecification extends Properties("Pipeline") {
+object PipelineCheck extends Properties("Pipeline") {
   import Fixtures._
 
   def genTargetID = for {
