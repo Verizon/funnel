@@ -12,4 +12,4 @@ We currently have two getting started guides avalible:
 
 1. [Operations]({{ site.baseurl }}getting-started/operations.html) - describes the operational aspects of funnel; installing and configuring flask and chemist etc
 
-1. [Migration Guides]({{ site.baseurl }}getting-started/migration.html) - describes the deltas between versions and highlights things that impact end-users.
+3. [FAQ]({{ site.baseurl }}getting-started/faq.html) - answers questions often asked by users when trying to understand *Funnel* semantics.

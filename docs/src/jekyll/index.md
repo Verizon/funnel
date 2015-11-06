@@ -15,7 +15,7 @@ To get started, please read the most appropriate documentation:
 
 *Funnel* allows systems to push, pull, mirror and aggregate metrics from disparate systems, all with a unified API. High-level dashboards can then be created by down-stream consumers (in this case, pushing to elastic search and visualising *Funnel* data with Kiabana)
 
-![image]({{ site.baseurl }}img/elk-dash.png)
+![image]({{ site.baseurl }}img/elk-dash-2.png)
 
 <a name="overview"></a>
 
