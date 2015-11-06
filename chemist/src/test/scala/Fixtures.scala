@@ -36,8 +36,8 @@ object Fixtures {
   implicit lazy val arbLocationIntent: Arbitrary[LocationIntent] = Arbitrary(oneOf(Mirroring, Ignored))
   implicit lazy val arbLocationTemplate: Arbitrary[LocationTemplate] = Arbitrary(genLocationTemplate)
   implicit lazy val arbLocation: Arbitrary[Location] = Arbitrary(genLocation)
-  implicit lazy val arbFlaskID: Arbitrary[FlaskID] = Arbitrary(genFlaskID)
-  implicit lazy val arbFlask: Arbitrary[Flask] = Arbitrary(genFlask)
+  implicit lazy val arbFlaskID: Arbitrary[FlaskID] = Arbitrary(oneOf(List(flask01, flask02, flask03).map(_.id)))
+  implicit lazy val arbFlask: Arbitrary[Flask] = Arbitrary(oneOf(flask01, flask02, flask03))
   implicit lazy val arbSharder: Arbitrary[Sharder] = Arbitrary(genSharder)
   implicit val ordering = Target.orderTarget.toScalaOrdering
 

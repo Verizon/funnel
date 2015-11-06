@@ -42,13 +42,15 @@ object TestingMultiJvmSubscriber {
   import scalaz.stream.io
   import scalaz.stream.async.signalOf
 
+  val S = Strategy.Executor(Monitoring.defaultPool)
+
   def main(args: Array[String]): Unit = {
     val E = Endpoint(subscribe &&& (connect ~ topics.all), Settings.tcp
       ).getOrElse(sys.error("Unable to configure the TCP subscriber endpoint"))
 
     Ø.link(E)(Fixtures.signal)(Ø.receive).map(t => new String(t.bytes)).to(io.stdOut).run.runAsync(_ => ())
 
-    time.sleep(10.seconds)(Strategy.DefaultStrategy, Monitoring.schedulingPool)
+    time.sleep(10.seconds)(S, Monitoring.schedulingPool)
       .onComplete(Process.eval_(Fixtures.signal.get)).run.run
 
     println("Subscriber - Stopping the task...")

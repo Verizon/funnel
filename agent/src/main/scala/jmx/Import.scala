@@ -37,6 +37,7 @@ case class JMXImportException(override val getMessage: String) extends RuntimeEx
 object Import {
   import JMXConnection._
   import Monitoring.{serverPool,schedulingPool}
+  val S = Strategy.Executor(serverPool)
 
   private[this] val log = Logger[Import.type]
 
@@ -55,7 +56,7 @@ object Import {
   )(cache: ConnectorCache, inst: Instruments
   )(frequency: Duration = 10.seconds
   ): Process[Task,Unit] =
-    time.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool)
+    time.awakeEvery(frequency)(S, schedulingPool)
       .evalMap(_ => now(location, queries, exclusions, cluster)(cache, inst))
 
   /**

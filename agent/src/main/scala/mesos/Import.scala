@@ -38,6 +38,7 @@ case class MetricsChecker(field:  Int)
 
 object Import {
   import Monitoring.{serverPool,schedulingPool}
+  val S = Strategy.Executor(serverPool)
 
   private[this] val log = Logger[Import.type]
 
@@ -53,7 +54,7 @@ object Import {
                     )(inst: Instruments
                     )(frequency: Duration = 10.seconds
                     ): Process[Task,Unit] =
-    time.awakeEvery(frequency)(Strategy.Executor(serverPool), schedulingPool)
+    time.awakeEvery(frequency)(S, schedulingPool)
       .evalMap(_ => now(url, queries, checkfield, cluster)(inst))
 
 

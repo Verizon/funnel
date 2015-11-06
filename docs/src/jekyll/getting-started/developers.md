@@ -9,7 +9,7 @@ section: "getting-started"
 First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
 ``` scala
-libraryDependencies += "funnel" %% "http" % "x.y.z"
+libraryDependencies += "oncue.funnel" %% "http" % "x.y.z"
 ```
 
 (check for the latest release by [looking on the nexus](http://nexus.svc.oncue.com/nexus/content/repositories/releases/oncue/svc/funnel/http_2.10/))
@@ -27,15 +27,14 @@ You will likely never touch these dependencies directly, but its important to be
 With the dependency setup complete, you can now start instrumenting your code. The first thing you need to do is create a `metrics.scala` file, which should look something like this:
 
 ``` scala
-package oncue.svc
-package myproject
+package yourapp
 
 import funnel.instruments._
 
 object metrics {
   val HttpReadWidgets = timer("http/get/widgets", 
     "time taken to read and display the list of widgets")
-  val HttpReadWidget  = timer("http/get/widgets/:id", 
+  val HttpReadWidget  = timer("http/get/widgets/id", 
     "time taken to read and display a given widget")
   val FooCount        = counter("domain/foocount", 
     "the number of foos that have been seen")
@@ -53,7 +52,7 @@ The goal of this `metrics` object is to define your metrics up front, and force 
 At first blush, clearly having a single namespace for the entire world of application metrics could become unwieldy, so it is recommended to organise your metrics with nested objects, based on logical application layering. Here's a more complete example from the SU service that illustrates this pattern:
 
 ``` scala
-package oncue.svc.su
+package yourapp
 
 import funnel.instruments._
 
@@ -67,19 +66,19 @@ object metrics {
       "time taken to determine if the supplied device profile needs any software updated")
     val CreateAllocations = timer("http/post/allocations", 
       "time taken to make new allocations")
-    val ReadAllocations   = timer("http/get/allocations/:key", 
+    val ReadAllocations   = timer("http/get/allocations/key", 
       "time taken to read a specified allocation")
-    val DeleteAllocation  = timer("http/delete/allocations/:key", 
+    val DeleteAllocation  = timer("http/delete/allocations/key", 
       "time taken to delete an allocation")
     val ReadGroups        = timer("http/get/groups", 
       "time taken to load and present all defined groups as json")
     val CreateGroup       = timer("http/post/groups", 
       "time taken to add a new group")
-    val ReadGroup         = timer("http/get/groups/:key", 
+    val ReadGroup         = timer("http/get/groups/key", 
       "time taken to read a group definition and display as json")
-    val UpdateGroup       = timer("http/put/groups/:key", 
+    val UpdateGroup       = timer("http/put/groups/key", 
       "time taken to replace the definition of a group")
-    val DeleteGroup       = timer("http/delete/groups/:key", 
+    val DeleteGroup       = timer("http/delete/groups/key", 
       "time taken to delete a group with a given key")
   }
 
@@ -102,14 +101,6 @@ object metrics {
     val DeleteLatency     = timer("db/delete/batch/latency", 
       "time taken to delete a batch from the database")
   }
-
-  /**
-   * Instruments that record latencies for talking to other services
-   */
-  object s2s {
-    val ArtifactSyncLatency = timer("s2s/artifacts/latency", 
-      "time taken to request all the artifacts from inventory service")
-  }
 }
 ```
 
@@ -125,8 +116,7 @@ You should **not** use a counter for a magnitude or amount that represents the c
 For example, to create a counter for the number of cache hits:
 
 ``` scala
-package oncue.svc
-package yourproject
+package yourapp
 
 import funnel.instruments._
 
@@ -158,8 +148,7 @@ trait SomeFun {
 As the name suggests, **timers** are all about the amount of time take to perform a specific operation.
 
 ``` scala
-package oncue.svc
-package yourproject
+package yourapp
 
 import funnel.instruments._
 
@@ -211,8 +200,7 @@ Use a gauge when you want to monitor the magnitude or amount of something at a p
 
 
 ``` scala
-package oncue.svc
-package yourproject
+package yourapp
 
 import funnel.Units
 import funnel.instruments._
@@ -250,8 +238,7 @@ By default, the following types are supported as values for gauges:
 In addition to simply recording the value of the gauge, there is a specialised gauge that can also track numerical statistics like `mean`, `variance` etc. To use it, just adjust your `metrics` declaration like so:
 
 ``` scala
-package oncue.svc
-package yourproject
+package yourapp
 
 import funnel.instruments._
 
@@ -261,6 +248,7 @@ object metrics {
 }
 ```
 
+There is a subtle nuance between `gauge` and `numericGauge` instruments. Specifically, `gauge` can be used with any `A` that is `Reportable`. Whilst this is useful for some causes, the majority of gauges you would need form some kind of `numericGauge` (i.e. their value is usually `Double`, `Int`, etc), and as such its very important that you use `numericGauge` and not `gauge` for these values. The subtle difference here is that because `gauge` is the general-case instrument, its input cannot be guaranteed to aggregate (form a `Group`), so the metric values are only outputted on the `now` stream, which is not typically collected by *Flask*, as the `now` stream has a huge amount of throughput compared to `previous` (by default *Chemist* is configured to only pull `String` items from the `now` - strings do not aggregate but form traffic lights and edges - so your plain `gauge` would not be collected). `numericGauges` on the other hand output in all three streams: `now`, `sliding` and `previous`.
 
 #### Traffic Light
 
@@ -273,8 +261,7 @@ As an extension to the concept of `Gauge`, there is also the notion of a "traffi
 Traffic light metrics are used to derive actionable signals for operations (they can derive whatever they like too), but for example, one might put a traffic light metric on database access, or the status of a circuit breaker used to invoke a 3rd party system. Using traffic lights is super simple:
 
 ``` scala
-package oncue.svc
-package yourproject
+package yourapp
 
 import funnel.instruments._
 
@@ -411,12 +398,15 @@ val timer2 = timer("t2")
 val ratio: Metric[Double] =
   (timer1.keys |@| timer2.keys)(_ + _)
 
+// do this only once at the endge of the world:
 val _ = ratio.publish("foo/mytimer", Units.Milliseconds).run
+
 ```
 
 We could publish a metric that determines whether our application is "healthy", meaning that we haven't received more than 20,000 requests in the current window, the database is up, and our average query response time is under 20 milliseconds.
 
 ``` scala
+
 val reqs = counter("requests")
 val dbOk = gauge("db-up", true)
 val query = timer("query-speed")
@@ -428,12 +418,14 @@ val healthy: Metric[Boolean] =
      t.mean < 20
   }
 
+// do this only once at the endge of the world:
 healthy.publish("healthy", Units.Healthy).run
+
 ```
 
 ### Monitoring Server
 
-All the metrics you define in your application, plus some additional platform metrics supplied by the monitoring library can be exposed via a baked in administration server. In order to use this server, one simply only needs to add the following line to the `main` of their application:
+All the metrics you define in your application, plus some additional platform metrics supplied by the monitoring library can be exposed via a baked in HTTP server. In order to use this server, one simply only needs to add the following line to the `main` of their application:
 
 ``` scala
 import funnel.http.MonitoringServer
@@ -450,9 +442,5 @@ object Main {
 
 **NOTE: By application `main`, this does not have to be the actual main, but rather, the end of the world for your application (which however, would usually be the main). For Play! applications, this means the Global object.**
 
-With this in your application, and assuming you are developing locally, once running you will be able to access [http://127.0.0.1:5775/](http://127.0.0.1:5775/) in your local web browser, where the index page will give you a list of available resources and descriptions of their function:
-
-![image]({{ site.baseurl }}img/control-panel.png)
-
-
+With this in your application, and assuming you are developing locally, once running you will be able to access [http://127.0.0.1:5775/](http://127.0.0.1:5775/) in your local web browser, where the index page will give you a list of available resources and descriptions of their function.
 
