@@ -1,5 +1,5 @@
 {
-  "template" : "funnel*",
+  "template" : "funnel-exploded*",
   "order" : 10,
   "mappings": {
     "_default_" : {
