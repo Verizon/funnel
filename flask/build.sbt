@@ -1,17 +1,10 @@
-import oncue.build._
-import com.typesafe.sbt.SbtNativePackager._
-import com.typesafe.sbt.packager.Keys._
 
-OnCue.baseSettings
+common.settings
 
-Revolver.settings
-
-ScalaTest.settings
-
-Custom.resources
-
-Custom.revolver
+common.revolver
 
 libraryDependencies += "oncue.knobs" %% "core" % V.knobs
 
 fork in Test := true
+
+mainClass in run := Some("funnel.flask.Main")
