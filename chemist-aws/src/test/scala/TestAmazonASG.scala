@@ -47,7 +47,7 @@ object TestAmazonASG {
       .withLaunchConfigurationName(s"lc-$uuid")
       .withTags(tags(
         AwsTagKeys.name -> "flask",
-        AwsTagKeys.version -> oncue.svc.funnel.BuildInfo.version,
+        AwsTagKeys.version -> funnel.BuildInfo.version,
         AwsTagKeys.qualifier -> "testing"
       ))
   }
