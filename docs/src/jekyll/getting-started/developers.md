@@ -12,12 +12,12 @@ First up you need to add the dependency for the monitoring library to your `buil
 libraryDependencies += "oncue.funnel" %% "http" % "x.y.z"
 ```
 
-(check for the latest release by [looking on the nexus](http://nexus.svc.oncue.com/nexus/content/repositories/releases/oncue/svc/funnel/http_2.10/))
+(check for the latest release by [looking on bintray](https://bintray.com/oncue/releases/funnel/view))
 
 Current transitive dependencies this will introduce on your classpath:
 
 - [Scalaz](https://github.com/scalaz/scalaz) 7.1.0
-- [Scalaz Stream](https://github.com/scalaz/scalaz-stream) 0.7.1a
+- [Scalaz Stream](https://github.com/scalaz/scalaz-stream) 0.7.3a
 - [Algebird Core](https://github.com/twitter/algebird) 0.8.0
 
 You will likely never touch these dependencies directly, but its important to be aware of them in case you decide yourself to use Scalaz (for example); if you have conflicting versions then you will see some very strange binary collisions at runtime.
@@ -32,11 +32,11 @@ package yourapp
 import funnel.instruments._
 
 object metrics {
-  val HttpReadWidgets = timer("http/get/widgets", 
+  val HttpReadWidgets = timer("http/get/widgets",
     "time taken to read and display the list of widgets")
-  val HttpReadWidget  = timer("http/get/widgets/id", 
+  val HttpReadWidget  = timer("http/get/widgets/id",
     "time taken to read and display a given widget")
-  val FooCount        = counter("domain/foocount", 
+  val FooCount        = counter("domain/foocount",
     "the number of foos that have been seen")
   // more metrics here
 }
@@ -62,23 +62,23 @@ object metrics {
     * Instruments for everything related to the HTTP stack.
     */
   object http {
-    val ReadUpdates       = timer("http/post/updates", 
+    val ReadUpdates       = timer("http/post/updates",
       "time taken to determine if the supplied device profile needs any software updated")
-    val CreateAllocations = timer("http/post/allocations", 
+    val CreateAllocations = timer("http/post/allocations",
       "time taken to make new allocations")
-    val ReadAllocations   = timer("http/get/allocations/key", 
+    val ReadAllocations   = timer("http/get/allocations/key",
       "time taken to read a specified allocation")
-    val DeleteAllocation  = timer("http/delete/allocations/key", 
+    val DeleteAllocation  = timer("http/delete/allocations/key",
       "time taken to delete an allocation")
-    val ReadGroups        = timer("http/get/groups", 
+    val ReadGroups        = timer("http/get/groups",
       "time taken to load and present all defined groups as json")
-    val CreateGroup       = timer("http/post/groups", 
+    val CreateGroup       = timer("http/post/groups",
       "time taken to add a new group")
-    val ReadGroup         = timer("http/get/groups/key", 
+    val ReadGroup         = timer("http/get/groups/key",
       "time taken to read a group definition and display as json")
-    val UpdateGroup       = timer("http/put/groups/key", 
+    val UpdateGroup       = timer("http/put/groups/key",
       "time taken to replace the definition of a group")
-    val DeleteGroup       = timer("http/delete/groups/key", 
+    val DeleteGroup       = timer("http/delete/groups/key",
       "time taken to delete a group with a given key")
   }
 
@@ -86,19 +86,19 @@ object metrics {
     * Instruments for the database access operations
     */
   object db {
-    val ReadLatency       = timer("db/read/single/latency", 
+    val ReadLatency       = timer("db/read/single/latency",
       "time taken to read a single entry from the database")
-    val ReadBatchLatency  = timer("db/read/batch/latency", 
+    val ReadBatchLatency  = timer("db/read/batch/latency",
       "time taken to read a batch of items from the database with a specified set of keys")
-    val ReadListLatency   = timer("db/read/list/latency", 
+    val ReadListLatency   = timer("db/read/list/latency",
       "time taken to list items from the database with a given hash+range combination")
-    val ReadScanLatency   = timer("db/read/scan/latency", 
+    val ReadScanLatency   = timer("db/read/scan/latency",
       "time taken to scan the specified database table")
-    val WriteLatency      = timer("db/write/single/latency", 
+    val WriteLatency      = timer("db/write/single/latency",
       "time taken to write a single entry into the database")
-    val WriteBatchLatency = timer("db/write/batch/latency", 
+    val WriteBatchLatency = timer("db/write/batch/latency",
       "time taken to write a batch to the database")
-    val DeleteLatency     = timer("db/delete/batch/latency", 
+    val DeleteLatency     = timer("db/delete/batch/latency",
       "time taken to delete a batch from the database")
   }
 }
