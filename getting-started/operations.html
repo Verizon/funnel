@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Funnel - Getting Started - Operations</title>
+
+    <link rel="stylesheet" href="/funnel/css/styles.css">
+    <link rel="stylesheet" href="/funnel/css/custom.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <a name="top"></a>
+    <div class="wrapper">
+      <header>
+        <h1>Funnel</h1>
+        <p>Last updated on <em>November 17, 2015</em></p>
+
+        <ul>
+          <li><a href="https://github.com/oncue/funnel/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/oncue/funnel/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/oncue/funnel">View On <strong>GitHub</strong></a></li>
+        </ul>
+
+        <hr />
+
+        <ol>
+          <!-- home -->
+          <li><a href="/funnel/">Home</a></li>
+          <li><a href="/funnel/#overview">Overview</a></li>
+
+          <!-- getting started -->
+          <li><a href="/funnel/getting-started">Getting Started</a></li>
+          
+            <li>
+              <ol>
+                <li><a href="/funnel/getting-started/developers.html">Developers</a></li>
+                <li><a href="/funnel/getting-started/operations.html">Operations</a></li>
+                <li><a href="/funnel/getting-started/faq.html">FAQ</a></li>
+              </ol>
+            </li>
+          
+
+          <!-- modules -->
+          <li><a href="/funnel/modules">Modules</a></li>
+          
+
+          <!-- services -->
+          <li><a href="/funnel/services">Services</a></li>
+          
+        </ol>
+
+        <hr />
+
+      </header>
+      <section>
+        <h1>Getting Started: Operations</h1>
+
+<p>The <em>Funnel</em> monitoring system is an umbrella for several components:</p>
+
+<ul>
+<li><p><a href="/funnel/services/#agent">Agent</a>: runs on each and every host and provides a stable network location for <em>Flask</em> to stream metrics from.</p></li>
+<li><p><a href="/funnel/services/#flask">Flask</a>: collects metrics coming from the Agent stream and stores them in local memory, partitioned by a given &quot;bucket&quot; (more on this later).</p></li>
+<li><p><a href="/funnel/services/#chemist">Chemist</a>: organising what funnels are pouring which metrics into which flasks. In essence this component is a job manager. Chemist can automatically detect failures in flasks and repartition the load amongst the remaining flasks in the operational cluster.</p></li>
+</ul>
+
+<p>At a high-level, the system can be visualised like this:</p>
+
+<p><img src="/funnel/img/chemist-flask-funnel.png" alt="image"></p>
+
+<p>Given the different functions of each component, please refer to their specific sections for more information.</p>
+
+<h2>Installation</h2>
+
+<p>Regardless of the <em>Funnel</em> service component</p>
+
+<h2>Security</h2>
+
+<p>The security model of funnel currently <strong>relies on network level security</strong>; the application does not attempt to security its communication over the wire using any kind of TLS. With this in mind, never ever host a service on the public internet where the <em>Funnel</em> network port (typically <code>5775</code> for HTTP and/or <code>7390</code> for ZMTP) is open. Doing this would leave the system open for tampering and expose sensitive internals to attackers.</p>
+
+<p>In this frame, the recommended security model is to restrict access to datacenter internals, VPNs and specific VLANs. We may add application-layer security at a later date, but given that the system is designed to run fast and light, using operational network security is a fair trade off.</p>
+
+      </section>
+      <footer>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,284 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Funnel - Modules</title>
+
+    <link rel="stylesheet" href="/funnel/css/styles.css">
+    <link rel="stylesheet" href="/funnel/css/custom.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <a name="top"></a>
+    <div class="wrapper">
+      <header>
+        <h1>Funnel</h1>
+        <p>Last updated on <em>November 17, 2015</em></p>
+
+        <ul>
+          <li><a href="https://github.com/oncue/funnel/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/oncue/funnel/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/oncue/funnel">View On <strong>GitHub</strong></a></li>
+        </ul>
+
+        <hr />
+
+        <ol>
+          <!-- home -->
+          <li><a href="/funnel/">Home</a></li>
+          <li><a href="/funnel/#overview">Overview</a></li>
+
+          <!-- getting started -->
+          <li><a href="/funnel/getting-started">Getting Started</a></li>
+          
+
+          <!-- modules -->
+          <li><a href="/funnel/modules">Modules</a></li>
+          
+            <li>
+              <ol>
+                <li><a href="/funnel/modules/#elastic-flattened">Elastic Search (flattened)</a></li>
+                <li><a href="/funnel/modules/#elastic-exploded">Elastic Search (exploded)</a></li>
+                <li><a href="/funnel/modules/#nginx">Nginx</a></li>
+                <li><a href="/funnel/modules/#zeromq">ZeroMQ</a></li>
+              </ol>
+            </li>
+          
+
+          <!-- services -->
+          <li><a href="/funnel/services">Services</a></li>
+          
+        </ol>
+
+        <hr />
+
+      </header>
+      <section>
+        <h1>Modules</h1>
+
+<p><em>Funnel</em> comes with a range of modules that allows composistion of the system in a variety of ways. Some modules are straight exporters, others provide both importing and exporting functionality.</p>
+
+<p><a name="elastic-flattened"></a></p>
+
+<h2>Elastic Search (Flattened)</h2>
+
+<p>Primarily for visualisation, this consumer takes the stream and aggregates into one document <em>per-metric</em> per time window, and then sends those documents to Elastic Search as a single <code>PUT</code> operation. The format of the message looks like this:</p>
+<div class="highlight"><pre><code class="language-" data-lang=""><span class="p">{</span><span class="w">
+  </span><span class="nt">"@timestamp"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2015-11-06T03:29:18.779+0000"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"window"</span><span class="p">:</span><span class="w"> </span><span class="s2">"now"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"jvm.memory.total.used"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"host"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ip-10-124-10-140"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"uri"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ip-10-124-10-140"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"cluster"</span><span class="p">:</span><span class="w"> </span><span class="s2">"flask-5.0.450"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"flask"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ip-10-124-10-140"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"units"</span><span class="p">:</span><span class="w"> </span><span class="s2">"megabytes"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"environment"</span><span class="p">:</span><span class="w"> </span><span class="s2">"imdev"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"stack"</span><span class="p">:</span><span class="w"> </span><span class="s2">"flask-5.0.450"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"numeric"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"variance"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"kurtosis"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"mean"</span><span class="p">:</span><span class="w"> </span><span class="mf">4662.508824</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"last"</span><span class="p">:</span><span class="w"> </span><span class="mf">4662.508824</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"skewness"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"standardDeviation"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="w">
+  </span><span class="p">},</span><span class="w">
+  </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"numeric"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"stats"</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div>
+<p>Using this document format enables extreamly fast indexing of documents in Elastic Search and gives great performance when using Kibana 4 (or later) for data visulisation.</p>
+
+<p><a name="elastic-exploded"></a></p>
+
+<h2>Elastic Search (Exploded)</h2>
+
+<p><strong>This sink is only to be used for light traffic, and at high-load it will cause yuor elastic search cluster to bloat its field space beyond the recomended safe limit. For high-volume workloads use the Flattened ES sink.</strong></p>
+
+<p>Primarily for visualisation, this consumer takes the stream and aggregates into one document <em>per-funnel-host</em> per time window, and then sends those documents to Elastic Search in a bulk <code>PUT</code> operation. The format of the message looks like this:</p>
+<div class="highlight"><pre><code class="language-" data-lang=""><span class="p">{</span><span class="w">
+  </span><span class="nt">"@timestamp"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2014-08-22T17:37:54.201855"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"cluster"</span><span class="p">:</span><span class="w"> </span><span class="s2">"imqa-maestro-1-0-279-F6Euts"</span><span class="p">,</span><span class="w">  </span><span class="err">#This</span><span class="w"> </span><span class="err">allows</span><span class="w"> </span><span class="err">for</span><span class="w"> </span><span class="err">a</span><span class="w"> </span><span class="err">Kibana</span><span class="w"> </span><span class="err">search,</span><span class="w"> </span><span class="err">cluster</span><span class="p">:</span><span class="w"> </span><span class="err">x</span><span class="w">
+  </span><span class="s2">"host"</span><span class="err">:</span><span class="w"> </span><span class="s2">"ec2-107-22-118-178.compute-1.amazonaws.com"</span><span class="p">,</span><span class="w">
+  </span><span class="nt">"previous"</span><span class="w"> </span><span class="err">{</span><span class="w">
+    </span><span class="nt">"jvm"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+      </span><span class="nt">"memory"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nt">"heap"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+          </span><span class="nt">"committed"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="nt">"last"</span><span class="p">:</span><span class="w"> </span><span class="mf">250.99763712000001</span><span class="p">,</span><span class="w">
+            </span><span class="nt">"mean"</span><span class="p">:</span><span class="w"> </span><span class="mf">250.99763712000001</span><span class="p">,</span><span class="w">
+            </span><span class="nt">"standard_deviation"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="w">
+          </span><span class="p">},</span><span class="w">
+          </span><span class="nt">"usage"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="nt">"last"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.042628084023299997</span><span class="p">,</span><span class="w">
+            </span><span class="nt">"mean"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.042445506024100001</span><span class="p">,</span><span class="w">
+            </span><span class="nt">"standard_deviation"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.00018257799924300001</span><span class="w">
+          </span><span class="p">}</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">}</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">}</span><span class="w">
+</span><span class="err">}</span><span class="w">
+</span></code></pre></div>
+<p>Using this document format enables Elastic Search to reason about both aggregate time queries, and top-n queries - the two primary use cases for monitoring visualisation.</p>
+
+<p><a name="nginx"></a></p>
+
+<h2>Nginx</h2>
+
+<p><em>Funnel</em> has a module for importing metrics from a specified Nginx web server. Provided your Nginx setup has the <a href="http://nginx.org/en/docs/http/ngx_http_stub_status_module.html">stub_status</a> module installed and setup, <em>Funnel</em> can import a set of information about current nginx connections, and lifetime behaviour of that Nginx process.</p>
+
+<p>The funnel agent has a convenient usage of this module, but users can also bundle this inside their application if they wish to collect Nginx statistics from an on-board JVM process directly. Usage is exceedingly simple:</p>
+<div class="highlight"><pre><code class="language-" data-lang="">package yourapp
+
+import java.net.URI
+
+object Main {
+  def main(args: Array[String]): Unit = {
+    ...
+    val uri = new URI("http://localhost:4444/stub_status")
+    funnel.nginx.Import.periodically(uri)
+    ...
+  }
+}
+
+</code></pre></div>
+<p><a name="zeromq"></a></p>
+
+<h2>ZeroMQ</h2>
+
+<p>The <a href="http://zeromq.org/">ZeroMQ</a> module provides both the ability to publish metrics from a <code>Monitoring</code> instance out to a socket (with an arbitrary transport and mode), and the ability to consume metrics from a socket and import them into the specified <code>Monitoring</code> instance.</p>
+
+<h4>Installation</h4>
+
+<p>The ZeroMQ module comes in two flavours:</p>
+
+<ol>
+<li><p><code>zeromq</code> which uses the <em>native</em> <code>libzmq</code> C++ library and allows use of UNIX domain sockets, PGM etc. This is the reference implementation of ZMTP.</p></li>
+<li><p><code>zeromq-java</code> which uses the pure-Java implementation of the same library API. This module is meant purely for compatiblity with Windows systems, as it cannot leverage domain sockets or PGM. Do not use this module unless you are sure of what you&#39;re doing.</p></li>
+</ol>
+
+<p>With this frame, in order to run locally you&#39;ll need to install the <code>libzmq</code> and the <code>jzmq</code> native binaries. You can do that by running the following steps:</p>
+
+<ol>
+<li>Install ZeroMQ. Be sure to install ZeroMQ 4.0.+ (4.1 is NOT compatible)</li>
+</ol>
+<div class="highlight"><pre><code class="language-" data-lang="">brew update &amp;&amp; brew install zeromq
+</code></pre></div>
+<ol>
+<li>Build the JZMQ binaries</li>
+<li>Unzip the file and execute the following shell</li>
+</ol>
+<div class="highlight"><pre><code class="language-" data-lang="">cd jzmq-3.1.0 &amp;&amp; sudo mv libjzmq* /Library/Java/Extensions/
+
+</code></pre></div>
+<p>That&#39;s all there is to it!</p>
+
+<h4>Exporting</h4>
+
+<p>In order to publish your metrics using ZeroMQ, ensure that you have the following in your <code>build.sbt</code>:</p>
+<div class="highlight"><pre><code class="language-" data-lang="">libraryDependencies += "oncue.funnel" %% "zeromq" % "x.x.x"
+</code></pre></div>
+<p>This will allow you to setup the publishing of metrics. Technically, this publishing happens on a background daemon thread, so its typically best to put this line at the very edge of your work (typically the application main):</p>
+<div class="highlight"><pre><code class="language-" data-lang="">package foo
+
+object Foo {
+  def main(args: Array[String]): Unit = {
+    funnel.zeromq.Publish.toUnixSocket()
+  }
+}
+
+</code></pre></div>
+<p><strong>NOTE</strong>: If you do not have the native library installed you will see an error at runtime on your local machine. For development purposes this can be ignored - the binaries are instaleld by default on the foundation images used during deployment.</p>
+
+<p>If you would like more control over when the <code>Publish</code> process is started and stopped, then you can simply pass the function an async <code>Signal[Boolean]</code>:</p>
+<div class="highlight"><pre><code class="language-" data-lang="">package foo
+
+import scalaz.stream.async.signalOf
+import scalaz.stream.async.mutable.Signal
+import scalaz.concurrent.Task
+import funnel.zeromq.Publish
+
+object Foo {
+
+  def stop(signal: Signal[Boolean]): Task[Unit] = {
+    for {
+      _ &lt;- signal.set(false)
+      _ &lt;- signal.close
+    } yield ()
+  }
+
+  def main(args: Array[String]): Unit = {
+     val alive = signalOf(true)
+    Publish.toUnixSocket(signal = alive)
+
+    // sometime later when you want to stop
+    stop(alive)
+  }
+}
+
+</code></pre></div>
+<h4>Importing</h4>
+
+<p>Similarly, importing metrics is trival. Please note this documentation is intended for completeness only and is not a typical user-level API unless one is implementing a <em>Flask</em>-like process. Given that <code>Monitoring.mirrorAll</code> simply requires a <code>DatapointParser</code> type, the ZeroMQ module supplies one like this:</p>
+<div class="highlight"><pre><code class="language-" data-lang="">package foo
+
+import scalaz.stream.async.signalOf
+import funnel.zeromq.Publish
+import funnel.DatapointParser
+
+object Foo {
+
+  def main(args: Array[String]): Unit = {
+     val alive = signalOf(true)
+    val dp: DatapointParser = Mirror.from(alive) _
+  }
+}
+</code></pre></div>
+<h4>Endpoints</h4>
+
+<p>When using the ZeroMQ module primitives to do anything with sockets, you will need to specify and <code>Endpoint</code>. The module provides a range of useful combinators to make creating the type of socket you want simple. Here&#39;s an example:</p>
+<div class="highlight"><pre><code class="language-" data-lang="">package foo
+
+import scalaz.stream.async.signalOf
+import funnel.zeromq.{Endpoint,sockets}, sockets._
+import java.net.URI
+
+object Foo {
+
+  def main(args: Array[String]): Unit = {
+     val uri = new URI("ipc:///tmp/foo.socket")
+    val E1 = Endpoint(publish &amp;&amp;&amp; bind, uri)
+    val E2 = Endpoint(push &amp;&amp;&amp; bind, uri)
+    val E3 = Endpoint(subscribe &amp;&amp;&amp; (connect ~ topics.all))
+  }
+}
+</code></pre></div>
+<p>Essentially the ZeroMQ socket types are modelled as functions and you can specify if you want to be the side of the connection that <code>bind</code>&#39;s or <code>connect</code>&#39;s. In the case of PUB-SUB you also have the option to specify a discriminating predicate for topic subscription.</p>
+
+<h4>Wire Protocol</h4>
+
+<p>Whilst the 0mq socket uses <a href="http://zmtp.org/">ZMTP</a>, the payload framing is always the responsibility of the implementing application. Subsequently, <em>Funnel</em> has an application-layer scheme for handling versioning and message discrimination on the wire. <em>Funnel</em> uses a single header frame followed by all subsequent payload frames. The header frame acts like a routing envelope for the message payload, and it has a simple delimited text construction that looks like this:</p>
+<div class="highlight"><pre><code class="language-" data-lang="">&lt;scheme&gt;/&lt;version&gt;/&lt;window&gt;/&lt;topic&gt;
+
+</code></pre></div>
+<p>Some of the fields here are <em>optional</em>, and but all fields have an important role to play:</p>
+
+<ul>
+<li><p><code>scheme</code>: mandatory element that represents the types of payload that this message (set of frames) contains. At the time of writing the <em>Funnel</em> module supported two types of message scheme: <code>fsm</code> and <code>telem</code>, everything is classified as <code>unknown</code>.</p></li>
+<li><p><code>version</code>: mandatory element that represents the version of the prefixed <code>scheme</code>. This is vital for protocol evolution over time, and clients are expected to parse the version information and be able to support multiple scheme versions simultaneously. Often the combination of <code>scheme</code> and <code>version</code> is everything the client needs to figure out how to handle a particular payload.</p></li>
+<li><p><code>window</code>: <em>optional</em> element that denotes the <em>Funnel</em> window period this message pertains too. At the time of writing this was really only applicable to the <code>fsm</code> scheme, and only makes sense when <em>Flask</em> is consuming metrics from a remote target.</p></li>
+<li><p><code>topic</code>: <em>optional</em> element that denotes any further specification about which metric key this payload is related too. At the time of writing this was really only applicable to the <code>fsm</code> scheme, and only makes sense when <em>Flask</em> is consuming metrics from a remote target.</p></li>
+</ul>
+
+      </section>
+      <footer>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+  </body>
+</html>

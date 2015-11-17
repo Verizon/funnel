@@ -1,0 +1,464 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Funnel - Getting Started - Developers</title>
+
+    <link rel="stylesheet" href="/funnel/css/styles.css">
+    <link rel="stylesheet" href="/funnel/css/custom.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <a name="top"></a>
+    <div class="wrapper">
+      <header>
+        <h1>Funnel</h1>
+        <p>Last updated on <em>November 17, 2015</em></p>
+
+        <ul>
+          <li><a href="https://github.com/oncue/funnel/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/oncue/funnel/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/oncue/funnel">View On <strong>GitHub</strong></a></li>
+        </ul>
+
+        <hr />
+
+        <ol>
+          <!-- home -->
+          <li><a href="/funnel/">Home</a></li>
+          <li><a href="/funnel/#overview">Overview</a></li>
+
+          <!-- getting started -->
+          <li><a href="/funnel/getting-started">Getting Started</a></li>
+          
+            <li>
+              <ol>
+                <li><a href="/funnel/getting-started/developers.html">Developers</a></li>
+                <li><a href="/funnel/getting-started/operations.html">Operations</a></li>
+                <li><a href="/funnel/getting-started/faq.html">FAQ</a></li>
+              </ol>
+            </li>
+          
+
+          <!-- modules -->
+          <li><a href="/funnel/modules">Modules</a></li>
+          
+
+          <!-- services -->
+          <li><a href="/funnel/services">Services</a></li>
+          
+        </ol>
+
+        <hr />
+
+      </header>
+      <section>
+        <h1>Getting Started: Developers</h1>
+
+<p>First up you need to add the dependency for the monitoring library to your <code>build.scala</code> or your <code>build.sbt</code> file:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="n">libraryDependencies</span> <span class="o">+=</span> <span class="s">"oncue.funnel"</span> <span class="o">%%</span> <span class="s">"http"</span> <span class="o">%</span> <span class="s">"x.y.z"</span>
+</code></pre></div>
+<p>(check for the latest release by <a href="http://nexus.svc.oncue.com/nexus/content/repositories/releases/oncue/svc/funnel/http_2.10/">looking on the nexus</a>)</p>
+
+<p>Current transitive dependencies this will introduce on your classpath:</p>
+
+<ul>
+<li><a href="https://github.com/scalaz/scalaz">Scalaz</a> 7.1.0</li>
+<li><a href="https://github.com/scalaz/scalaz-stream">Scalaz Stream</a> 0.7.1a</li>
+<li><a href="https://github.com/twitter/algebird">Algebird Core</a> 0.8.0</li>
+</ul>
+
+<p>You will likely never touch these dependencies directly, but its important to be aware of them in case you decide yourself to use Scalaz (for example); if you have conflicting versions then you will see some very strange binary collisions at runtime.</p>
+
+<h3>Defining Metrics</h3>
+
+<p>With the dependency setup complete, you can now start instrumenting your code. The first thing you need to do is create a <code>metrics.scala</code> file, which should look something like this:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">package</span> <span class="nn">yourapp</span>
+
+<span class="k">import</span> <span class="nn">funnel.instruments._</span>
+
+<span class="k">object</span> <span class="nc">metrics</span> <span class="o">{</span>
+  <span class="k">val</span> <span class="nc">HttpReadWidgets</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/widgets"</span><span class="o">,</span> 
+    <span class="s">"time taken to read and display the list of widgets"</span><span class="o">)</span>
+  <span class="k">val</span> <span class="nc">HttpReadWidget</span>  <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/widgets/id"</span><span class="o">,</span> 
+    <span class="s">"time taken to read and display a given widget"</span><span class="o">)</span>
+  <span class="k">val</span> <span class="nc">FooCount</span>        <span class="k">=</span> <span class="n">counter</span><span class="o">(</span><span class="s">"domain/foocount"</span><span class="o">,</span> 
+    <span class="s">"the number of foos that have been seen"</span><span class="o">)</span>
+  <span class="c1">// more metrics here
+</span><span class="o">}</span>
+</code></pre></div>
+<p>The goal of this <code>metrics</code> object is to define your metrics up front, and force yourself to think about the metric requirements that your application has. All of your application metrics should be defined in the <code>metrics</code> object, and imported where they are needed by specific APIs.</p>
+
+<blockquote>
+<p><strong>NOTE:</strong> When it comes to naming metrics, always bucket your metrics using <code>/</code> as a delimiter, and try to logically order things as a &quot;tree&quot;. For example:</p>
+
+<ul>
+<li>When implementing timers for HTTP resources, use the idiom: <code>http/&lt;verb&gt;/&lt;resource&gt;</code>. If parts of the resource are variable, then use <code>:yourvar</code>, or whatever parameter name makes most sense. The reason for structure HTTP metrics like this is that it is easily consumable by operations and that it makes it easy to quickly compare different resources for a given HTTP verb (for example)</li>
+<li>As a rule of thumb, try to logically order your metrics in order of component coarseness. For example, anything starting with &quot;db&quot; for database operations can all be compared together in a convenient fashion, so it would make sense to bucket all database operations together, and then perhaps bucket all the <em>read</em> operations together, versus the <em>write</em> operations (see below for a more complete example)</li>
+</ul>
+</blockquote>
+
+<p>At first blush, clearly having a single namespace for the entire world of application metrics could become unwieldy, so it is recommended to organise your metrics with nested objects, based on logical application layering. Here&#39;s a more complete example from the SU service that illustrates this pattern:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">package</span> <span class="nn">yourapp</span>
+
+<span class="k">import</span> <span class="nn">funnel.instruments._</span>
+
+<span class="k">object</span> <span class="nc">metrics</span> <span class="o">{</span>
+
+  <span class="cm">/**
+    * Instruments for everything related to the HTTP stack.
+    */</span>
+  <span class="k">object</span> <span class="nc">http</span> <span class="o">{</span>
+    <span class="k">val</span> <span class="nc">ReadUpdates</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/post/updates"</span><span class="o">,</span> 
+      <span class="s">"time taken to determine if the supplied device profile needs any software updated"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">CreateAllocations</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/post/allocations"</span><span class="o">,</span> 
+      <span class="s">"time taken to make new allocations"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">ReadAllocations</span>   <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/allocations/key"</span><span class="o">,</span> 
+      <span class="s">"time taken to read a specified allocation"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">DeleteAllocation</span>  <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/delete/allocations/key"</span><span class="o">,</span> 
+      <span class="s">"time taken to delete an allocation"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">ReadGroups</span>        <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/groups"</span><span class="o">,</span> 
+      <span class="s">"time taken to load and present all defined groups as json"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">CreateGroup</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/post/groups"</span><span class="o">,</span> 
+      <span class="s">"time taken to add a new group"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">ReadGroup</span>         <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/groups/key"</span><span class="o">,</span> 
+      <span class="s">"time taken to read a group definition and display as json"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">UpdateGroup</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/put/groups/key"</span><span class="o">,</span> 
+      <span class="s">"time taken to replace the definition of a group"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">DeleteGroup</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/delete/groups/key"</span><span class="o">,</span> 
+      <span class="s">"time taken to delete a group with a given key"</span><span class="o">)</span>
+  <span class="o">}</span>
+
+  <span class="cm">/**
+    * Instruments for the database access operations
+    */</span>
+  <span class="k">object</span> <span class="nc">db</span> <span class="o">{</span>
+    <span class="k">val</span> <span class="nc">ReadLatency</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/single/latency"</span><span class="o">,</span> 
+      <span class="s">"time taken to read a single entry from the database"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">ReadBatchLatency</span>  <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/batch/latency"</span><span class="o">,</span> 
+      <span class="s">"time taken to read a batch of items from the database with a specified set of keys"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">ReadListLatency</span>   <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/list/latency"</span><span class="o">,</span> 
+      <span class="s">"time taken to list items from the database with a given hash+range combination"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">ReadScanLatency</span>   <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/scan/latency"</span><span class="o">,</span> 
+      <span class="s">"time taken to scan the specified database table"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">WriteLatency</span>      <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/write/single/latency"</span><span class="o">,</span> 
+      <span class="s">"time taken to write a single entry into the database"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">WriteBatchLatency</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/write/batch/latency"</span><span class="o">,</span> 
+      <span class="s">"time taken to write a batch to the database"</span><span class="o">)</span>
+    <span class="k">val</span> <span class="nc">DeleteLatency</span>     <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/delete/batch/latency"</span><span class="o">,</span> 
+      <span class="s">"time taken to delete a batch from the database"</span><span class="o">)</span>
+  <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div>
+<p>The 1.0.x series of <code>funnel-core</code> has five  supported metric types: <code>Counter</code>, <code>Timer</code>, <code>Gauge</code>, <code>TrafficLight</code>, and <code>Edge</code>.</p>
+
+<h4>Counters</h4>
+
+<p>A counter simply increments an integer value specified by a label that you supply. A counter is appropriate for metrics that represent a tally, or the number of occurrences of something during a particular period. Typical examples are the number of sales, the number of errors, or messages received.</p>
+
+<p>You should <strong>not</strong> use a counter for a magnitude or amount that represents the current value of something, such as the number of concurrent connections, the number of ongoing transactions, or the number of messages in a queue. In that case, use a <em>gauge</em> instead (see below).</p>
+
+<p>For example, to create a counter for the number of cache hits:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">package</span> <span class="nn">yourapp</span>
+
+<span class="k">import</span> <span class="nn">funnel.instruments._</span>
+
+<span class="k">object</span> <span class="nc">metrics</span> <span class="o">{</span>
+  <span class="k">val</span> <span class="nc">NumberOfCacheHits</span> <span class="k">=</span> <span class="n">counter</span><span class="o">(</span><span class="s">"cache/hits"</span><span class="o">)</span>
+<span class="o">}</span>
+</code></pre></div>
+<p>Counters can then be incremented monotonically, or incremented by a given amount:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">import</span> <span class="nn">metrics._</span>
+
+<span class="k">trait</span> <span class="nc">SomeFun</span> <span class="o">{</span>
+
+  <span class="k">def</span> <span class="n">foobar</span> <span class="k">=</span> <span class="o">{</span>
+    <span class="c1">// increment monotonically
+</span>    <span class="nc">NumberOfCacheHits</span><span class="o">.</span><span class="n">increment</span>
+
+    <span class="c1">// increment by a given amount
+</span>    <span class="nc">NumberOfCacheHits</span><span class="o">.</span><span class="n">incrementBy</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span>
+  <span class="o">}</span>
+
+<span class="o">}</span>
+</code></pre></div>
+<h4>Timers</h4>
+
+<p>As the name suggests, <strong>timers</strong> are all about the amount of time take to perform a specific operation.</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">package</span> <span class="nn">yourapp</span>
+
+<span class="k">import</span> <span class="nn">funnel.instruments._</span>
+
+<span class="k">object</span> <span class="nc">metrics</span> <span class="o">{</span>
+  <span class="k">val</span> <span class="nc">GetUserList</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/get-user-list"</span><span class="o">)</span>
+<span class="o">}</span>
+</code></pre></div>
+<p>Timers can then record several different types of value:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">import</span> <span class="nn">metrics._</span>
+<span class="k">import</span> <span class="nn">scalaz.concurrent.Task</span>
+<span class="k">import</span> <span class="nn">scala.concurrent.Future</span>
+
+<span class="k">trait</span> <span class="nc">SomeFun</span> <span class="o">{</span>
+
+  <span class="k">private</span> <span class="k">def</span> <span class="n">getList</span><span class="k">:</span> <span class="kt">Future</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="err">…</span>
+  <span class="k">private</span> <span class="k">def</span> <span class="n">getListTask</span><span class="k">:</span> <span class="kt">Task</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
+
+  <span class="k">def</span> <span class="n">foobar</span> <span class="k">=</span> <span class="o">{</span>
+
+    <span class="c1">// for timing strict values, just use the block syntax:
+</span>    <span class="nc">GetUserList</span><span class="o">.</span><span class="n">time</span> <span class="o">{</span>
+      <span class="c1">// expensive operation goes here
+</span>    <span class="o">}</span>
+
+    <span class="c1">// for timing async Future[A]
+</span>    <span class="nc">GetUserList</span><span class="o">.</span><span class="n">timeFuture</span><span class="o">(</span><span class="n">getList</span><span class="o">)</span>
+
+    <span class="c1">// for timing scalaz.concurrent.Task[A]
+</span>    <span class="nc">GetUserList</span><span class="o">.</span><span class="n">timeTask</span><span class="o">(</span><span class="n">getListTask</span><span class="o">)</span>
+
+    <span class="c1">// for anything else procedural, the side-effecting API
+</span>    <span class="k">val</span> <span class="n">stopwatch</span> <span class="k">=</span> <span class="nc">GetUserList</span><span class="o">.</span><span class="n">start</span><span class="o">()</span>
+    <span class="k">val</span> <span class="n">x</span> <span class="k">=</span> <span class="c1">// operation to be timed
+</span>    <span class="n">stopwatch</span><span class="o">()</span> <span class="c1">// stops the stopwatch and records the time taken
+</span>
+  <span class="o">}</span>
+
+<span class="o">}</span>
+</code></pre></div>
+<h4>Gauges</h4>
+
+<p>A gauge represents the current state of a value. A good analogy is checking the oil on a car; the dipstick is the gauge of how much oil the engine currently has, and this changes over time, moving both up and down, but it can only have a single value at any particular reading.</p>
+
+<p>Use a gauge when you want to monitor the magnitude or amount of something at a particular point in time, or the average amount of something over a period, such as the number of concurrent connections, ongoing transactions, or messages in a queue. A gauge is <strong>not</strong> appropriate for counting or tallying occurrences of some event, such as the number of errors, number of sales, or messages received so far. For such things, use a <em>counter</em> instead (see above).</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">package</span> <span class="nn">yourapp</span>
+
+<span class="k">import</span> <span class="nn">funnel.Units</span>
+<span class="k">import</span> <span class="nn">funnel.instruments._</span>
+
+<span class="k">object</span> <span class="nc">metrics</span> <span class="o">{</span>
+  <span class="c1">// gauges require an initial value
+</span>  <span class="k">val</span> <span class="nc">OilGauge</span> <span class="k">=</span> <span class="n">gauge</span><span class="o">(</span><span class="s">"oil"</span><span class="o">,</span> <span class="mf">0d</span><span class="o">,</span> <span class="nc">Units</span><span class="o">.</span><span class="nc">Count</span><span class="o">)</span>
+<span class="o">}</span>
+</code></pre></div>
+<p>Unlike other metrics, gauges are strongly typed in their value, and must be given a default upon being created. To set the value later on in your code, you simply do the following:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">import</span> <span class="nn">metrics._</span>
+
+<span class="k">trait</span> <span class="nc">SomeFun</span> <span class="o">{</span>
+  <span class="k">def</span> <span class="n">readOilLevel</span><span class="k">:</span> <span class="kt">Double</span> <span class="o">=</span> <span class="o">{</span>
+    <span class="k">val</span> <span class="n">level</span> <span class="k">=</span> <span class="c1">// database op
+</span>    <span class="nc">OilLevel</span><span class="o">.</span><span class="n">set</span><span class="o">(</span><span class="n">level</span><span class="o">)</span>
+    <span class="n">level</span>
+  <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div>
+<p>By default, the following types are supported as values for gauges:</p>
+
+<ul>
+<li><code>String</code></li>
+<li>Any <code>Numeric[A]</code> instance; the Scala std library supplies typeclasses for:
+
+<ul>
+<li><code>Int</code></li>
+<li><code>Double</code></li>
+<li><code>Float</code></li>
+<li><code>BigDecimal</code></li>
+<li><code>Long</code></li>
+</ul></li>
+</ul>
+
+<p>In addition to simply recording the value of the gauge, there is a specialised gauge that can also track numerical statistics like <code>mean</code>, <code>variance</code> etc. To use it, just adjust your <code>metrics</code> declaration like so:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">package</span> <span class="nn">yourapp</span>
+
+<span class="k">import</span> <span class="nn">funnel.instruments._</span>
+
+<span class="k">object</span> <span class="nc">metrics</span> <span class="o">{</span>
+  <span class="c1">// gauges require an initial value
+</span>  <span class="k">val</span> <span class="nc">OilGauge</span> <span class="k">=</span> <span class="n">numericGauge</span><span class="o">(</span><span class="s">"oil"</span><span class="o">,</span> <span class="mf">0d</span><span class="o">,</span> <span class="nc">Units</span><span class="o">.</span><span class="nc">Count</span><span class="o">)</span>
+<span class="o">}</span>
+</code></pre></div>
+<p>There is a subtle nuance between <code>gauge</code> and <code>numericGauge</code> instruments. Specifically, <code>gauge</code> can be used with any <code>A</code> that is <code>Reportable</code>. Whilst this is useful for some causes, the majority of gauges you would need form some kind of <code>numericGauge</code> (i.e. their value is usually <code>Double</code>, <code>Int</code>, etc), and as such its very important that you use <code>numericGauge</code> and not <code>gauge</code> for these values. The subtle difference here is that because <code>gauge</code> is the general-case instrument, its input cannot be guaranteed to aggregate (form a <code>Group</code>), so the metric values are only outputted on the <code>now</code> stream, which is not typically collected by <em>Flask</em>, as the <code>now</code> stream has a huge amount of throughput compared to <code>previous</code> (by default <em>Chemist</em> is configured to only pull <code>String</code> items from the <code>now</code> - strings do not aggregate but form traffic lights and edges - so your plain <code>gauge</code> would not be collected). <code>numericGauges</code> on the other hand output in all three streams: <code>now</code>, <code>sliding</code> and <code>previous</code>.</p>
+
+<h4>Traffic Light</h4>
+
+<p>As an extension to the concept of <code>Gauge</code>, there is also the notion of a &quot;traffic light&quot; which is essentially a gauge that can be in only one of three possible finite states:</p>
+
+<ul>
+<li>Red</li>
+<li>Amber</li>
+<li>Green</li>
+</ul>
+
+<p>Traffic light metrics are used to derive actionable signals for operations (they can derive whatever they like too), but for example, one might put a traffic light metric on database access, or the status of a circuit breaker used to invoke a 3rd party system. Using traffic lights is super simple:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">package</span> <span class="nn">yourapp</span>
+
+<span class="k">import</span> <span class="nn">funnel.instruments._</span>
+
+<span class="k">object</span> <span class="nc">metrics</span> <span class="o">{</span>
+  <span class="k">val</span> <span class="nc">GeoLocationCircuit</span> <span class="k">=</span> <span class="n">trafficLight</span><span class="o">(</span><span class="s">"circuit/geo"</span><span class="o">)</span>
+<span class="o">}</span>
+</code></pre></div>
+<p>And the actual usage in the circuit breaking code:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">import</span> <span class="nn">metrics._</span>
+
+<span class="k">trait</span> <span class="nc">SomeFun</span> <span class="o">{</span>
+  <span class="k">def</span> <span class="n">doGeoLocation</span> <span class="k">=</span> <span class="o">{</span>
+    <span class="c1">// your logic for the function
+</span>    <span class="err">…</span>
+  <span class="c1">// if all went well, set the breaker accordingly
+</span>   <span class="nc">GeoLocationCircuit</span><span class="o">.</span><span class="n">green</span>
+
+   <span class="cm">/*
+   Traffic lights can be set into red and amber states in a similar fashion:
+   GeoLocationCircuit.amber
+   GeoLocationCircuit.red
+   */</span>
+  <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div>
+<h4>Edge</h4>
+
+<p>An <code>Edge</code> instrument provides inter-service telemetry. Its purpose is to
+monitor the status and timings of service-to-service connections. It&#39;s just
+an aggregation of four other instruments:</p>
+
+<ul>
+<li><code>origin</code>: A continuous string gauge</li>
+<li><code>destination</code>: Another continuous string gauge</li>
+<li><code>timer</code>: A timer</li>
+<li><code>status</code>: A traffic light</li>
+</ul>
+
+<p>The <code>origin</code> is the actual origin of the connection. The <code>destination</code> is
+where the connection is being made to. The <code>timer</code> is a measure of some
+latency or roundtrip timing between the origin and destination, and the
+<code>status</code> is some notion of the overall status of the connection
+(Red, Amber, or Green).</p>
+
+<p>In a typical use case, we&#39;re making a connection from one service to
+another, relying on some discovery service or load balancer to provide us
+with an actual host to connect to. The <code>origin</code> is the local hostname,
+and the <code>destination</code> should be the actual remote hostname. Each time we are
+redirected to a new host for the service, we should set the <code>destination</code>
+to the name of that host. When we make a request across the connection, we
+should time it with the edge <code>timer</code>. If we detect that the remote host is
+down, we should set the <code>status</code> traffic light to <code>Red</code>. In a connection
+configured with a circuit-breaker, we can use <code>Amber</code> to indicate the
+&quot;half-open&quot; state.</p>
+
+<p>Edges are created with:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">import</span> <span class="nn">funnel.instruments._</span>
+
+<span class="k">val</span> <span class="n">anEdge</span> <span class="k">=</span> <span class="n">edge</span><span class="o">(</span><span class="s">"myservice/otherservice"</span><span class="o">,</span>
+                  <span class="s">"The edge from my service to some other service"</span><span class="o">,</span>
+                  <span class="s">"10.0.0.1"</span><span class="o">,</span>
+                  <span class="s">"10.0.0.2"</span><span class="o">)</span>
+</code></pre></div>
+<h4>LapTimer</h4>
+
+<p>A <code>LapTimer</code> instrument is a compound instrument, which combines Timer and Counter instruments. It adds counter to all the timer operations.</p>
+
+<p>A Timer can be easily replaced with LapTimer, by simply replacing the way it is created:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">package</span> <span class="nn">oncue.svc</span>
+<span class="k">package</span> <span class="nn">yourproject</span>
+
+<span class="k">import</span> <span class="nn">funnel.instruments._</span>
+
+<span class="k">object</span> <span class="nc">metrics</span> <span class="o">{</span>
+  <span class="k">val</span> <span class="nc">GetUserList</span> <span class="k">=</span> <span class="n">lapTimer</span><span class="o">(</span><span class="s">"db/get-user-list"</span><span class="o">)</span>
+<span class="o">}</span>
+</code></pre></div>
+<p>LapTimer fully supports Timer features:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">import</span> <span class="nn">metrics._</span>
+<span class="k">import</span> <span class="nn">scalaz.concurrent.Task</span>
+<span class="k">import</span> <span class="nn">scala.concurrent.Future</span>
+
+<span class="k">trait</span> <span class="nc">SomeFun</span> <span class="o">{</span>
+
+  <span class="k">private</span> <span class="k">def</span> <span class="n">getList</span><span class="k">:</span> <span class="kt">Future</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="err">…</span>
+  <span class="k">private</span> <span class="k">def</span> <span class="n">getListTask</span><span class="k">:</span> <span class="kt">Task</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
+
+  <span class="k">def</span> <span class="n">foobar</span> <span class="k">=</span> <span class="o">{</span>
+
+    <span class="c1">// for timing strict values, just use the block syntax:
+</span>    <span class="nc">GetUserList</span><span class="o">.</span><span class="n">time</span> <span class="o">{</span>
+      <span class="c1">// expensive operation goes here
+</span>    <span class="o">}</span>
+
+    <span class="c1">// for timing async Future[A]
+</span>    <span class="nc">GetUserList</span><span class="o">.</span><span class="n">timeFuture</span><span class="o">(</span><span class="n">getList</span><span class="o">)</span>
+
+    <span class="c1">// for timing scalaz.concurrent.Task[A]
+</span>    <span class="nc">GetUserList</span><span class="o">.</span><span class="n">timeTask</span><span class="o">(</span><span class="n">getListTask</span><span class="o">)</span>
+
+    <span class="c1">// for anything else procedural, the side-effecting API
+</span>    <span class="k">val</span> <span class="n">stopwatch</span> <span class="k">=</span> <span class="nc">GetUserList</span><span class="o">.</span><span class="n">start</span><span class="o">()</span>
+    <span class="k">val</span> <span class="n">x</span> <span class="k">=</span> <span class="c1">// operation to be timed
+</span>    <span class="n">stopwatch</span><span class="o">()</span> <span class="c1">// stops the stopwatch and records the time taken
+</span>
+  <span class="o">}</span>
+
+<span class="o">}</span>
+</code></pre></div>
+<h3>Derived Metrics</h3>
+
+<p>Funnel provides an API for combining metrics via the <code>funnel.Metric</code> datatype. For example, to make a metric that tracks a ratio between the present value of two timers:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">import</span> <span class="nn">funnel.instruments._</span>
+<span class="k">import</span> <span class="nn">funnel.Metric._</span>
+<span class="k">import</span> <span class="nn">scalaz.syntax.applicative._</span>
+
+<span class="k">val</span> <span class="n">timer1</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"t1"</span><span class="o">)</span>
+<span class="k">val</span> <span class="n">timer2</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"t2"</span><span class="o">)</span>
+
+<span class="k">val</span> <span class="n">ratio</span><span class="k">:</span> <span class="kt">Metric</span><span class="o">[</span><span class="kt">Double</span><span class="o">]</span> <span class="k">=</span>
+  <span class="o">(</span><span class="n">timer1</span><span class="o">.</span><span class="n">keys</span> <span class="o">|@|</span> <span class="n">timer2</span><span class="o">.</span><span class="n">keys</span><span class="o">)(</span><span class="k">_</span> <span class="o">+</span> <span class="k">_</span><span class="o">)</span>
+
+<span class="c1">// do this only once at the endge of the world:
+</span><span class="k">val</span> <span class="k">_</span> <span class="k">=</span> <span class="n">ratio</span><span class="o">.</span><span class="n">publish</span><span class="o">(</span><span class="s">"foo/mytimer"</span><span class="o">,</span> <span class="nc">Units</span><span class="o">.</span><span class="nc">Milliseconds</span><span class="o">).</span><span class="n">run</span>
+
+</code></pre></div>
+<p>We could publish a metric that determines whether our application is &quot;healthy&quot;, meaning that we haven&#39;t received more than 20,000 requests in the current window, the database is up, and our average query response time is under 20 milliseconds.</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala">
+<span class="k">val</span> <span class="n">reqs</span> <span class="k">=</span> <span class="n">counter</span><span class="o">(</span><span class="s">"requests"</span><span class="o">)</span>
+<span class="k">val</span> <span class="n">dbOk</span> <span class="k">=</span> <span class="n">gauge</span><span class="o">(</span><span class="s">"db-up"</span><span class="o">,</span> <span class="kc">true</span><span class="o">)</span>
+<span class="k">val</span> <span class="n">query</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"query-speed"</span><span class="o">)</span>
+
+<span class="k">val</span> <span class="n">healthy</span><span class="k">:</span> <span class="kt">Metric</span><span class="o">[</span><span class="kt">Boolean</span><span class="o">]</span> <span class="k">=</span>
+  <span class="o">(</span><span class="n">reqs</span><span class="o">.</span><span class="n">keys</span><span class="o">.</span><span class="n">now</span> <span class="o">|@|</span> <span class="n">dbOk</span><span class="o">.</span><span class="n">keys</span> <span class="o">|@|</span> <span class="n">query</span><span class="o">.</span><span class="n">keys</span><span class="o">)</span> <span class="o">{</span> <span class="o">(</span><span class="n">n</span><span class="o">,</span> <span class="n">db</span><span class="o">,</span> <span class="n">t</span><span class="o">)</span> <span class="k">=&gt;</span>
+     <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">20000</span> <span class="o">&amp;&amp;</span>
+     <span class="n">db</span> <span class="o">&amp;&amp;</span>
+     <span class="n">t</span><span class="o">.</span><span class="n">mean</span> <span class="o">&lt;</span> <span class="mi">20</span>
+  <span class="o">}</span>
+
+<span class="c1">// do this only once at the endge of the world:
+</span><span class="n">healthy</span><span class="o">.</span><span class="n">publish</span><span class="o">(</span><span class="s">"healthy"</span><span class="o">,</span> <span class="nc">Units</span><span class="o">.</span><span class="nc">Healthy</span><span class="o">).</span><span class="n">run</span>
+
+</code></pre></div>
+<h3>Monitoring Server</h3>
+
+<p>All the metrics you define in your application, plus some additional platform metrics supplied by the monitoring library can be exposed via a baked in HTTP server. In order to use this server, one simply only needs to add the following line to the <code>main</code> of their application:</p>
+<div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="k">import</span> <span class="nn">funnel.http.MonitoringServer</span>
+<span class="k">import</span> <span class="nn">funnel.Monitoring</span>
+
+<span class="k">object</span> <span class="nc">Main</span> <span class="o">{</span>
+  <span class="k">def</span> <span class="k">def</span> <span class="n">main</span><span class="o">(</span><span class="n">args</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">String</span><span class="o">])</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+    <span class="nc">MonitoringServer</span><span class="o">.</span><span class="n">start</span><span class="o">(</span><span class="nc">Monitoring</span><span class="o">.</span><span class="n">default</span><span class="o">,</span> <span class="mi">5775</span><span class="o">)</span>
+
+    <span class="c1">// your application code starts here
+</span>  <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div>
+<p><strong>NOTE: By application <code>main</code>, this does not have to be the actual main, but rather, the end of the world for your application (which however, would usually be the main). For Play! applications, this means the Global object.</strong></p>
+
+<p>With this in your application, and assuming you are developing locally, once running you will be able to access <a href="http://127.0.0.1:5775/">http://127.0.0.1:5775/</a> in your local web browser, where the index page will give you a list of available resources and descriptions of their function.</p>
+
+      </section>
+      <footer>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+  </body>
+</html>

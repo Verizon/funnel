@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Funnel - Frequently Asked Questions</title>
+
+    <link rel="stylesheet" href="/funnel/css/styles.css">
+    <link rel="stylesheet" href="/funnel/css/custom.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <a name="top"></a>
+    <div class="wrapper">
+      <header>
+        <h1>Funnel</h1>
+        <p>Last updated on <em>November 17, 2015</em></p>
+
+        <ul>
+          <li><a href="https://github.com/oncue/funnel/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/oncue/funnel/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/oncue/funnel">View On <strong>GitHub</strong></a></li>
+        </ul>
+
+        <hr />
+
+        <ol>
+          <!-- home -->
+          <li><a href="/funnel/">Home</a></li>
+          <li><a href="/funnel/#overview">Overview</a></li>
+
+          <!-- getting started -->
+          <li><a href="/funnel/getting-started">Getting Started</a></li>
+          
+            <li>
+              <ol>
+                <li><a href="/funnel/getting-started/developers.html">Developers</a></li>
+                <li><a href="/funnel/getting-started/operations.html">Operations</a></li>
+                <li><a href="/funnel/getting-started/faq.html">FAQ</a></li>
+              </ol>
+            </li>
+          
+
+          <!-- modules -->
+          <li><a href="/funnel/modules">Modules</a></li>
+          
+
+          <!-- services -->
+          <li><a href="/funnel/services">Services</a></li>
+          
+        </ol>
+
+        <hr />
+
+      </header>
+      <section>
+        <h1>Frequently Asked Questions</h1>
+
+<p><em>Funnel</em> is a complex system, and whilst we - the makers - have tried to make it as simple to use as possible, there are still some things we cannot insulate users from, which usually stem from important choices users must make in order to get the best out of the system. Subsequently, this FAQ serves as a reference for these nuances.</p>
+
+<p><a name="instrument-count"></a></p>
+
+<h3>Counts with statistical instruments</h3>
+
+<p>Most of the numerical values <em>Funnel</em> outputs have an internal type of <code>Stats</code>. This essentially represents the <a href="https://en.wikipedia.org/wiki/Moment_(mathematics)">five statistical moments</a>, with the addition of a <code>count</code> field. Often users assume the <code>count</code> field is the number of times a particular <em>timer</em> or <em>numericGauge</em> is updated. This however is not accurate: <code>count</code> represents the number of samples funnel has made to this instrument in the given window. <em>Funnel</em> instruments are buffered to prevent flooding our backend collection system, and as such, we do not sample instruments at full resolution, subsequently, the <code>count</code> field represents the number of samples that were actually taken. </p>
+
+<p>If the user does desire an atomic count of instrument usage, it is recommended to use a <em>counter</em> in addition to the stats-producing instrument. However, as this is a very common use-case, <em>Funnel</em> provides the <code>lapTimer</code> instrument to obtain both a <code>counter</code> and a <code>timer</code> with the same name.</p>
+
+<p><a name="infrequent-updates"></a></p>
+
+<h3>Seemingly inaccurate reporting for infrequent updates</h3>
+
+<p>In high-load systems, <em>Funnel</em> samples updates to avoid flooding the backend collection infrastructure. Whilst this is a massive benefit for high-load systems, for batch or infrequently updated instruments, one has to be a bit careful about how values in Elastic Search are interpreted. Specifically, using the <code>max</code> function offered by Elastic Search on a <code>mean</code> stats field that is infrequently updated will often provide skewed results. The reason for this is that the <code>mean</code> that is computed on the &quot;leaf&quot; machines (e.g. your foo service) and if there have been very few samples taken within a given window, then the <code>mean</code> is subsequently skewed. In this case, to get a more realistic average value, one should use the <code>avg</code> (Average) aggregation function offered by Elastic Search, and apply that to the <code>mean</code> field of the stats instrument. This should then linearise the aforementioned skewing. </p>
+
+<p><a name="numeric-gauges"></a></p>
+
+<h3>Use of gauge vs numericGauge</h3>
+
+<p>There is a subtle nuance between <code>gauge</code> and <code>numericGauge</code> instruments. Specifically, <code>gauge</code> can be used with any <code>A</code> that is <code>Reportable</code>. Whilst this is useful for some causes, the majority of gauges you would need form some kind of <code>numericGauge</code> (i.e. their value is usually <code>Double</code>, <code>Int</code>, etc), and as such its very important that you use <code>numericGauge</code> and not <code>gauge</code> for these values. The subtle difference here is that because <code>gauge</code> is the general-case instrument, its input cannot be guaranteed to aggregate (form a <code>Group</code>), so the metric values are only outputted on the <code>now</code> stream, which is not typically collected by <em>Flask</em>, as the <code>now</code> stream has a huge amount of throughput compared to <code>previous</code> (by default <em>Chemist</em> is configured to only pull <code>String</code> items from the <code>now</code> - strings do not aggregate but form traffic lights and edges - so your plain <code>gauge</code> would not be collected). <code>numericGauges</code> on the other hand output in all three streams: <code>now</code>, <code>sliding</code> and <code>previous</code>.</p>
+
+      </section>
+      <footer>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+  </body>
+</html>

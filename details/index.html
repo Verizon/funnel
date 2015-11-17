@@ -1,0 +1,201 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Funnel - Details</title>
+
+    <link rel="stylesheet" href="/funnel/css/styles.css">
+    <link rel="stylesheet" href="/funnel/css/custom.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <a name="top"></a>
+    <div class="wrapper">
+      <header>
+        <h1>Funnel</h1>
+        <p>Last updated on <em>November 17, 2015</em></p>
+
+        <ul>
+          <li><a href="https://github.com/oncue/funnel/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/oncue/funnel/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/oncue/funnel">View On <strong>GitHub</strong></a></li>
+        </ul>
+
+        <hr />
+
+        <ol>
+          <!-- home -->
+          <li><a href="/funnel/">Home</a></li>
+          <li><a href="/funnel/#overview">Overview</a></li>
+
+          <!-- getting started -->
+          <li><a href="/funnel/getting-started">Getting Started</a></li>
+          
+
+          <!-- modules -->
+          <li><a href="/funnel/modules">Modules</a></li>
+          
+
+          <!-- services -->
+          <li><a href="/funnel/services">Services</a></li>
+          
+        </ol>
+
+        <hr />
+
+      </header>
+      <section>
+        <h1>Detailed Information</h1>
+
+<p>As funnel is a fairly comprehensive system, but its user-level API is relatively constrained, this page adds some additional detail to both some of the internal workings and useful things to know as users.</p>
+
+<ol>
+<li><a href="#builtin-metrics">Built-in Metrics</a></li>
+<li><a href="#control-server">Control Server</a></li>
+</ol>
+
+<p><a name="builtin-metrics"></a></p>
+
+<h1>Built-in Metrics</h1>
+
+<p>Using the default instruments, you&#39;ll notice that there&#39;s a raft of metrics being produced automatically. These logically fall into two categories:</p>
+
+<ol>
+<li><a href="#jvm-metrics">JVM and Clock Metrics</a> - list of the built-in JVM metrics</li>
+<li><a href="#system-metrics">System Metrics</a> - information about the built-in system metrics </li>
+</ol>
+
+<p>The following subsections cover these in more detail.</p>
+
+<p><a name="jvm-metrics"></a></p>
+
+<h2>JVM and Clock Metrics</h2>
+
+<p>The default set of instruments (<code>funnel.instruments</code>) will automatically collect the following JVM statistics (where <code>:period</code> is one of either <code>now</code>, <code>sliding</code> or <code>previous</code>):</p>
+
+<ul>
+<li><code>:period/jvm/memory/nonheap/init</code></li>
+<li><code>:period/jvm/memory/heap/committed</code></li>
+<li><code>:period/jvm/memory/total/committed</code></li>
+<li><code>:period/jvm/gc/ParNew</code></li>
+<li><code>:period/jvm/memory/nonheap/committed</code></li>
+<li><code>:period/jvm/gc/ConcurrentMarkSweep</code></li>
+<li><code>:period/jvm/gc/ConcurrentMarkSweep/time</code></li>
+<li><code>:period/jvm/memory/nonheap/max</code></li>
+<li><code>:period/jvm/memory/heap/usage</code></li>
+<li><code>:period/jvm/gc/ParNew/time</code></li>
+<li><code>:period/jvm/memory/heap/init</code></li>
+<li><code>:period/jvm/memory/nonheap/used</code></li>
+<li><code>:period/jvm/memory/total/max</code></li>
+<li><code>:period/jvm/memory/heap/used</code></li>
+<li><code>:period/jvm/memory/total/init</code></li>
+<li><code>:period/jvm/memory/total/used</code></li>
+<li><code>:period/jvm/memory/heap/max</code></li>
+<li><code>:period/jvm/memory/nonheap/usage</code></li>
+</ul>
+
+<p>In addition to these JVM metrics, the default instruments also provide the following:</p>
+
+<ul>
+<li><code>:period/elapsed</code> - amount of time that has elapsed so far in the specified period.</li>
+<li><code>:period/remaining</code> - amount of time remaining in the specified period.</li>
+<li><code>uptime</code> - Amount of time that this monitoring instance has been running.</li>
+</ul>
+
+<p>These are keys provided by the default instruments, but if you would like to create a custom <code>Instruments</code> instance, this is entirely possible. The only reason you would typically want to do this is to specify a custom boundary for time periods. <strong>This is not generally advisable</strong> as the operation logic expects the time period defined by the library. </p>
+<div class="highlight"><pre><code class="language-" data-lang="">import funnel._
+import scala.concurrent.duration._
+
+val I = new Instruments(2 minutes, Monitoring.default) with DefaultKeys {
+  JVM.instrument(this)
+  Clocks.instrument(this)
+}
+</code></pre></div>
+<p><a name="system-metrics"></a></p>
+
+<h2>System metrics</h2>
+
+<p>The default set of instruments (<code>funnel.instruments</code>) will also automatically collect operating system statistics if the Hyperic SIGAR library is available on the <code>java.library.path</code> (by default on Linux systems this maps to the <code>LD_LIBRARY_PATH</code> environment variable).</p>
+
+<p>Download the library here: <a href="http://sourceforge.net/projects/sigar/files/">http://sourceforge.net/projects/sigar/files/</a>.</p>
+
+<p>SIGAR gathers a large set of metrics which will appear in Funnel under <code>:period/system</code>:</p>
+
+<ul>
+<li><code>:period/system/cpu/aggregate</code> - Aggregate CPU metrics.</li>
+<li><code>:period/system/cpu/:n</code> - Per-CPU metrics for individual CPU number <code>:n</code>.</li>
+<li><code>:period/system/tcp</code> - TCP/IP statistics.</li>
+<li><code>:period/system/file_system/:fs</code> Filesystem statistics where <code>:fs</code> is an individual filesystem mount point. The mount point name is URL-encoded.</li>
+<li><code>:period/system/mem</code> - Memory statistics.</li>
+<li><code>:period/system/load_average</code> - Load averages for 5, 10, and 15 minute intervals.</li>
+<li><code>system/uptime</code> - Amount of time the OS has been running.</li>
+</ul>
+
+<p><a name="control-server"></a></p>
+
+<h1>Control Server</h1>
+
+<p>Funnel comes with a built in system for plug-able monitoring servers - that is, a way to expose the internal streams over some kind of wire protocol. At the time of writing, there was only a single <code>MonitoringServer</code> implementation that uses <code>HTTP</code> as its wire protocol and <code>JSON</code> over <code>SSE</code> as its serialisation strategy. This is entirely flexible, and if one wanted to implement a different <code>MonitoringServer</code> it would be entirely easy to do so externally by writing a <code>scalaz.stream.Process[Task, A]</code> consumer. </p>
+
+<h3>Bootup</h3>
+
+<p>The working expectation is that applications that expose metrics of their own (or indeed, consume metrics from others they wish to replicate) expose a monitoring server. This is done simply by calling <code>MonitoringServer.start</code></p>
+<div class="highlight"><pre><code class="language-" data-lang="">import funnel.http.{MonitoringServer,Monitoring}
+
+object Main {
+  def def main(args: Array[String]): Unit = {
+    MonitoringServer.start(Monitoring.default, 5775)
+
+    // your application code starts here 
+  }
+}
+
+</code></pre></div>
+<p>Once the server is booted as a part of your application, you can visit the specified port on <code>localhost</code> and have access to a range of resources. </p>
+
+<h3>Resources</h3>
+
+<ul>
+<li><p><code>/:period</code> - For example, <code>/now</code>, <code>/sliding</code> or <code>/previous</code>. Displays all of the metric keys that have values in that period. If there is nothing to display, the resulting JSON array will be empty. </p></li>
+<li><p><code>/:period&gt;/:metric-prefix</code> - For example, <code>/now/uptime</code> or <code>/now/http/get/index</code>. The key thing to understand here is that <code>:metric-prefix</code> here really means the name of the key (or at least the first part of it), which is why its so useful to bucket keys by the common prefix: you can lookup all the keys related to a given subject. For example, <code>/now/http</code> gets you all the metric keys that start with the string <code>http</code>.</p></li>
+<li><p><code>/stream</code> - obtain a stream of everything that is happening in the system right now as a HTTP SSE stream.</p></li>
+</ul>
+
+<h3>JSON</h3>
+<div class="highlight"><pre><code class="language-" data-lang=""><span class="p">{</span><span class="w">
+  </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"now/jvm/memory/nonheap/init"</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Stats"</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"units"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Megabytes"</span><span class="w">
+  </span><span class="p">},</span><span class="w">
+  </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="mi">9</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"variance"</span><span class="p">:</span><span class="w"> </span><span class="mf">58.38652776185048</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"kurtosis"</span><span class="p">:</span><span class="w"> </span><span class="mf">4.1249999999999964</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"mean"</span><span class="p">:</span><span class="w"> </span><span class="mf">21.61231644444444</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"last"</span><span class="p">:</span><span class="w"> </span><span class="mf">24.313855999999998</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"skewness"</span><span class="p">:</span><span class="w"> </span><span class="mf">-2.474873734152916</span><span class="p">,</span><span class="w">
+    </span><span class="nt">"standardDeviation"</span><span class="p">:</span><span class="w"> </span><span class="mf">7.6411077575081015</span><span class="w">
+  </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div>
+<h3>Queries</h3>
+
+<p>For any given resource that serves metrics or metric keys, you can restrict the keys that are returned by specifying them in the query parameters of the URL. For example, to request only keys from the <code>/stream/now</code> resource whose type is <code>String</code> use a URL like the following:</p>
+<div class="highlight"><pre><code class="language-" data-lang="">http://localhost:5777/stream/now?type="String"
+</code></pre></div>
+<p>The quotes around <code>&quot;String&quot;</code> are important since the query value must actually be valid JSON. You can also specify a value for <code>units</code> if you want, for example, all the keys whose values are measured in megabytes.</p>
+
+<p>When querying a Flask instance, some keys will be associated with buckets and urls (<a href="/funnel/getting-started/#flask">see the Flask documentation</a>). You can request keys from a specific bucket or URL by specifying <code>bucket=&quot;myBucket&quot;</code> or <code>url=&quot;myURL&quot;</code>, as desired.</p>
+
+      </section>
+      <footer>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+  </body>
+</html>
