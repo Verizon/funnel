@@ -21,4 +21,4 @@ ghpagesNoJekyll := false
 
 includeFilter in makeSite := "*.html" | "*.css" | "*.png" | "*.jpg" | "*.gif" | "*.js" | "*.yml" | "*.md"
 
-git.remoteRepo := "git@github.oncue.verizon.net:IntelMedia/funnel.git"
+git.remoteRepo := "git@github.com:oncue/funnel.git"
