@@ -62,13 +62,13 @@
 <p>First up you need to add the dependency for the monitoring library to your <code>build.scala</code> or your <code>build.sbt</code> file:</p>
 <div class="highlight"><pre><code class="language-scala" data-lang="scala"><span class="n">libraryDependencies</span> <span class="o">+=</span> <span class="s">"oncue.funnel"</span> <span class="o">%%</span> <span class="s">"http"</span> <span class="o">%</span> <span class="s">"x.y.z"</span>
 </code></pre></div>
-<p>(check for the latest release by <a href="http://nexus.svc.oncue.com/nexus/content/repositories/releases/oncue/svc/funnel/http_2.10/">looking on the nexus</a>)</p>
+<p>(check for the latest release by <a href="https://bintray.com/oncue/releases/funnel/view">looking on bintray</a>)</p>
 
 <p>Current transitive dependencies this will introduce on your classpath:</p>
 
 <ul>
 <li><a href="https://github.com/scalaz/scalaz">Scalaz</a> 7.1.0</li>
-<li><a href="https://github.com/scalaz/scalaz-stream">Scalaz Stream</a> 0.7.1a</li>
+<li><a href="https://github.com/scalaz/scalaz-stream">Scalaz Stream</a> 0.7.3a</li>
 <li><a href="https://github.com/twitter/algebird">Algebird Core</a> 0.8.0</li>
 </ul>
 
@@ -82,11 +82,11 @@
 <span class="k">import</span> <span class="nn">funnel.instruments._</span>
 
 <span class="k">object</span> <span class="nc">metrics</span> <span class="o">{</span>
-  <span class="k">val</span> <span class="nc">HttpReadWidgets</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/widgets"</span><span class="o">,</span> 
+  <span class="k">val</span> <span class="nc">HttpReadWidgets</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/widgets"</span><span class="o">,</span>
     <span class="s">"time taken to read and display the list of widgets"</span><span class="o">)</span>
-  <span class="k">val</span> <span class="nc">HttpReadWidget</span>  <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/widgets/id"</span><span class="o">,</span> 
+  <span class="k">val</span> <span class="nc">HttpReadWidget</span>  <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/widgets/id"</span><span class="o">,</span>
     <span class="s">"time taken to read and display a given widget"</span><span class="o">)</span>
-  <span class="k">val</span> <span class="nc">FooCount</span>        <span class="k">=</span> <span class="n">counter</span><span class="o">(</span><span class="s">"domain/foocount"</span><span class="o">,</span> 
+  <span class="k">val</span> <span class="nc">FooCount</span>        <span class="k">=</span> <span class="n">counter</span><span class="o">(</span><span class="s">"domain/foocount"</span><span class="o">,</span>
     <span class="s">"the number of foos that have been seen"</span><span class="o">)</span>
   <span class="c1">// more metrics here
 </span><span class="o">}</span>
@@ -113,23 +113,23 @@
     * Instruments for everything related to the HTTP stack.
     */</span>
   <span class="k">object</span> <span class="nc">http</span> <span class="o">{</span>
-    <span class="k">val</span> <span class="nc">ReadUpdates</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/post/updates"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">ReadUpdates</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/post/updates"</span><span class="o">,</span>
       <span class="s">"time taken to determine if the supplied device profile needs any software updated"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">CreateAllocations</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/post/allocations"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">CreateAllocations</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/post/allocations"</span><span class="o">,</span>
       <span class="s">"time taken to make new allocations"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">ReadAllocations</span>   <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/allocations/key"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">ReadAllocations</span>   <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/allocations/key"</span><span class="o">,</span>
       <span class="s">"time taken to read a specified allocation"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">DeleteAllocation</span>  <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/delete/allocations/key"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">DeleteAllocation</span>  <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/delete/allocations/key"</span><span class="o">,</span>
       <span class="s">"time taken to delete an allocation"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">ReadGroups</span>        <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/groups"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">ReadGroups</span>        <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/groups"</span><span class="o">,</span>
       <span class="s">"time taken to load and present all defined groups as json"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">CreateGroup</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/post/groups"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">CreateGroup</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/post/groups"</span><span class="o">,</span>
       <span class="s">"time taken to add a new group"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">ReadGroup</span>         <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/groups/key"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">ReadGroup</span>         <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/get/groups/key"</span><span class="o">,</span>
       <span class="s">"time taken to read a group definition and display as json"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">UpdateGroup</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/put/groups/key"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">UpdateGroup</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/put/groups/key"</span><span class="o">,</span>
       <span class="s">"time taken to replace the definition of a group"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">DeleteGroup</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/delete/groups/key"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">DeleteGroup</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"http/delete/groups/key"</span><span class="o">,</span>
       <span class="s">"time taken to delete a group with a given key"</span><span class="o">)</span>
   <span class="o">}</span>
 
@@ -137,19 +137,19 @@
     * Instruments for the database access operations
     */</span>
   <span class="k">object</span> <span class="nc">db</span> <span class="o">{</span>
-    <span class="k">val</span> <span class="nc">ReadLatency</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/single/latency"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">ReadLatency</span>       <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/single/latency"</span><span class="o">,</span>
       <span class="s">"time taken to read a single entry from the database"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">ReadBatchLatency</span>  <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/batch/latency"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">ReadBatchLatency</span>  <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/batch/latency"</span><span class="o">,</span>
       <span class="s">"time taken to read a batch of items from the database with a specified set of keys"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">ReadListLatency</span>   <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/list/latency"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">ReadListLatency</span>   <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/list/latency"</span><span class="o">,</span>
       <span class="s">"time taken to list items from the database with a given hash+range combination"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">ReadScanLatency</span>   <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/scan/latency"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">ReadScanLatency</span>   <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/read/scan/latency"</span><span class="o">,</span>
       <span class="s">"time taken to scan the specified database table"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">WriteLatency</span>      <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/write/single/latency"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">WriteLatency</span>      <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/write/single/latency"</span><span class="o">,</span>
       <span class="s">"time taken to write a single entry into the database"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">WriteBatchLatency</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/write/batch/latency"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">WriteBatchLatency</span> <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/write/batch/latency"</span><span class="o">,</span>
       <span class="s">"time taken to write a batch to the database"</span><span class="o">)</span>
-    <span class="k">val</span> <span class="nc">DeleteLatency</span>     <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/delete/batch/latency"</span><span class="o">,</span> 
+    <span class="k">val</span> <span class="nc">DeleteLatency</span>     <span class="k">=</span> <span class="n">timer</span><span class="o">(</span><span class="s">"db/delete/batch/latency"</span><span class="o">,</span>
       <span class="s">"time taken to delete a batch from the database"</span><span class="o">)</span>
   <span class="o">}</span>
 <span class="o">}</span>
