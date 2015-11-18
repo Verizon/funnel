@@ -5,8 +5,8 @@
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
     <title>Funnel - Services</title>
 
-    <link rel="stylesheet" href="/funnel/css/styles.css">
-    <link rel="stylesheet" href="/funnel/css/custom.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/custom.css">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <!--[if lt IE 9]>
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
@@ -29,25 +29,25 @@
 
         <ol>
           <!-- home -->
-          <li><a href="/funnel/">Home</a></li>
-          <li><a href="/funnel/#overview">Overview</a></li>
+          <li><a href="/">Home</a></li>
+          <li><a href="/#overview">Overview</a></li>
 
           <!-- getting started -->
-          <li><a href="/funnel/getting-started">Getting Started</a></li>
+          <li><a href="/getting-started">Getting Started</a></li>
           
 
           <!-- modules -->
-          <li><a href="/funnel/modules">Modules</a></li>
+          <li><a href="/modules">Modules</a></li>
           
 
           <!-- services -->
-          <li><a href="/funnel/services">Services</a></li>
+          <li><a href="/services">Services</a></li>
           
             <li>
               <ol>
-                <li><a href="/funnel/services/#agent">Agent</a></li>
-                <li><a href="/funnel/services/#flask">Flask</a></li>
-                <li><a href="/funnel/services/#chemist">Chemist</a></li>
+                <li><a href="/services/#agent">Agent</a></li>
+                <li><a href="/services/#flask">Flask</a></li>
+                <li><a href="/services/#chemist">Chemist</a></li>
               </ol>
             </li>
           
@@ -74,7 +74,7 @@
 <li><a href="http://nginx.org/">Nginx</a> statistic importer to pull utilisation data from the specific nginx stub_status module.</li>
 </ul>
 
-<p>The agent process makes heavy use of the <a href="/funnel/modules/#zeromq">ZeroMQ</a> module in order to provide communication locally, and remotely. Specifically applications running on that host may connect to the appropriate local domain socket to submit their metrics, and in turn, the agent will consume from that domain socket and transparently emit those metrics on a TCP socket bound to the host adaptor. This provides a convenient mechanism for the application to report metrics irrespective of if this particular host is mulit-tennant (e.g. using containers and a resource manager) or not.</p>
+<p>The agent process makes heavy use of the <a href="/modules/#zeromq">ZeroMQ</a> module in order to provide communication locally, and remotely. Specifically applications running on that host may connect to the appropriate local domain socket to submit their metrics, and in turn, the agent will consume from that domain socket and transparently emit those metrics on a TCP socket bound to the host adaptor. This provides a convenient mechanism for the application to report metrics irrespective of if this particular host is mulit-tennant (e.g. using containers and a resource manager) or not.</p>
 
 <p><a name="agent-config"></a></p>
 
@@ -367,7 +367,7 @@
 <li><p><code>flask.name</code>: the name the running JVM process will report.</p></li>
 <li><p><code>flask.collect-local-metrics</code> and <code>flask.local-metric-frequency</code>: should flask use its own funnel (see the section <a href="#flask-system-metrics">System Metrics</a>)</p></li>
 <li><p><code>flask.network.host</code>, <code>flask.network.selfie-port</code> and <code>flask.network.http-port</code>: the network host and port that flask process will bind to when it starts.</p></li>
-<li><p><code>flask.elastic.*</code>: configuration parameters that specify how flask will connect and publish data to the elastic search sinks. See the <a href="/funnel//modules/#elastic-flattened">elastic sink docs</a> for more information.</p></li>
+<li><p><code>flask.elastic.*</code>: configuration parameters that specify how flask will connect and publish data to the elastic search sinks. See the <a href="//modules/#elastic-flattened">elastic sink docs</a> for more information.</p></li>
 </ul>
 
 <p><a name="flask-error-reporting"></a></p>
