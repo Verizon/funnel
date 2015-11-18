@@ -9,6 +9,8 @@ organization in Global  := "oncue.funnel"
 
 scalaVersion in Global  := "2.10.5"
 
+parallelExecution in Global := false
+
 lazy val funnel = project.in(file(".")).aggregate(
   core,
   http,
