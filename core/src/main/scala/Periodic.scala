@@ -30,6 +30,10 @@ package funnel
  */
 case class Periodic[+A](now: Key[A], previous: Key[A], sliding: Key[A]) {
   def toTriple: Triple[Key[A]] = Triple(now, previous, sliding)
+  def |@|[AA >: A, B](m: Metric[B]) = {
+    import scalaz.syntax.applicative._
+    Metric.periodicToMetric[AA](this) |@| m
+  }
 }
 
 object Periodic {
@@ -42,5 +46,10 @@ object Periodic {
  * which there isn't a good way of aggregating or
  * summarizing multiple historical values.
  */
-case class Continuous[+A](now: Key[A])
+case class Continuous[+A](now: Key[A]) {
+  def |@|[AA >: A, B](m: Metric[B]) = {
+    import scalaz.syntax.applicative._
+    Metric.continuousToMetric[AA](this) |@| m
+  }
+}
 
