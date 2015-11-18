@@ -58,7 +58,7 @@
 <li>For operations staff who want to aggregate metrics, monitor systems and familiarise themselves with the failure modes, <a href="getting-started/operations.html">see here</a></li>
 </ul>
 
-<p><em>Funnel</em> allows systems to push, pull, mirror and aggregate metrics from disparate systems, all with a unified API. High-level dashboards can then be created by down-stream consumers (in this case, pushing to elastic search and visualising <em>Funnel</em> data with Kiabana)</p>
+<p><em>Funnel</em> allows systems to push, pull, mirror and aggregate metrics from disparate systems, all with a unified API. High-level dashboards can then be created by down-stream consumers (in this case, pushing to elastic search and visualising <em>Funnel</em> data with Kibana)</p>
 
 <p><img src="/funnel/img/elk-dash-2.png" alt="image"></p>
 
@@ -79,13 +79,13 @@
 <li><p><strong>Exporters</strong> are the last peice of the puzzle. Exporters consume the streams in the core of <em>Funnel</em> and typically execute some kind of effectful transduction on that stream. In practice this might be transforming the streams into JSON to send to elastic search, or sending to a network socket. This section is highly extensible and simpy needs the implementor to provide a function <code>URI =&gt; Process[Task, Datapoint[Any]]</code>.</p></li>
 </ul>
 
-<p>This is the view of the system from a single machine perspective, but conveniently it turns out that this design composes accross the network to create a large distributed system. Viewed at a larger scale, the system can be vizulised like this:</p>
+<p>This is the view of the system from a single machine perspective, but conveniently it turns out that this design composes accross the network to create a large distributed system. Viewed at a larger scale, the system can be visualized like this:</p>
 
 <p><img src="/funnel/img/chemist-flask-funnel.png" alt="design"></p>
 
-<p>The specifics of this diagram are covered in the <a href="/funnel/services/">operatations guide</a> section. From the high-level, the pushing and pulling of data is simply a combintation of various importers and exporters.</p>
+<p>The specifics of this diagram are covered in the <a href="/funnel/services/">operatations guide</a> section. From the high-level, the pushing and pulling of data is simply a combination of various importers and exporters.</p>
 
-<p>Several design choices were made specifically with goal of giving <em>Funnel</em> the ability to scale linearly. Probably the most obvious is the pull-based model the system employed by the agent &lt;-&gt; flask reltationship: by pulling metrics and conducting service-local aggregation of samples, the aggregating systems never see load-spikes that might cause cascading failure: they instead see a consistent load that only increases with the number of metric keys in total that <em>Flask</em> instance is being asked to monitor. Put another way: increases in local sampling on a given host adds overhead to that host, but it doesn&#39;t affect the wider system.</p>
+<p>Several design choices were made specifically with goal of giving <em>Funnel</em> the ability to scale linearly. Probably the most obvious is the pull-based model the system employed by the agent &lt;-&gt; flask relationship: by pulling metrics and conducting service-local aggregation of samples, the aggregating systems never see load-spikes that might cause cascading failure: they instead see a consistent load that only increases with the number of metric keys in total that <em>Flask</em> instance is being asked to monitor. Put another way: increases in local sampling on a given host adds overhead to that host, but it doesn&#39;t affect the wider system.</p>
 
 <p><a name="time-periods"></a></p>
 
@@ -107,7 +107,7 @@
 
 <h2>Units</h2>
 
-<p>Any given metric has the notion of reporting the <code>Units</code> that the specific metric denotes. For example, simply seeing the value <code>18544</code> for, say, memory usage would not be specifically useful. Is it gigabytes, megabytes? If its the former, perhaps its running hot, if its the latter, there is plenty of headroom. In this frame, you can see how important it is to have an associated metric. At the time of writing the library supports the following <code>Units</code>:</p>
+<p>Any given metric has the notion of reporting the <code>Units</code> that the specific metric denotes. For example, simply seeing the value <code>18544</code> for, say, memory usage would not be specifically useful. Is it gigabytes, megabytes? If it&#39;s the former, perhaps its running hot, if its the latter, there is plenty of headroom. In this frame, you can see how important it is to have an associated metric. At the time of writing the library supports the following <code>Units</code>:</p>
 
 <ul>
 <li><code>Count</code></li>
