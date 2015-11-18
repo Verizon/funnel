@@ -47,7 +47,7 @@ Several design choices were made specifically with goal of giving *Funnel* the a
 
 As with all monitoring systems, understanding the way time periods is handled is really important (where time period represents the time in which metrics are collected, and then reset). *Funnel* supports three different time period types, as illustrated by the diagram below.
 
-![image]({{ site.baseurl }}img/time-periods.jpg)
+![image]({{ site.baseurl }}img/time-periods.png)
 
 In this diagram, **T** represents time moving left to right. A, B and C respectively illustrate the boundaries of given time periods. The duration of the time period is very arbitrary, but the default setting is for 1 minute periods. In this frame:
 
