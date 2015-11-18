@@ -25,7 +25,7 @@ package funnel {
   }
 }
 
-import scalaz.Free.FreeC
+import scalaz.FreeAp
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scalaz.Monoid
