@@ -1,9 +1,9 @@
 name: Funnel
 markdown: redcarpet
 # localhost
-baseurl: "/"
+# baseurl: "/"
 # ghpages
-# baseurl: "/funnel/"
+baseurl: "/funnel/"
 github:
   domain: "https://github.com"
   repo: "/oncue/funnel"
