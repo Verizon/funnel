@@ -11,7 +11,7 @@ A distributed monitoring system based on a lightweight streaming protocol. To ge
 * For engineers that want to instrument their code, [see here](getting-started/developers.html)
 * For operations staff who want to aggregate metrics, monitor systems and familiarise themselves with the failure modes, [see here](getting-started/operations.html)
 
-*Funnel* allows systems to push, pull, mirror and aggregate metrics from disparate systems, all with a unified API. High-level dashboards can then be created by down-stream consumers (in this case, pushing to elastic search and visualising *Funnel* data with Kiabana)
+*Funnel* allows systems to push, pull, mirror and aggregate metrics from disparate systems, all with a unified API. High-level dashboards can then be created by down-stream consumers (in this case, pushing to elastic search and visualising *Funnel* data with Kibana)
 
 ![image]({{ site.baseurl }}img/elk-dash-2.png)
 
@@ -33,7 +33,7 @@ Each part of this pipeline has a distinct function:
 
 * **Exporters** are the last peice of the puzzle. Exporters consume the streams in the core of *Funnel* and typically execute some kind of effectful transduction on that stream. In practice this might be transforming the streams into JSON to send to elastic search, or sending to a network socket. This section is highly extensible and simpy needs the implementor to provide a function `URI => Process[Task, Datapoint[Any]]`.
 
-This is the view of the system from a single machine perspective, but conveniently it turns out that this design composes accross the network to create a large distributed system. Viewed at a larger scale, the system can be vizulised like this:
+This is the view of the system from a single machine perspective, but conveniently it turns out that this design composes accross the network to create a large distributed system. Viewed at a larger scale, the system can be visualized like this:
 
 ![design]({{ site.baseurl }}img/chemist-flask-funnel.png)
 
