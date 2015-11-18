@@ -7,8 +7,6 @@ metadata.settings
 
 // Custom.binaryCompatibility
 
-resolvers += Resolver.jcenterRepo
-
 scalacOptions += "-language:postfixOps"
 
 libraryDependencies ++= Seq(

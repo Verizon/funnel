@@ -28,6 +28,7 @@ object common {
 
   def settings =
     prompt.settings ++
+    artifactRepositories ++
     compilation ++
     bintraySettings ++
     releaseSettings ++
@@ -99,6 +100,11 @@ object common {
     Revolver.reStartArgs :=
       (baseDirectory.value / ".." / "etc" / "development" / name.value / s"${name.value}.dev.cfg").getCanonicalPath :: Nil,
     mainClass in Revolver.reStart := (mainClass in run).value
+  )
+
+  def artifactRepositories = Seq(
+    resolvers ++= Resolver.jcenterRepo ::
+                  Resolver.bintrayRepo("oncue", "releases") :: Nil
   )
 
   def ignore = Seq(

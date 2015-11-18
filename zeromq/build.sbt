@@ -1,8 +1,6 @@
 
 common.settings
 
-resolvers += Resolver.bintrayRepo("oncue", "releases")
-
 // Custom.binaryCompatibility
 
 // pure-java implementation:
