@@ -37,9 +37,9 @@ This is the view of the system from a single machine perspective, but convenient
 
 ![design]({{ site.baseurl }}img/chemist-flask-funnel.png)
 
-The specifics of this diagram are covered in the [operatations guide]({{ site.baseurl }}services/) section. From the high-level, the pushing and pulling of data is simply a combintation of various importers and exporters.
+The specifics of this diagram are covered in the [operatations guide]({{ site.baseurl }}services/) section. From the high-level, the pushing and pulling of data is simply a combination of various importers and exporters.
 
-Several design choices were made specifically with goal of giving *Funnel* the ability to scale linearly. Probably the most obvious is the pull-based model the system employed by the agent <-> flask reltationship: by pulling metrics and conducting service-local aggregation of samples, the aggregating systems never see load-spikes that might cause cascading failure: they instead see a consistent load that only increases with the number of metric keys in total that *Flask* instance is being asked to monitor. Put another way: increases in local sampling on a given host adds overhead to that host, but it doesn't affect the wider system.
+Several design choices were made specifically with goal of giving *Funnel* the ability to scale linearly. Probably the most obvious is the pull-based model the system employed by the agent <-> flask relationship: by pulling metrics and conducting service-local aggregation of samples, the aggregating systems never see load-spikes that might cause cascading failure: they instead see a consistent load that only increases with the number of metric keys in total that *Flask* instance is being asked to monitor. Put another way: increases in local sampling on a given host adds overhead to that host, but it doesn't affect the wider system.
 
 <a name="time-periods"></a>
 
@@ -59,7 +59,7 @@ In this diagram, **T** represents time moving left to right. A, B and C respecti
 
 ## Units
 
-Any given metric has the notion of reporting the `Units` that the specific metric denotes. For example, simply seeing the value `18544` for, say, memory usage would not be specifically useful. Is it gigabytes, megabytes? If its the former, perhaps its running hot, if its the latter, there is plenty of headroom. In this frame, you can see how important it is to have an associated metric. At the time of writing the library supports the following `Units`:
+Any given metric has the notion of reporting the `Units` that the specific metric denotes. For example, simply seeing the value `18544` for, say, memory usage would not be specifically useful. Is it gigabytes, megabytes? If it's the former, perhaps its running hot, if its the latter, there is plenty of headroom. In this frame, you can see how important it is to have an associated metric. At the time of writing the library supports the following `Units`:
 
 * `Count`
 * `Ratio`
