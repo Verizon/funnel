@@ -23,6 +23,7 @@ import com.typesafe.sbt.pgp.PgpKeys._
 import bintray.BintrayKeys._
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 import spray.revolver.RevolverPlugin._
+import sbtassembly.{MergeStrategy,AssemblyKeys}, AssemblyKeys._
 
 object common {
 
@@ -106,6 +107,20 @@ object common {
     resolvers ++= Resolver.jcenterRepo ::
                   Resolver.bintrayRepo("oncue", "releases") :: Nil
   )
+
+  def fatjar = Seq(
+    assemblyMergeStrategy in assembly := {
+      case "META-INF/io.netty.versions.properties" => MergeStrategy.first
+      case x =>
+        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        oldStrategy(x)
+    },
+    artifact in (Compile, assembly) := {
+      val art = (artifact in (Compile, assembly)).value
+      art.copy(`classifier` = Some("assembly"))
+    },
+    mainClass in assembly := mainClass in run
+  ) ++ addArtifact(artifact in (Compile, assembly), assembly)
 
   def ignore = Seq(
     publish := (),
