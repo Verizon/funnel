@@ -3,6 +3,8 @@ common.settings
 
 common.revolver
 
+common.fatjar
+
 libraryDependencies ++= Seq(
   "com.amazonaws" % "aws-java-sdk-ec2"            % V.aws,
   "com.amazonaws" % "aws-java-sdk-autoscaling"    % V.aws,

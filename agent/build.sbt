@@ -5,6 +5,8 @@ common.revolver
 
 common.unmanaged
 
+common.fatjar
+
 libraryDependencies ++= Seq(
   "net.databinder"    %% "unfiltered-filter"       % V.unfiltered,
   "net.databinder"    %% "unfiltered-netty-server" % V.unfiltered,
@@ -16,10 +18,3 @@ libraryDependencies ++= Seq(
 )
 
 mainClass in run := Some("funnel.agent.Main")
-
-assemblyMergeStrategy in assembly := {
-  case "META-INF/io.netty.versions.properties" => MergeStrategy.first
-  case x =>
-    val oldStrategy = (assemblyMergeStrategy in assembly).value
-    oldStrategy(x)
-}
