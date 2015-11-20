@@ -1,7 +1,7 @@
 
 common.settings
 
-fork in test := true
+// fork in test := true
 
 initialCommands in console := """
 import funnel._, chemist._
