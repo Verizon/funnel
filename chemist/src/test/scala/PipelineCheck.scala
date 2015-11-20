@@ -84,16 +84,16 @@ object PipelineCheck extends Properties("Pipeline") {
   implicit lazy val arbContextOfPlatformEvent: Arbitrary[Context[PlatformEvent]] =
     Arbitrary(genContextOfPlatformEvent)
 
-  property("newFlask works") = forAll { (f: Flask, s: Sharder, d: Distribution) =>
-    val (nd, _) = Pipeline.handle.newFlask(f, s)(d)
-    (!Sharding.shards(d).contains(f)) ==>
-    ("The existing Distribution does not contain the Flask" |:
-      !d.keySet.contains(f)) &&
-    ("The new Distribution contains the Flask" |:
-      nd.keySet.contains(f)) &&
-    ("The existing and new Distributions have the same Targets" |:
-      Sharding.targets(d) == Sharding.targets(nd))
-  }
+  // property("newFlask works") = forAll { (f: Flask, s: Sharder, d: Distribution) =>
+  //   val (nd, _) = Pipeline.handle.newFlask(f, s)(d)
+  //   (!Sharding.shards(d).contains(f)) ==>
+  //   ("The existing Distribution does not contain the Flask" |:
+  //     !d.keySet.contains(f)) &&
+  //   ("The new Distribution contains the Flask" |:
+  //     nd.keySet.contains(f)) &&
+  //   ("The existing and new Distributions have the same Targets" |:
+  //     Sharding.targets(d) == Sharding.targets(nd))
+  // }
 
   property("newTarget works") = forAll { (t: Target, s: Sharder, d: Distribution) =>
     val nd = Pipeline.handle.newTarget(t, s)(d)
