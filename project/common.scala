@@ -118,7 +118,8 @@ object common {
       val art = (artifact in (Compile, assembly)).value
       art.copy(`classifier` = Some("assembly"))
     },
-    mainClass in assembly := (mainClass in run).value
+    mainClass in assembly := (mainClass in run).value,
+    test in assembly := ()
   ) ++ addArtifact(artifact in (Compile, assembly), assembly)
 
   def ignore = Seq(
