@@ -151,9 +151,9 @@ object common {
     releaseProcess := Seq[ReleaseStep](
       checkSnapshotDependencies,
       inquireVersions,
-      runTest,
       setReleaseVersion,
       tagRelease,
+      runTest,
       publishArtifacts,
       pushChanges.copy(check = identity)
     )
