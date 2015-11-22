@@ -19,6 +19,7 @@ import sbtrelease._
 import sbtrelease.ReleasePlugin.autoImport._
 import sbtrelease.ReleaseStateTransformations._
 import sbtrelease.Utilities._
+import sbtrelease.Version
 import bintray.BintrayKeys._
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 import spray.revolver.RevolverPlugin._
@@ -140,17 +141,21 @@ object common {
 
   def releaseSettings = Seq(
     releaseCrossBuild := true,
+    releaseVersion := { ver =>
+      sys.env.get("TRAVIS_BUILD_NUMBER").orElse(sys.env.get("BUILD_NUMBER"))
+        .map(s => try Option(s.toInt) catch { case _: NumberFormatException => Option.empty[Int] })
+        .flatMap(ci => Version(ver).map(_.withoutQualifier.copy(bugfix = ci).string))
+        .orElse(Version(ver).map(_.withoutQualifier.string))
+        .getOrElse(versionFormatError)
+    },
     releaseProcess := Seq[ReleaseStep](
       checkSnapshotDependencies,
       inquireVersions,
       runTest,
       setReleaseVersion,
-      commitReleaseVersion,
       tagRelease,
       publishArtifacts,
-      setNextVersion,
-      commitNextVersion,
-      pushChanges
+      pushChanges.copy(check = identity)
     )
   )
 
