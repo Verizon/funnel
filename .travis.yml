@@ -8,10 +8,9 @@ branches:
   only:
     - master
 before_install:
-  - "mkdir -p ~/.sbt/gpg/ && mkdir -p ~/.bintray/"
+  - mkdir -p ~/.bintray/
   - openssl aes-256-cbc -K "$encrypted_cd28ec037f46_key" -iv "$encrypted_cd28ec037f46_iv" -in secrets.zip.enc -out secrets.zip -d
   - unzip secrets.zip
   - mv bintray ~/.bintray/.credentials
-  - mv secring.asc ~/.sbt/gpg/secring.asc
   - rm secrets.zip
 script: ./travis-build
