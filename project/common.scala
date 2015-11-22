@@ -19,7 +19,6 @@ import sbtrelease._
 import sbtrelease.ReleasePlugin.autoImport._
 import sbtrelease.ReleaseStateTransformations._
 import sbtrelease.Utilities._
-import com.typesafe.sbt.pgp.PgpKeys._
 import bintray.BintrayKeys._
 import com.typesafe.sbt.SbtMultiJvm.MultiJvmKeys.MultiJvm
 import spray.revolver.RevolverPlugin._
@@ -124,9 +123,9 @@ object common {
 
   def ignore = Seq(
     publish := (),
-    publishSigned := (),
+    // publishSigned := (),
     publishLocal := (),
-    publishLocalSigned := (),
+    // publishLocalSigned := (),
     publishArtifact in Test := false,
     publishArtifact in Compile := false
   )
@@ -140,7 +139,6 @@ object common {
 
   def releaseSettings = Seq(
     releaseCrossBuild := true,
-    releasePublishArtifactsAction := publishSigned.value,
     releaseProcess := Seq[ReleaseStep](
       checkSnapshotDependencies,
       inquireVersions,
@@ -200,7 +198,6 @@ object common {
         </developer>
       </developers>),
     publishMavenStyle := true,
-    useGpg := true,
     licenses := Seq("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.html")),
     homepage := Some(url("http://oncue.github.io/funnel/")),
     scmInfo := Some(ScmInfo(url("https://github.com/oncue/funnel"),
