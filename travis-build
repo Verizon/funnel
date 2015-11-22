@@ -18,7 +18,7 @@ EOF
   git config --global user.name "travis-ci"
   git config credential.helper "store --file=.git/credentials"
   echo "https://${GITHUB_TOKEN}:@github.com" > .git/credentials
-  git fetch --unshallow
+  git fetch -q --unshallow
   git checkout -qf ${TRAVIS_BRANCH}
 
   sbt "release cross with-defaults"
