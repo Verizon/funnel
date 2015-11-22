@@ -5,11 +5,10 @@ set -ev
 # When the build is for a pull request, it will contain the
 # pull request’s number.
 if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then
+  git config --global user.email "oss@travis-ci.org"
+  git config --global user.name "travis-ci"
   git fetch --unshallow
-  git checkout -qf master
-  # git config remote.origin.fetch +refs/heads/*:refs/remotes/origin/*
-  # git config branch.master.remote origin
-  # git config branch.master.merge refs/heads/master
+  git checkout -qf ${TRAVIS_BRANCH}
   sbt "release cross with-defaults"
 else
   # for pull requests only do tests
