@@ -1,16 +1,14 @@
----
 language: scala
 scala:
-  - 2.10.5
+- 2.10.5
 jdk:
-  - oraclejdk8
+- oraclejdk8
 branches:
   only:
-    - master
-before_install:
-  - mkdir -p ~/.bintray/
-  - openssl aes-256-cbc -K "$encrypted_cd28ec037f46_key" -iv "$encrypted_cd28ec037f46_iv" -in secrets.zip.enc -out secrets.zip -d
-  - unzip secrets.zip
-  - mv bintray ~/.bintray/.credentials
-  - rm secrets.zip
+  - master
 script: ./travis-build
+env:
+  global:
+  - secure: BFyg2bXP87m8W6QhGLLL95IWyPNXj/6DaGehcitaQlU03zt0StOd/Rz9dS7jZ4i9VPPJ62IigpfVHHBonBdaSYjH7LCJzZ058RihS2ixgs8MDH3NswxVRZAMe6cI0Fi2t1Bs/K31wpnmSrGprfxgbqKQagcrtRUoNWCriGIRTvLZSjTYqeG0Ocllg7BSdqMLEC0Jd5YYlJiHSvRCY0/2QKpyw7C8TgcMY6CD6dW1Ab0Qtl/cmkOWdx9WrQZ70VWBjBdrObKZPA6tjlm4fNoySodWBRqa5WCh5QENAphik6t5N9NoK5LVyUHKUYuTBpHLjLp+1zFF8cDKXmf82MZVH/vxENMJslxjcbXp90yN/eorgiT17L1LYxRBaqWT/seKCJxFXxYJB4ZIK7C7rpK+bYtmPX7qoVK9FRXlBIpq9kEJgqIhAUTYFfkIvCp4MyBWuwnpT2P0dd3sRToFH/capYNH9IcC/f6gi21OPa9FHjQADkvUgSJBibSWP1YVhFeNZszB/48+qJES7YfdkaIImt9T23VULzCwTjcsHCHDDXKi49u3G3isKVsxABnRUMT/0mswde58toI0kD1Zp3EVOjLiLZOxbKyQRRify900xKCRVDm3TcYnG1dIBpplaiXqNXZTal8x/cyzE2pYOOMTBH+adq2jo9G24O48miJ9MFs=
+  - secure: yK4U4I04Jk6iBfoMGwSzqN8cYzIP1ESSaJLLapZfOsEvvWaqkvh6nXGJr5AG41TFgJWs01SZ+aNnPOcw6rOrzaTZ/4JtLLRrpT/jeirOoTHL3nj3awkNZpmYW3ifz/LhDXoN3xWsdvDQcJBXcx7RINQ/1rAU1izytfe6VazTezBk3Ga3lRuMIkeSdoUhAOxHxiAaPevui/LaJOE3BuVCjVF46oaLkY6Zj4+hELaVBTM3VGVqut9a8089pqyWEWoBE9W6cp490KNchNt+ESPW61vf2/7552Ygs+efUwo2JJgPjGXuxgekDgrezWxgS1h+q5L/YH31fKDqoqhBQJ1u2lk/cOLxa4uoOOxet3NUx5zB5ZAuXNhmv6PZLcbUII0xAmyIM+WY8zhwjJ5U6nJSL6VddCRHt4vWE61NaFSg0rbyYSyd99udMjvhny/PKQOIFQ5hleCOt1acm1hVtdXkZmgxVL+CVAxCFV+ey3lmNgL1JSEf+W0UkJOPWPQYVjJYwLwpx4/wdjnS/mxWeLpuZGTpszGLHfHaFZP/JJQ7Fx/9q18Tfw+YuSXmYFWopjP4uCQZUmc50YzRhOIQmm6jgAciM4RDiDOApJmelTS3aSpNcz7gcJ3bAzioh4j4pmQb7BGWlDtKNiqcD4X609S4DsHyRg3Jt5MArd+je/bxtdc=
+  - secure: 4CWlyj3Q5ODDfFfglkAWNKY4LFRkg1QoHygxzvjTqB0Y/4h7jScCjWuzNlY9ZjngNOsD/9ni4w+ZfsQM3ECM5eabgVh9AxxU17Fi9rG24JaQhymdY5vVNnWYmWRemB/VqWKaqkUx7My7f/+fv5FOLhqK7wDjIInuH+QfoORRN3u6xfyVDwN0Pa9Slf+Oja/4LDT04vftYiqXocTnl1asHpuuelq5WIU0dvYD4yC9XEKt27YUY0ouFqrCPTeTnA722GUg3c+nWClOxMezQ18Y2C6M1ElKuIteK7EM6rqxxf7nASL+hQqE/DEVQlBWTW3QQEhmfkK7FPiCEb2aPqcKQb94NmB+nAZAoF+AYa4nbwAsluawAoyyetzR4XTU/bWUvWud8UuxmBJnJ2w2Zx220i6EfO6GI0nOZsQKzJ8lRN1IhMiHYTkU7hJX4AIvfWasLDLg1PXh3Fqr1mw+5dN9O+EdN5sOMBCnxwBCdUA8BUeYrKyvzMxeZGgeEQ7bhavxivyWvVAG5IKdYIZFhzifpN48Yv8xKnA+PHhutOVg4fkAsic6cDia4dt+utPzxgOzJYcX83mVPOHN4ujZEOTSeJ4hzJuGtORHVVxOJfw9dOhsyIGjjUsg20nbNc6x/vdVgfwCqZ1v48cP06JGZEVy++xckz3snRwJo6BsgNp+puU=
