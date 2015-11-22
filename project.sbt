@@ -5,6 +5,8 @@ common.ignore
 
 prompt.settings
 
+common.release
+
 organization in Global  := "oncue.funnel"
 
 scalaVersion in Global  := "2.10.5"

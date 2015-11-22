@@ -32,7 +32,7 @@ object common {
     artifactRepositories ++
     compilation ++
     bintraySettings ++
-    releaseSettings ++
+    release ++
     publishingSettings ++
     testSettings
 
@@ -139,7 +139,7 @@ object common {
     bintrayPackage := "funnel"
   )
 
-  def releaseSettings = Seq(
+  def release = Seq(
     releaseCrossBuild := true,
     releaseVersion := { ver =>
       sys.env.get("TRAVIS_BUILD_NUMBER").orElse(sys.env.get("BUILD_NUMBER"))
@@ -151,9 +151,9 @@ object common {
     releaseProcess := Seq[ReleaseStep](
       checkSnapshotDependencies,
       inquireVersions,
-      runTest,
       setReleaseVersion,
       tagRelease,
+      runTest,
       publishArtifacts,
       pushChanges.copy(check = identity)
     )
