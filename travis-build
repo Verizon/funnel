@@ -14,8 +14,6 @@ user = ${BINTRAY_USER}
 password = ${BINTRAY_TOKEN}
 EOF
 
-  env | grep TRAVIS_
-
   git config --global user.email "oss@travis-ci.org"
   git config --global user.name "travis-ci"
   git config credential.helper "store --file=.git/credentials"
@@ -23,7 +21,7 @@ EOF
   git fetch -q --unshallow
   git checkout -qf ${TRAVIS_BRANCH}
 
-  #sbt "release cross with-defaults"
+  sbt "release cross with-defaults"
 else
   # for pull requests only do tests
   sbt ++$TRAVIS_SCALA_VERSION +test
