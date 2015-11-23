@@ -20,6 +20,7 @@ lazy val funnel = project.in(file(".")).aggregate(
   http,
   elastic,
   nginx,
+  riemann,
   // integration,
   zeromq,
   agent,
@@ -54,6 +55,8 @@ lazy val http = project.dependsOn(core)
 // lazy val integration = project.dependsOn(flask, chemist % "test->test;compile->compile").configs(MultiJvm)
 
 lazy val nginx = project.dependsOn(core)
+
+lazy val riemann = project.dependsOn(core)
 
 lazy val zeromq = project.dependsOn(core, http).configs(MultiJvm) // http? this is for http.JSON._, which should be fixed probably
 
