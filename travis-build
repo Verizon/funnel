@@ -21,7 +21,7 @@ EOF
   git fetch -q --unshallow
   git checkout -qf ${TRAVIS_BRANCH}
 
-  sbt "release cross with-defaults"
+  sbt ++$TRAVIS_SCALA_VERSION "release with-defaults"
 else
   # for pull requests only do tests
   sbt ++$TRAVIS_SCALA_VERSION test

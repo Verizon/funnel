@@ -140,7 +140,7 @@ object common {
   )
 
   def release = Seq(
-    releaseCrossBuild := true,
+    releaseCrossBuild := false,
     releaseVersion := { ver =>
       sys.env.get("TRAVIS_BUILD_NUMBER").orElse(sys.env.get("BUILD_NUMBER"))
         .map(s => try Option(s.toInt) catch { case _: NumberFormatException => Option.empty[Int] })
