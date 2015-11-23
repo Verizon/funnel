@@ -148,6 +148,8 @@ object common {
         .orElse(Version(ver).map(_.withoutQualifier.string))
         .getOrElse(versionFormatError)
     },
+    releaseTagName :=
+      s"${scalaVersion.value.take(4)}/v${if (releaseUseGlobalVersion.value) (version in ThisBuild).value else version.value}",
     releaseProcess := Seq[ReleaseStep](
       checkSnapshotDependencies,
       inquireVersions,
