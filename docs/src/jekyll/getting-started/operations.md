@@ -20,13 +20,9 @@ At a high-level, the system can be visualised like this:
 
 Given the different functions of each component, please refer to their specific sections for more information.
 
-## Installation
-
-Regardless of the *Funnel* service component
-
 ## Security
 
-The security model of funnel currently **relies on network level security**; the application does not attempt to security its communication over the wire using any kind of TLS. With this in mind, never ever host a service on the public internet where the *Funnel* network port (typically `5775` for HTTP and/or `7390` for ZMTP) is open. Doing this would leave the system open for tampering and expose sensitive internals to attackers.
+Funnel currently **relies on network level security**; it does not attempt to secure its communication over the wire using TLS. With this in mind, never ever host a service on the public internet where the *Funnel* network port (typically `5775` for HTTP and/or `7390` for ZMTP) is open. Doing this would leave the system open for tampering and expose sensitive internals to attackers.
 
 In this frame, the recommended security model is to restrict access to datacenter internals, VPNs and specific VLANs. We may add application-layer security at a later date, but given that the system is designed to run fast and light, using operational network security is a fair trade off.
 
