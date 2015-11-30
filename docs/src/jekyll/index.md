@@ -37,7 +37,7 @@ This is the view of the Funnel system from the perspective of a single machine, 
 
 ![design]({{ site.baseurl }}img/chemist-flask-funnel.png)
 
-The specifics of this diagram are covered in the [operatations guide]({{ site.baseurl }}services/) section.
+The specifics of this diagram are covered in the [operations guide]({{ site.baseurl }}services/) section.
 
 Several design choices were made specifically with the goal of giving *Funnel* the ability to scale linearly. The most obvious feature is that the relatioship between *Agent* and *Flask* is pull-based. By downsampling at the level of individual agents, the aggregating *Flask* systems never see load spikes that might cause cascading failures. The load on a *Flask* depends on the number of metric keys it has been asked to consume, and not on the volume of changes to the metrics under those keys. If the data rate on a given host increases, only the overhead on that host is affected since the downstream system pulls samples at a semi-fixed rate.
 
