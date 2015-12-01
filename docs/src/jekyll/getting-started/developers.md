@@ -6,7 +6,7 @@ section: "getting-started"
 
 # Getting Started: Developers
 
-First up you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
+First you need to add the dependency for the monitoring library to your `build.scala` or your `build.sbt` file:
 
 ``` scala
 libraryDependencies += "oncue.funnel" %% "http" % "x.y.z"
@@ -14,7 +14,7 @@ libraryDependencies += "oncue.funnel" %% "http" % "x.y.z"
 
 (check for the latest release by [looking on bintray](https://bintray.com/oncue/releases/funnel/view))
 
-Current transitive dependencies this will introduce on your classpath:
+Current transitive dependencies introduced on your classpath:
 
 - [Scalaz](https://github.com/scalaz/scalaz) 7.1.0
 - [Scalaz Stream](https://github.com/scalaz/scalaz-stream) 0.7.3a
