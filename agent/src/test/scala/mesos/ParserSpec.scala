@@ -56,7 +56,8 @@ class ParserSpec extends FlatSpec with Matchers {
     val checkfield: Option[String] = None
 
     Import.fetch(fromFile("oncue/mesos-statistics.txt"), queries, checkfield) should equal(
-      None)
+      Some(List(ArbitraryMetric("master/slaves_disconnected", GaugeDouble, Some("0"))))
+    )
   }
 
   "Import.fetch" should "fetch non existent metric string from url" in {
