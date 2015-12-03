@@ -107,10 +107,10 @@ object Import {
 
     checkfield match {
       case None => true
-      case _ => {
+      case Some(cf) => {
         implicit def metricsDecodeJson: DecodeJson[MetricsChecker] =
           DecodeJson(c => for {
-            field <- (c --\ checkfield.get).as[Int]
+            field <- (c --\ cf).as[Int]
           } yield MetricsChecker(field))
 
         val jo = json.jdecode(metricsDecodeJson)

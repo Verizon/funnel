@@ -126,7 +126,7 @@ object Main {
       val mesosUrl    = cfg.lookup[String]("agent.mesos.url")
       val mesosFreq     = cfg.lookup[Duration]("agent.mesos.poll-frequency")
       val mesosQueries  = cfg.lookup[List[String]]("agent.mesos.queries")
-      val mesosCheckfield = cfg.lookup[String]("agent.mesos.checkfield").orElse(None)
+      val mesosCheckfield = cfg.lookup[String]("agent.mesos.checkfield")
 
       Options(
         agent  = (systemMetrics |@| jvmMetrics)(AgentConfig),
