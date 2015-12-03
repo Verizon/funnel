@@ -49,7 +49,7 @@ object Import {
   def periodically(
                     url: URI,
                     queries: List[String],
-                    checkfield: String,
+                    checkfield: Option[String],
                     cluster: String
                     )(inst: Instruments
                     )(frequency: Duration = 10.seconds
@@ -65,7 +65,7 @@ object Import {
   def now(
            url: URI,
            queries: List[String],
-           checkfield: String,
+           checkfield: Option[String],
            cluster: String
            )(inst: Instruments): Task[Unit] =  {
     for {
@@ -80,8 +80,9 @@ object Import {
     Task.now(Source.fromInputStream(url.toURL.openConnection.getInputStream).mkString)
 
 
-  def fetch(url: URI, queries: List[String], checkfield: String): Task[Seq[ArbitraryMetric]] =  {
-   fetch(url).map(jsonString => {fetch(jsonString, queries, checkfield)}.get).handleWith {
+  def fetch(url: URI, queries: List[String], checkfield: Option[String]): Task[Seq[ArbitraryMetric]] =  {
+   fetch(url).map(jsonString =>
+     fetch(jsonString, queries, checkfield).getOrElse(Seq.empty[ArbitraryMetric])).handleWith {
      case NonFatal(e) =>
        log.error(s"An error occoured with the mesos import from $url")
        e.printStackTrace
@@ -89,7 +90,7 @@ object Import {
    }
   }
 
-  def fetch(jsonString: String, queries: List[String], checkfield: String): Option[Seq[ArbitraryMetric]] =  {
+  def fetch(jsonString: String, queries: List[String], checkfield: Option[String]): Option[Seq[ArbitraryMetric]] =  {
       val json = Parse.parse(jsonString)
       for {
         j <- json.toOption
@@ -102,18 +103,23 @@ object Import {
   /**
    * check if field exists and it's set to 1
    */
-  private[mesos] def checkpasses(json: Json, checkfield: String): Boolean = {
+  private[mesos] def checkpasses(json: Json, checkfield: Option[String]): Boolean = {
 
-    implicit def metricsDecodeJson: DecodeJson[MetricsChecker] =
-      DecodeJson(c => for {
-        field <- (c --\ checkfield).as[Int]
-      } yield MetricsChecker(field))
+    checkfield match {
+      case None => true
+      case Some(cf) => {
+        implicit def metricsDecodeJson: DecodeJson[MetricsChecker] =
+          DecodeJson(c => for {
+            field <- (c --\ cf).as[Int]
+          } yield MetricsChecker(field))
 
-    val jo = json.jdecode(metricsDecodeJson)
+        val jo = json.jdecode(metricsDecodeJson)
 
-    jo.value match {
-      case Some(MetricsChecker(1)) => true
-      case _ => false
+        jo.value match {
+          case Some(MetricsChecker(1)) => true
+          case _ => false
+        }
+      }
     }
   }
 

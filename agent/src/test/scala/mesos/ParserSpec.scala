@@ -35,7 +35,7 @@ class ParserSpec extends FlatSpec with Matchers {
   "Import.fetch" should "fetch metric string from url" in {
 
     val queries = List("master/slaves_disconnected|long")
-    val checkfield: String = "master/elected"
+    val checkfield: Option[String] = Some("master/elected")
 
     Import.fetch(fromFile("oncue/mesos-statistics.txt"), queries, checkfield) should equal(
       Some(List((ArbitraryMetric("master/slaves_disconnected", GaugeDouble, Some("0"))))))
@@ -44,7 +44,7 @@ class ParserSpec extends FlatSpec with Matchers {
   "Import.fetch" should "fetch non existent checkfield from url" in {
 
     val queries = List("master/slaves_disconnected|long")
-    val checkfield: String = "master/elected1"
+    val checkfield: Option[String] = Some("master/elected1")
 
     Import.fetch(fromFile("oncue/mesos-statistics.txt"), queries, checkfield) should equal(
       None)
@@ -53,16 +53,17 @@ class ParserSpec extends FlatSpec with Matchers {
   "Import.fetch" should "fetch metrics when there is no checkfield" in {
 
     val queries = List("master/slaves_disconnected|long")
-    val checkfield: String = ""
+    val checkfield: Option[String] = None
 
     Import.fetch(fromFile("oncue/mesos-statistics.txt"), queries, checkfield) should equal(
-      None)
+      Some(List(ArbitraryMetric("master/slaves_disconnected", GaugeDouble, Some("0"))))
+    )
   }
 
   "Import.fetch" should "fetch non existent metric string from url" in {
 
     val queries = List("master/slaves_disconnected1|long")
-    val checkfield: String = "master/elected"
+    val checkfield: Option[String] = Some("master/elected")
 
     Import.fetch(fromFile("oncue/mesos-statistics.txt"), queries, checkfield) should equal(
       Some(List()))
@@ -71,7 +72,19 @@ class ParserSpec extends FlatSpec with Matchers {
   "Import.fetch" should "fetch array of fields from url" in {
 
     val queries = List("master/slaves_disconnected|long","master/messages_deactivate_framework|counter","master/tasks_failed|counter"  )
-    val checkfield: String = "master/elected"
+    val checkfield: Option[String] = Some("master/elected")
+
+    Import.fetch(fromFile("oncue/mesos-statistics.txt"), queries, checkfield) should equal(
+      Some(List(ArbitraryMetric("master/slaves_disconnected", GaugeDouble, Some("0")),
+        ArbitraryMetric("master/messages_deactivate_framework", Counter, Some("0")),
+        ArbitraryMetric("master/tasks_failed", Counter, Some("0"))
+      )))
+  }
+
+  "Import.fetch" should "fetch array of fields from url when there is no need to check for a field existence" in {
+
+    val queries = List("master/slaves_disconnected|long","master/messages_deactivate_framework|counter","master/tasks_failed|counter"  )
+    val checkfield: Option[String] = None
 
     Import.fetch(fromFile("oncue/mesos-statistics.txt"), queries, checkfield) should equal(
       Some(List(ArbitraryMetric("master/slaves_disconnected", GaugeDouble, Some("0")),

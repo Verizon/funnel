@@ -43,7 +43,7 @@ object Main {
                          uri: String,
                          frequency: Duration,
                          queries: List[String] = Nil,
-                         checkfield: String)
+                         checkfield: Option[String])
 
   case class JmxConfig(
     name: String,
@@ -135,7 +135,7 @@ object Main {
         zeromq = proxySocket.map(ZeromqConfig(_, (proxyHost |@| proxyPort)(ProxyConfig))),
         nginx  = (nginxUrl |@| nginxFreq)(NginxConfig),
         jmx    = (jmxName |@| jmxUri |@| jmxFreq |@| jmxQueries |@| jmxExcludes)(JmxConfig),
-        mesos = (mesosName |@| mesosUrl |@| mesosFreq |@| mesosQueries |@| mesosCheckfield)(MesosConfig)
+        mesos = (mesosName |@| mesosUrl |@| mesosFreq |@| mesosQueries |@| Option(mesosCheckfield))(MesosConfig)
       )
     }.run
 
