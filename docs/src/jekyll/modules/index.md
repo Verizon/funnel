@@ -46,7 +46,7 @@ Using this document format enables extreamly fast indexing of documents in Elast
 
 ## Elastic Search (Exploded)
 
-**This sink is only to be used for light traffic, and at high-load it will cause yuor elastic search cluster to bloat its field space beyond the recomended safe limit. For high-volume workloads use the Flattened ES sink.**
+**This sink is only to be used for light traffic, and at high-load it will cause yuor elastic search cluster to bloat its field space beyond the recommended safe limit. For high-volume workloads use the Flattened ES sink.**
 
 Primarily for visualisation, this consumer takes the stream and aggregates into one document *per-funnel-host* per time window, and then sends those documents to Elastic Search in a bulk `PUT` operation. The format of the message looks like this:
 
