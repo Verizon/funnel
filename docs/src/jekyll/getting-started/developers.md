@@ -432,7 +432,7 @@ import funnel.http.MonitoringServer
 import funnel.Monitoring
 
 object Main {
-  def def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     MonitoringServer.start(Monitoring.default, 5775)
 
     // your application code starts here
