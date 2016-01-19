@@ -22,15 +22,13 @@ import scalaz.concurrent.Strategy
 import scalaz.{\/,-\/,\/-}
 import scalaz.syntax.traverse._
 import scalaz.syntax.monad._
-import scalaz.concurrent.{Actor, Task}
-import scalaz.stream.{Process, Process0, Process1, Sink, time}
-import scalaz.stream.async.mutable.Signal
+import scalaz.concurrent.Task
+import scalaz.stream.{Process, time}
 import com.amazonaws.services.sqs.model.Message
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import funnel.aws._
-import java.net.URI
 import scala.concurrent.duration._
 
 /**
@@ -43,7 +41,7 @@ import scala.concurrent.duration._
  */
 object Lifecycle {
   import JSON._
-  import argonaut._, Argonaut._
+  import argonaut._
   import journal.Logger
   import scala.collection.JavaConverters._
   import metrics._
@@ -57,7 +55,7 @@ object Lifecycle {
    * `MessageParseException` in the event the message is not decipherable.
    */
   def parseMessage(msg: Message): Throwable \/ AutoScalingEvent =
-    Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException(_))
+    Parse.decodeEither[AutoScalingEvent](msg.getBody).leftMap(MessageParseException)
 
   private val defaultTicker: Process[Task,Duration] =
     time.awakeEvery(12.seconds)(Strategy.Executor(Chemist.defaultPool), Chemist.schedulingPool)
@@ -86,16 +84,16 @@ object Lifecycle {
             noop
 
           case e =>
-            log.warn(s"Failed to handle error state when recieving lifecycle event. event = ${m.getBody}, error = $e")
+            log.warn(s"Failed to handle error state when receiving lifecycle event. event = ${m.getBody}, error = $e")
             e.printStackTrace
             noop
         }
 
     for {
       a <- SQS.subscribe(queueName, ticker = ticker)(sqs)(Chemist.defaultPool)
-      // _ <- Process.eval(Task(log.debug(s"stream, number messages recieved: ${a.length}")))
+      // _ <- Process.eval(Task(log.debug(s"stream, number messages received: ${a.length}")))
       b <- Process.emitAll(a)
-      _ <- Process.eval(Task(log.debug(s"stream, raw message recieved: $b")))
+      _ <- Process.eval(Task(log.debug(s"stream, raw message received: $b")))
       c <- Process.eval(go(b)).stripW
       d <- Process.emitAll(c)
       _ <- Process.eval(Task(log.debug(s"stream, computed action: $c")))

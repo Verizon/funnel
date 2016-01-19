@@ -20,7 +20,7 @@ package aws
 
 import journal.Logger
 import scalaz.syntax.kleisli._
-import scalaz.concurrent.{Task,Strategy}
+import scalaz.concurrent.Task
 import scalaz.stream.async.boundedQueue
 import funnel.aws.{SNS,CFN}
 
@@ -35,7 +35,7 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
   private val queue = boundedQueue[PlatformEvent](2048)(Chemist.defaultExecutor)
 
   /**
-   * Initilize the chemist serivce by trying to create the various AWS resources
+   * Initialize the chemist service by trying to create the various AWS resources
    * that are required to operate. Once complete, execute the init.
    *
    * There are a couple of important things to note here:
@@ -43,14 +43,14 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
    *    this still needs to be connected with your ASGs in whatever deployment
    *    configuration you happen to be using (e.g. cloudformation). This is
    *    inherently out-of-band for chemist, so we just "create" the SNS topic
-   *    to ensure cheimst has the best chance of initilizing correctly. Without
-   *    the aforementioend external configuration, you wont ever get any lifecycle
-   *    events, and subsequently no immediete monitoring.
+   *    to ensure chemist has the best chance of initializing correctly. Without
+   *    the aforementioned external configuration, you wont ever get any lifecycle
+   *    events, and subsequently no immediate monitoring.
    *
    * 2. Given that SQS is basically a mutable queue, it does not play well when
    *    there are multiple chemist instances running. In an effort to isolate ourselves
    *    from this, the expectation is that you would be launching chemist with
-   *    cloudformation and specifiying the relevant queue as an output of your template.
+   *    cloudformation and specifying the relevant queue as an output of your template.
    *    Doing this means that every deployment you do has a its own, isolated mutable
    *    queue to work with, and when the CFN stack is deleted, the queue will be too.
    */
@@ -64,11 +64,11 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
       _  = log.debug(s"created sns topic with arn = $a")
 
       b <- cfg.discovery.lookupOne(cfg.machine.id).liftKleisli
-      b1 = b.tags.get("aws:cloudformation:stack-name").getOrElse("unknown")
+      b1 = b.tags.getOrElse("aws:cloudformation:stack-name", "unknown")
       _  = log.debug(s"discovered stack name for this running instance to be '$b1'")
 
       c <- CFN.getStackOutputs(b1)(cfg.cfn).liftKleisli
-      c1 = c.get("ServiceQueueARN").getOrElse("unknown")
+      c1 = c.getOrElse("ServiceQueueARN", "unknown")
       _  = log.debug(s"discovered sqs queue with name '$c1'")
 
       _ <- SNS.subscribe(a, c1)(cfg.sns).liftKleisli
@@ -91,7 +91,7 @@ class AwsChemist[A <: Aws] extends Chemist[A]{
 
       _  = log.debug("lifecycle process started")
 
-      _ <- Task.delay(log.info(">>>>>>>>>>>> initilization complete <<<<<<<<<<<<")).liftKleisli
+      _ <- Task.delay(log.info(">>>>>>>>>>>> initialization complete <<<<<<<<<<<<")).liftKleisli
     } yield ()
   }
 }

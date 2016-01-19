@@ -18,16 +18,9 @@ package funnel
 package aws
 
 import com.amazonaws.regions.{Region, Regions}
-import com.amazonaws.auth.{AWSCredentials,BasicAWSCredentials}
+import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.ec2.{AmazonEC2,AmazonEC2Client}
-import com.amazonaws.services.ec2.model.{
-  DescribeAddressesRequest,
-  DescribeAddressesResult,
-  Filter,
-  Address,
-  DescribeInstancesRequest,
-  DescribeInstancesResult,
-  Reservation}
+import com.amazonaws.services.ec2.model.{DescribeInstancesRequest, Reservation}
 import scalaz.concurrent.Task
 import scala.collection.JavaConverters._
 
@@ -58,9 +51,11 @@ object EC2 {
 
       val aggregated = l ++ result
 
-      if(r.getNextToken != null) fetch(aggregated, Option(r.getNextToken))
+      if (r.getNextToken != null) fetch(aggregated, Option(r.getNextToken))
       else aggregated
     }
+
+    println(s"IIIII: ${ids.length} $ids")
 
     Task(fetch(Nil))(funnel.chemist.Chemist.serverPool)
   }

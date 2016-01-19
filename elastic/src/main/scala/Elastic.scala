@@ -20,16 +20,16 @@ package elastic
 import argonaut._
 import knobs.IORef
 import java.io.File
-import instruments._
 import journal.Logger
 import java.util.Date
 import java.text.SimpleDateFormat
 import scala.util.control.NonFatal
-import scalaz.stream.{async,time,wye}
+import scalaz.stream.Process
 import scalaz.concurrent.{Task,Strategy}
-import scalaz.stream.Process, Process.constant
+import Process.constant
 import scala.concurrent.{Future,ExecutionContext}
 import scalaz.{\/,Kleisli,Monad,~>,Reader,Nondeterminism}
+import scalaz.stream.async.mutable.ScalazHack
 
 object Elastic {
   import Argonaut._
@@ -128,7 +128,7 @@ object Elastic {
     ta <- lower(elasticString(req << json))
     _  <- lift(ta.attempt.map(_.fold(
       e => {log.error(s"Unable to send document to elastic search due to '$e'.")
-            log.error(s"Configuration was $es. Document was: \n ${json}")},
+            log.error(s"Configuration was $es. Document was: \n $json")},
       _ => ())))
   } yield ()
 
@@ -147,7 +147,7 @@ object Elastic {
           }.flatMap(_ => Task.fail(e))
         case _ =>
           Task.delay {
-            log.error(s"Error contacting ElasticSearch: ${e}.\nRetrying...")
+            log.error(s"Error contacting ElasticSearch: $e.\nRetrying...")
             NonHttpErrors.increment
           } >>= (_ => Task.fail(e))
       },
@@ -170,16 +170,16 @@ object Elastic {
   )(jsonStream: ElasticCfg => Process[Task, Json]): ES[Unit] = {
     // val E = Executor(Monitoring.defaultPool)
     def doPublish(de: Process[Task, Json], cfg: ElasticCfg): Process[Task, Unit] =
-      de to (constant((json: Json) => for {
+      de to constant((json: Json) => for {
         r <- Task.delay(esURL(cfg))
         _ <- retry( HttpResponse2xx.timeTask(elasticJson(r.POST, json)(cfg)) )
-      } yield ()))
+      } yield ())
     for {
       cfg <- getConfig
       _ = log.info(s"Ensuring Elastic template ${cfg.templateName} exists...")
       _   <- ensureTemplate
       _ = log.info(s"Initializing Elastic buffer of size ${cfg.bufferSize}...")
-      buffer = async.circularBuffer[Json](cfg.bufferSize)(E)
+      buffer = ScalazHack.observableCircularBuffer[Json](cfg.bufferSize, metrics.BufferDropped, metrics.BufferUsed)(E)
       ref <- lift(IORef(Set[Key[Any]]()))
       d   <- duration.lift[Task]
       _ = log.info(s"Started Elastic subscription")

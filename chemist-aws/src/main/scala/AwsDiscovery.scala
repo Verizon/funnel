@@ -18,13 +18,11 @@ package funnel
 package chemist
 package aws
 
-import java.net.{ InetSocketAddress, Socket, URI }
+import java.net.URI
 import scala.collection.JavaConverters._
-import scala.concurrent.duration._
 import scalaz.concurrent.Task
 import scalaz.{\/,NonEmptyList,Nondeterminism}
 import scalaz.std.vector._
-import scalaz.stream.Process
 import scalaz.syntax.monadPlus._
 import scalaz.syntax.std.option._
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
@@ -32,7 +30,6 @@ import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.{Instance => AWSInstance}
 import journal.Logger
 import funnel.aws._
-import concurrent.duration._
 
 /**
  * This module contains functions for describing the deployed world as the caller
@@ -72,7 +69,7 @@ class AwsDiscovery(
   ///////////////////////////// public api /////////////////////////////
 
   /**
-   * List all of the instances in the given AWS account that respond to a rudimentry
+   * List all of the instances in the given AWS account that respond to a rudimentary
    * verification that Funnel is running on port 5775 and is network accessible.
    */
   def listTargets: Task[Seq[(TargetID, Set[Target])]] =
@@ -136,7 +133,7 @@ class AwsDiscovery(
    */
   def lookupTargets(id: TargetID): Task[Set[Target]] =
     lookupMany(Seq(id.value)).flatMap {
-      _.filter(_.id == id.value).headOption match {
+      _.find(_.id == id.value) match {
         case None    => Task.fail(InstanceNotFoundException(id.value))
         case Some(i) => Task.now(i.targets)
       }
@@ -148,7 +145,7 @@ class AwsDiscovery(
    */
   def lookupOne(id: String): Task[AwsInstance] = {
     lookupMany(Seq(id)).flatMap {
-      _.filter(_.id == id).headOption match {
+      _.find(_.id == id) match {
         case None => Task.fail(InstanceNotFoundException(id))
         case Some(i) => Task.now(i)
       }
@@ -272,7 +269,7 @@ class AwsDiscovery(
   private def readAutoScallingGroups: Task[Seq[AwsInstance]] =
     for {
       g <- ASG.list(asg)
-      _  = log.debug(s"Found ${g.length} auto-scalling groups with ${g.map(_.instances.length).reduceLeft(_ + _)} instances...")
+      _  = log.debug(s"Found ${g.length} auto-scaling groups with ${g.map(_.instances.length).sum} instances...")
       r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))
     } yield r
 
