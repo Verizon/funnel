@@ -43,7 +43,7 @@ object RandomSharding extends Sharder {
   private def calculate(s: Set[Target])(d: Distribution): Seq[(Flask,Target)] = {
     val flasks = Sharding.shards(d)
     val range = flasks.indices
-    if(flasks.size == 0) Nil
+    if (flasks.isEmpty) Nil
     else {
       s.toList.map { t =>
         flasks(rnd.nextInt(range.length)) -> t
@@ -112,7 +112,7 @@ object LFRRSharding extends Sharder {
 
   def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution) = {
     // this check is needed as otherwise the fold gets stuck in a gnarly
-    // infinate loop, and this function never completes.
+    // infinite loop, and this function never completes.
     if(s.isEmpty) (Seq.empty,d)
     else {
       log.debug(s"distribution: attempting to distribute targets '${s.mkString(",")}'")

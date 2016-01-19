@@ -24,4 +24,6 @@ object metrics {
   val HttpResponse5xx  = counter("elastic/http/5xx")
   val HttpResponse4xx  = counter("elastic/http/4xx")
   val HttpResponse2xx  = lapTimer("elastic/http/2xx")
+  val BufferDropped    = counter("elastic/queue/dropped")
+  val BufferUsed       = numericGauge("elastic/buffer/pending", 0)
 }

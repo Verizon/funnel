@@ -17,13 +17,11 @@
 package funnel
 package chemist
 
-import java.net.URI
 import journal.Logger
-import scalaz.{\/,\/-}
 import scala.concurrent.duration._
 import scalaz.concurrent.{Task,Strategy}
-import scalaz.stream.async.mutable.{Queue,Signal}
-import scalaz.stream.{Process,Process1,Sink,time,channel,wye,sink,async}
+import scalaz.stream.async.mutable.Queue
+import scalaz.stream.{Process,Sink,time,wye}
 
 object Pipeline {
   import Chemist.{Context,Flow}
@@ -40,7 +38,7 @@ object Pipeline {
       a  <- dsc.listActiveFlasks
       c   = a.foldLeft(Distribution.empty){ (x,y) => x.insert(y, Set.empty[Target]) }
     } yield c
-    b <- dsc.listTargets.map(_.map(_._2).flatten)
+    b <- dsc.listTargets.map(_.flatMap(_._2))
   } yield Context(dist, b)
 
   /**
@@ -138,7 +136,7 @@ object Pipeline {
             a <- dsc.listTargets
             b  = a.flatMap(_._2).toSet
             t  = b -- Sharding.targets(d)
-            c  = t.toList.map(NewTarget(_))
+            c  = t.toList.map(NewTarget)
           } yield c
         Context(d, Produce(tasks))
 
@@ -162,7 +160,7 @@ object Pipeline {
       for(dist <- gather(a)) yield {
         val current: Vector[Target] = dist.values.toVector.flatten
         val event: PlatformEvent =
-          if(current.exists(_ == b)) NoOp
+          if(current.contains(b)) NoOp
           else NewTarget(b)
         Context(dist, event)
       }
@@ -173,7 +171,7 @@ object Pipeline {
   /**
    * create a process that merges the discovery and lifecycle streams into a single
    * process, and then executes the mapping function to figure out what actions
-   * should be executed (withou actually executing them).
+   * should be executed (without actually executing them).
    */
   def process(
     lifecycle: Flow[PlatformEvent],
