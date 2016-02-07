@@ -21,14 +21,9 @@ package aws
 import org.scalatest.{FlatSpec,Matchers}
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
-import scalaz.concurrent.Strategy
-import scalaz.{\/,\/-,-\/,==>>}
-import scalaz.stream.{Process,Sink}
+import scalaz.{\/,\/-}
+import scalaz.stream.Process
 import scalaz.concurrent.Task
-import scalaz.stream.async.signalOf
-import scalaz.stream.async.mutable.Signal
-import scalaz.std.string._
-import Sharding.Distribution
 
 class LifecycleSpec extends FlatSpec with Matchers {
   import PlatformEvent._
@@ -67,10 +62,6 @@ class LifecycleSpec extends FlatSpec with Matchers {
   }
 
   behavior of "Lifecycle.interpreter"
-
-  import scalaz.syntax.traverse._
-  import scalaz.{Unapply,Traverse}
-  import scalaz.syntax.either._
 
   def check(json: String): Task[Throwable \/ Seq[PlatformEvent]] =
     Lifecycle.parseMessage(TestMessage(json)

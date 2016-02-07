@@ -21,13 +21,23 @@ package aws
 import funnel.instruments._
 
 object metrics {
-  val LifecycleEvents = counter("lifecycle/events", 0, "number of lifecycle events within a given window")
+  val LifecycleEvents = counter("chemist/lifecycle/events", 0, "number of lifecycle events within a given window")
 
   object discovery {
-    val ListMonitorable = lapTimer("discovery/list/monitorable")
-    val ListUnmonitorable = lapTimer("discovery/list/unmonitorable")
-    val ListFlasks = lapTimer("discovery/list/flasks")
-    val LookupManyAws = lapTimer("discovery/lookup/aws")
-    val ValidateLatency = lapTimer("discovery/validate")
+    val ListMonitorable = lapTimer("chemist/discovery/list/monitorable")
+    val ListUnmonitorable = lapTimer("chemist/discovery/list/unmonitorable")
+    val ListFlasks = lapTimer("chemist/discovery/list/flasks")
+    val ListActiveFlasks = lapTimer("chemist/discovery/list/activeFlasks")
+    val LookupManyAws = lapTimer("chemist/discovery/aws/lookups")
+    val LookupAwsFailure = counter("chemist/discovery/aws/errors")
+    val ValidateLatency = lapTimer("chemist/discovery/validate")
+  }
+
+  object model {
+    val hostsTotal = numericGauge("chemist/hosts/total", 0)
+    val hostsValid = numericGauge("chemist/hosts/valid", 0)
+    val hostsInValid = numericGauge("chemist/hosts/invalid", 0)
+    val hostsFlask = numericGauge("chemist/hosts/flasks", 0)
+    val hostsActiveFlask = numericGauge("chemist/hosts/activeFlasks", 0)
   }
 }

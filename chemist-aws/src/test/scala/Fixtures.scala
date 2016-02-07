@@ -29,7 +29,7 @@ object Fixtures {
     datacenter: String = "us-east-1b",
     privateDns: String = "foo.internal",
     publicDns: String = "foo.ext.amazonaws.com",
-    tags: Seq[(String,String)] = Seq("baz" -> "v1","bar" -> "v2")
+    tags: Seq[(String,String)] = Seq("baz" -> "v1","bar" -> "v2","funnel:mirror:uri-template"->"http://@host:5775")
   ): EC2Instance =
     (new EC2Instance).withInstanceId(id)
     .withPlacement(new Placement(datacenter))
@@ -45,7 +45,7 @@ object Fixtures {
     instance("i-dx947af7") ::
     instance("i-15807647") ::
     instance("i-flaskAAA",
-      tags = Vector(AwsTagKeys.name -> "flask")
+      tags = Vector(AwsTagKeys.name -> "flask", "funnel:mirror:uri-template"->"http://@host:5775")
     ) :: Nil
 
   val localhost: Location =

@@ -17,7 +17,7 @@
 package funnel
 
 /**
- * A type, `A`, constained to be either `Int`,
+ * A type, `A`, constrained to be either `Int`,
  * `Double`, `String`, or `Stats`.
  */
 sealed trait Reportable[+A] { self =>
@@ -30,7 +30,7 @@ sealed trait Reportable[+A] { self =>
 
 object Reportable {
   /**
-   * used to make sure scalacheck is generating all possiblilites, if
+   * used to make sure scalacheck is generating all possibilities, if
    * you add a new one, please update this
    */
   def all: Seq[Reportable[Any]] = Seq(B,D,S,Stats)

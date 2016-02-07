@@ -55,8 +55,6 @@ object EC2 {
       else aggregated
     }
 
-    println(s"IIIII: ${ids.length} $ids")
-
     Task(fetch(Nil))(funnel.chemist.Chemist.serverPool)
   }
 }

@@ -22,8 +22,6 @@ import knobs._
 import funnel.aws._
 import dispatch.Http
 import java.net.InetAddress
-import scalaz.concurrent.Strategy
-import scalaz.stream.async.signalOf
 import concurrent.duration.Duration
 import com.amazonaws.services.sns.AmazonSNS
 import com.amazonaws.services.sqs.AmazonSQS
