@@ -75,9 +75,11 @@ trait Chemist[A <: Platform]{
       cfg <- config
       flk <- shard(id).map(_.getOrElse(throw new RuntimeException(s"Couldn't find shard ${id.value}")))
       out <- Flask.gatherAssignedTargets(flk :: Nil)(cfg.http).liftKleisli
-    } yield out.toList.headOption.map {
-        case (a,set) => Cluster(a.id.value,set.toList.map(_.uri.toString))
-    }.toList
+      //if result have no details about flask then we failed to reach it
+      result = out.lookup(flk).getOrElse(
+        throw new RuntimeException(s"Failed to get flask state, id=${id.value}")
+      )
+    } yield List(Cluster(id.value, result.toList.map(_.uri.toString)))
   }
 
   /**

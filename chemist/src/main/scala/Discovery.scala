@@ -57,10 +57,10 @@ trait Discovery {
    * The reason this is not simply the inverted version of `isActiveFlask`
    * is that when asking for targets, we specifically do not want any
    * Flasks, active or otherwise, because mirroring a Flask from another
-   * Flask risks a cascading failure due to key amplication (essentially
-   * mirroring the mirrorer whilst its mirroring etc).
+   * Flask risks a cascading failure due to key amplification (essentially
+   * mirroring the mirrored whilst its mirroring etc).
    *
-   * To mittigate this, we specifically call out anything that is not
+   * To mitigate this, we specifically call out anything that is not
    * classified as an `ActiveTarget`
    *
    * @see funnel.chemist.Classifier

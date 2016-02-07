@@ -19,6 +19,8 @@ package chemist
 
 import scalaz.Order
 import scalaz.std.string._
+import scalaz.std.vector._
+import scalaz.syntax.monadPlus._
 
 case class FlaskID(value: String) extends AnyVal
 
@@ -48,23 +50,44 @@ object Flask {
    * Given a collection of flask instances, find out what exactly they are already
    * mirroring and absorb that into the view of the world.
    *
-   * This function should only really be used startup of chemist.
+   * If some flasks are down then they will not be returned as part of distribution
+   * and should not be allocated work too. This might lead to double work assignment in case of
+   * network partitioning but Chemist need to be able to correct double assignment issues anyways.
+   *
+   * This function should only really be used startup of chemist. //wrong??? part of discovery and it is periodic
    */
-  def gatherAssignedTargets(flasks: Seq[Flask])(http: dispatch.Http): Task[Distribution] = {
-    val d = (for {
-       a <- Nondeterminism[Task].gatherUnordered(flasks.map(
-         f => requestAssignedTargets(f.location)(http).map(f -> _).flatMap { t =>
-           Task.delay {
-             log.debug(s"Read targets $t from flask $f")
-             t
-           }
-         }
-       ))
-    } yield a.foldLeft(Distribution.empty)(
-      (a,b) => a.updateAppend(b._1, b._2))
-    ).map { dis =>
-      log.debug(s"Gathered distribution $dis")
-      dis
+  def gatherAssignedTargets(flasks: Seq[Flask])(http: dispatch.HttpExecutor): Task[Distribution] = {
+    val lookups = Nondeterminism[Task].gatherUnordered(
+      flasks.map(
+        f => requestAssignedTargets(f.location)(http).map(f -> _).attempt.map {
+          v => v.leftMap(f -> _)
+        }
+      )
+    )
+
+    val d = lookups.map {
+      all =>
+        val (errors, success) = all.toVector.separate
+
+        metrics.deadFlasks.set(errors.size)
+        metrics.liveFlasks.set(success.size)
+
+        errors.foreach {
+          e => log.error(s"[gatherAssigned] dead flask=${e._1}, problem=${e._2}")
+            print(s"[gatherAssigned] dead flask=${e._1}, problem=${e._2}\n")
+        }
+
+        val dis = success.foldLeft(Distribution.empty)(
+          (a,b) => a.updateAppend(b._1, b._2)
+        )
+
+        val cnt = dis.values.map(_.size).sum
+        metrics.knownSources.set(cnt)
+
+        log.info(s"[gatherAssigned] distribution stats: flasks=${dis.keySet.size} targets=$cnt")
+        log.debug(s"[gatherAssigned] distribution details: $dis")
+
+        dis
     }
 
     GatherAssignedLatency.timeTask(d) or Task.now(Distribution.empty)
@@ -76,21 +99,16 @@ object Flask {
    * Call out to the specific location and grab the list of things the flask
    * is already mirroring.
    */
-  private def requestAssignedTargets(location: Location)(http: dispatch.Http): Task[Set[Target]] = {
+  private def requestAssignedTargets(location: Location)(http: dispatch.HttpExecutor): Task[Set[Target]] = {
     import argonaut._, Argonaut._, JSON._, HJSON._
     import dispatch._, Defaults._
 
     val a = location.uriFromTemplate(LocationTemplate(s"http://@host:@port/mirror/sources"))
     val req = Task.delay(url(a.toString)) <* Task.delay(log.debug(s"requesting assigned targets from $a"))
-    req flatMap { b =>
-      http(b OK as.String).map { c =>
-        Parse.decodeOption[List[Cluster]](c
-        ).toList.flatMap(identity
-        ).map { cluster =>
-          log.debug(s"Received cluster $cluster from $a")
-          cluster
-        }.foldLeft(Set.empty[Target]){ (a,b) =>
-          a ++ b.urls.map(s => Target(b.label, new URI(s))).toSet
+    req flatMap {
+      b => http.apply(b OK as.String).map {
+        c => Parse.decodeOption[List[Cluster]](c).toList.flatten.foldLeft(Set.empty[Target]){
+          (a,b) => a ++ b.urls.map(s => Target(b.label, new URI(s))).toSet
         }
       }
     }

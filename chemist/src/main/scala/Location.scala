@@ -76,8 +76,8 @@ case class Location(
 object Location {
 
   /**
-   * Given a `java.net.URI`, attempt to conver this into a `Location`
-   * instance. This is not guarenteed to work, and there are a range
+   * Given a `java.net.URI`, attempt to convert this into a `Location`
+   * instance. This is not guaranteed to work, and there are a range
    * of failure cases because of the problems with the way `URI` is
    * actually implemented within the JDK. With that being said, for
    * our purposes, this works as our URIs are always well formed -
