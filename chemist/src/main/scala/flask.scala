@@ -53,8 +53,6 @@ object Flask {
    * If some flasks are down then they will not be returned as part of distribution
    * and should not be allocated work too. This might lead to double work assignment in case of
    * network partitioning but Chemist need to be able to correct double assignment issues anyways.
-   *
-   * This function should only really be used startup of chemist. //wrong??? part of discovery and it is periodic
    */
   def gatherAssignedTargets(flasks: Seq[Flask])(http: dispatch.HttpExecutor): Task[Distribution] = {
     val lookups = Nondeterminism[Task].gatherUnordered(

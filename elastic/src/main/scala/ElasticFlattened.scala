@@ -25,10 +25,10 @@ import java.text.SimpleDateFormat
 import scalaz.concurrent.Strategy.Executor
 
 /**
- * This class provides a consumer for the funnel montioring stream that takes
+ * This class provides a consumer for the funnel monitoring stream that takes
  * the events emitted and constructs a JSON document that will be sent to elastic
  * search. Each and every metric key has its own individual document, where fields
- * are flattened into a simplistic structure, which is optiomal for the manner in
+ * are flattened into a simplistic structure, which is optimal for the manner in
  * which elastic search stores documents and manages in-memory indexing with Lucene.
  *
  * {
@@ -89,13 +89,13 @@ case class ElasticFlattened(M: Monitoring){
       case _ => ("unknown", keyname) // should not happen; what would it mean?
     }
     val attrs = pt.key.attributes
-    val source: String = attrs.get(AttributeKeys.source).getOrElse(flaskNameOrHost)
+    val source: String = attrs.getOrElse(AttributeKeys.source, flaskNameOrHost)
     val host: String = attrs.get(AttributeKeys.source
       ).map(u => (new URI(u)).getHost).getOrElse(flaskNameOrHost)
     val experimentId: Option[String] = attrs.get(AttributeKeys.experimentID)
     val experimentGroup: Option[String] = attrs.get(AttributeKeys.experimentGroup)
     val kind: Option[String] = attrs.get(AttributeKeys.kind).map(_.toLowerCase)
-    val cluster: String = attrs.get(AttributeKeys.cluster).getOrElse(flaskCluster)
+    val cluster: String = attrs.getOrElse(AttributeKeys.cluster, flaskCluster)
     val units: String = pt.units.toString.toLowerCase
     val edge: Option[String] = attrs.get(AttributeKeys.edge)
     val keytype: String = pt.typeOf.description.toLowerCase
@@ -124,7 +124,7 @@ case class ElasticFlattened(M: Monitoring){
      * this was the best path right now. (*sigh*)
      *
      * likewise, the hack here with elapsed, remaining and uptime is because they
-     * are currently inccorectly reporting themselves as kind=timer, which then
+     * are currently incorrectly reporting themselves as kind=timer, which then
      * screws up the mapping because we expect timers to be a `Stats` instance. To
      * workaround this bug, i've added this hack until we can migrate users to a
      * newer version of funnel core in the leaves of our system.
@@ -133,7 +133,7 @@ case class ElasticFlattened(M: Monitoring){
       kind.map { k =>
         val value = (pt.asJson -| "value").get
         if(k == "gauge")
-          Json((s"${kind.get}-${keytype}") -> value)
+          Json(s"${kind.get}-$keytype" -> value)
         else if(name == "elapsed" || name == "remaining" || name == "uptime")
           Json(name -> value)
         else
