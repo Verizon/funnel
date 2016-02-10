@@ -65,7 +65,7 @@ object Pipeline {
 
   /**
    * grab the existing work from the shards, and update the distribution;
-   * our view of the world as it is right now (stale and immedietly non-authoritive)
+   * our view of the world as it is right now (stale and immediately non-authoritative)
    */
   def collect(http: dispatch.Http)(d: Distribution): Task[Distribution] =
     Flask.gatherAssignedTargets(Sharding.shards(d))(http)
@@ -78,7 +78,7 @@ object Pipeline {
       sharder.distribution(Set(target))(d)._2 // drop the seq, as its not needed
 
     /**
-     * in the event more capacity becomes avalible, rebalence the cluster to take
+     * in the event more capacity becomes available, rebalance the cluster to take
      * best advantage of that new capacity using the specified sharder to
      * redistribute the work. This function is soley responsible for orchestrating
      * the inputs/outputs of the sharder, and the actual imlpementaiton logic of

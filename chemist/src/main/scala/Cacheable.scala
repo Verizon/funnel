@@ -30,9 +30,6 @@ trait Cacheable[A]{
   def cache(a: Context[A], to: StateCache): Task[Unit]
 }
 object Cacheable {
-  import scalaz.syntax.apply._
-  import Sharding.Distribution
-
   private[this] val log = Logger[Cacheable.type]
 
   implicit val planCachable: Cacheable[Plan] =
@@ -52,8 +49,7 @@ object Cacheable {
           case Context(d, p) =>
             for {
               _ <- to.plan(in.value)
-              _  = log.debug(s"value = ${in.value}")
-              _  = log.debug(s"distribution = ${in.distribution}")
+              _  = log.debug(s"[cache] value = ${in.value} distribution = ${in.distribution}")
               _ <- to.distribution(in.distribution)
             } yield ()
         }

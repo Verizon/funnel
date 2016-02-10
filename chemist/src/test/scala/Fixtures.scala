@@ -17,6 +17,10 @@
 package funnel
 package chemist
 
+import com.ning.http.client.{AsyncHandler, Request}
+import dispatch._
+
+import scala.concurrent.ExecutionContext
 import scalaz.==>>
 import java.net.URI
 import java.util.UUID
@@ -118,4 +122,27 @@ object Fixtures {
       protocol = NetworkScheme.Http,
       intent = LocationIntent.Mirroring,
       templates = Seq.empty))
+
+  val flask04 = Flask(FlaskID("flask04"),
+    Location(
+      host = "127.0.0.1",
+      port = 1234,
+      datacenter = "local",
+      protocol = NetworkScheme.Http,
+      intent = LocationIntent.Mirroring,
+      templates = Seq.empty))
+}
+
+case class FakeHttpExecutor(responses: Map[String, Any]) extends HttpExecutor {
+  def client = ???
+
+  override def apply[T](request: Request, handler: AsyncHandler[T])(implicit executor: ExecutionContext): Future[T] =
+    responses.get(request.getRawUrl) match {
+      case None =>
+        Future.failed(new RuntimeException(s"Missing: ${request.getRawUrl}"))
+      case Some(v) =>
+        Future.successful(v.asInstanceOf[T])
+    }
+
+  override def shutdown(): Unit = {}
 }

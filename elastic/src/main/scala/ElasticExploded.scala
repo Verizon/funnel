@@ -25,7 +25,7 @@ import scalaz.concurrent.Strategy.Executor
 import scalaz.stream.{Process1,Process,time,async,wye}
 
 /**
- * This class provides a consumer for the funnel montioring stream that takes
+ * This class provides a consumer for the funnel monitoring stream that takes
  * the events emitted and constructs a JSON document that will be sent to elastic
  * search. The names of the metrics on the stream are expected to be delimited
  * by a `/`, which will then be exploded into a tree of fields.

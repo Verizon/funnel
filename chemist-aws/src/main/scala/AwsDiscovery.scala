@@ -76,7 +76,9 @@ class AwsDiscovery(
     ListMonitorable.timeTask {
       for {
         i <- instances(isMonitorable)
+        _ = metrics.model.hostsTotal.set(i.size)
         v <- valid(i)
+        _ = metrics.model.hostsValid.set(v.size)
       } yield v.map(in => TargetID(in.id) -> in.targets)
     }
 
@@ -89,8 +91,11 @@ class AwsDiscovery(
     ListUnmonitorable.timeTask {
       for {
         i <- instances(isMonitorable)
+        _ = metrics.model.hostsTotal.set(i.size)
         v <- valid(i)
+        _ = metrics.model.hostsValid.set(v.size)
         bad = i.toSet &~ v.toSet
+        _ = metrics.model.hostsInValid.set(bad.size)
       } yield bad.toList.map(in => TargetID(in.id) -> in.targets)
     }
 
@@ -100,15 +105,17 @@ class AwsDiscovery(
    * an active flask.
    */
   def listActiveFlasks: Task[Seq[Flask]] =
-    ListFlasks.timeTask {
+    ListActiveFlasks.timeTask {
       for {
         a <- instances(isActiveFlask)
+        _ = metrics.model.hostsTotal.set(a.size)
         b  = a.map(i => Flask(FlaskID(i.id), i.location))
+        _ = metrics.model.hostsActiveFlask.set(b.size)
       } yield b
     }
 
   /**
-   * List all instances that clsasify as a flask, regardless of working state.
+   * List all instances that classify as a flask, regardless of working state.
    * This function is only ever called during migration / re-election of an orchestrating
    * leader chemist.
    */
@@ -116,7 +123,9 @@ class AwsDiscovery(
     ListFlasks.timeTask {
       for {
         a <- instances(isFlask)
+        _ = metrics.model.hostsTotal.set(a.size)
         b  = a.map(i => Flask(FlaskID(i.id), i.location))
+        _ = metrics.model.hostsFlask.set(b.size)
       } yield b
     }
 
@@ -157,54 +166,51 @@ class AwsDiscovery(
    * @see funnel.chemist.AwsDiscovery.lookupOne
    */
   protected def lookupMany(ids: Seq[String]): Task[Seq[AwsInstance]] = {
-    def lookInCache: (Seq[String],Seq[AwsInstance]) =
-      ids.map(id => id -> cache.get(id)
-        ).foldLeft[(Seq[String],Seq[AwsInstance])]((Seq.empty, Seq.empty)){ (a,b) =>
+    def lookInCache: (Seq[String], Seq[AwsInstance]) =
+      ids.map(
+        id => id -> cache.get(id)
+      ).foldLeft[(Seq[String], Seq[AwsInstance])]((Seq.empty, Seq.empty)) {
+        (a,b) =>
           val (ids,instances) = a
           b match {
             case (id,Some(instance)) => (ids, instances :+ instance)
             case (id,None) => (ids :+ id, instances)
           }
-        }
+      }
 
     def lookInAws(specificIds: Seq[String]): Task[Seq[AwsInstance]] =
-      LookupManyAws.timeTask {
-        for {
-          a <- EC2.reservations(specificIds)(ec2)
-          _  = log.debug(s"lookupMany, reservations = ${a.length}")
-          b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
-          (fails,successes) = b.toVector.separate
-          _  = log.info(s"lookupMany, failed to validate ${fails.length} instances.")
-          _  = log.debug(s"lookupMany, validated ${successes.length} instances.")
-          _  = fails.foreach(x => log.error(s"lookupMany, failed to validate '$x'"))
-        } yield successes
-      }
+      if (specificIds.isEmpty)
+        Task.now(Seq.empty)
+      else
+        LookupManyAws.timeTask {
+          for {
+            a <- EC2.reservations(specificIds)(ec2)
+            b <- Task.now(a.flatMap(_.getInstances.asScala.map(fromAWSInstance)))
+            (ignored,eligible) = b.toVector.separate
+            _  = log.info(s"[lookupMany] reservations=${a.length} eligible=${eligible.length} ignored=${ignored.length}")
+            _  = ignored.groupBy(_._2).mapValues(_.map(_._1)).foreach {
+              case (reason, lst) => log.warn(s"[lookupMany] ignored ${lst.size} instances, reason='$reason', ids=$lst")
+            }
+          } yield eligible
+        }.handleWith {
+          case t =>
+            LookupAwsFailure.increment
+            Task.fail(t)
+        }
 
     def updateCache(instances: Seq[AwsInstance]): Task[Seq[AwsInstance]] =
       Task.delay {
-        log.debug(s"lookupMany, updating the cache with ${instances.length} items.")
+        log.debug(s"[lookupMany] updating the cache, items=${instances.length}.")
         instances.foreach(i => cache.put(i.id, i))
         instances
       }
 
-    lookInCache match {
-      // all found in cache
-      case (Nil,found) =>
-        log.debug(s"lookupMany, all ${found.length} instances in the cache.")
-        Task.now(found)
+    val (missing, found) = lookInCache
 
-      // none found in cache
-      case (missing,Nil) =>
-        log.debug(s"lookupMany, all ${missing.length} instances are missing in the cache.")
-        lookInAws(missing).flatMap(updateCache)
+    if (missing.nonEmpty)
+      log.info(s"[lookupMany] missing=${missing.length}, cached=${found.length}")
 
-      // partially found in cache
-      case (missing,found) =>
-        log.debug(s"lookupMany, ${missing.length} missing. ${found.length} found in the cache.")
-        lookInAws(missing)
-          .flatMap(updateCache)
-          .map(_ ++ found)
-    }
+    lookInAws(missing).flatMap(updateCache).map(_ ++ found)
   }
 
   ///////////////////////////// internal api /////////////////////////////
@@ -217,17 +223,23 @@ class AwsDiscovery(
   private def validate(instance: AwsInstance): Task[AwsInstance] =
     ValidateLatency.timeTask {
       /**
-       * Do a naieve check to see if the socket is even network accessible.
+       * Do a naive check to see if the socket is even network accessible.
        * Given that funnel is using multiple protocols we can't assume that
        * any given protocol at this point in time, so we just try to see if
-       * its even avalible on the port the discovery flow said it was.
+       * its even available on the port the discovery flow said it was.
        *
        * This mainly guards against miss-configuration of the network setup,
        * LAN-ACLs, firewalls etc.
        */
       for {
         a <- Task(contact(instance.location.uri))(Chemist.serverPool)
-        b <- a.fold(e => Task.fail(e), o => Task.now(o))
+        b <- a.fold(
+          e => {
+            log.debug(s"failed validation instance=${instance.id} uri=${instance.location.uri} reason=$e")
+            Task.fail(e)
+          },
+          o => Task.now(o)
+        )
       } yield instance
     }
 
@@ -237,7 +249,7 @@ class AwsDiscovery(
    */
   private def instances(g: Classification => Boolean): Task[Seq[AwsInstance]] =
     for {
-      a <- readAutoScallingGroups
+      a <- readAutoScalingGroups
       b <- classifier.task
       c  = b andThen g
       // apply the specified filter if we want to remove specific groups for a reason
@@ -245,7 +257,7 @@ class AwsDiscovery(
       // _  = println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
       // _  = a.filter(c(_)).foreach { i => println(s"i: ${i.application.map(_.name)} -> ${b(i)} -> ${c(i)}") }
       // _  = println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-      _  = log.debug(s"instances, discovered ${d.size} instances (minus ${a.size - d.size} filtered instances).")
+      _  = log.debug(s"instances, discovered=${d.size}, filtered=${a.size - d.size}")
     } yield d
 
   /**
@@ -259,17 +271,17 @@ class AwsDiscovery(
     // run the tasks on the specified thread pool (Server.defaultPool)
     b <- Nondeterminism[Task].gatherUnordered(y)
     r = b.flatMap(_.toList)
-    _ = log.debug(s"valid, validated instance list: ${r.map(_.id).mkString(", ")}")
+    _ = log.debug(s"[validateInstances], instances=${r.map(_.id).mkString(", ")}")
   } yield r
 
   /**
    * This is kind of horrible, but it is what it is. The AWS api's really do not help here at all.
    * Sorry!
    */
-  private def readAutoScallingGroups: Task[Seq[AwsInstance]] =
+  private def readAutoScalingGroups: Task[Seq[AwsInstance]] =
     for {
       g <- ASG.list(asg)
-      _  = log.debug(s"Found ${g.length} auto-scaling groups with ${g.map(_.instances.length).sum} instances...")
+      _  = log.info(s"[readAutoScalingGroups] found asgs=${g.length} instances=${g.map(_.instances.length).sum}")
       r <- lookupMany(g.flatMap(_.instances.map(_.getInstanceId)))
     } yield r
 
@@ -282,16 +294,13 @@ class AwsDiscovery(
       a <- Option(dns).filter(_.nonEmpty
         ) \/> s"instance had no address: $dns"
 
-      b <- template \/> s"supplied template was invalid. template = '$template'"
+      b <- template \/> s"instance does not have tag with funnel template uri"
 
       c  = new URI(LocationTemplate(b).build("@host" -> a))
 
       d <- Location.fromURI(c, datacenter, intent, allTemplates
         ) \/> s"unable to create a location from uri '$c'"
     } yield d
-
-  // should be overriden at deploy time, but this is just last resort fallback.
-  private val defaultInstanceTemplate = Option("http://@host:5775")
 
   /**
    * The EC2 instance in question should have the following tags:
@@ -304,8 +313,10 @@ class AwsDiscovery(
    * 2. `funnel:telemetry:uri-template` - should be a qualified uri that denotes the
    * host that chemist should be able to find the admin telemetry socket. Only valid
    * protocol is `tcp` for a zeromq PUB socket.
+   *
+   * In case of failure to convert we return (InstanceId, Message)
    */
-  private[aws] def fromAWSInstance(in: AWSInstance): String \/ AwsInstance = {
+  private[aws] def fromAWSInstance(in: AWSInstance): (String, String) \/ AwsInstance = {
     import LocationIntent._
 
     val machineTags = in.getTags.asScala.map(t => t.getKey -> t.getValue).toMap
@@ -314,16 +325,19 @@ class AwsDiscovery(
 
     val datacenter = in.getPlacement.getAvailabilityZone
 
-    val mirrorTemplate: Option[String] =
-      machineTags.get(AwsTagKeys.mirrorTemplate) orElse defaultInstanceTemplate
+    //Note: if node is not labeled explicitly we ignore it to avoid wasting time trying to continiously
+    // reconnect to incompatible instances
+    val mirrorTemplate: Option[String] = machineTags.get(AwsTagKeys.mirrorTemplate)
 
-    for {
+    val r = for {
       a <- toLocation(dns, datacenter, mirrorTemplate, Mirroring)
-      // _  = log.debug(s"discovered mirrioring template '$a'")
+      // _  = log.debug(s"discovered mirroring template '$a'")
     } yield AwsInstance(
       id = in.getInstanceId,
       tags = machineTags,
       locations = NonEmptyList(a)
     )
+
+    r.leftMap(message => (in.getInstanceId, message))
   }
 }
