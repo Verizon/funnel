@@ -73,7 +73,7 @@ object Gauge {
           scheduled = false
           publish(delta)
           delta = reset(delta)
-        }
+        }; ()
       }(later)
 
       val task = new Runnable {
