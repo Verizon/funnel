@@ -82,7 +82,7 @@ class Flask(options: Options, val I: Instruments) {
     // Determine whether to generate system statistics for the local host
     for {
       b <- options.collectLocalMetrics
-      t <- options.localMetricFrequency
+      t <- options.localMetricFrequency if b
     }{
       implicit val duration = t.seconds
       Sigar(ISelfie).foreach(_.instrument)

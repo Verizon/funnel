@@ -351,7 +351,7 @@ trait Monitoring {
       case List(k) =>
         val t = k.typeOf
         if (t == R) k.asInstanceOf[Key[O]]
-        else sys.error("type mismatch: $R $t")
+        else sys.error(s"type mismatch: $R $t")
       case ks => sys.error(s"lookup($name) does not determine a unique key: $ks")
     }
 
