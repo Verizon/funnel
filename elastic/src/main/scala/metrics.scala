@@ -17,13 +17,18 @@
 package funnel
 package elastic
 
+//Needed for static initialization of JVM Metrics
 import instruments._
+import scala.concurrent.duration._
 
 object metrics {
-  val NonHttpErrors    = counter("elastic/errors/other")
-  val HttpResponse5xx  = counter("elastic/http/5xx")
-  val HttpResponse4xx  = counter("elastic/http/4xx")
-  val HttpResponse2xx  = lapTimer("elastic/http/2xx")
-  val BufferDropped    = counter("elastic/queue/dropped")
-  val BufferUsed       = numericGauge("elastic/buffer/pending", 0)
+  //report these metrics every 30 seconds
+  val i = new Instruments(bufferTime = 30 seconds)
+
+  val NonHttpErrors    = i.counter("elastic/errors/other")
+  val HttpResponse5xx  = i.counter("elastic/http/5xx")
+  val HttpResponse4xx  = i.counter("elastic/http/4xx")
+  val HttpResponse2xx  = i.lapTimer("elastic/http/2xx")
+  val BufferDropped    = i.counter("elastic/queue/dropped")
+  val BufferUsed       = i.numericGauge("elastic/buffer/pending", 0)
 }
