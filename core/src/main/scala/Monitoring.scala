@@ -513,13 +513,16 @@ object Monitoring {
   def subscribe(M: Monitoring)(f: Key[Any] => Boolean)(
   implicit ES: ExecutorService = serverPool):
       Process[Task, Datapoint[Any]] = {
-   def interleaveAll(p: Key[Any] => Boolean): Process[Task, Datapoint[Any]] = 
-     scalaz.stream.merge.mergeN(M.distinctKeys.filter(p).map(k => points(k)))(Strategy.Executor(ES))
-   def points(k: Key[Any]): Process[Task, Datapoint[Any]] =
-     M.get(k).discrete.map(Datapoint(k, _)).onComplete {
-       Process.eval_(Task.delay(M.log.debug(s"unsubscribing: $k")))
-     }
-   interleaveAll(f)
+
+   def points(k: Key[Any]): Process[Task, Datapoint[Any]] = {
+     val discrete: Process[Task, Any] = M.get(k).discrete
+     discrete.
+       map(Datapoint(k, _)).
+       onComplete { Process.eval_(Task.delay(M.log.debug(s"unsubscribing: $k"))) }
+   }
+
+    val filteredDataPoints: Process[Task, Process[Task, Datapoint[Any]]] = M.distinctKeys.filter(f).map(k => points(k))
+    scalaz.stream.merge.mergeN(filteredDataPoints)(Strategy.Executor(ES))
   }
 
   /**
