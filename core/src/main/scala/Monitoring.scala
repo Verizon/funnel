@@ -515,8 +515,8 @@ object Monitoring {
       Process[Task, Datapoint[Any]] = {
 
    def points(k: Key[Any]): Process[Task, Datapoint[Any]] = {
-     val discrete: Process[Task, Any] = M.get(k).discrete
-     discrete.
+     val data: Process[Task, Any] = M.get(k).discrete
+     data.
        map(Datapoint(k, _)).
        onComplete { Process.eval_(Task.delay(M.log.debug(s"unsubscribing: $k"))) }
    }

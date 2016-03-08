@@ -173,9 +173,9 @@ case class ElasticFlattened(M: Monitoring){
           subscribe(M){ k => cfg.groups.exists(g => k.startsWith(g)) }.
           map(Option.apply)
 
-      val ticks:                  Process[Task, Duration]               = time.awakeEvery(cfg.subscriptionTimeout)(E, Monitoring.schedulingPool)
+      val ticks: Process[Task, Duration] = time.awakeEvery(cfg.subscriptionTimeout)(E, Monitoring.schedulingPool)
       val ticksAsEmptyDatapoints: Process[Task, Option[Datapoint[Any]]] = ticks.map(_ => Option.empty[Datapoint[Any]])
-      val mergeTicksAndData:      Process[Task, Option[Datapoint[Any]]] = ticksAsEmptyDatapoints.wye(data)(wye.merge)(E)
+      val mergeTicksAndData: Process[Task, Option[Datapoint[Any]]] = ticksAsEmptyDatapoints.wye(data)(wye.merge)(E)
 
       mergeTicksAndData |> render(environment, flaskNameOrHost, flaskCluster)
     }
