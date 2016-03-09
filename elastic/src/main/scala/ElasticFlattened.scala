@@ -18,6 +18,7 @@ package funnel
 package elastic
 
 import java.net.URI
+import scalaz.concurrent.Task
 import scalaz.stream._
 import concurrent.duration._
 import java.util.{Date,TimeZone}
@@ -143,20 +144,21 @@ case class ElasticFlattened(M: Monitoring){
   }
 
   /**
-   *
+   * Returns a stream that takes a datapoint and renders it as Json
    */
   def render[A](
     environment: String,
     flaskNameOrHost: String,
     flaskCluster: String
-  ): Process1[Option[Datapoint[A]], Json] =
-    await1[Option[Datapoint[A]]].flatMap { o =>
-      emitAll(o.toSeq.map(pt =>
-        toJson(environment, flaskNameOrHost, flaskCluster)(pt)))
-    }.repeat
+  ): Process1[Option[Datapoint[A]], Json] = {
+    await1[Option[Datapoint[A]]]
+     .map(_.toSeq.map(toJson(environment, flaskNameOrHost, flaskCluster)))
+     .flatMap(emitAll)
+     .repeat
+  }
 
   /**
-   *
+   * Merges datapoints and regularly timed ticks, then renders them as JSON.
    */
   def publish(
     environment: String,
@@ -165,13 +167,17 @@ case class ElasticFlattened(M: Monitoring){
   ): ES[Unit] = {
     val E = Executor(Monitoring.defaultPool)
     bufferAndPublish(flaskNameOrHost, flaskCluster)(M, E){ cfg =>
-      val subscription = Monitoring.subscribe(M){ k =>
-        cfg.groups.exists(g => k.startsWith(g))}.map(Option.apply)
 
-      time.awakeEvery(cfg.subscriptionTimeout)(E,
-        Monitoring.schedulingPool).map(_ => Option.empty[Datapoint[Any]]
-      ).wye(subscription)(wye.merge)(E) |>
-        render(environment, flaskNameOrHost, flaskCluster)
+      val data: Process[Task, Option[Datapoint[Any]]] =
+        Monitoring.
+          subscribe(M){ k => cfg.groups.exists(g => k.startsWith(g)) }.
+          map(Option.apply)
+
+      val ticks: Process[Task, Duration] = time.awakeEvery(cfg.subscriptionTimeout)(E, Monitoring.schedulingPool)
+      val ticksAsEmptyDatapoints: Process[Task, Option[Datapoint[Any]]] = ticks.map(_ => Option.empty[Datapoint[Any]])
+      val mergeTicksAndData: Process[Task, Option[Datapoint[Any]]] = ticksAsEmptyDatapoints.wye(data)(wye.merge)(E)
+
+      mergeTicksAndData |> render(environment, flaskNameOrHost, flaskCluster)
     }
   }
 
