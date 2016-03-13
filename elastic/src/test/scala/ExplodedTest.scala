@@ -28,10 +28,12 @@ object ExplodedTest extends P("elastic") {
    h <- genHost
   } yield Key[Stats](n, Units.Count, "description", Map(AttributeKeys.source -> h))
 
-  val datapoint = for {
+  val datapoint = Option(Datapoint(Key[Stats]("n1", Units.Count, "description", Map(AttributeKeys.source -> "h1")), 3))
+
+/*    for {
     k <- genKey
-    d <- Gen.posNum[Double]
-  } yield Option(Datapoint(k, d))
+    //d <- Gen.posNum[Double]
+  } yield Option(Datapoint(k, 3 /*d */)) */
 
   val E = ElasticExploded(Monitoring.default)
 
