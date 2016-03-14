@@ -1,4 +1,6 @@
 
+Revolver.settings
+
 common.settings
 
 common.revolver
