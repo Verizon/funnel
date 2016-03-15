@@ -28,7 +28,7 @@ object ExplodedTest extends P("elastic") {
    h <- genHost
   } yield Key[Stats](n, Units.Count, "description", Map(AttributeKeys.source -> h))
 
-  val datapoint = Option(Datapoint(Key[Stats]("n1", Units.Count, "description", Map(AttributeKeys.source -> "h1")), 3))
+  val datapoint = Option(Datapoint(Key[Stats]("n1", Units.Count, "description", Map(AttributeKeys.source -> "h1")), Stats(3)))
 
 /*    for {
     k <- genKey
