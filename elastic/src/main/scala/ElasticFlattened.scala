@@ -19,8 +19,8 @@ package elastic
 
 import java.net.URI
 import scalaz.concurrent.Task
+import scala.concurrent.duration.Duration
 import scalaz.stream._
-import concurrent.duration._
 import java.util.{Date,TimeZone}
 import java.text.SimpleDateFormat
 import scalaz.concurrent.Strategy.Executor
@@ -55,7 +55,7 @@ import scalaz.concurrent.Strategy.Executor
  *   }
  * }
  */
-case class ElasticFlattened(M: Monitoring){
+case class ElasticFlattened(M: Monitoring, H: HttpLayer = SharedHttpLayer.H){
   import Elastic._
   import argonaut._, Argonaut._
   import Process._
@@ -92,7 +92,7 @@ case class ElasticFlattened(M: Monitoring){
     val attrs = pt.key.attributes
     val source: String = attrs.getOrElse(AttributeKeys.source, flaskNameOrHost)
     val host: String = attrs.get(AttributeKeys.source
-      ).map(u => (new URI(u)).getHost).getOrElse(flaskNameOrHost)
+      ).map(u => new URI(u).getHost).getOrElse(flaskNameOrHost)
     val experimentId: Option[String] = attrs.get(AttributeKeys.experimentID)
     val experimentGroup: Option[String] = attrs.get(AttributeKeys.experimentGroup)
     val kind: Option[String] = attrs.get(AttributeKeys.kind).map(_.toLowerCase)
@@ -165,8 +165,9 @@ case class ElasticFlattened(M: Monitoring){
     flaskNameOrHost: String,
     flaskCluster: String
   ): ES[Unit] = {
+    //TODO: consider dedicated pool for ES publishing, need to guarantee we will not starve when mirroring many agents
     val E = Executor(Monitoring.defaultPool)
-    bufferAndPublish(flaskNameOrHost, flaskCluster)(M, E){ cfg =>
+    bufferAndPublish(flaskNameOrHost, flaskCluster)(M, E, H){ cfg =>
 
       val data: Process[Task, Option[Datapoint[Any]]] =
         Monitoring.

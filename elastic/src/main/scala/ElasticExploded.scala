@@ -18,11 +18,10 @@ package funnel
 package elastic
 
 import java.net.URI
-import scalaz.Kleisli
 import java.util.Date
 import java.text.SimpleDateFormat
 import scalaz.concurrent.Strategy.Executor
-import scalaz.stream.{Process1,Process,time,async,wye}
+import scalaz.stream.{Process1,Process,time,wye}
 
 /**
  * This class provides a consumer for the funnel monitoring stream that takes
@@ -58,13 +57,11 @@ import scalaz.stream.{Process1,Process,time,async,wye}
  * }
  *
  */
-case class ElasticExploded(M: Monitoring){
-
+case class ElasticExploded(M: Monitoring, H: HttpLayer = SharedHttpLayer.H) {
   import Process._
   import Elastic._
   import http.JSON._
   import argonaut._, Argonaut._
-  import scala.concurrent.duration._
 
   /**
    * Data points grouped by mirror URL, experiment ID, experiment group,
@@ -103,19 +100,19 @@ case class ElasticExploded(M: Monitoring){
           m.get(groupKey) match {
             case Some(g) => g.get(k) match {
               case Some(_) =>
-                emit(m) ++ go(true, Map(groupKey -> Map(k -> pt)))
+                emit(m) ++ go(sawDatapoint = true, Map(groupKey -> Map(k -> pt)))
               case None =>
-                go(true, m + (groupKey -> (g + (k -> pt))))
+                go(sawDatapoint = true, m + (groupKey -> (g + (k -> pt))))
             }
             case None =>
-              go(true, m + (groupKey -> Map(k -> pt)))
+              go(sawDatapoint = true, m + (groupKey -> Map(k -> pt)))
           }
         case None =>                    // No Datapoint this time
           if (sawDatapoint) {           // Saw one last time
-            go(false, m)                // Keep going with current Map
+            go(sawDatapoint = false, m)                // Keep going with current Map
           } else {                      // Didn't see one last time, either
             M.log.info("I haven't seen any data points for a while. I hope everything's alright.")
-            emit(m) ++ go(false, Map()) // Publish current Map
+            emit(m) ++ go(sawDatapoint = false, Map()) // Publish current Map
           }
       }
     go(false, Map())
@@ -147,7 +144,7 @@ case class ElasticExploded(M: Monitoring){
               val attrs = dp.key.attributes
               val kind = attrs.get(AttributeKeys.kind)
               val clust = ("cluster" :=
-                attrs.get(AttributeKeys.cluster).getOrElse(flaskCluster)) ->: jEmptyObject
+                attrs.getOrElse(AttributeKeys.cluster, flaskCluster)) ->: jEmptyObject
               clust deepmerge (o deepmerge (ps ++ kind).foldRight((dp.asJson -| "value").get)(
                 (a, b) => (a := b) ->: jEmptyObject))
           }
@@ -159,7 +156,7 @@ case class ElasticExploded(M: Monitoring){
    */
   def publish(flaskName: String, flaskCluster: String): ES[Unit] = {
     val E = Executor(Monitoring.defaultPool)
-    bufferAndPublish(flaskName, flaskCluster)(M, E){ cfg =>
+    bufferAndPublish(flaskName, flaskCluster)(M, E, H){ cfg =>
       val subscription = Monitoring.subscribe(M){ k =>
         cfg.groups.exists(g => k.startsWith(g))}.map(Option.apply)
 
