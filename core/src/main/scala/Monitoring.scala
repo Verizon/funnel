@@ -271,7 +271,7 @@ trait Monitoring {
     val alive = signalOf[Unit](())(Strategy.Sequential)
     val pts = Monitoring.subscribe(this)(f).onComplete {
       Process.eval_ { alive.close flatMap { _ =>
-        log.debug(s"$msg no more data points for '$f', resetting...")
+        log.info(s"$msg no more data points for '$f', resetting...")
         reset
       }}
     }
@@ -279,7 +279,7 @@ trait Monitoring {
     e(this).zip(alive.continuous).map(_._1).either(pts)(S)
            .scan(Vector(false,false))((acc,a) => acc.tail :+ a.isLeft)
            .filter { xs => xs forall (identity) }
-           .evalMap { _ => log.debug(s"$msg no activity for '$f', resetting..."); reset }
+           .evalMap { _ => log.info(s"$msg no activity for '$f', resetting..."); reset }
            .run
   }
 
@@ -293,7 +293,7 @@ trait Monitoring {
       val alive = signalOf[Unit](())(Strategy.Sequential)
       val pts = get(k).discrete.onComplete {
         Process.eval_ { alive.close flatMap { _ =>
-          log.debug(s"Key senescence: no more data points for '${k.name}', removing...")
+          log.info(s"Key senescence: no more data points for '${k.name}', removing...")
           remove(k)
         }}
       }
@@ -302,7 +302,7 @@ trait Monitoring {
           (acc, a) => acc.tail :+ a.isLeft
         }.evalMap { v =>
           if (v.forall(identity)) {
-            log.debug(s"Key senescence: no activity for '${k.name}' removing...")
+            log.info(s"Key senescence: no activity for '${k.name}' removing...")
             alive.close >> remove(k)
           } else {
             Task.now(())
@@ -473,14 +473,17 @@ object Monitoring {
         }
       }
 
-      def topicWithKey[I,O](k: Key[O], costive: Boolean = false)(buf: TBuffer[Option[I],O]): Task[I => Task[Unit]] = for {
-        p <- bufferedSignal(buf)(ES)
-        (pub, v) = p
-        _ <- Task.delay(topics += (k -> eraseTopic(Topic(pub, v))))
-        t = (k.typeOf, k.units)
-        _ <- keys_.compareAndSet(_.map(_ + k))
-        _ <- costiveKeys.compareAndSet(_.map(_ + k)) whenM costive
-      } yield (i: I) => now flatMap (t => pub(Some(i) -> t))
+      def topicWithKey[I,O](k: Key[O], costive: Boolean = false)(
+        buf: TBuffer[Option[I],O]): Task[I => Task[Unit]] =
+        for {
+          p <- bufferedSignal(buf)(ES)
+          (pub, v) = p
+          _ <- Task.delay(topics += (k -> eraseTopic(Topic(pub, v))))
+          t = (k.typeOf, k.units)
+          _ = log.info(s"setting key $k")
+          _ <- keys_.compareAndSet(_.map(_ + k))
+          _ <- costiveKeys.compareAndSet(_.map(_ + k)) whenM costive
+        } yield (i: I) => now flatMap (t => pub(Some(i) -> t))
 
       protected def update[O](k: Key[O], v: O): Task[Unit] =
         topics.get(k).map(_.current.set(v)).getOrElse(Task(())(defaultPool)).map(_ => ())
