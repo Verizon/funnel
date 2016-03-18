@@ -38,7 +38,10 @@ trait Gauge[K,A] extends Instrument[K] { self =>
   def buffer(d: Duration)(
              implicit S: ScheduledExecutorService = Monitoring.schedulingPool,
              S2: ExecutorService = Monitoring.defaultPool): Gauge[K, A] = new Gauge[K, A] {
-    val b = new Gauge.Buffer[Option[A]](d, None)((_, a) => a, a => a, a => self.set(a.get))
+    val b = new Gauge.Buffer[Option[A]](d, None)(
+      append = (_, a) => a, //ensures only the most recently appended value is sent
+      reset = a => a,
+      publish = a => self.set(a.get))
     def set(a: A): Unit = b(Some(a))
     def keys = self.keys
   }
@@ -78,7 +81,7 @@ object Gauge {
 
       val task = new Runnable {
         def run = {
-          self.send(None)
+          self.send(None) //flush the buffer
         }
       }
 
