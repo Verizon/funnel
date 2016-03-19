@@ -111,7 +111,8 @@ object Elastic {
       a => Task.now(a)
     ))
     t.retry(schedule, {
-      case HttpException(_) => false
+      case e: HttpException if e.clientError => false
+      case e: HttpException => true //retry on server errors like "gateway timeout"
       case e@NonFatal(_) => true
       case _ => false
     })
