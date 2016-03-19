@@ -37,7 +37,7 @@ object LoggingRemote extends RemoteFlask {
 
   def command(c: FlaskCommand): Task[Unit] =
     Task.delay {
-      log.info("LoggingRemote recieved: " + c)
+      log.info("LoggingRemote received: " + c)
     }
 }
 

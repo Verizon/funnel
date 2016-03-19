@@ -21,11 +21,8 @@ import unfiltered.request._
 import unfiltered.response._
 import unfiltered.netty._
 import argonaut._, Argonaut._
-import scalaz.concurrent.Task
-import scalaz.stream.Process
 import scalaz.{\/,-\/,\/-}
 import journal.Logger
-import concurrent.duration._
 
 object JsonRequest {
   def apply[T](r: HttpRequest[T]) =
@@ -55,10 +52,10 @@ object Server {
 
     chemist.init(platform).runAsync {
       case -\/(err) =>
-        log.error(s"FATAL: Unable to initilize the chemist service. Failed with error: $err")
-        err.printStackTrace
+        log.error(s"FATAL: Unable to initialize the chemist service. Failed with error: $err")
+        err.printStackTrace()
 
-      case \/-(_) => log.error("FATAL: Sucsessfully initilized chemist at startup.")
+      case \/-(_) => log.error("FATAL: Successfully initialized chemist at startup.")
     }
 
     val p = this.getClass.getResource("/oncue/www/")
@@ -77,13 +74,12 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
   import chemist.ChemistK
   import JSON._
   import Server._
-  import metrics._
 
   protected def json[A : EncodeJson](a: ChemistK[A]) =
     a(platform).attemptRun.fold(
       e => {
         log.error(s"Unable to process response: ${e.toString} - ${e.getMessage}")
-        e.printStackTrace
+        e.printStackTrace()
         InternalServerError ~> JsonResponse(e.toString)
       },
       o => Ok ~> JsonResponse(o))
@@ -108,7 +104,7 @@ class Server[U <: Platform](val chemist: Chemist[U], val platform: U) extends cy
       json(chemist.platformHistory.map(_.toList))
 
     case POST(Path("/distribute")) =>
-      NotImplemented ~> JsonResponse("This feature is not avalible in this build. Sorry :-)")
+      NotImplemented ~> JsonResponse("This feature is not available in this build. Sorry :-)")
 
     case GET(Path(Seg("shards" :: Nil))) =>
       json(chemist.shards)

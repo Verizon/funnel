@@ -17,8 +17,6 @@
 package funnel
 package chemist
 
-import scalaz.stream.async
-import scalaz.stream.async.mutable.Signal
 import scalaz.concurrent.Task
 
 class TestConfig extends PlatformConfig {
