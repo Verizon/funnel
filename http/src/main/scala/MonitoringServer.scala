@@ -134,7 +134,7 @@ class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
           val cs: List[Command] =
             blist.flatMap(b => b.urls.map(u => Mirror(new URI(u), b.label)))
 
-          M.log.debug(s"recieved instruction to mirror '${cs.mkString(",")}'")
+          M.log.info(s"received instruction to mirror '${cs.mkString(",")}'")
 
           val p0: Process[Task, Command] = Process.emitAll(cs)
           val p: Process[Task, Unit] = p0.to(M.mirroringQueue.enqueue)
