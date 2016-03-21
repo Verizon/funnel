@@ -20,10 +20,12 @@ import funnel.chemist._
 import org.scalatest.{FlatSpec, Matchers}
 import java.net.URI
 import java.util.concurrent.Executors
+
 import funnel.chemist.Chemist.Context
 import funnel.chemist.Sharding._
-import scalaz.==>>
-import scalaz.concurrent.Task
+
+import scalaz.{==>>, Catchable, Monad}
+import scalaz.concurrent._
 import scalaz.stream.async._
 import scalaz.stream._
 
@@ -74,7 +76,7 @@ class SinksSpec extends FlatSpec with Matchers {
     Process(
       Context[Plan](Distribution.empty, Distribute(valid)),
       Context[Plan](Distribution.empty, Redistribute(valid, valid))
-    ).to(sinks.unsafeNetworkIO(f, q)).run.run
+    ).toSource.to(sinks.unsafeNetworkIO(f, q)).run.run
 
     f.commandsCompleted shouldBe 6
     f.commandsFailed shouldBe 0
@@ -87,10 +89,10 @@ class SinksSpec extends FlatSpec with Matchers {
     // we expect that
     //   1) process will not fail
     //   2) even when one flask fails it will not prevent distributing work to live flasks
-    Process(
+    Process.apply(
       Context[Plan](Distribution.empty, Distribute(broken)),
       Context[Plan](Distribution.empty, Distribute(valid))
-    ).to(sinks.unsafeNetworkIO(f, q)).run.run
+    ).toSource.to(sinks.unsafeNetworkIO(f, q)).run.run
 
     f.commandsCompleted shouldBe 3
     f.commandsFailed shouldBe 1
@@ -107,7 +109,7 @@ class SinksSpec extends FlatSpec with Matchers {
     Process(
       Context[Plan](Distribution.empty, Redistribute(broken, valid)),
       Context[Plan](Distribution.empty, Distribute(valid))
-    ).to(sinks.unsafeNetworkIO(f, q)).run.run
+    ).toSource.to(sinks.unsafeNetworkIO(f, q)).run.run
 
     f.commandsCompleted should be >= 2
     f.commandsCompleted should be <= 3
@@ -122,10 +124,10 @@ class SinksSpec extends FlatSpec with Matchers {
     //   1) process will not fail
     //   2) "stop" part of redistribute step will succeed
     //   3) "start" part of redistribute step will succeed for good flasks
-    Process(
+    Process.apply(
       Context[Plan](Distribution.empty, Redistribute(valid, broken)),
       Context[Plan](Distribution.empty, Distribute(valid))
-    ).to(sinks.unsafeNetworkIO(f, q)).run.run
+    ).toSource.to(sinks.unsafeNetworkIO(f, q)).run.run
 
     f.commandsCompleted shouldBe 5
     f.commandsFailed shouldBe 1 //we should not try to run anything after failure
