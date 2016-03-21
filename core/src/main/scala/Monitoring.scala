@@ -21,17 +21,16 @@ import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorServic
 import scala.concurrent.duration._
 import scala.language.higherKinds
 import scalaz.concurrent.{Actor,Strategy,Task}
-import scalaz.{Free,Nondeterminism,==>>}
+import scalaz.{Nondeterminism,==>>}
 import scalaz.stream._
 import scalaz.stream.merge._
 import scalaz.stream.async
-import async.mutable.Queue
 import scalaz.syntax.traverse._
 import scalaz.syntax.monad._
 import scalaz.std.option._
 import scalaz.std.string._
 import scalaz.std.set._
-import scalaz.{\/, ~>, Monad}
+import scalaz.\/
 import Events.Event
 import scalaz.stream.async.mutable.Signal
 import scalaz.stream.async.{signalOf,signalUnset}
@@ -94,7 +93,7 @@ trait Monitoring {
     val proc: Process[Task, O] = e(this).flatMap(_ => Process.eval(f))
     // Republish these values to a new topic
     Task.delay((for {
-      _ <- proc.evalMap((o: O) => for {
+      _ <- proc.evalMap[Task, Unit]((o: O) => for {
         b <- exists(key)
         _ <- if (b) update(key, o)
              else topicWithKey[O,O](key)(B.ignoreTickAndTime(process1.id))
@@ -153,7 +152,7 @@ trait Monitoring {
     }
 
     for {
-      _ <- mirroringCommands.evalMap {
+      _ <- mirroringCommands.evalMap[Task, Unit] {
         case Mirror(source, cluster) => Task.suspend {
           log.info(s"Attempting to monitor '$cluster' located at '$source'")
           val S = Strategy.Executor(Monitoring.serverPool)
@@ -245,7 +244,7 @@ trait Monitoring {
     _ <- initialize(out)
     _ <- Task.fork(e(this).flatMap { _ =>
       log.debug("Monitoring.aggregate: gathering values")
-      Process.eval { evalFamily(family).flatMap { vs =>
+      Process.eval[Task, Unit] { evalFamily(family).flatMap { vs =>
         val v = f(vs)
         log.debug(s"Monitoring.aggregate: aggregated $v from ${vs.size} matching keys")
         update(out, v)
@@ -261,7 +260,7 @@ trait Monitoring {
    */
   def decay(f: Key[Any] => Boolean)(e: Event): Task[Unit] = Task.suspend {
     def reset = keys.continuous.once.map {
-      _.traverse_(k => k.default.traverse_(update(k, _)))
+      _.traverse_[Task](k => k.default.traverse_(update(k, _)))
     }.run
     val msg = "Monitoring.decay:" // logging msg prefix
 
@@ -270,7 +269,7 @@ trait Monitoring {
     // we reset all matching keys back to their default
     val alive = signalOf[Unit](())(Strategy.Sequential)
     val pts = Monitoring.subscribe(this)(f).onComplete {
-      Process.eval_ { alive.close flatMap { _ =>
+      Process.eval_[Task, Unit] { alive.close flatMap { _ =>
         log.info(s"$msg no more data points for '$f', resetting...")
         reset
       }}
@@ -278,8 +277,8 @@ trait Monitoring {
     val S = Strategy.Executor(Monitoring.defaultPool)
     e(this).zip(alive.continuous).map(_._1).either(pts)(S)
            .scan(Vector(false,false))((acc,a) => acc.tail :+ a.isLeft)
-           .filter { xs => xs forall (identity) }
-           .evalMap { _ => log.info(s"$msg no activity for '$f', resetting..."); reset }
+           .filter { xs => xs forall identity }
+           .evalMap[Task, Unit] { _ => log.info(s"$msg no activity for '$f', resetting..."); reset }
            .run
   }
 
@@ -292,7 +291,7 @@ trait Monitoring {
     mergeN(ks.map { k =>
       val alive = signalOf[Unit](())(Strategy.Sequential)
       val pts = get(k).discrete.onComplete {
-        Process.eval_ { alive.close flatMap { _ =>
+        Process.eval_[Task, Unit] { alive.close flatMap { _ =>
           log.info(s"Key senescence: no more data points for '${k.name}', removing...")
           remove(k)
         }}
@@ -300,7 +299,7 @@ trait Monitoring {
       e(this).zip(alive.continuous).map(_._1).either(pts)(S)
         .scan(Vector(false,false)) {
           (acc, a) => acc.tail :+ a.isLeft
-        }.evalMap { v =>
+        }.evalMap[Task, Unit] { v =>
           if (v.forall(identity)) {
             log.info(s"Key senescence: no activity for '${k.name}' removing...")
             alive.close >> remove(k)
@@ -377,7 +376,7 @@ trait Monitoring {
     filterKeys(Key.StartsWith(family.name)).once.runLastOr(List()).flatMap { ks =>
       val ksO: Seq[Key[O]] = ks.flatMap(_.cast(family.typeOf, family.units))
       import Metric._
-      Nondeterminism[Task].gatherUnordered(ksO.flatMap(x => toMetric(x).eval(this)._2.toList).toSeq)
+      Nondeterminism[Task].gatherUnordered(ksO.flatMap(x => toMetric(x).eval(this)._2.toList))
     }
 
   /**
@@ -463,7 +462,7 @@ object Monitoring {
         time.awakeEvery(window)(S, Monitoring.schedulingPool).evalMap { _ =>
           for {
             ks <- costiveKeys.get
-            _ <- ks.toList.traverse_ { k =>
+            _ <- ks.toList.traverse_[Task] { k =>
               topics.get(k).traverse_ { t => for {
                 tick <- now
                 _ <- t.publish(None -> tick)

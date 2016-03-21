@@ -103,6 +103,10 @@ trait DispatchHttpLayer extends HttpLayer {
           r <- Task.delay(req(v)(cfg))
           response <- fromScalaFuture(cfg.http(r > handler)).handleWith {
             case e: StatusCode => Task.fail(HttpException(e.code))
+            //Dispatch often results in exception wrapping StatusCode exception
+            case ex => ex.getCause match {
+              case e: StatusCode => Task.fail(HttpException(e.code))
+            }
           }
         } yield response
     )

@@ -17,26 +17,18 @@
 package funnel
 package chemist
 
-import knobs.{loadImmutable,Required,FileResource,ClassPathResource}
-import java.io.File
-import java.net.{ InetSocketAddress, Socket, URI, URL }
+import java.net.{ InetSocketAddress, Socket, URI }
 import journal.Logger
-import scalaz.{\/,-\/,\/-,Kleisli}
+import scalaz.{\/,Kleisli}
 import scalaz.syntax.kleisli._
-import scalaz.syntax.traverse._
-import scalaz.syntax.id._
-import scalaz.std.vector._
-import scalaz.std.option._
 import scalaz.concurrent.{Task,Strategy}
-import scalaz.stream.{Process,Process0, Sink}
+import scalaz.stream.Process
 import java.util.concurrent.{Executors, ExecutorService, ScheduledExecutorService, ThreadFactory}
 
 trait Chemist[A <: Platform]{
   import http.Cluster
 
   type ChemistK[U] = Kleisli[Task, A, U]
-
-  private val log = Logger[this.type]
 
   //////////////////////// PUBLIC API ////////////////////////////
 
@@ -96,7 +88,7 @@ trait Chemist[A <: Platform]{
       cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2)))
 
   /**
-   * Initilize the chemist serivce by trying to create the various AWS resources
+   * Initialize the chemist service by trying to create the various AWS resources
    * that are required to operate. Once complete, execute the boostrap.
    */
   def init: ChemistK[Unit]
@@ -151,7 +143,7 @@ object Chemist {
       val s = new Socket
       // timeout in 300ms to keep the overhead reasonable
       try s.connect(new InetSocketAddress(uri.getHost, uri.getPort), 1000)
-      finally s.close // whatever the outcome, close the socket to prevent leaks.
+      finally s.close() // whatever the outcome, close the socket to prevent leaks.
     }
 }
 
