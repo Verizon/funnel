@@ -19,13 +19,16 @@ package chemist
 
 import scalaz.concurrent.Task
 
+case class DiscoveryInventory(targets: Seq[(TargetID,Set[Target])],
+                              unmonitorableTargets: Seq[(TargetID,Set[Target])],
+                              allFlasks: Seq[Flask],
+                              activeFlasks: Seq[Flask])
+
 trait Discovery {
-  def listTargets: Task[Seq[(TargetID,Set[Target])]]
-  def listUnmonitorableTargets: Task[Seq[(TargetID,Set[Target])]]
-  def listAllFlasks: Task[Seq[Flask]]
-  def listActiveFlasks: Task[Seq[Flask]]
   def lookupTargets(id: TargetID): Task[Set[Target]]
   def lookupFlask(id: FlaskID): Task[Flask]
+
+  def inventory: Task[DiscoveryInventory]
 
   ///////////////////////////// filters /////////////////////////////
 

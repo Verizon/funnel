@@ -18,7 +18,6 @@ package funnel
 package chemist
 
 import java.net.{ InetSocketAddress, Socket, URI }
-import journal.Logger
 import scalaz.{\/,Kleisli}
 import scalaz.syntax.kleisli._
 import scalaz.concurrent.{Task,Strategy}
@@ -85,7 +84,7 @@ trait Chemist[A <: Platform]{
    */
   def listUnmonitorableTargets: ChemistK[List[Target]] =
     config.flatMapK( cfg =>
-      cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2)))
+      cfg.discovery.inventory.map(_.unmonitorableTargets.toList.flatMap(_._2)))
 
   /**
    * Initialize the chemist service by trying to create the various AWS resources

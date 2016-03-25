@@ -17,7 +17,6 @@
 package funnel
 package chemist
 
-import journal.Logger
 import scala.concurrent.duration._
 import scalaz.concurrent.{Task,Strategy}
 import scalaz.stream.async.mutable.Queue
@@ -28,17 +27,13 @@ object Pipeline {
   import Sharding.Distribution
   import PlatformEvent._
 
-  private[this] val log = Logger[Pipeline.type]
-
   /**
     * Discover all the known Targets in a Context.
     */
   def targets(dsc: Discovery): Task[Context[Seq[Target]]] = for {
-    dist <- for {
-      a  <- dsc.listActiveFlasks
-      c   = a.foldLeft(Distribution.empty){ (x,y) => x.insert(y, Set.empty[Target]) }
-    } yield c
-    b <- dsc.listTargets.map(_.flatMap(_._2))
+    inv <- dsc.inventory
+    dist = inv.activeFlasks.foldLeft(Distribution.empty){ (x,y) => x.insert(y, Set.empty[Target]) }
+    b = inv.targets.flatMap(_._2)
   } yield Context(dist, b)
 
   /**
@@ -46,14 +41,10 @@ object Pipeline {
    * ensures that we capture any outliers, despite having the more event-based
    * platform lifecycle stream (which could periodically fail).
    */
-  def discover(dsc: Discovery, interval: Duration): Flow[Target] = {
-    (Process.emit(Duration.Zero) ++ time.awakeEvery(interval)(Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool)).flatMap { _ =>
-      val ts: Task[Seq[Context[Target]]] = for {
-        ctx <- targets(dsc)
-        ts  <- Task.now(ctx.value.map(Context(ctx.distribution, _)))
-      } yield ts
-      Process.eval(ts).flatMap(Process.emitAll)
-    }
+  def discover(dsc: Discovery, interval: Duration): Flow[Seq[Target]] = {
+    (Process.emit(Duration.Zero) ++ time.awakeEvery(interval)(
+      Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool
+    )).evalMap[Task, Context[Seq[Target]]](_ => targets(dsc))
   }
 
   /**
@@ -133,8 +124,8 @@ object Pipeline {
       case Context(d,TerminatedFlask(flask)) =>
         val tasks: Task[Seq[PlatformEvent]] =
           for {
-            a <- dsc.listTargets
-            b  = a.flatMap(_._2).toSet
+            a <- dsc.inventory
+            b  = a.targets.flatMap(_._2).toSet
             t  = b -- Sharding.targets(d)
             c  = t.toList.map(NewTarget)
           } yield c
@@ -156,14 +147,19 @@ object Pipeline {
   )(dsc: Discovery,
     gather: Distribution => Task[Distribution]
   ): Process[Task,Context[PlatformEvent]] =
-    discover(dsc, interval).evalMap { case Context(a,b) =>
-      for(dist <- gather(a)) yield {
-        val current: Vector[Target] = dist.values.toVector.flatten
-        val event: PlatformEvent =
-          if(current.contains(b)) NoOp
-          else NewTarget(b)
-        Context(dist, event)
-      }
+    discover(dsc, interval).flatMap {
+      case Context(a, targets) =>
+        val ts: Task[Seq[Context[PlatformEvent]]] = for(dist <- gather(a)) yield {
+          val current: Set[Target] = dist.values.toSet.flatten
+          val newTargets = targets.toSet.diff(current)
+          val stoppedTargets = current.diff(targets.toSet)
+
+          val events: Set[PlatformEvent] = newTargets.map(t => NewTarget(t))
+             //TODO: consider adding ++ stoppedTargets.map(t => TerminatedTarget(t.uri))
+          events.map(e => Context(dist, e)).toSeq
+        }
+
+        Process.eval(ts).flatMap(Process.emitAll[Context[PlatformEvent]])
     }
 
   /********* edge of the world *********/
