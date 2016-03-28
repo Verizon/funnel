@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit
 import com.twitter.algebird.Group
 import funnel.{Buffers => B}
 import funnel.Buffers.TBuffer
+import journal.Logger
 
 import scala.concurrent.duration._
 import scalaz.std.list._
@@ -122,10 +123,15 @@ class Instruments(val monitoring: Monitoring = Monitoring.default,
     description: String,
     keyMod: Key[O] => Key[O] = identity[Key[O]] _
   ): (Periodic[O], Task[I => Task[Unit]]) = {
+
+    val log = Logger[Instruments]
     import scalaz._
     import Scalaz._
     val (ks, nps) =
       periodicBuffers(nowBuf, unit, label, units, description, keyMod)
+
+    log.debug(s"adding keys from periodic of $ks and the triple Buffer of $nps")
+
     val t = List(monitoring.topicWithKey(ks.now)(nps.one),
                  monitoring.topicWithKey(ks.previous, true)(nps.two),
                  monitoring.topicWithKey(ks.sliding)(nps.three)).traverse(

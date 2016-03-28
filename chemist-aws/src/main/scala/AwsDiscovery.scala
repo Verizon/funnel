@@ -235,7 +235,7 @@ class AwsDiscovery(
         a <- Task(contact(instance.location.uri))(Chemist.serverPool)
         b <- a.fold(
           e => {
-            log.debug(s"failed validation instance=${instance.id} uri=${instance.location.uri} reason=$e")
+            log.info(s"failed validation instance=${instance.id} uri=${instance.location.uri} reason=$e")
             Task.fail(e)
           },
           o => Task.now(o)
