@@ -282,34 +282,52 @@ trait Monitoring {
            .run
   }
 
+  
+  def watchKey(k: Key[Any], e: Event)(S: Strategy): Process[Task, Unit] = {
+    //Used to signal whether the data is still flowing
+    val alive = signalOf[Unit](())(Strategy.Sequential)
+
+    //signal for this key's data.
+    val pts = get(k).discrete.onComplete {
+      //when the signal is finished, close the alive signal
+      Process.eval_[Task, Unit] { alive.close flatMap { _ =>
+        log.info(s"Key senescence: no more data points for '${k.name}', removing...")
+        //TODO: if this fails, then what?
+        remove(k)
+      }}
+    }
+
+
+    e(this).
+      zip(alive.continuous).
+      map{ case (tick, _) => tick }.
+      either(pts)(S).
+      scan(Vector(false,false)) {
+        (acc, a) => acc.tail :+ a.isLeft //looking for 2 ticks in a row, which will be isLeft
+      }.evalMap[Task, Unit] { v =>
+        if (v.forall(identity)) { //sums up vector of size 2 to see if they are both true i.e. two ticks in a row
+          log.info(s"Key senescence: no activity for '${k.name}' removing...")
+          alive.close >> remove(k)
+        } else {
+          Task.now(())
+        }
+      }
+  }
+
   /**
    * Remove keys from this `Monitoring` instance for which no updates are seen
    * between two triggerings of the event `e`.
    */
   def keySenescence(e: Event, ks: Process[Task, Key[Any]]): Process[Task, Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
-    mergeN(ks.map { k =>
-      val alive = signalOf[Unit](())(Strategy.Sequential)
-      val pts = get(k).discrete.onComplete {
-        Process.eval_[Task, Unit] { alive.close flatMap { _ =>
-          log.info(s"Key senescence: no more data points for '${k.name}', removing...")
-          remove(k)
-        }}
-      }
-      e(this).zip(alive.continuous).map(_._1).either(pts)(S)
-        .scan(Vector(false,false)) {
-          (acc, a) => acc.tail :+ a.isLeft
-        }.evalMap[Task, Unit] { v =>
-          if (v.forall(identity)) {
-            log.info(s"Key senescence: no activity for '${k.name}' removing...")
-            alive.close >> remove(k)
-          } else {
-            Task.now(())
-          }
-        }
-    }.onComplete {
-      Process.eval_(Task.delay(log.debug(s"Key senescence: keys exhausted.")))
-    })(S).onComplete(Process.eval(Task.delay(log.debug(s"Key senescence terminated."))))
+    val e1: Process[Task, Unit] = e(this)
+
+    val watchedKeysProcesses: Process[Task, Process[Task, Unit]] = ks.
+      map(watchKey(_, e)(S)).
+      onComplete { Process.eval_(Task.delay(log.debug(s"Key senescence: keys exhausted."))) }
+
+    mergeN(watchedKeysProcesses)(S).
+      onComplete(Process.eval(Task.delay(log.debug(s"Key senescence terminated."))))
   }
 
   /** Return the elapsed time since this instance was started. */

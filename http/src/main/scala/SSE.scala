@@ -21,6 +21,7 @@ import argonaut.{DecodeJson, EncodeJson}
 import java.io.InputStream
 import java.util.concurrent.ExecutorService
 import java.net.{URL,URI}
+import scalaz.\/
 import scalaz.concurrent.Task
 import scalaz.stream._
 import scalaz.stream.{Process => P}
@@ -137,11 +138,18 @@ object SSE {
    */
   def readEvents(uri: URI)(implicit S: ExecutorService = Monitoring.serverPool):
       Process[Task, Datapoint[Any]] = {
-    urlLinesR(uri.toURL)(S).attempt().pipeO(blockParser.map {
-      case (_,data) => parseOrThrow[Datapoint[Any]](data)
-                                            }).flatMap(_.fold({e => Process.fail(e)
-                                                              }, {s => Process.emit(s)
-                                                              }))
+    readUrl(urlLinesR(uri.toURL)(S))
+  }
+
+  //for testing purposes
+  private[http] def readUrl(urlData: Process[Task, String]) = {
+    urlData.attempt().
+      pipeO(
+        blockParser.map {
+          case (_, data) => parseOrThrow[Datapoint[Any]](data)
+        }
+      ).
+      flatMap(_.fold(P.fail, P.emit))
   }
 
   // various helper functions
