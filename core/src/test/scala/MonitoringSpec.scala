@@ -553,4 +553,41 @@ object MonitoringSpec extends Properties("monitoring") {
     go || go || go
   }
 
+  property("keys are being removed upon end of data from host") = secure {
+    val M = Monitoring.default
+    val i = new Instruments(monitoring = M)
+    val gauge = i.gauge("someGauge",0.0)
+    M.keys.get.map(println).run
+
+    M.keySenescence(Events.every(100.milliseconds),Process.eval(Task.delay(gauge.key))).run.run
+    M.keys.get.run.size == 0
+  }
+
+  property("keys are being removed upon disconnect") = secure {
+    val M = Monitoring.default
+    val i = new Instruments(monitoring = M)
+    val gauge = i.gauge("someGauge",0.0)
+    val key = M.keys.get.run.head
+
+    //closing the signal, simulating the host dropping the connection
+    M.get(key).close.run
+
+    val x = M.keySenescence(Events.every(100.milliseconds),Process.eval(Task.delay(gauge.key)))
+
+    x.run.run
+    M.keys.get.run.size == 0
+  }
+
+  property("flask will not report keys in case of host disconnect") = secure {
+    val I = new Instruments
+
+    val fakeUriConnection: URI => Process[Task, Datapoint[Any]] = _ => Process.halt
+
+    val retries = Events.takeEvery(1 millisecond, 1)
+
+    I.monitoring.processMirroringEvents(fakeUriConnection, "flask", _ => retries)
+
+    false
+  }
+
 }
