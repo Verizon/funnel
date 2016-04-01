@@ -71,7 +71,8 @@ object ASG {
     Task(fetch(Nil).map(g =>
       Group(
         name      = g.getAutoScalingGroupName,
-        instances = g.getInstances.asScala.toSeq,
+        //ignore "starting"/"terminating" instances
+        instances = g.getInstances.asScala.filterNot(_.getLifecycleState == "InService"),
         tags      = tags(g))
       ))(funnel.chemist.Chemist.serverPool)
   }

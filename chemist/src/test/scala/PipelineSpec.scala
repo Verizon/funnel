@@ -17,10 +17,14 @@
 package funnel
 package chemist
 
-import org.scalatest.{FlatSpec,Matchers}
+import org.scalatest.{FlatSpec, Matchers}
+
 import scala.concurrent.duration._
 import scalaz.stream.Process
 import java.net.URI
+
+import scalaz.==>>
+import scalaz.concurrent.Task
 
 class PipelineSpec extends FlatSpec with Matchers {
   import PlatformEvent._
@@ -71,28 +75,40 @@ class PipelineSpec extends FlatSpec with Matchers {
     "http://localhost:4006/stream/now?type=%22String%22".target
   )
 
+  def sizePlans(lst: List[Plan]): Int =
+    lst.map {
+      case Redistribute(stop, start) =>
+        Sharding.targets(stop).size + Sharding.targets(start).size
+      case Distribute(d) =>
+        Sharding.targets(d).size
+      case _ => 0
+    }.sum
+
   /************************ plan checking ************************/
 
-  it should "correctly distribute the work to one of the flasks" in {
-    val p1: Flow[PlatformEvent] =
-      List("http://localhost:8888/stream/previous".target).flow
+  "transform" should "correctly distribute the work to one of the flasks" in {
+    val t = "http://localhost:8888/stream/previous".target
+    val e: Context[PlatformEvent] = Context(d1, NewTarget(t))
 
-    (p1.map(transform(TestDiscovery, RandomSharding)).runLast.run
-      .get.value match {
-        case Distribute(d) => d.values.flatMap(identity).length
-        case _ => 0
-      }) should equal(1)
+    transform(TestDiscovery, RandomSharding)(e).run.value match {
+      case Redistribute(stop, start) =>
+        stop.values.flatten.size should equal(0)
+        start.values.flatten.size should equal(1)
+        start.values.flatten.toSet should equal(Set(t))
+      case _ => fail("unexpected command")
+    }
   }
 
-  // this is a little lame
-  it should "produce a plan for every input target" in {
+  it should "produce a ONE command to monitor for every input target" in {
     val accum: List[Plan] =
       t1.flow.map(transform(TestDiscovery, RandomSharding))
-      .scan(List.empty[Plan])((a,b) => a :+ b.value)
+      .scan(List.empty[Plan])((a,b) => a :+ b.run.value)
       .runLast.run
       .toList
       .flatten
+
     accum.length should equal (t1.length)
+    sizePlans(accum) should equal(t1.length)
   }
 
   /************************ handlers ************************/
@@ -108,17 +124,41 @@ class PipelineSpec extends FlatSpec with Matchers {
 
     Sharding.shards(n).size should equal (d.keys.size + 1)
     Sharding.targets(n).size should equal (t1.size + t2.size)
+  }
 
-    // println("\n\n >>>>> origional")
-    // d.pretty()
+  "handle.rediscovery" should "correctly stop work" in {
+    val d = Distribution.empty
+      .insert(flask01, t1.toSet)
+      .insert(flask02, t2.toSet)
 
-    // println("\n\n >>>>> stopping")
-    // r.stop.pretty()
+    val (n, r) = handle.rediscovery(Set.empty, d)(LFRRSharding)
 
-    // println("\n\n >>>>> starting")
-    // r.start.pretty()
+    Sharding.shards(n).size should equal (d.keys.size)
+    Sharding.targets(n).size should equal (0)
+    Sharding.targets(r.start).size should be (0)
+    Sharding.targets(r.stop).size should be (t1.size + t2.size)
+  }
 
-    // println("\n\n >>>>> distribution")
-    // n.pretty()
+  it should "correctly start new work" in {
+    val (n, r) = handle.rediscovery(t2.toSet, d1)(LFRRSharding)
+
+    Sharding.shards(n).size should equal (d1.keys.size)
+    Sharding.targets(n).size should equal (t2.size)
+    Sharding.targets(r.stop).size should be (0)
+    Sharding.targets(r.start).size should be (t2.size)
+  }
+
+  it should "correctly rebalance work" in {
+    //distribution is mix of targets that will stay and targets that will disappear
+    val d = Distribution.empty
+      .insert(flask01, t1.take(3).toSet ++ t2.take(1).toSet)
+      .insert(flask02, t1.takeRight(3).toSet ++ t2.takeRight(1).toSet)
+
+    val (n, r) = handle.rediscovery(t2.toSet, d)(LFRRSharding)
+
+    Sharding.shards(n).size should equal (d.keys.size)
+    Sharding.targets(n).size should equal (t2.size)
+    Sharding.targets(r.stop).size should be (3 + 3)
+    Sharding.targets(r.start).size should be (t2.size - 1 - 1)
   }
 }

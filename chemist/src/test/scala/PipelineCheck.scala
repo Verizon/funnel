@@ -27,7 +27,7 @@ import Gen.oneOf
 import Arbitrary.arbitrary
 import Prop.{BooleanOperators, falsified, forAll, passed}
 
-class StaticDiscovery(targets: Map[TargetID, Set[Target]], flasks: Map[FlaskID, Flask]) extends Discovery {
+case class StaticDiscovery(targets: Map[TargetID, Set[Target]], flasks: Map[FlaskID, Flask]) extends Discovery {
   def inventory: Task[DiscoveryInventory] = Task.delay(
     DiscoveryInventory(targets.toSeq, Seq.empty, flasks.values.toSeq, flasks.values.toSeq)
   )
@@ -37,6 +37,14 @@ class StaticDiscovery(targets: Map[TargetID, Set[Target]], flasks: Map[FlaskID, 
 
 object PipelineCheck extends Properties("Pipeline") {
   import Fixtures._
+
+  implicit class PrettyPrintDistribution(d: Distribution) {
+    def pretty(): String =
+      s"=========== flasks=${d.keySet.size} targets=${d.values.map(_.size).sum}\n" +
+      d.toList.map { case (key,value) =>
+        s"$key\n" + value.map(t => s"    $t").mkString("\n")
+      }.mkString("\n") + "\n===================\n"
+  }
 
   def genTargetID = for {
     id <- alphaNumStr
@@ -77,19 +85,8 @@ object PipelineCheck extends Properties("Pipeline") {
   implicit lazy val arbContextOfPlatformEvent: Arbitrary[Context[PlatformEvent]] =
     Arbitrary(genContextOfPlatformEvent)
 
-  // property("newFlask works") = forAll { (f: Flask, s: Sharder, d: Distribution) =>
-  //   val (nd, _) = Pipeline.handle.newFlask(f, s)(d)
-  //   (!Sharding.shards(d).contains(f)) ==>
-  //   ("The existing Distribution does not contain the Flask" |:
-  //     !d.keySet.contains(f)) &&
-  //   ("The new Distribution contains the Flask" |:
-  //     nd.keySet.contains(f)) &&
-  //   ("The existing and new Distributions have the same Targets" |:
-  //     Sharding.targets(d) == Sharding.targets(nd))
-  // }
-
   property("newTarget works") = forAll { (t: Target, s: Sharder, d: Distribution) =>
-    val nd = Pipeline.handle.newTarget(t, s)(d)
+    val (nd, cmd) = Pipeline.handle.newTarget(t, s)(d)
     ("The existing Distribution does not contain the Target" |:
       !Sharding.targets(d).contains(t)) &&
      ("The new Distribution contains the Target" |:
@@ -99,16 +96,17 @@ object PipelineCheck extends Properties("Pipeline") {
   property("transform works") = forAll { (sd: StaticDiscovery, s: Sharder, c: Context[PlatformEvent]) =>
     val d: Distribution = c.distribution
     val e: PlatformEvent = c.value
-    val cp: Context[Plan] = Pipeline.transform(sd, s)(c)
+    val cp: Context[Plan] = Pipeline.transform(sd, s)(c).run
     val nd: Distribution = cp.distribution
     val p: Plan = cp.value
 
     e match {
       case NewTarget(t) => p match {
-        case Distribute(w) =>
+        case Redistribute(stop, start) =>
           ("The old Distribution does not contain the new Target" |: !Sharding.targets(d).contains(t)) &&
+          ("Nothing to stop" |: stop.isEmpty) &&
           (d.size > 0) ==>
-            ("The Work does contain the new Target" |: Sharding.targets(w).contains(t))
+            ("The Work does contain ONLY new Target" |: Sharding.targets(start) == Set(t))
         case _ => falsified
       }
       case NewFlask(f) => p match {
@@ -122,20 +120,17 @@ object PipelineCheck extends Properties("Pipeline") {
       }
       case NoOp => passed
       case TerminatedFlask(f) => p match {
-        case Produce(tasks) =>
-          val ts = tasks.run.map {
-            case NewTarget(t) => t
-            case _ => throw new RuntimeException("Not all Produced PlatformEvents were NewTargets")
-          }.toSet
+        case Redistribute(stop, start) =>
           val nts = Sharding.targets(nd)
           val ots = Sharding.targets(d)
-          //TODO: this is not valid check as it checks for FlaskID in the Set[Flask]
-          //  however, test fails if fixed (user to fail before my latest changes too)
-          //  Need to look into this separately
-          (Sharding.shards(d).contains(f)) ==>
-          (s"The new Distribution's Targets ($nts) plus the Produced Targets ($ts) equal the old Distribution's Targets ($ots)" |:
-            nts ++ ts == ots) &&
-          ("The terminated Flask is not in the new Distribution" |: !Sharding.shards(nd).contains(f))
+
+          val oldLoad: Option[Set[Target]] = d.mapKeys(_.id).lookup(f)
+          //inputs are random => not all of them may be in the discovery and then they will not be reallocated!
+          val oldTargets = oldLoad.getOrElse(Set.empty).intersect(sd.targets.values.flatten.toSet)
+
+          oldLoad.nonEmpty ==>
+            (s"Targets monitored by old flask should be reassigned if they are alive."
+              |: oldTargets.diff(Sharding.targets(start)).isEmpty)
         case _ => falsified
       }
       case TerminatedTarget(t) => p match {

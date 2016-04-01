@@ -18,9 +18,9 @@ package funnel
 package chemist
 
 import scala.concurrent.duration._
-import scalaz.concurrent.{Task,Strategy}
+import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.async.mutable.Queue
-import scalaz.stream.{Process,Sink,time,wye}
+import scalaz.stream.{Process, Sink, time, wye}
 
 object Pipeline {
   import Chemist.{Context,Flow}
@@ -49,7 +49,7 @@ object Pipeline {
 
   /**
    * basically just lift a given A into a Context A... perhaps this would be
-   * better on the Context compantion object?
+   * better on the Context companion object?
    */
   def contextualise[A](a: A): Context[A] =
     Context(Distribution.empty, a)
@@ -61,18 +61,47 @@ object Pipeline {
   def collect(http: dispatch.Http)(d: Distribution): Task[Distribution] =
     Flask.gatherAssignedTargets(Sharding.shards(d))(http)
 
+
+  /**
+    * Each of distribution update operations computes set of actions to perform (start or stop monitoring)
+    * represented by Redistribute plan as well as "new" distribution after operations had been performed
+    */
   object handle {
     /**
      * distribution is the specific work that needs to take place, represented as a distribution
      */
-    def newTarget(target: Target, sharder: Sharder)(d: Distribution): Distribution =
-      sharder.distribution(Set(target))(d)._2 // drop the seq, as its not needed
+    def newTarget(target: Target, sharder: Sharder)(d: Distribution): (Distribution, Redistribute) = {
+      val proposed = sharder.distribution(Set(target))(d)._2 // drop the seq, as its not needed
+
+      //there is nothing to stop and we only need to issue command for new target
+      (proposed, Redistribute(Distribution.empty, proposed.map(_.intersect(Set(target)))))
+    }
+
+
+    /**
+      * computes distribution given full state of the world.
+      * We do not want to reduce it to distributing each of new targets independently as
+      * it gives us more flexibility if we know full set of changes to be made
+      */
+    def rediscovery(allTargets: Set[Target], old: Distribution)(shd: Sharder): (Distribution, Redistribute) = {
+        val current: Set[Target] = Sharding.targets(old)
+        val newTargets = allTargets.diff(current)
+        val missingTargets = current.diff(allTargets)
+
+        val proposed = shd.distribution(newTargets)(old)._2.map(_.diff(missingTargets))
+
+        //redistribute command assumes we are not sending "redundant" requests to monitor something being monitored
+        val proposedDelta = proposed.map(_.intersect(newTargets))
+        val oldDelta = old.map(_.intersect(missingTargets))
+
+        (proposed, Redistribute(oldDelta, proposedDelta))
+      }
 
     /**
      * in the event more capacity becomes available, rebalance the cluster to take
      * best advantage of that new capacity using the specified sharder to
-     * redistribute the work. This function is soley responsible for orchestrating
-     * the inputs/outputs of the sharder, and the actual imlpementaiton logic of
+     * redistribute the work. This function is solely responsible for orchestrating
+     * the inputs/outputs of the sharder, and the actual implementation logic of
      * what to shard where is entirely encapsulated in the `Sharder`.
      */
     def newFlask(flask: Flask, shd: Sharder)(old: Distribution): (Distribution, Redistribute) = {
@@ -108,31 +137,37 @@ object Pipeline {
    * this function should only ever be indicating what the intended actions
    * are, not actually doing any effectful I/O itself.
    */
-  def transform(dsc: Discovery, shd: Sharder)(c: Context[PlatformEvent]): Context[Plan] =
+  def transform(dsc: Discovery, shd: Sharder)
+               (c: Context[PlatformEvent]): Task[Context[Plan]] =
     c match {
-      case Context(d,NewTarget(target)) =>
-        val work = handle.newTarget(target, shd)(d)
-        Context(d, Distribute(work))
+      case Context(d, NewTarget(target)) => Task.delay {
+        val (proposed, work) = handle.newTarget(target, shd)(d)
+        Context(proposed, work)
+      }
 
-      case Context(d,NewFlask(f)) =>
+      case Context(d,NewFlask(f)) => Task.delay {
         val (proposed, work) = handle.newFlask(f, shd)(d)
         Context(proposed, work)
+      }
 
       case Context(d,TerminatedTarget(uri)) =>
-        Context(d, Ignore)
+        Task.delay(Context(d, Ignore))
 
-      case Context(d,TerminatedFlask(flask)) =>
-        val tasks: Task[Seq[PlatformEvent]] =
-          for {
-            a <- dsc.inventory
-            b  = a.targets.flatMap(_._2).toSet
-            t  = b -- Sharding.targets(d)
-            c  = t.toList.map(NewTarget)
-          } yield c
-        Context(d, Produce(tasks))
+      //if flask is terminated we probably do not have accurate state of what it was monitoring
+      // => perform full discovery and redistribute work
+      case Context(d, TerminatedFlask(flaskId)) =>
+        targets(dsc).map {
+          ctx =>
+            //we just completed rediscovery and terminating flask should not be there but to be safe ...
+            val c: Context[Seq[Target]] =
+              ctx.copy(distribution = ctx.distribution.filterWithKey((k, v) => k.id != flaskId))
+
+            val (proposed, work) = handle.rediscovery(c.value.toSet, c.distribution)(shd)
+            Context(proposed, work)
+        }
 
       case Context(d,NoOp) =>
-        Context(d, Ignore)
+        Task.delay(Context(d, Ignore))
     }
 
   /**
@@ -145,21 +180,13 @@ object Pipeline {
   def discovery(
     interval: Duration
   )(dsc: Discovery,
+    shd: Sharder,
     gather: Distribution => Task[Distribution]
-  ): Process[Task,Context[PlatformEvent]] =
-    discover(dsc, interval).flatMap {
-      case Context(a, targets) =>
-        val ts: Task[Seq[Context[PlatformEvent]]] = for(dist <- gather(a)) yield {
-          val current: Set[Target] = dist.values.toSet.flatten
-          val newTargets = targets.toSet.diff(current)
-          val stoppedTargets = current.diff(targets.toSet)
-
-          val events: Set[PlatformEvent] = newTargets.map(t => NewTarget(t))
-             //TODO: consider adding ++ stoppedTargets.map(t => TerminatedTarget(t.uri))
-          events.map(e => Context(dist, e)).toSeq
-        }
-
-        Process.eval(ts).flatMap(Process.emitAll[Context[PlatformEvent]])
+  ): Process[Task,Context[Plan]] =
+    discover(dsc, interval).map {
+      ctx =>
+        val (proposed, work) = handle.rediscovery(ctx.value.toSet, ctx.distribution)(shd)
+        Context(proposed, work)
     }
 
   /********* edge of the world *********/
@@ -177,9 +204,11 @@ object Pipeline {
     http: dispatch.Http
   ): Process[Task, Context[Plan]] = {
     val S = Strategy.Executor(Chemist.defaultPool)
-    discovery(pollInterval)(dsc, collect(http)(_))
-      .wye(lifecycle)(wye.merge)(S)
-      .map(transform(dsc,shd))
+    //TODO: Add AllTargets event and let discovery emit it, then transform will apply to both
+    discovery(pollInterval)(dsc, shd, collect(http)(_))
+      .wye(
+        lifecycle.flatMap(ctx => Process.eval(transform(dsc, shd)(ctx)))
+      )(wye.merge)(S)
   }
 
   // needs error handling
