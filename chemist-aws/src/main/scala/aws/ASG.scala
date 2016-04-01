@@ -72,7 +72,7 @@ object ASG {
       Group(
         name      = g.getAutoScalingGroupName,
         //ignore "starting"/"terminating" instances
-        instances = g.getInstances.asScala.filterNot(_.getLifecycleState == "InService"),
+        instances = g.getInstances.asScala.filter(_.getLifecycleState == "InService"),
         tags      = tags(g))
       ))(funnel.chemist.Chemist.serverPool)
   }
