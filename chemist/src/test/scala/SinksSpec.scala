@@ -132,4 +132,18 @@ class SinksSpec extends FlatSpec with Matchers {
     f.commandsCompleted shouldBe 5
     f.commandsFailed shouldBe 1 //we should not try to run anything after failure
   }
+
+  it should "not issue commands if there is no work to do" in {
+    val f = UnstableFlask("bad")
+
+    // if we get plans with no actionable items then we should not call flask
+    Process.apply(
+      Context[Plan](Distribution.empty, Redistribute(Distribution.empty, Distribution.empty)),
+      Context[Plan](Distribution.empty, Distribute(Distribution.empty))
+    ).toSource.to(sinks.unsafeNetworkIO(f, q)).run.run
+
+    f.commandsCompleted shouldBe 0
+    f.commandsFailed shouldBe 0
+
+  }
 }
