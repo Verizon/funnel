@@ -72,7 +72,6 @@ object Flask {
 
         errors.foreach {
           e => log.error(s"[gatherAssigned] dead flask=${e._1}, problem=${e._2}")
-            print(s"[gatherAssigned] dead flask=${e._1}, problem=${e._2}\n")
         }
 
         val dis = success.foldLeft(Distribution.empty)(

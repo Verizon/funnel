@@ -18,9 +18,7 @@ package funnel
 package aws
 
 import com.amazonaws.regions.{Region, Regions}
-import com.amazonaws.auth.{AWSCredentials,BasicAWSCredentials}
-import com.amazonaws.services.ec2.AmazonEC2
-import com.amazonaws.services.ec2.model.Address
+import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.autoscaling.{AmazonAutoScaling,AmazonAutoScalingClient}
 import com.amazonaws.services.autoscaling.model.{
   DescribeAutoScalingGroupsRequest,

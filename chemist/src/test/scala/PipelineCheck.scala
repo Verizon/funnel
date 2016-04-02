@@ -82,8 +82,11 @@ object PipelineCheck extends Properties("Pipeline") {
     d <- arbitrary[Distribution]
     e <- arbitrary[PlatformEvent]
   } yield Context(d, e)
+
   implicit lazy val arbContextOfPlatformEvent: Arbitrary[Context[PlatformEvent]] =
     Arbitrary(genContextOfPlatformEvent)
+
+  private val gatherIdentity = (in: Distribution) => Task.delay(in)
 
   property("newTarget works") = forAll { (t: Target, s: Sharder, d: Distribution) =>
     val (nd, cmd) = Pipeline.handle.newTarget(t, s)(d)
@@ -96,7 +99,7 @@ object PipelineCheck extends Properties("Pipeline") {
   property("transform works") = forAll { (sd: StaticDiscovery, s: Sharder, c: Context[PlatformEvent]) =>
     val d: Distribution = c.distribution
     val e: PlatformEvent = c.value
-    val cp: Context[Plan] = Pipeline.transform(sd, s)(c).run
+    val cp: Context[Plan] = Pipeline.transform(sd, s, gatherIdentity)(c).run
     val nd: Distribution = cp.distribution
     val p: Plan = cp.value
 

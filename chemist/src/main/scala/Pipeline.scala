@@ -17,6 +17,7 @@
 package funnel
 package chemist
 
+import journal.Logger
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.async.mutable.Queue
@@ -27,24 +28,26 @@ object Pipeline {
   import Sharding.Distribution
   import PlatformEvent._
 
+  private val log = Logger[Pipeline.type]
+
   /**
     * Discover all the known Targets in a Context.
     */
-  def targets(dsc: Discovery): Task[Context[Seq[Target]]] = for {
+  def targets(dsc: Discovery)(gather: Distribution => Task[Distribution]): Task[Context[PlatformEvent]] = for {
     inv <- dsc.inventory
-    dist = inv.activeFlasks.foldLeft(Distribution.empty){ (x,y) => x.insert(y, Set.empty[Target]) }
+    dist <- gather(Distribution.empty(inv.activeFlasks))
     b = inv.targets.flatMap(_._2)
-  } yield Context(dist, b)
+  } yield Context[PlatformEvent](dist, AllTargets(b))
 
   /**
    * periodically wake up and call the platform discovery system. doing this
    * ensures that we capture any outliers, despite having the more event-based
    * platform lifecycle stream (which could periodically fail).
    */
-  def discover(dsc: Discovery, interval: Duration): Flow[Seq[Target]] = {
+  def discover(dsc: Discovery, interval: Duration)(gather: Distribution => Task[Distribution]): Flow[PlatformEvent] = {
     (Process.emit(Duration.Zero) ++ time.awakeEvery(interval)(
       Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool
-    )).evalMap[Task, Context[Seq[Target]]](_ => targets(dsc))
+    )).evalMap[Task, Context[PlatformEvent]](_ => targets(dsc)(gather))
   }
 
   /**
@@ -137,38 +140,49 @@ object Pipeline {
    * this function should only ever be indicating what the intended actions
    * are, not actually doing any effectful I/O itself.
    */
-  def transform(dsc: Discovery, shd: Sharder)
-               (c: Context[PlatformEvent]): Task[Context[Plan]] =
+  def transform(dsc: Discovery, shd: Sharder, gather: Distribution => Task[Distribution])
+               (c: Context[PlatformEvent]): Task[Context[Plan]] = {
     c match {
       case Context(d, NewTarget(target)) => Task.delay {
+        log.info(s"[transform] new target=$target allocated=${Sharding.targets(d).size}")
         val (proposed, work) = handle.newTarget(target, shd)(d)
         Context(proposed, work)
       }
 
-      case Context(d,NewFlask(f)) => Task.delay {
+      case Context(d, NewFlask(f)) => Task.delay {
+        log.info(s"[transform] new flask=$f allocated=${Sharding.targets(d).size}")
         val (proposed, work) = handle.newFlask(f, shd)(d)
         Context(proposed, work)
       }
 
-      case Context(d,TerminatedTarget(uri)) =>
+      case Context(d, TerminatedTarget(uri)) =>
+        log.info(s"[transform] terminated target=$uri allocated=${Sharding.targets(d).size}")
         Task.delay(Context(d, Ignore))
+
+      case Context(d, AllTargets(all)) => Task.delay {
+        log.info(s"[transform] allTargets total=${all.size} allocated=${Sharding.targets(d).size} new=${all.toSet.diff(Sharding.targets(d)).size} diff=${all.toSet.diff(Sharding.targets(d))}")
+        val (proposed, work) = handle.rediscovery(all.toSet, d)(shd)
+        Context(proposed, work)
+      }
 
       //if flask is terminated we probably do not have accurate state of what it was monitoring
       // => perform full discovery and redistribute work
       case Context(d, TerminatedFlask(flaskId)) =>
-        targets(dsc).map {
+        log.info(s"[transform] terminated flask=$flaskId allocated=${Sharding.targets(d).size}")
+        targets(dsc)(gather).flatMap {
           ctx =>
             //we just completed rediscovery and terminating flask should not be there but to be safe ...
-            val c: Context[Seq[Target]] =
+            val ctx2: Context[PlatformEvent] =
               ctx.copy(distribution = ctx.distribution.filterWithKey((k, v) => k.id != flaskId))
 
-            val (proposed, work) = handle.rediscovery(c.value.toSet, c.distribution)(shd)
-            Context(proposed, work)
+            transform(dsc, shd, gather)(ctx2)
         }
 
-      case Context(d,NoOp) =>
+      case Context(d, NoOp) =>
+        log.info(s"[transform] NoOp allocated=${Sharding.targets(d).size}")
         Task.delay(Context(d, Ignore))
     }
+  }
 
   /**
    * create the discovery stream by calling the discovery system and also
@@ -182,12 +196,8 @@ object Pipeline {
   )(dsc: Discovery,
     shd: Sharder,
     gather: Distribution => Task[Distribution]
-  ): Process[Task,Context[Plan]] =
-    discover(dsc, interval).map {
-      ctx =>
-        val (proposed, work) = handle.rediscovery(ctx.value.toSet, ctx.distribution)(shd)
-        Context(proposed, work)
-    }
+  ): Process[Task,Context[PlatformEvent]] =
+    discover(dsc, interval)(gather)
 
   /********* edge of the world *********/
 
@@ -206,9 +216,8 @@ object Pipeline {
     val S = Strategy.Executor(Chemist.defaultPool)
     //TODO: Add AllTargets event and let discovery emit it, then transform will apply to both
     discovery(pollInterval)(dsc, shd, collect(http)(_))
-      .wye(
-        lifecycle.flatMap(ctx => Process.eval(transform(dsc, shd)(ctx)))
-      )(wye.merge)(S)
+      .wye(lifecycle)(wye.merge)(S)
+        .evalMap(transform(dsc,shd, collect(http)(_)))
   }
 
   // needs error handling

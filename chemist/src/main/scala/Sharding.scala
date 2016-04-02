@@ -26,6 +26,8 @@ object Sharding {
 
   object Distribution {
     def empty: Distribution = ==>>()
+
+    def empty(flasks: Seq[Flask]) = ==>>.fromList(flasks.toList.map(f => f -> Set.empty[Target]))
   }
 
   /**

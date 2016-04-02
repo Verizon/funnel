@@ -18,19 +18,15 @@ package funnel
 package chemist
 
 import org.scalatest.{FlatSpec, Matchers}
-
-import scala.concurrent.duration._
 import scalaz.stream.Process
 import java.net.URI
-
-import scalaz.==>>
 import scalaz.concurrent.Task
 
 class PipelineSpec extends FlatSpec with Matchers {
   import PlatformEvent._
   import Chemist.{Flow,Context}
   import Sharding.Distribution
-  import Pipeline.{contextualise,transform}
+  import Pipeline.transform
   import Fixtures._
 
   implicit class AsTarget(s: String){
@@ -75,7 +71,7 @@ class PipelineSpec extends FlatSpec with Matchers {
     "http://localhost:4006/stream/now?type=%22String%22".target
   )
 
-  def sizePlans(lst: List[Plan]): Int =
+  private def sizePlans(lst: List[Plan]): Int =
     lst.map {
       case Redistribute(stop, start) =>
         Sharding.targets(stop).size + Sharding.targets(start).size
@@ -84,13 +80,15 @@ class PipelineSpec extends FlatSpec with Matchers {
       case _ => 0
     }.sum
 
+  private val gatherIdentity = (in: Distribution) => Task.delay(in)
+
   /************************ plan checking ************************/
 
   "transform" should "correctly distribute the work to one of the flasks" in {
     val t = "http://localhost:8888/stream/previous".target
     val e: Context[PlatformEvent] = Context(d1, NewTarget(t))
 
-    transform(TestDiscovery, RandomSharding)(e).run.value match {
+    transform(TestDiscovery, RandomSharding, gatherIdentity)(e).run.value match {
       case Redistribute(stop, start) =>
         stop.values.flatten.size should equal(0)
         start.values.flatten.size should equal(1)
@@ -101,7 +99,7 @@ class PipelineSpec extends FlatSpec with Matchers {
 
   it should "produce a ONE command to monitor for every input target" in {
     val accum: List[Plan] =
-      t1.flow.map(transform(TestDiscovery, RandomSharding))
+      t1.flow.map(transform(TestDiscovery, RandomSharding, gatherIdentity))
       .scan(List.empty[Plan])((a,b) => a :+ b.run.value)
       .runLast.run
       .toList
@@ -109,6 +107,25 @@ class PipelineSpec extends FlatSpec with Matchers {
 
     accum.length should equal (t1.length)
     sizePlans(accum) should equal(t1.length)
+  }
+
+  it should "not produce commands for streams we already monitor (full discovery)" in {
+    val targetsInDiscovery: Set[Target] = t1.toSet ++ t2.toSet
+
+    val d = Distribution.empty.insert(flask01, t1.toSet).insert(flask02, Set.empty)
+
+    val e = AllTargets(targetsInDiscovery.toSeq)
+
+    val p: Flow[PlatformEvent] = Process.emit(Context(d, e))
+
+    val accum: List[Plan] = p.evalMap[Task, Context[Plan]](e => transform(TestDiscovery, RandomSharding, gatherIdentity)(e))
+          .scan(List.empty[Plan])((a,b) => a :+ b.value)
+          .runLast.run
+          .toList
+          .flatten
+
+    accum.length should equal (1) //single redistribute action
+    sizePlans(accum) should equal (t2.size) //should only include what was not part of incoming distribution
   }
 
   /************************ handlers ************************/
@@ -124,6 +141,8 @@ class PipelineSpec extends FlatSpec with Matchers {
 
     Sharding.shards(n).size should equal (d.keys.size + 1)
     Sharding.targets(n).size should equal (t1.size + t2.size)
+    //expect we restart everything we stop
+    Sharding.targets(r.stop).size should equal(Sharding.targets(r.start).size)
   }
 
   "handle.rediscovery" should "correctly stop work" in {

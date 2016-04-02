@@ -97,7 +97,7 @@ class AwsDiscovery(
       f = a.filter((b andThen isFlask)(_))
       _ = metrics.model.hostsFlask.set(f.size)
 
-      _  = log.info(s"instances=${a.size}, monitorable=${m.size}, unmonitorable=${um.size} activeFlasks=${af.size} flasks=${af.size}")
+      _  = log.info(s"[inventory] instances=${a.size}, monitorable=${m.size}, unmonitorable=${um.size} activeFlasks=${af.size} flasks=${af.size}")
 
     } yield DiscoveryInventory(
       m.map(in => TargetID(in.id) -> in.targets),
