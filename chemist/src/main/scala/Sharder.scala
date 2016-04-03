@@ -24,15 +24,12 @@ import scalaz.std.set._
 trait Sharder {
   /**
    * provide the new distribution based on the result of calculating
-   * how the new set should actually be distributed. main benifit here
+   * how the new set should actually be distributed. main benefit here
    * is simply making the operations opaque (handling missing key cases)
    *
-   * Returns values of this function represent two things:
-   * 1. `Seq[(Flask,Target)]` is a sequence of targets zipped with the flask it was assigned too.
-   * 2. `Distribution` is that same sequence folded into a `Distribution` instance which can
-   *     then be added to the existing state of the world.
+   * Returned distribution includes all previous assignments as well as assignments for nee targets.
    */
-  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution)
+  def distribution(s: Set[Target])(d: Distribution): Distribution
 }
 
 object RandomSharding extends Sharder {
@@ -63,8 +60,8 @@ object RandomSharding extends Sharder {
    * `s`: The targets to distribute
    * `d`: The existing distribution
    */
-  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution) = {
-    if(s.isEmpty) (Seq.empty,d)
+  def distribution(s: Set[Target])(d: Distribution): Distribution = {
+    if(s.isEmpty) d
     else {
       log.debug(s"distribution: attempting to distribute targets '${s.mkString(",")}'")
       val work = calculate(s)(d)
@@ -75,7 +72,7 @@ object RandomSharding extends Sharder {
 
       log.debug(s"work = $work, dist = $dist")
 
-      (work, dist)
+      dist
     }
   }
 }
@@ -110,10 +107,10 @@ object LFRRSharding extends Sharder {
     }
   }
 
-  def distribution(s: Set[Target])(d: Distribution): (Seq[(Flask,Target)], Distribution) = {
+  def distribution(s: Set[Target])(d: Distribution): Distribution = {
     // this check is needed as otherwise the fold gets stuck in a gnarly
     // infinite loop, and this function never completes.
-    if(s.isEmpty) (Seq.empty,d)
+    if(s.isEmpty) d
     else {
       log.debug(s"distribution: attempting to distribute targets '${s.mkString(",")}'")
       val work = calculate(s)(d)
@@ -124,7 +121,7 @@ object LFRRSharding extends Sharder {
 
       log.debug(s"work = $work, dist = $dist")
 
-      (work, dist)
+      dist
     }
   }
 }

@@ -72,7 +72,7 @@ object Pipeline {
      * distribution is the specific work that needs to take place, represented as a distribution
      */
     def newTarget(target: Target, sharder: Sharder)(d: Distribution): (Distribution, Redistribute) = {
-      val proposed = sharder.distribution(Set(target))(d)._2 // drop the seq, as its not needed
+      val proposed = sharder.distribution(Set(target))(d) // drop the seq, as its not needed
 
       //there is nothing to stop and we only need to issue command for new target
       (proposed, Redistribute(Distribution.empty, proposed.map(_.intersect(Set(target)))))
@@ -89,7 +89,7 @@ object Pipeline {
         val newTargets = allTargets.diff(current)
         val missingTargets = current.diff(allTargets)
 
-        val proposed = shd.distribution(newTargets)(old)._2.map(_.diff(missingTargets))
+        val proposed = shd.distribution(newTargets)(old).map(_.diff(missingTargets))
 
         //redistribute command assumes we are not sending "redundant" requests to monitor something being monitored
         val proposedDelta = proposed.map(_.intersect(newTargets))
@@ -114,7 +114,7 @@ object Pipeline {
       val empty: Distribution = flasks.foldLeft(Distribution.empty)(
         (a,b) => a.insert(b, Set.empty)).insert(flask, Set.empty)
 
-      val proposed: Distribution = shd.distribution(targets)(empty)._2
+      val proposed: Distribution = shd.distribution(targets)(empty)
 
       val r1 = proposed.fold(Redistribute.empty){ (f, t, r) =>
         if(f.id == flask.id) r.update(f, stopping = Set.empty, starting = t)
