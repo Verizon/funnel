@@ -18,7 +18,9 @@ package funnel
 package chemist
 
 import journal.Logger
+
 import scala.concurrent.duration._
+import scalaz.{-\/, \/-}
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.async.mutable.Queue
 import scalaz.stream.{Process, Sink, time, wye}
@@ -34,21 +36,14 @@ object Pipeline {
     * Discover all the known Targets in a Context.
     */
   def targets(dsc: Discovery)(gather: Distribution => Task[Distribution]): Task[Context[PlatformEvent]] = for {
-    inv <- dsc.inventory
+    inv <- metrics.DiscoveryLatency.timeTaskSuccess(dsc.inventory).handleWith {
+      case t: Throwable =>
+        metrics.ErrorsDiscovery.increment
+        Task.fail(t)
+    }
     dist <- gather(Distribution.empty(inv.activeFlasks))
     b = inv.targets.flatMap(_._2)
   } yield Context[PlatformEvent](dist, AllTargets(b))
-
-  /**
-   * periodically wake up and call the platform discovery system. doing this
-   * ensures that we capture any outliers, despite having the more event-based
-   * platform lifecycle stream (which could periodically fail).
-   */
-  def discover(dsc: Discovery, interval: Duration)(gather: Distribution => Task[Distribution]): Flow[PlatformEvent] = {
-    (Process.emit(Duration.Zero) ++ time.awakeEvery(interval)(
-      Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool
-    )).evalMap[Task, Context[PlatformEvent]](_ => targets(dsc)(gather))
-  }
 
   /**
    * basically just lift a given A into a Context A... perhaps this would be
@@ -62,8 +57,11 @@ object Pipeline {
    * our view of the world as it is right now (stale and immediately non-authoritative)
    */
   def collect(http: dispatch.Http)(d: Distribution): Task[Distribution] =
-    Flask.gatherAssignedTargets(Sharding.shards(d))(http)
-
+    Flask.gatherAssignedTargets(Sharding.shards(d))(http).handleWith {
+      case t: Throwable =>
+        metrics.ErrorsFlask.increment
+        Task.fail(t)
+    }
 
   /**
     * Each of distribution update operations computes set of actions to perform (start or stop monitoring)
@@ -96,6 +94,9 @@ object Pipeline {
         //redistribute command assumes we are not sending "redundant" requests to monitor something being monitored
         val proposedDelta = proposed.map(_.intersect(newTargets))
         val oldDelta = old.map(_.intersect(missingTargets))
+
+        metrics.ModelAllSources.set(allTargets.size)
+        metrics.ModelDeadSources.set(missingTargets.size)
 
         (proposed, Redistribute(oldDelta, proposedDelta))
       }
@@ -190,6 +191,10 @@ object Pipeline {
    * right now. difference the discovered work with the known work and then
    * produce `NewTarget` events for any remain, as they are not currently
    * being monitored.
+   *
+   * periodically wake up and call the platform discovery system. doing this
+   * ensures that we capture any outliers, despite having the more event-based
+   * platform lifecycle stream (which could periodically fail).
    */
   def discovery(
     interval: Duration
@@ -197,7 +202,9 @@ object Pipeline {
     shd: Sharder,
     gather: Distribution => Task[Distribution]
   ): Process[Task,Context[PlatformEvent]] =
-    discover(dsc, interval)(gather)
+    (Process.emit(Duration.Zero) ++ time.awakeEvery(interval)(
+      Strategy.Executor(Chemist.serverPool), Chemist.schedulingPool
+    )).evalMap[Task, Context[PlatformEvent]](_ => targets(dsc)(gather))
 
   /********* edge of the world *********/
 

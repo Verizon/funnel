@@ -67,8 +67,8 @@ object Flask {
       all =>
         val (errors, success) = all.toVector.separate
 
-        metrics.deadFlasks.set(errors.size)
-        metrics.liveFlasks.set(success.size)
+        metrics.ModelDeadFlasks.set(errors.size)
+        metrics.ModelLiveFlasks.set(success.size)
 
         errors.foreach {
           e => log.error(s"[gatherAssigned] dead flask=${e._1}, problem=${e._2}")
@@ -79,7 +79,7 @@ object Flask {
         )
 
         val cnt = dis.values.map(_.size).sum
-        metrics.knownSources.set(cnt)
+        metrics.ModelAssignedSources.set(cnt)
 
         log.info(s"[gatherAssigned] distribution stats: flasks=${dis.keySet.size} targets=$cnt")
         log.debug(s"[gatherAssigned] distribution details: $dis")
