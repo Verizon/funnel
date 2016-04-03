@@ -57,19 +57,16 @@ trait Discovery {
     c == ActiveChemist
 
   /**
-   * The reason this is not simply the inverted version of `isActiveFlask`
-   * is that when asking for targets, we specifically do not want any
-   * Flasks, active or otherwise, because mirroring a Flask from another
+   * The reason we exclude inactive flasks is because  mirroring a Flask from another
    * Flask risks a cascading failure due to key amplification (essentially
    * mirroring the mirrored whilst its mirroring etc).
    *
-   * To mitigate this, we specifically call out anything that is not
-   * classified as an `ActiveTarget`
+   * For "active" flasks we assume Sharder is aware of this and will not assign "flask" streams
+   * to other flasks. For inactive flasks Sharder can not figure that stream belongs to flask.
+   * To mitigate the issue we specifically exclude inactive flasks.
    *
    * @see funnel.chemist.Classifier
    */
   def isMonitorable(c: Classification): Boolean =
-    c == ActiveTarget ||
-    c == ActiveChemist ||
-    c == InactiveChemist
+    c != InactiveFlask
 }
