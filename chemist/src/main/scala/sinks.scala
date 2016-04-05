@@ -87,7 +87,7 @@ object sinks {
         }
       }
 
-      (Task.delay(log.info(s"received redistribute command: $p")) <*
+      (Task.delay(log.info(s"received redistribute command: stop=${Sharding.targets(p.stop).size} start=${Sharding.targets(p.start).size} cmd=$p")) <*
        Nondeterminism[Task].gatherUnordered(stopping) <*
        Nondeterminism[Task].gatherUnordered(starting)).handle {
         //this can fail as we did not handle errors for "unmonitor" commands
