@@ -16,6 +16,8 @@
 //: ----------------------------------------------------------------------------
 package funnel
 
+import java.net.URI
+
 import com.twitter.algebird.Group
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Prop._
@@ -26,7 +28,7 @@ import scalaz.Nondeterminism
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.tuple._
-import scalaz.stream.Process
+import scalaz.stream.{Process, Sink}
 import scalaz.syntax.foldable._
 import scalaz.syntax.functor._
 
@@ -557,7 +559,6 @@ object MonitoringSpec extends Properties("monitoring") {
     val M = Monitoring.default
     val i = new Instruments(monitoring = M)
     val gauge = i.gauge("someGauge",0.0)
-    M.keys.get.map(println).run
 
     M.keySenescence(Events.every(100.milliseconds),Process.eval(Task.delay(gauge.key))).run.run
     M.keys.get.run.size == 0
@@ -578,16 +579,56 @@ object MonitoringSpec extends Properties("monitoring") {
     M.keys.get.run.size == 0
   }
 
-  property("flask will not report keys in case of host disconnect") = secure {
-    val I = new Instruments
+  /*
+    This test fails, showing that the cleanup io code is never executed and thus connections to remote hosts
+    are left open
+    */
+  property("Disconnect Command disconnects from Host")= secure {
+    val M = Monitoring.default
+    val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
 
-    val fakeUriConnection: URI => Process[Task, Datapoint[Any]] = _ => Process.halt
+    val uri= URI.create("http://localhost")
 
-    val retries = Events.takeEvery(1 millisecond, 1)
+    val mirror = Mirror(uri,"clustername")
 
-    I.monitoring.processMirroringEvents(fakeUriConnection, "flask", _ => retries)
+    val discard = Discard(uri)
 
-    false
+    val datapoint = new Datapoint[Any](Key[String]("key",Units.TrafficLight),"green")
+
+    val result = new java.util.concurrent.atomic.AtomicBoolean(false)
+
+    val countdown = new java.util.concurrent.CountDownLatch(1)
+
+    val commandEnqueue = Process.emitAll(Seq(mirror, discard)).to(enqueueSink)
+
+    val mockParse: URI => Process[Task, Datapoint[Any]] = _ => scalaz.stream.io.resource(Task.delay(())){ _ => 
+        Task.delay{
+          result.set(true)
+          countdown.countDown
+          ()
+        }
+        
+    }(_ => Task.delay(datapoint))
+
+    //enqueue the commands
+    commandEnqueue.run.run
+
+    //This is used as a flag to cancel the processing
+    val b = new java.util.concurrent.atomic.AtomicBoolean(false)
+
+    //start processing commands
+    M.processMirroringEvents(mockParse).runAsyncInterruptibly(_ => (), b)
+
+
+    //end processing
+    b.set(true)
+
+    //cleanup
+    M.mirroringQueue.close.run
+
+    //check whether the io cleanup code was run
+    countdown.await(3, java.util.concurrent.TimeUnit.SECONDS)
+
+    result.get
   }
-
 }
