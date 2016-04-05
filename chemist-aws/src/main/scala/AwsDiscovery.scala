@@ -102,8 +102,8 @@ class AwsDiscovery(
     } yield DiscoveryInventory(
       m.map(in => TargetID(in.id) -> in.targets),
       um.toSeq.map(in => TargetID(in.id) -> in.targets),
-      af.map(i => Flask(FlaskID(i.id), i.location)),
-      f.map(i => Flask(FlaskID(i.id), i.location))
+      af.map(i => Flask(FlaskID(i.id), i.location.copy(port = 5775))), //FIXME: we really need to be reading control port from EC2 tags!
+      f.map(i => Flask(FlaskID(i.id), i.location.copy(port = 5775)))
     )
   }
 
