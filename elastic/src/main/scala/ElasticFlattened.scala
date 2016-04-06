@@ -21,7 +21,7 @@ import java.net.URI
 import scalaz.concurrent.Task
 import scala.concurrent.duration.Duration
 import scalaz.stream._
-import java.util.{Date,TimeZone}
+import java.util.{Date, TimeZone}
 import java.text.SimpleDateFormat
 import scalaz.concurrent.Strategy.Executor
 
@@ -165,8 +165,7 @@ case class ElasticFlattened(M: Monitoring, H: HttpLayer = SharedHttpLayer.H){
     flaskNameOrHost: String,
     flaskCluster: String
   ): ES[Unit] = {
-    //TODO: consider dedicated pool for ES publishing, need to guarantee we will not starve when mirroring many agents
-    val E = Executor(Monitoring.defaultPool)
+    val E = Executor(Elastic.esPool)
     bufferAndPublish(flaskNameOrHost, flaskCluster)(M, E, H){ cfg =>
 
       val data: Process[Task, Option[Datapoint[Any]]] =

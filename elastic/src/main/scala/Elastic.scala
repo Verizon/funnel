@@ -19,12 +19,15 @@ package elastic
 
 import argonaut._
 import java.io.File
+
 import journal.Logger
 import java.util.Date
 import java.text.SimpleDateFormat
+import java.util.concurrent.{ExecutorService, Executors, ThreadFactory}
+
 import scala.util.control.NonFatal
 import scalaz.stream.Process
-import scalaz.concurrent.{Task,Strategy}
+import scalaz.concurrent.{Strategy, Task}
 import Process.constant
 import scalaz._
 import scalaz.stream.async.mutable.ScalazHack
@@ -45,6 +48,18 @@ object Elastic {
   type ES[A] = Kleisli[Task, ElasticCfg, A]
 
   private[this] val log = Logger[Elastic.type]
+
+  private[funnel] def daemonThreads(name: String) = new ThreadFactory {
+    def newThread(r: Runnable) = {
+      val t = Executors.defaultThreadFactory.newThread(r)
+      t.setDaemon(true)
+      t.setName(name)
+      t
+    }
+  }
+
+  val esPool: ExecutorService =
+    Executors.newFixedThreadPool(8, daemonThreads("elastic-publisher-thread"))
 
   /**
    *
