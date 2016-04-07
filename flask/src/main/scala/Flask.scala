@@ -50,7 +50,7 @@ class Flask(options: Options, val I: Instruments) {
   //30 seconds is workaround attempting to reduce number of documents we produce
   // it is NOT a real solution but i move it here as it was used in elastic module before refactoring
   //TODO: revisit it
-  val ISelfie = new Instruments(Selfie, bufferTime = 30 seconds)
+  val ISelfie = new Instruments(Selfie, bufferTime = 30.seconds)
   val mirrorDatapoints = ISelfie.counter("mirror/datapoints")
 
   val S = MonitoringServer.start(I.monitoring, options.funnelPort)
