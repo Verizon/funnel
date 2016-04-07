@@ -20,10 +20,7 @@ package elastic
 //Needed for static initialization of JVM Metrics
 import scala.concurrent.duration._
 
-object metrics {
-  //report these metrics every 30 seconds
-  val i = new Instruments(bufferTime = 30 seconds)
-
+class ElasticMetrics(i: Instruments) {
   val DroppedDocErrors = i.counter("elastic/errors/dropped")
   val NonHttpErrors    = i.counter("elastic/errors/other")
   val HttpResponse5xx  = i.counter("elastic/http/5xx")

@@ -55,7 +55,7 @@ import scalaz.concurrent.Strategy.Executor
  *   }
  * }
  */
-case class ElasticFlattened(M: Monitoring, H: HttpLayer = SharedHttpLayer.H){
+case class ElasticFlattened(M: Monitoring, ISelfie: Instruments, H: HttpLayer = SharedHttpLayer.H){
   import Elastic._
   import argonaut._, Argonaut._
   import Process._
@@ -75,6 +75,9 @@ case class ElasticFlattened(M: Monitoring, H: HttpLayer = SharedHttpLayer.H){
       sdf.format(d)
     }
   }
+
+  //metrics to report own status
+  val metrics = new ElasticMetrics(ISelfie)
 
   /**
    *
@@ -166,7 +169,7 @@ case class ElasticFlattened(M: Monitoring, H: HttpLayer = SharedHttpLayer.H){
     flaskCluster: String
   ): ES[Unit] = {
     val E = Executor(Elastic.esPool)
-    bufferAndPublish(flaskNameOrHost, flaskCluster)(M, E, H){ cfg =>
+    bufferAndPublish(flaskNameOrHost, flaskCluster)(M, E, H, metrics){ cfg =>
 
       val data: Process[Task, Option[Datapoint[Any]]] =
         Monitoring.

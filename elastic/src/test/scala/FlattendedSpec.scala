@@ -31,7 +31,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 class FlattenedSpec extends FlatSpec with Matchers with Eventually {
-  val F = ElasticFlattened(Monitoring.default)
+  val F = ElasticFlattened(Monitoring.default, new Instruments(Monitoring.default))
 
   def point =
     Datapoint[Any](Key[Double](s"now/${java.util.UUID.randomUUID.toString}", Units.Count, "some description",
@@ -98,8 +98,8 @@ class FlattenedSpec extends FlatSpec with Matchers with Eventually {
 
     val M = Monitoring.instance(ES = pool, windowSize = 50.millis)
 
-    val ef = ElasticFlattened(M, httpLayer)
     val instruments = new Instruments(M, bufferTime = 20 millis)
+    val ef = ElasticFlattened(M, instruments, httpLayer)
 
     val env = MonitoringEnv(M, instruments, ef, httpLayer)
 

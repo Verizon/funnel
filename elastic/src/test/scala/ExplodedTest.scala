@@ -35,7 +35,7 @@ object ExplodedTest extends P("elastic") {
     //d <- Gen.posNum[Double]
   } yield Option(Datapoint(k, 3 /*d */)) */
 
-  val E = ElasticExploded(Monitoring.default)
+  val E = ElasticExploded(Monitoring.default, new Instruments(Monitoring.default))
 
   import E._
 
