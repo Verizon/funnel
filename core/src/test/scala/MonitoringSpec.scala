@@ -633,6 +633,40 @@ object MonitoringSpec extends Properties("monitoring") {
     result.get
   }
   */
+
+  property("TCP disconnect removes host from /mirror/sources list") = secure {
+    val M = Monitoring.default
+    val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
+    val uri= URI.create("http://localhost")
+    val clusterName = "clusterName"
+    val mirror = Mirror(uri,clusterName)
+    val discard = Discard(uri)
+    val datapoint = new Datapoint[Any](Key[String]("key",Units.TrafficLight),"green")
+    val commandEnqueue = Process.emitAll(Seq(mirror, discard)).to(enqueueSink)
+    val mockParse: URI => Process[Task, Datapoint[Any]] = 
+      _ => Process.eval(Task.delay(throw new RuntimeException("boom")))
+
+    //enqueue the commands
+    commandEnqueue.run.run
+
+    //This is used as a flag to cancel the processing
+    val b = new java.util.concurrent.atomic.AtomicBoolean(false)
+
+    //start processing commands
+    M.processMirroringEvents(
+      mockParse,
+      nodeRetries = _ => Events.takeEvery(1 millisecond,1)
+    ).runAsyncInterruptibly(_ => (), b)
+
+    //end processing
+    b.set(true)
+
+    //cleanup
+    M.mirroringQueue.close.run
+
+    M.mirroringUrls.size == 0
+  }
+
   /*
     This tests fails, showing that the disconnect command does _not_ remove the host from mirrorUrls.
     This will require an update to the API to add cluster argument, which will in turn need to be 
@@ -649,41 +683,6 @@ object MonitoringSpec extends Properties("monitoring") {
     val mockParse: URI => Process[Task, Datapoint[Any]] = _ => scalaz.stream.io.resource(Task.delay(())
     ){ _ => Task.delay{ () }
     }(_ => Task.delay(datapoint))
-
-    //enqueue the commands
-    commandEnqueue.run.run
-
-    //This is used as a flag to cancel the processing
-    val b = new java.util.concurrent.atomic.AtomicBoolean(false)
-
-    //start processing commands
-    M.processMirroringEvents(mockParse).runAsyncInterruptibly(_ => (), b)
-
-    Thread.sleep(1000)
-
-    //end processing
-    b.set(true)
-    Thread.sleep(1000)
-
-    //cleanup
-    M.mirroringQueue.close.run
-
-    M.mirroringUrls.size == 0
-  }
-  */
-
-  /*
-    Test fails, showing that /mirror/sources still shows the host present even after disconnect.
-
-  property("TCP disconnect removes host from /mirror/sources list") = secure {
-    val M = Monitoring.default
-    val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
-    val uri= URI.create("http://localhost")
-    val mirror = Mirror(uri,"clustername")
-    val discard = Discard(uri)
-    val datapoint = new Datapoint[Any](Key[String]("key",Units.TrafficLight),"green")
-    val commandEnqueue = Process.emitAll(Seq(mirror, discard)).to(enqueueSink)
-    val mockParse: URI => Process[Task, Datapoint[Any]] = _ => Process.eval(Task.delay(throw new RuntimeException("boom")))
 
     //enqueue the commands
     commandEnqueue.run.run

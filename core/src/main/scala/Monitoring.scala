@@ -144,9 +144,15 @@ trait Monitoring {
      * to mirror, and the cluster -> url mapping.
      */
     def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] = {
+      def updateTask = {
+        clusterUrls.update(_.
+          alter(b, s => Option(f(s.getOrElse(Set.empty[URI])))).
+          filter(_.nonEmpty)
+        )
+      }
       for {
         _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))))
-        _ <- Task(clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))).filter(_.nonEmpty))(defaultPool)
+        _ <- Task(updateTask)(defaultPool)
         _  = log.debug(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
       } yield ()
     }
@@ -160,10 +166,13 @@ trait Monitoring {
 
           urlSignals.put(source, hook)
 
+          val removeFromMirroringUrls: Process[Task, Unit] =
+            Process.eval_(modifyActive(cluster, _ - source))
+
           val received: Process[Task,Unit] = link(hook) {
             attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, new URI(source.toString))))(
               source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> source.toString))
-          }
+          }.onComplete(removeFromMirroringUrls)
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
             if (urls.contains(source)) {
@@ -497,7 +506,7 @@ object Monitoring {
           (pub, v) = p
           _ <- Task.delay(topics += (k -> eraseTopic(Topic(pub, v))))
           t = (k.typeOf, k.units)
-          _ = log.info(s"setting key $k")
+          _ = log.info(s"setting key $k: costive: $costive")
           _ <- keys_.compareAndSet(_.map(_ + k))
           _ <- costiveKeys.compareAndSet(_.map(_ + k)) whenM costive
         } yield (i: I) => now flatMap (t => pub(Some(i) -> t))
