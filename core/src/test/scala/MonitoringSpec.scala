@@ -573,7 +573,9 @@ object MonitoringSpec extends Properties("monitoring") {
     //closing the signal, simulating the host dropping the connection
     M.get(key).close.run
 
-    val x = M.keySenescence(Events.every(100.milliseconds),Process.eval(Task.delay(gauge.key)))
+    val x = M.keySenescence(Events.every(1 milliseconds),Process.eval(Task.delay(gauge.key)))
+
+    Thread.sleep(1000)
 
     x.run.run
     M.keys.get.run.size == 0
