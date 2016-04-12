@@ -649,7 +649,10 @@ object MonitoringSpec extends Properties("monitoring") {
     val datapoint = new Datapoint[Any](Key[String]("key",Units.TrafficLight),"green")
     val commands: Process[Task, Command] = Process.emitAll(Seq(mirror, discard))
 
-    val commandEnqueue = commands.to(enqueueSink)
+    //this should be commands.to(enqueueSink) but scala 2.10 didn't like it
+    //val commandEnqueue = commands.to(enqueueSink)
+    val commandEnqueue = commands.zipWith(enqueueSink)((o,f) => f(o)).eval
+
     val mockParse: URI => Process[Task, Datapoint[Any]] = 
       _ => Process.eval(Task.delay(throw new RuntimeException("boom")))
 
