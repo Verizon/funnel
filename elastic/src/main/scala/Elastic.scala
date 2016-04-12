@@ -48,17 +48,8 @@ object Elastic {
 
   private[this] val log = Logger[Elastic.type]
 
-  private[funnel] def daemonThreads(name: String) = new ThreadFactory {
-    def newThread(r: Runnable) = {
-      val t = Executors.defaultThreadFactory.newThread(r)
-      t.setDaemon(true)
-      t.setName(name)
-      t
-    }
-  }
-
   val esPool: ExecutorService =
-    Executors.newFixedThreadPool(8, daemonThreads("elastic-publisher-thread"))
+    Executors.newFixedThreadPool(8, Monitoring.daemonThreads("elastic-publisher-thread"))
 
   /**
    *
