@@ -647,7 +647,9 @@ object MonitoringSpec extends Properties("monitoring") {
     val mirror = Mirror(uri,clusterName)
     val discard = Discard(uri)
     val datapoint = new Datapoint[Any](Key[String]("key",Units.TrafficLight),"green")
-    val commandEnqueue = Process.emitAll(Seq(mirror, discard)).to(enqueueSink)
+    val commands: Process[Task, Command] = Process.emitAll(Seq(mirror, discard))
+
+    val commandEnqueue = commands.to(enqueueSink)
     val mockParse: URI => Process[Task, Datapoint[Any]] = 
       _ => Process.eval(Task.delay(throw new RuntimeException("boom")))
 
