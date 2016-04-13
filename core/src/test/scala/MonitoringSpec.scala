@@ -584,60 +584,6 @@ object MonitoringSpec extends Properties("monitoring") {
     !M.keys.get.run.contains(key)
   }
 
-  /*
-    This test fails, showing that the cleanup io code is never executed and thus connections to remote hosts
-    are left open
-
-  property("Disconnect Command disconnects from Host")= secure {
-    val M = Monitoring.default
-    val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
-
-    val uri= URI.create("http://localhost")
-
-    val mirror = Mirror(uri,"clustername")
-
-    val discard = Discard(uri)
-
-    val datapoint = new Datapoint[Any](Key[String]("key",Units.TrafficLight),"green")
-
-    val result = new java.util.concurrent.atomic.AtomicBoolean(false)
-
-    val countdown = new java.util.concurrent.CountDownLatch(1)
-
-    val commandEnqueue = Process.emitAll(Seq(mirror, discard)).to(enqueueSink)
-
-    val mockParse: URI => Process[Task, Datapoint[Any]] = _ => scalaz.stream.io.resource(Task.delay(())){ _ => 
-        Task.delay{
-          result.set(true)
-          countdown.countDown
-          ()
-        }
-        
-    }(_ => Task.delay(datapoint))
-
-    //enqueue the commands
-    commandEnqueue.run.run
-
-    //This is used as a flag to cancel the processing
-    val b = new java.util.concurrent.atomic.AtomicBoolean(false)
-
-    //start processing commands
-    M.processMirroringEvents(mockParse).runAsyncInterruptibly(_ => (), b)
-
-    Thread.sleep(1000)
-
-    //end processing
-    b.set(true)
-
-    //cleanup
-    M.mirroringQueue.close.run
-
-    //check whether the io cleanup code was run
-    countdown.await(3, java.util.concurrent.TimeUnit.SECONDS)
-
-    result.get
-  }
-  */
 
   property("TCP disconnect removes host from /mirror/sources list") = secure {
     val M = Monitoring.default
@@ -680,19 +626,16 @@ object MonitoringSpec extends Properties("monitoring") {
     M.mirroringUrls.size == 0
   }
 
-  /*
-    This tests fails, showing that the disconnect command does _not_ remove the host from mirrorUrls.
-    This will require an update to the API to add cluster argument, which will in turn need to be 
-    sent by chemist
-
+  private val clusterName: ClusterName = "clusterName"
   property("Disconnect command removes host from /mirror/sources list") = secure {
     val M = Monitoring.default
     val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
     val uri= URI.create("http://localhost")
-    val mirror = Mirror(uri,"clustername")
+    val mirror = Mirror(uri,clusterName)
     val discard = Discard(uri)
     val datapoint = new Datapoint[Any](Key[String]("key",Units.TrafficLight),"green")
-    val commandEnqueue = Process.emitAll(Seq(mirror, discard)).to(enqueueSink)
+    val commands: Process[Task, Command] = Process.emitAll(Seq(mirror, discard))
+    val commandEnqueue = commands.zipWith(enqueueSink)((o,f) => f(o)).eval
     val mockParse: URI => Process[Task, Datapoint[Any]] = _ => scalaz.stream.io.resource(Task.delay(())
     ){ _ => Task.delay{ () }
     }(_ => Task.delay(datapoint))
@@ -715,8 +658,65 @@ object MonitoringSpec extends Properties("monitoring") {
     //cleanup
     M.mirroringQueue.close.run
 
-    M.mirroringUrls.size == 0
+    println(M.mirroringUrls.toMap.get(clusterName))
+    M.mirroringUrls.toMap.get(clusterName) == None
   }
-  */
 
+  /*
+  Test fails due to io.resource's cleanup code not being executed.
+  property("Disconnect Command disconnects from Host")= secure {
+    val M = Monitoring.default
+    val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
+    val uri= URI.create("http://localhost")
+    val mirror = Mirror(uri,clusterName)
+    val discard = Discard(uri)
+    val datapoint = new Datapoint[Any](Key[String]("key",Units.TrafficLight),"green")
+    val result = new java.util.concurrent.atomic.AtomicBoolean(false)
+    val countdown = new java.util.concurrent.CountDownLatch(1)
+    val commands: Process[Task, Command] = Process.emitAll(Seq(mirror, discard))
+    val commandEnqueue = commands.zipWith(enqueueSink)((o,f) => f(o)).eval
+
+    val mockDataConnection: URI => Process[Task, Datapoint[Any]] = _ => scalaz.stream.io.resource(Task.delay(())){ _ =>
+      Task.delay{
+        result.set(true)
+        countdown.countDown
+        ()
+      }
+
+    }(_ => Task.delay(datapoint))
+
+    //enqueue the commands
+    commandEnqueue.run.run
+
+    //This is used as a flag to cancel the processing
+    val b = new java.util.concurrent.atomic.AtomicBoolean(false)
+
+    //start processing commands
+    M.processMirroringEvents(mockDataConnection).runAsyncInterruptibly(_ => (), b)
+
+    Thread.sleep(1000)
+
+    //check whether the io cleanup code was run
+    countdown.await(3, java.util.concurrent.TimeUnit.SECONDS)
+
+    //end processing
+    b.set(true)
+
+    result.get
+  }
+
+  property("link executes cleanup code on process") = secure {
+    val adp = new AtomicBoolean(false)
+    val S = Strategy.Executor(Monitoring.defaultPool)
+    val hook = scalaz.stream.async.signalOf[Unit](())(S)
+    val other: Process[Task, Unit] = scalaz.stream.io.resource(
+      Task.delay(())
+    )(
+      _ => Task.delay{adp.set(true);println("cleaning up");()}
+    )(_ => Task.delay(()))
+    Monitoring.default.link(hook)(other)
+    hook.close.run
+    adp.get
+  }
+   */
 }
