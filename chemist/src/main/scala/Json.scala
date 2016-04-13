@@ -121,6 +121,20 @@ object JSON {
     jEmptyObject
   }
 
+  def encodeAllTargets(targets: Seq[Target], time: Date): Json = {
+    ("type" := "AllTargets") ->:
+    ("time" := time) ->:
+    ("targets" -> Json.array(
+      targets.map {
+        t =>
+          ("cluster" := t.cluster) ->:
+            ("uri" := t.uri) ->:
+            jEmptyObject
+      }: _*)
+    ) ->:
+    jEmptyObject
+  }
+
   def encodeNewFlask(f: Flask, time: Date): Json = {
     ("type" := "NewFlask") ->:
     ("flask" := f.id) ->:
@@ -172,6 +186,7 @@ object JSON {
   implicit val platformEventToJson: EncodeJson[PlatformEvent] =
     EncodeJson {
       case e @ PlatformEvent.NewTarget(t) => encodeNewTarget(t, e.time)
+      case e @ PlatformEvent.AllTargets(t) => encodeAllTargets(t, e.time)
       case e @ PlatformEvent.NewFlask(f) => encodeNewFlask(f, e.time)
       case e @ PlatformEvent.TerminatedTarget(u) => encodeTerminatedTarget(u, e.time)
       case e @ PlatformEvent.TerminatedFlask(f) => encodeTerminatedFlask(f, e.time)

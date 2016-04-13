@@ -20,10 +20,7 @@ package chemist
 import java.net.URI
 import journal.Logger
 import scalaz.syntax.apply._
-import scalaz.concurrent.{Task,Strategy}
-import scalaz.stream.{Process,Sink}
-import scalaz.stream.async.mutable.Signal
-import scalaz.{-\/,\/,\/-, Either3,Left3,Middle3,Right3}
+import scalaz.concurrent.Task
 
 trait RemoteFlask {
   def flaskTemplate(path: String) =
@@ -43,17 +40,29 @@ object LoggingRemote extends RemoteFlask {
 
 class HttpFlask(http: dispatch.Http) extends RemoteFlask {
   import FlaskCommand._
-  import metrics.{MonitorCommandLatency,UnmonitorCommandLatency}
+  import metrics._
 
   private[this] val log = Logger[HttpFlask]
 
   def command(c: FlaskCommand): Task[Unit] = {
     c match {
       case Monitor(flask, targets) =>
-        MonitorCommandLatency.timeTaskSuccess(monitor(flask.location, targets).void)
+        MonitorCommands.incrementBy(targets.size)
+        MonitorCallLatency.timeTaskSuccess(monitor(flask.location, targets).void).handleWith {
+          case t: Throwable =>
+            log.warn(s"[HttpFlask] Failed to deliver command=monitor to flask=$flask, error=$t, targets=$targets")
+            ErrorsFlask.increment
+            Task.fail(t)
+        }
 
       case Unmonitor(flask, targets) =>
-        UnmonitorCommandLatency.timeTaskSuccess(unmonitor(flask.location, targets).void)
+        UnmonitorCommands.incrementBy(targets.size)
+        UnmonitorCallLatency.timeTaskSuccess(unmonitor(flask.location, targets).void).handleWith {
+          case t: Throwable =>
+            log.warn(s"[HttpFlask] Failed to deliver command=discard to flask=$flask, error=$t, targets=$targets")
+            ErrorsFlask.increment
+            Task.fail(t)
+        }
     }
   }
 

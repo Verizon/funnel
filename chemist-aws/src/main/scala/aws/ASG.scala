@@ -18,9 +18,7 @@ package funnel
 package aws
 
 import com.amazonaws.regions.{Region, Regions}
-import com.amazonaws.auth.{AWSCredentials,BasicAWSCredentials}
-import com.amazonaws.services.ec2.AmazonEC2
-import com.amazonaws.services.ec2.model.Address
+import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.autoscaling.{AmazonAutoScaling,AmazonAutoScalingClient}
 import com.amazonaws.services.autoscaling.model.{
   DescribeAutoScalingGroupsRequest,
@@ -71,7 +69,8 @@ object ASG {
     Task(fetch(Nil).map(g =>
       Group(
         name      = g.getAutoScalingGroupName,
-        instances = g.getInstances.asScala.toSeq,
+        //ignore "starting"/"terminating" instances
+        instances = g.getInstances.asScala.filter(_.getLifecycleState == "InService"),
         tags      = tags(g))
       ))(funnel.chemist.Chemist.serverPool)
   }

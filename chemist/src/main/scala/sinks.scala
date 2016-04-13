@@ -58,7 +58,7 @@ object sinks {
   def unsafeNetworkIO(f: RemoteFlask, q: Queue[PlatformEvent]): Sink[Task, Context[Plan]] = sink.lift[Task, Context[Plan]] {
     case Context(d, Distribute(work)) =>
       val tasks = work.fold(List.empty[Task[Unit]]) {
-        (a,b,c) => c :+ f.command(Monitor(a,b)).handle {
+        (a,b,c) => if (b.isEmpty) c else c :+ f.command(Monitor(a,b)).handle {
           case t =>
             //swallow error if we fail to talk to individual flask (could be still coming up)
             //we will retry on the next iteration
@@ -72,14 +72,14 @@ object sinks {
     case Context(d, p@Redistribute(stop, start)) =>
       //this can fail but we can not swallow individual errors to prevent double monitoring
       val stopping = stop.fold(List.empty[Task[Unit]]) {
-        (a,b,c) => c :+ f.command(Unmonitor(a,b))
+        (a,b,c) => if (b.nonEmpty) c :+ f.command(Unmonitor(a,b)) else c
       }
 
       //we can handle errors per flask here because we will only run this AFTER we successfully
       // executed "unmonitor" commands. Hence in worst case some targets will not be monitored
       // until next iteration
       val starting = start.fold(List.empty[Task[Unit]]) {
-        (a,b,c) => c :+ f.command(Monitor(a,b)).handle {
+        (a,b,c) => if (b.isEmpty) c else c :+ f.command(Monitor(a,b)).handle {
           case t =>
             //swallow error if we fail to talk to individual flask (could be still coming up)
             //we will retry on the next iteration
@@ -87,7 +87,7 @@ object sinks {
         }
       }
 
-      (Task.delay(log.info(s"received redistribute command: $p")) <*
+      (Task.delay(log.info(s"received redistribute command: stop=${Sharding.targets(p.stop).size} start=${Sharding.targets(p.start).size} cmd=$p")) <*
        Nondeterminism[Task].gatherUnordered(stopping) <*
        Nondeterminism[Task].gatherUnordered(starting)).handle {
         //this can fail as we did not handle errors for "unmonitor" commands

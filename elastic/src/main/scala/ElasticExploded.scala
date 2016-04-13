@@ -57,11 +57,14 @@ import scalaz.stream.{Process1,Process,time,wye}
  * }
  *
  */
-case class ElasticExploded(M: Monitoring, H: HttpLayer = SharedHttpLayer.H) {
+case class ElasticExploded(M: Monitoring, ISelfie: Instruments, H: HttpLayer = SharedHttpLayer.H) {
   import Process._
   import Elastic._
   import http.JSON._
   import argonaut._, Argonaut._
+
+  //metrics to report own status
+  val metrics = new ElasticMetrics(ISelfie)
 
   /**
    * Data points grouped by mirror URL, experiment ID, experiment group,
@@ -156,7 +159,7 @@ case class ElasticExploded(M: Monitoring, H: HttpLayer = SharedHttpLayer.H) {
    */
   def publish(flaskName: String, flaskCluster: String): ES[Unit] = {
     val E = Executor(Monitoring.defaultPool)
-    bufferAndPublish(flaskName, flaskCluster)(M, E, H){ cfg =>
+    bufferAndPublish(flaskName, flaskCluster)(M, E, H, metrics){ cfg =>
       val subscription = Monitoring.subscribe(M){ k =>
         cfg.groups.exists(g => k.startsWith(g))}.map(Option.apply)
 

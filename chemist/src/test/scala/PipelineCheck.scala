@@ -18,32 +18,33 @@ package funnel
 package chemist
 
 import java.net.URI
-import java.util.UUID
-
-import scalaz.==>>
 import scalaz.concurrent.Task
-
 import Chemist.Context
-import LocationIntent._
 import PlatformEvent._
 import Sharding.Distribution
-
 import org.scalacheck._
-import Gen.{ alphaNumChar, listOfN, oneOf }
+import Gen.oneOf
 import Arbitrary.arbitrary
-import Prop.{ falsified, forAll, passed, BooleanOperators }
+import Prop.{BooleanOperators, falsified, forAll, passed}
 
-class StaticDiscovery(targets: Map[TargetID, Set[Target]], flasks: Map[FlaskID, Flask]) extends Discovery {
-  def listTargets: Task[Seq[(TargetID, Set[Target])]] = Task.delay(targets.toSeq)
-  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] = Task.now(Seq.empty)
-  def listAllFlasks: Task[Seq[Flask]] = Task.delay(flasks.values.toSeq)
-  def listActiveFlasks: Task[Seq[Flask]] = Task.delay(flasks.values.toSeq)
+case class StaticDiscovery(targets: Map[TargetID, Set[Target]], flasks: Map[FlaskID, Flask]) extends Discovery {
+  def inventory: Task[DiscoveryInventory] = Task.delay(
+    DiscoveryInventory(targets.toSeq, Seq.empty, flasks.values.toSeq, flasks.values.toSeq)
+  )
   def lookupFlask(id: FlaskID): Task[Flask] = Task.delay(flasks(id))	// Can obviously cause the Task to fail
   def lookupTargets(id: TargetID): Task[Set[Target]] = Task.delay(targets(id))	// Can obviously cause the Task to fail
 }
 
 object PipelineCheck extends Properties("Pipeline") {
   import Fixtures._
+
+  implicit class PrettyPrintDistribution(d: Distribution) {
+    def pretty(): String =
+      s"=========== flasks=${d.keySet.size} targets=${d.values.map(_.size).sum}\n" +
+      d.toList.map { case (key,value) =>
+        s"$key\n" + value.map(t => s"    $t").mkString("\n")
+      }.mkString("\n") + "\n===================\n"
+  }
 
   def genTargetID = for {
     id <- alphaNumStr
@@ -81,22 +82,14 @@ object PipelineCheck extends Properties("Pipeline") {
     d <- arbitrary[Distribution]
     e <- arbitrary[PlatformEvent]
   } yield Context(d, e)
+
   implicit lazy val arbContextOfPlatformEvent: Arbitrary[Context[PlatformEvent]] =
     Arbitrary(genContextOfPlatformEvent)
 
-  // property("newFlask works") = forAll { (f: Flask, s: Sharder, d: Distribution) =>
-  //   val (nd, _) = Pipeline.handle.newFlask(f, s)(d)
-  //   (!Sharding.shards(d).contains(f)) ==>
-  //   ("The existing Distribution does not contain the Flask" |:
-  //     !d.keySet.contains(f)) &&
-  //   ("The new Distribution contains the Flask" |:
-  //     nd.keySet.contains(f)) &&
-  //   ("The existing and new Distributions have the same Targets" |:
-  //     Sharding.targets(d) == Sharding.targets(nd))
-  // }
+  private val gatherIdentity = (in: Distribution) => Task.delay(in)
 
   property("newTarget works") = forAll { (t: Target, s: Sharder, d: Distribution) =>
-    val nd = Pipeline.handle.newTarget(t, s)(d)
+    val (nd, cmd) = Pipeline.handle.newTarget(t, s)(d)
     ("The existing Distribution does not contain the Target" |:
       !Sharding.targets(d).contains(t)) &&
      ("The new Distribution contains the Target" |:
@@ -106,16 +99,17 @@ object PipelineCheck extends Properties("Pipeline") {
   property("transform works") = forAll { (sd: StaticDiscovery, s: Sharder, c: Context[PlatformEvent]) =>
     val d: Distribution = c.distribution
     val e: PlatformEvent = c.value
-    val cp: Context[Plan] = Pipeline.transform(sd, s)(c)
+    val cp: Context[Plan] = Pipeline.transform(sd, s, gatherIdentity)(c).run
     val nd: Distribution = cp.distribution
     val p: Plan = cp.value
 
     e match {
       case NewTarget(t) => p match {
-        case Distribute(w) =>
+        case Redistribute(stop, start) =>
           ("The old Distribution does not contain the new Target" |: !Sharding.targets(d).contains(t)) &&
+          ("Nothing to stop" |: stop.isEmpty) &&
           (d.size > 0) ==>
-            ("The Work does contain the new Target" |: Sharding.targets(w).contains(t))
+            ("The Work does contain ONLY new Target" |: Sharding.targets(start) == Set(t))
         case _ => falsified
       }
       case NewFlask(f) => p match {
@@ -129,17 +123,17 @@ object PipelineCheck extends Properties("Pipeline") {
       }
       case NoOp => passed
       case TerminatedFlask(f) => p match {
-        case Produce(tasks) =>
-          val ts = tasks.run.map { _ match {
-            case NewTarget(t) => t
-            case _ => throw new RuntimeException("Not all Produced PlatformEvents were NewTargets")
-          }}.toSet
+        case Redistribute(stop, start) =>
           val nts = Sharding.targets(nd)
           val ots = Sharding.targets(d)
-          (Sharding.shards(d).contains(f)) ==>
-          (s"The new Distribution's Targets ($nts) plus the Produced Targets ($ts) equal the old Distribution's Targets ($ots)" |:
-            nts ++ ts == ots) &&
-          ("The terminated Flask is not in the new Distribution" |: !Sharding.shards(nd).contains(f))
+
+          val oldLoad: Option[Set[Target]] = d.mapKeys(_.id).lookup(f)
+          //inputs are random => not all of them may be in the discovery and then they will not be reallocated!
+          val oldTargets = oldLoad.getOrElse(Set.empty).intersect(sd.targets.values.flatten.toSet)
+
+          oldLoad.nonEmpty ==>
+            (s"Targets monitored by old flask should be reassigned if they are alive."
+              |: oldTargets.diff(Sharding.targets(start)).isEmpty)
         case _ => falsified
       }
       case TerminatedTarget(t) => p match {

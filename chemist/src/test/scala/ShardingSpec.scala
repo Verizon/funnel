@@ -17,23 +17,18 @@
 package funnel
 package chemist
 
-import journal.Logger
-import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterAll}
-import funnel.Monitoring
-import funnel.http.MonitoringServer
+import org.scalatest.{FlatSpec, Matchers}
 import scalaz.==>>
-import scalaz.std.string._
 import java.net.URI
-import Target._
 import org.scalactic.TypeCheckedTripleEquals
 
 class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
 
   import Sharding.Distribution
 
-  val localhost: Location =
+  def location(id: String): Location =
     Location(
-      host = "127.0.0.1",
+      host = s"$id.host",
       port = 5775,
       datacenter = "local",
       protocol = NetworkScheme.Http,
@@ -43,7 +38,7 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
   implicit def tuple2target(in: (String,String)): Target =
     Target(in._1, new URI(in._2))
 
-  def fakeFlask(id: String) = Flask(FlaskID(id), localhost)
+  def fakeFlask(id: String) = Flask(FlaskID(id), location(id))
 
   val d1: Distribution = ==>>(
     (fakeFlask("a"), Set(("z","http://one.internal"))),
@@ -71,24 +66,34 @@ class ShardingSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
     ("z", "http://omicron.internal")
   )
 
-  it should "correctly calculate how the new request should be sharded over known flasks" in {
-    val (s, newdist) = LFRRSharding.distribution(i1)(d1)
-    s.map {
-      case (x,y) => x.id.value -> y
-    }.toSet should === (Set(
-      "a" -> Target("u",new URI("http://eight.internal")),
-      "c" -> Target("v",new URI("http://nine.internal"))))
+  "LFRRSharding" should "correctly calculate how the new request should be sharded over known flasks" in {
+    val newdist = LFRRSharding.distribution(i1)(d1)
 
-    val (s2,newdist2) = LFRRSharding.distribution(i2)(d1)
-    s2.map(_._2).toSet should === (Set(
-      Target("v",new URI("http://omega.internal")),
-      Target("w",new URI("http://alpha.internal")),
-      Target("r",new URI("http://epsilon.internal")),
-      Target("z",new URI("http://gamma.internal")),
-      Target("u",new URI("http://beta.internal")),
-      Target("z",new URI("http://omicron.internal")),
-      Target("r",new URI("http://kappa.internal")),
-      Target("r",new URI("http://theta.internal")),
-      Target("p",new URI("http://zeta.internal"))))
+    //Expect that 2 new targets got assigned to 2 least used flasks (one target each):
+    //  Target("u",new URI("http://eight.internal"))
+    //  Target("v",new URI("http://nine.internal")))
+    newdist.mapKeys(_.id).lookup(FlaskID("a")).get.size should equal(2)
+    newdist.mapKeys(_.id).lookup(FlaskID("c")).get.size should equal(2)
+
+    //adding new 9 targets. Expect almost equal distribution of work
+    val newdist2 = LFRRSharding.distribution(i2)(d1)
+    newdist2.values.map(_.size).sorted should equal(List(3, 4, 4, 5))
+  }
+
+  "FlaskStreamsSharder" should "ignore non-flask streams" in {
+    val (newdist, rest) = FlaskStreamsSharder.distribute(i1)(d1)
+
+    newdist should equal(d1)
+    rest should equal(i1)
+  }
+
+  it should "assign flask targets to flasks" in {
+    val flask = d1.keySet.head
+    val flaskTarget: Target = ("zz", s"http://${flask.location.host}")
+
+    val (newdist, rest) = FlaskStreamsSharder.distribute(Set(flaskTarget) ++ i1)(d1)
+
+    newdist.lookup(flask).get.contains(flaskTarget) should equal(true)
+    rest should equal(i1)
   }
 }

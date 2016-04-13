@@ -17,11 +17,8 @@
 package funnel
 package chemist
 
-import scalaz.{==>>,Order}
-import scalaz.concurrent.Task
-import funnel.ClusterName
+import scalaz.==>>
 import java.net.URI
-import journal.Logger
 
 object Sharding {
 
@@ -29,9 +26,9 @@ object Sharding {
 
   object Distribution {
     def empty: Distribution = ==>>()
-  }
 
-  private lazy val log = Logger[Sharding.type]
+    def empty(flasks: Seq[Flask]) = ==>>.fromList(flasks.toList.map(f => f -> Set.empty[Target]))
+  }
 
   /**
    * obtain a list of flasks ordered by flasks with the least

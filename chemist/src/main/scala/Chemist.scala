@@ -18,7 +18,6 @@ package funnel
 package chemist
 
 import java.net.{ InetSocketAddress, Socket, URI }
-import journal.Logger
 import scalaz.{\/,Kleisli}
 import scalaz.syntax.kleisli._
 import scalaz.concurrent.{Task,Strategy}
@@ -85,7 +84,7 @@ trait Chemist[A <: Platform]{
    */
   def listUnmonitorableTargets: ChemistK[List[Target]] =
     config.flatMapK( cfg =>
-      cfg.discovery.listUnmonitorableTargets.map(_.toList.flatMap(_._2)))
+      cfg.discovery.inventory.map(_.unmonitorableTargets.toList.flatMap(_._2)))
 
   /**
    * Initialize the chemist service by trying to create the various AWS resources
@@ -105,6 +104,19 @@ trait Chemist[A <: Platform]{
 object Chemist {
   type Flow[A] = Process[Task,Context[A]]
 
+  /**
+    * Context represents "current" state of the world before A is handled.
+    * This could be used to figure what is the best way to handle the A.
+    * E.g. what chose flask to observe it based on the flask load.
+    *
+    * Note that if Context is transformed then distribution need to be updated in the new Context.
+    * I.e. if we decide to emit command to discard stream then we should drop it from distribution too.
+    *
+    * Note that this representation might be somewhat out of date as other actions could have
+    * been performed after Context was built. E.g. if we discovered 100 new targets at the same time
+    * and process them one by one then we will build 100 Context with same distribution.
+    * As we process new targets real distribution will evolve but snapshots will stay the same.
+    */
   case class Context[A](distribution: Sharding.Distribution, value: A)
 
   /*********************************************************************************/

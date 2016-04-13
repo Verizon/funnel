@@ -24,10 +24,7 @@ object metrics {
   val LifecycleEvents = counter("chemist/lifecycle/events", 0, "number of lifecycle events within a given window")
 
   object discovery {
-    val ListMonitorable = lapTimer("chemist/discovery/list/monitorable")
-    val ListUnmonitorable = lapTimer("chemist/discovery/list/unmonitorable")
-    val ListFlasks = lapTimer("chemist/discovery/list/flasks")
-    val ListActiveFlasks = lapTimer("chemist/discovery/list/activeFlasks")
+    val ListInventory = lapTimer("chemist/discovery/inventory")
     val LookupManyAws = lapTimer("chemist/discovery/aws/lookups")
     val LookupAwsFailure = counter("chemist/discovery/aws/errors")
     val ValidateLatency = lapTimer("chemist/discovery/validate")
