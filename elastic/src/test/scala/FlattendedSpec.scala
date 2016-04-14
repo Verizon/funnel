@@ -48,11 +48,12 @@ class FlattenedSpec extends FlatSpec with Matchers with Eventually {
     ), Stats(3.14))
 
 
+  //use batch size one to be able to predict how many http requests we will see
   val sharedCfg = new ElasticCfg("http://some-host", "idx", "a", "yyyy.MM.ww", "template",
     Some("version.sbt"),
     http = null,
     List("previous"),
-    subscriptionTimeout = 300.millis, bufferSize = 4096, batchSize = 10)
+    subscriptionTimeout = 300.millis, bufferSize = 4096, batchSize = 1)
 
   case class MonitoringEnv(M: Monitoring, I: Instruments, EF: ElasticFlattened, H: InMemoryHttpLayer) {
     private def taskRun[A](t: Duration)(op: Task[A]): java.util.concurrent.atomic.AtomicBoolean = {
