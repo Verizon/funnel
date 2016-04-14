@@ -26,6 +26,7 @@ sealed abstract class PlatformEvent {
 object PlatformEvent {
   final case class NewTarget(target: Target) extends PlatformEvent
   final case class NewFlask(flask: Flask) extends PlatformEvent
+  final case class AllTargets(targets: Seq[Target]) extends PlatformEvent
   final case class TerminatedTarget(u: URI) extends PlatformEvent
   final case class TerminatedFlask(f: FlaskID) extends PlatformEvent
   final case object NoOp extends PlatformEvent

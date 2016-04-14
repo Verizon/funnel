@@ -46,7 +46,11 @@ class Flask(options: Options, val I: Instruments) {
   val log = Logger[this.type]
 
   val Selfie = Monitoring.instance
-  val ISelfie = new Instruments(Selfie)
+
+  //30 seconds is workaround attempting to reduce number of documents we produce
+  // it is NOT a real solution but i move it here as it was used in elastic module before refactoring
+  //TODO: revisit it
+  val ISelfie = new Instruments(Selfie, bufferTime = 30.seconds)
   val mirrorDatapoints = ISelfie.counter("mirror/datapoints")
 
   val S = MonitoringServer.start(I.monitoring, options.funnelPort)
@@ -120,12 +124,12 @@ class Flask(options: Options, val I: Instruments) {
 
     options.elasticExploded.foreach { elastic =>
       log.info("Booting the elastic-exploded search sink...")
-      runAsync(ElasticExploded(I.monitoring).publish(flaskName, flaskCluster)(elastic))
+      runAsync(ElasticExploded(I.monitoring, ISelfie).publish(flaskName, flaskCluster)(elastic))
     }
 
     options.elasticFlattened.foreach { elastic =>
       log.info("Booting the elastic-flattened search sink...")
-      runAsync(ElasticFlattened(I.monitoring).publish(options.environment, flaskName, flaskCluster)(elastic))
+      runAsync(ElasticFlattened(I.monitoring, ISelfie).publish(options.environment, flaskName, flaskCluster)(elastic))
     }
   }
 }

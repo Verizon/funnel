@@ -14,14 +14,28 @@
 //:   limitations under the License.
 //:
 //: ----------------------------------------------------------------------------
-package funnel
-package chemist
+package funnel.experimentation
 
-import scalaz.concurrent.Task
+import org.scalacheck.Arbitrary._
+import org.scalacheck.Prop._
+import org.scalacheck._
 
-object TestDiscovery extends Discovery {
-  def inventory: Task[DiscoveryInventory] = ???
-  def lookupFlask(id: funnel.chemist.FlaskID): Task[Flask] = ???
-  def lookupTarget(id: funnel.chemist.TargetID): Task[Seq[Target]] = ???
-  def lookupTargets(id: funnel.chemist.TargetID): Task[Set[Target]] = ???
+
+object ExperimentalSpec extends Properties("experimental") {
+  property("always send base event even when experiment is defined") = secure {
+    var sent = false
+    def sendToken(in: Int) = {sent = true}
+
+    val e = Experimental[Int,Int](_ => 4)
+    e(Map("some" -> "foo"))(sendToken)
+    sent
+  }
+  property("send base event even when experiment is not defined") = secure {
+    var sent = false
+    def sendToken(in: Int) = {sent = true}
+
+    val e = Experimental[Int,Int](_ => 4)
+    e(Map.empty[ExperimentID, GroupID])(sendToken)
+    sent
+  }
 }

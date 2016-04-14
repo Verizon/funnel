@@ -24,13 +24,15 @@ case class Experimental[I,K](underlying: (Key[K] => Key[K]) => I) {
   val memo = new TrieMap[(ExperimentID, GroupID), I]
   val unadorned = underlying(identity)
 
-  def apply(token: Map[ExperimentID, GroupID])(f: I => Unit): Unit =
-    if (token.isEmpty)
-      f(unadorned)
-    else token.foreach {
+  def apply(token: Map[ExperimentID, GroupID])(f: I => Unit): Unit = {
+    f(unadorned) // we always want to send the base event for a full count
+
+    //sending the event modified with additional experimental fields
+    token.foreach {
       case (e, g) => f(memo.getOrElseUpdate(
         (e, g), underlying(_.setAttribute(AttributeKeys.experimentID, e)
-                            .setAttribute(AttributeKeys.experimentGroup, g))))
+          .setAttribute(AttributeKeys.experimentGroup, g))))
     }
+  }
 }
 

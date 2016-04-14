@@ -69,65 +69,43 @@ class AwsDiscovery(
   ///////////////////////////// public api /////////////////////////////
 
   /**
-   * List all of the instances in the given AWS account that respond to a rudimentary
-   * verification that Funnel is running on port 5775 and is network accessible.
-   */
-  def listTargets: Task[Seq[(TargetID, Set[Target])]] =
-    ListMonitorable.timeTask {
-      for {
-        i <- instances(isMonitorable)
-        _ = metrics.model.hostsTotal.set(i.size)
-        v <- valid(i)
-        _ = metrics.model.hostsValid.set(v.size)
-      } yield v.map(in => TargetID(in.id) -> in.targets)
-    }
+    * Lists all of the instances in the given AWS account and groups them into
+    * funnel targets and flasks.
+    *
+    * Instance is considered to be monitorable if it responds to a rudimentary
+    * verification that Funnel is running on port 5775 and is network accessible.
+    * If network accessibility check fails then instance is considered unmonitorable.
+    *
+    *
+    */
+  def inventory: Task[DiscoveryInventory] = ListInventory.timeTask {
+    for {
+      a <- readAutoScalingGroups
+      b <- classifier.task
 
-  /**
-   * List all of the instances that failed basic network reachability validation.
-   * In practice, this is the set difference between all discovered instances
-   * and valid ones.
-   */
-  def listUnmonitorableTargets: Task[Seq[(TargetID, Set[Target])]] =
-    ListUnmonitorable.timeTask {
-      for {
-        i <- instances(isMonitorable)
-        _ = metrics.model.hostsTotal.set(i.size)
-        v <- valid(i)
-        _ = metrics.model.hostsValid.set(v.size)
-        bad = i.toSet &~ v.toSet
-        _ = metrics.model.hostsInValid.set(bad.size)
-      } yield bad.toList.map(in => TargetID(in.id) -> in.targets)
-    }
+      _ = metrics.model.hostsTotal.set(a.size)
+      m = a.filter((b andThen isMonitorable)(_))
+      _ = metrics.model.hostsValid.set(m.size)
 
-  /**
-   * List all of the instances in the given AWS account and figure out which ones of
-   * those instances meets the classification criterion for being considered
-   * an active flask.
-   */
-  def listActiveFlasks: Task[Seq[Flask]] =
-    ListActiveFlasks.timeTask {
-      for {
-        a <- instances(isActiveFlask)
-        _ = metrics.model.hostsTotal.set(a.size)
-        b  = a.map(i => Flask(FlaskID(i.id), i.location))
-        _ = metrics.model.hostsActiveFlask.set(b.size)
-      } yield b
-    }
+      v <- valid(a)
+      um = a.toSet &~ v.toSet
+      _ = metrics.model.hostsInValid.set(um.size)
 
-  /**
-   * List all instances that classify as a flask, regardless of working state.
-   * This function is only ever called during migration / re-election of an orchestrating
-   * leader chemist.
-   */
-  def listAllFlasks: Task[Seq[Flask]] =
-    ListFlasks.timeTask {
-      for {
-        a <- instances(isFlask)
-        _ = metrics.model.hostsTotal.set(a.size)
-        b  = a.map(i => Flask(FlaskID(i.id), i.location))
-        _ = metrics.model.hostsFlask.set(b.size)
-      } yield b
-    }
+      af = a.filter((b andThen isActiveFlask)(_))
+      _ = metrics.model.hostsActiveFlask.set(af.size)
+
+      f = a.filter((b andThen isFlask)(_))
+      _ = metrics.model.hostsFlask.set(f.size)
+
+      _  = log.info(s"[inventory] instances=${a.size}, monitorable=${m.size}, unmonitorable=${um.size} activeFlasks=${af.size} flasks=${af.size}")
+
+    } yield DiscoveryInventory(
+      m.map(in => TargetID(in.id) -> in.targets),
+      um.toSeq.map(in => TargetID(in.id) -> in.targets),
+      af.map(i => Flask(FlaskID(i.id), i.location.copy(port = 5775))), //FIXME: we really need to be reading control port from EC2 tags!
+      f.map(i => Flask(FlaskID(i.id), i.location.copy(port = 5775)))
+    )
+  }
 
   /**
    * Lookup the `AwsInstance` for a given `InstanceID`; `AwsInstance` returned contains all

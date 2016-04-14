@@ -23,7 +23,7 @@ import scalaz.concurrent.Task
 /**
  * This default implementation does not properly handle the various upgrade
  * cases that you might encounter when migrating from one set of clusters to
- * another, but it instead provided as a default where all avalible flasks
+ * another, but it instead provided as a default where all available flasks
  * and chemists are are "active". There are a set of upgrade scenarios where
  * you do not want to mirror from an existing flask cluster, so they are not
  * targets, nor are they active flasks.
@@ -31,7 +31,7 @@ import scalaz.concurrent.Task
  * Providing this function with a task return type so that extensions can do I/O
  * if they need too (clearly a cache locally would be needed in that case)
  *
- * It is highly recomended you override this with your own classification logic.
+ * It is highly recommended you override this with your own classification logic.
  */
 object DefaultClassifier extends Classifier[AwsInstance]{
   import Classification._
@@ -40,7 +40,7 @@ object DefaultClassifier extends Classifier[AwsInstance]{
   private[funnel] val Chemist = "chemist"
 
   def isApplication(prefix: String)(i: AwsInstance): Boolean =
-    i.application.map(_.name.trim.toLowerCase.startsWith(prefix)).getOrElse(false)
+    i.application.exists(_.name.trim.toLowerCase.startsWith(prefix))
 
   def isFlask(i: AwsInstance): Boolean =
     isApplication(Flask)(i)
@@ -51,8 +51,8 @@ object DefaultClassifier extends Classifier[AwsInstance]{
   val task: Task[AwsInstance => Classification] = {
     Task.delay {
       instance =>
-        if(isFlask(instance)) ActiveFlask
-        else if(isChemist(instance)) ActiveChemist
+        if (isFlask(instance)) ActiveFlask
+        else if (isChemist(instance)) ActiveChemist
         else ActiveTarget
     }
   }

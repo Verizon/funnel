@@ -20,11 +20,22 @@ package chemist
 import funnel.instruments._
 
 object metrics {
-  val GatherAssignedLatency = lapTimer("chemist/pipeline/gather-assigned-latency")
-  val MonitorCommandLatency = lapTimer("chemist/commands/monitor")
-  val UnmonitorCommandLatency = lapTimer("chemist/commands/unmonitor")
+  val ErrorsFlask     = counter("chemist/errors/flask") 
+  val ErrorsDiscovery = counter("chemist/errors/discovery") 
 
-  val deadFlasks   = numericGauge("chemist/flasks/dead", 0)
-  val liveFlasks   = numericGauge("chemist/flasks/live", 0)
-  val knownSources = numericGauge("chemist/flasks/sources", 0)
+  val GatherAssignedLatency = lapTimer("chemist/io/flask/gather-assigned") 
+  val MonitorCallLatency = lapTimer("chemist/io/flask/monitor") 
+  val UnmonitorCallLatency = lapTimer("chemist/io/flask/unmonitor") 
+
+  val DiscoveryLatency = lapTimer("chemist/io/discovery") 
+
+  val MonitorCommands   = counter("chemist/model/commands/monitor") 
+  val UnmonitorCommands = counter("chemist/model/commands/unmonitor") 
+
+  val ModelAssignedSources = numericGauge("chemist/model/streams/assigned", 0) 
+  val ModelAllSources  = numericGauge("chemist/model/streams/all", 0)
+  val ModelDeadSources = numericGauge("chemist/model/streams/dead", 0)
+
+  val ModelDeadFlasks   = numericGauge("chemist/model/flasks/dead", 0) 
+  val ModelLiveFlasks   = numericGauge("chemist/model/flasks/live", 0) 
 }

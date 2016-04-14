@@ -19,12 +19,15 @@ package elastic
 
 import argonaut._
 import java.io.File
+
 import journal.Logger
 import java.util.Date
 import java.text.SimpleDateFormat
+import java.util.concurrent.{ExecutorService, Executors, ThreadFactory}
+
 import scala.util.control.NonFatal
 import scalaz.stream.Process
-import scalaz.concurrent.{Task,Strategy}
+import scalaz.concurrent.{Strategy, Task}
 import Process.constant
 import scalaz._
 import scalaz.stream.async.mutable.ScalazHack
@@ -35,7 +38,6 @@ object Elastic {
   import scalaz.syntax.kleisli._
   import scalaz.syntax.monad._ // pulls in *>
   import scala.concurrent.duration._
-  import metrics._
 
   type SourceURL = String
   type ExperimentID = String
@@ -45,6 +47,9 @@ object Elastic {
   type ES[A] = Kleisli[Task, ElasticCfg, A]
 
   private[this] val log = Logger[Elastic.type]
+
+  val esPool: ExecutorService =
+    Executors.newFixedThreadPool(8, Monitoring.daemonThreads("elastic-publisher-thread"))
 
   /**
    *
@@ -93,19 +98,19 @@ object Elastic {
   /**
    * retries any non-HTTP errors with exponential backoff
    */
-  def retry[A](task: Task[A]): Task[A] = {
+  def retry[A](task: Task[A])(m: ElasticMetrics): Task[A] = {
     val schedule = Stream.iterate(2)(_ * 2).take(30).map(_.seconds)
     val t = task.attempt.flatMap(_.fold(
       {
         case e: HttpException =>
           Task.delay {
-            if (e.serverError) HttpResponse5xx.increment
-            else if (e.clientError) HttpResponse4xx.increment
+            if (e.serverError) m.HttpResponse5xx.increment
+            else if (e.clientError) m.HttpResponse4xx.increment
           }.flatMap(_ => Task.fail(e))
         case e =>
           Task.delay {
             log.error(s"Error contacting ElasticSearch: $e. Retrying...")
-            NonHttpErrors.increment
+            m.NonHttpErrors.increment
           } >>= (_ => Task.fail(e))
       },
       a => Task.now(a)
@@ -124,24 +129,24 @@ object Elastic {
   def bufferAndPublish(
     flaskName: String,
     flaskCluster: String
-  )(M: Monitoring, E: Strategy, H: HttpLayer
+  )(M: Monitoring, E: Strategy, H: HttpLayer, iselfie: ElasticMetrics
   )(jsonStream: ElasticCfg => Process[Task, Json]): ES[Unit] = {
     def doPublish(de: Process[Task, Json], cfg: ElasticCfg): Process[Task, Unit] =
       de to constant(
-        (json: Json) => retry(HttpResponse2xx.timeTask(
+        (json: Json) => retry(iselfie.HttpResponse2xx.timeTask(
           for {
             //delaying task is important here. Otherwise we will not really retry to send http request
             u <- Task.delay(esURL)
             _ <- H.http(POST(u, Reader((cfg: ElasticCfg) => json.nospaces)))(cfg)
           } yield ()
-        )).attempt.map {
+        ))(iselfie).attempt.map {
           case \/-(v) => ()
           case -\/(t) =>
             //if we fail to publish metric, proceed to the next one
             // TODO: consider circuit breaker on ES failures (embed into HttpLayer)
             // TODO: how does publishing dies when flasks stops monitoring target? do we release resources?
             log.warn(s"[elastic] failed to publish. error=$t data=$json ")
-            metrics.BufferDropped.increment
+            iselfie.BufferDropped.increment
             ()
         }
       )
@@ -152,7 +157,7 @@ object Elastic {
         (cfg: ElasticCfg) =>
           log.info(s"Initializing Elastic buffer of size ${cfg.bufferSize}...")
           val buffer = ScalazHack.observableCircularBuffer[Json](
-            cfg.bufferSize, metrics.BufferDropped, metrics.BufferUsed
+            cfg.bufferSize, iselfie.BufferDropped, iselfie.BufferUsed
           )(E)
 
           log.info(s"Started Elastic subscription")

@@ -28,7 +28,8 @@ class ExplodedSpec extends FlatSpec with Matchers {
 
   val scheduler = Monitoring.schedulingPool
   val S = Executor(Monitoring.serverPool)
-  val E = ElasticExploded(Monitoring.default)
+  val I = new Instruments(Monitoring.default)
+  val E = ElasticExploded(Monitoring.default, I)
 
   "elasticGroup" should "emit on timeout" in {
     val cfg = ElasticCfg("localhost", "index", "type", "dateFormat", "template", None, List("k"), 5.seconds, 5.seconds)
