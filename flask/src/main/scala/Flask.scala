@@ -104,7 +104,9 @@ class Flask(options: Options, val I: Instruments) {
       })
     }
 
-    val flaskHost = java.net.InetAddress.getLocalHost.getHostName
+    //getCanonicalHostName will try to give full DNS name, i.e. similar to what chemist will get
+    // e.g. it will get something like ip-10-120-11-134.ec2.internal in case of EC2
+    val flaskHost = java.net.InetAddress.getLocalHost.getCanonicalHostName
     val flaskName = options.name.getOrElse(flaskHost)
     val flaskCluster = options.cluster.getOrElse(s"flask-${BuildInfo.version}")
 
