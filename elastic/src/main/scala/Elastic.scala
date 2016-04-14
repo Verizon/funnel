@@ -23,7 +23,7 @@ import java.io.File
 import journal.Logger
 import java.util.Date
 import java.text.SimpleDateFormat
-import java.util.concurrent.{ExecutorService, Executors, ThreadFactory}
+import java.util.concurrent.{ExecutorService, Executors}
 
 import scala.util.control.NonFatal
 import scalaz.stream.Process
@@ -123,6 +123,11 @@ object Elastic {
     })
   }
 
+  private def toBulkPayload(jsons: Seq[Json]): String =
+    jsons.map {
+      js => s"""{ "create": {}}\n${js.nospaces}\n"""
+    }.mkString
+
   /**
    * Publishes to an ElasticSearch URL at `esURL`.
    */
@@ -131,13 +136,14 @@ object Elastic {
     flaskCluster: String
   )(M: Monitoring, E: Strategy, H: HttpLayer, iselfie: ElasticMetrics
   )(jsonStream: ElasticCfg => Process[Task, Json]): ES[Unit] = {
-    def doPublish(de: Process[Task, Json], cfg: ElasticCfg): Process[Task, Unit] =
+    def doPublish(de: Process[Task, Seq[Json]], cfg: ElasticCfg): Process[Task, Unit] =
       de to constant(
-        (json: Json) => retry(iselfie.HttpResponse2xx.timeTask(
+        (jsons: Seq[Json]) => retry(iselfie.HttpResponse2xx.timeTask(
           for {
             //delaying task is important here. Otherwise we will not really retry to send http request
-            u <- Task.delay(esURL)
-            _ <- H.http(POST(u, Reader((cfg: ElasticCfg) => json.nospaces)))(cfg)
+            u <- Task.delay(esBulkURL)
+            _ = log.debug(s"Posting ${jsons.size} docs.")
+            _ <- H.http(POST(u, Reader((cfg: ElasticCfg) => toBulkPayload(jsons))))(cfg)
           } yield ()
         ))(iselfie).attempt.map {
           case \/-(v) => ()
@@ -145,7 +151,7 @@ object Elastic {
             //if we fail to publish metric, proceed to the next one
             // TODO: consider circuit breaker on ES failures (embed into HttpLayer)
             // TODO: how does publishing dies when flasks stops monitoring target? do we release resources?
-            log.warn(s"[elastic] failed to publish. error=$t data=$json ")
+            log.warn(s"[elastic] failed to publish. error=$t cnt=${jsons.size} data=$jsons")
             iselfie.BufferDropped.increment
             ()
         }
@@ -160,11 +166,11 @@ object Elastic {
             cfg.bufferSize, iselfie.BufferDropped, iselfie.BufferUsed
           )(E)
 
-          log.info(s"Started Elastic subscription")
+          log.info(s"Started Elastic subscription (max batch size=${cfg.batchSize})")
           // Reads from the monitoring instance and posts to the publishing queue
           val read = jsonStream(cfg).to(buffer.enqueue)
           // Reads from the publishing queue and writes to ElasticSearch
-          val write = doPublish(buffer.dequeue, cfg)
+          val write = doPublish(buffer.dequeueBatch(cfg.batchSize), cfg)
           Nondeterminism[Task].reduceUnordered[Unit, Unit](Seq(read.run, write.run))
       }
     } yield r
@@ -187,6 +193,10 @@ object Elastic {
    */
   def esURL: Reader[ElasticCfg, String] = Reader {
     es => s"${indexURL(es)}/${es.typeName}"
+  }
+
+  def esBulkURL: Reader[ElasticCfg, String] = Reader {
+    es => s"${indexURL(es)}/${es.typeName}/_bulk"
   }
 
   private def esTemplateURL: Reader[ElasticCfg, String] = Reader {

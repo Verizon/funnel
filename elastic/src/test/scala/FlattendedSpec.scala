@@ -18,7 +18,6 @@ package funnel
 package elastic
 
 import java.io.IOException
-import java.net.URI
 import java.util.concurrent.{ThreadFactory, Executors, ExecutorService}
 import org.scalatest.{FlatSpec,Matchers}
 import org.scalatest.concurrent._
@@ -53,7 +52,7 @@ class FlattenedSpec extends FlatSpec with Matchers with Eventually {
     Some("version.sbt"),
     http = null,
     List("previous"),
-    subscriptionTimeout = 300.millis, bufferSize = 4096)
+    subscriptionTimeout = 300.millis, bufferSize = 4096, batchSize = 10)
 
   case class MonitoringEnv(M: Monitoring, I: Instruments, EF: ElasticFlattened, H: InMemoryHttpLayer) {
     private def taskRun[A](t: Duration)(op: Task[A]): java.util.concurrent.atomic.AtomicBoolean = {
