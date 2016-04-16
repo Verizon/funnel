@@ -83,7 +83,10 @@ object Options {
     val esTemplate       = cfg.lookup[String]("template.name").getOrElse("flask")
     val esTemplateLoc    = cfg.lookup[String]("template.location")
     val esPublishTimeout = cfg.lookup[Duration]("minimum-publish-frequency").getOrElse(10.minutes)
+    val esBufferSize     = cfg.lookup[Int]("buffer-size").getOrElse(4096)
+    val esBatchSize      = cfg.lookup[Int]("max-batch-size").getOrElse(256)
+
     (elasticURL |@| elasticIx |@| elasticTy |@| esGroups)(
-      ElasticCfg(_, _, _, elasticDf, esTemplate, esTemplateLoc, _, esPublishTimeout.toNanos.nanos, elasticTimeout))
+      ElasticCfg(_, _, _, elasticDf, esTemplate, esTemplateLoc, _, esPublishTimeout.toNanos.nanos, elasticTimeout, esBufferSize, esBatchSize))
   }
 }
