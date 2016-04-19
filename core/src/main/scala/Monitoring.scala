@@ -131,23 +131,6 @@ trait Monitoring {
   def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
     alive.continuous.zip(p).map(_._2)
 
-  def removeUri(uri: URI): Task[Unit] = {
-    Task.delay{
-      clusterUrls.update { map =>
-        //This is ugly, but necessary, as the Discard command does not provide the clustername for key-based lookup
-        val foundKey: Option[ClusterName] = map.toList.find{
-          case (_, uris) =>  uris.contains(uri)
-        }.map{ case (clusterName, _) => clusterName }
-
-        val result: ClusterName ==>> Set[URI] = foundKey match {
-          case Some(clusterName) => map.alter(clusterName, _.map(_ - uri))
-          case _ => map
-        }
-        result.filter(_.nonEmpty)
-      }
-    }
-  }
-
   def processMirroringEvents(
     parse: DatapointParser,
     myName: String = "Funnel Mirror",
@@ -155,6 +138,28 @@ trait Monitoring {
   ): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
     val active    = signalOf[Set[URI]](Set.empty)(S)
+
+
+    /*
+     We are given a URI to close via the Discard message.
+     We must remove this entry from the list of known URI's.
+     */
+    def removeUri(uri: URI): Task[Unit] = {
+      Task.delay{
+        clusterUrls.update { map =>
+          //This is ugly, but necessary, as the Discard command does not provide the clustername for key-based lookup
+          val foundKey: Option[ClusterName] = map.toList.find{
+            case (_, uris) =>  uris.contains(uri)
+          }.map{ case (clusterName, _) => clusterName }
+
+          val result: ClusterName ==>> Set[URI] = foundKey match {
+            case Some(clusterName) => map.alter(clusterName, _.map(_ - uri))
+            case _ => map
+          }
+          result.filter(_.nonEmpty)
+        }
+      }
+    }
 
     /**
      * Update the running state of the world by updating the URLs we know about
@@ -202,10 +207,10 @@ trait Monitoring {
           Task.delay(logErrors(Task.fork(receivedIdempotent.run)(defaultPool)).runAsync(_ => ()))
         }
         case Discard(source) => for {
-          _ <- Task.delay {log.info(s"Attempting to stop monitoring $source...") }
-          _ <- Option(urlSignals.get(source)).
-            traverse_(_.close).
-            flatMap(_ => removeUri(source))
+          _ <- Task.delay(log.info(s"Attempting to stop monitoring $source..."))
+          _ <- Option(urlSignals.get(source))
+                 .traverse_(_.signal.close)
+                 .flatMap(_ => removeUri(source))
         } yield ()
       }.run
     } yield ()
