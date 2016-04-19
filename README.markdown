@@ -16,3 +16,4 @@ Funnel operates an automated release system. Any merges to master produce a usab
 Contributions are welcome; please send a pull request or raise an issue as appropriate.
 
 All development and test phase logging controls are configured from the `logback-test.xml` files the `etc` directory in the root of the project. Likewise, all development configuration files are checked into the `etc` folder to ensure that local development and testing configurations never accidentally make it into a certified release.
+
