@@ -193,7 +193,7 @@ trait Monitoring {
 
           val received: Process[Task,Unit] = link(hook) {
             attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, new URI(source.toString))))(
-              source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> source.toString)).take(1)
+              source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> source.toString))
           }.onComplete(removeFromMirroringUrls)
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
