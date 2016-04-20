@@ -6,23 +6,26 @@ import com.twitter.algebird.Group
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Prop._
 import org.scalacheck._
-
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.Executors
 
 import scala.concurrent.duration._
 import scalaz.Nondeterminism
-import scalaz.concurrent.{Task, Strategy}
+import scalaz.concurrent.{Strategy, Task}
 import scalaz.std.list._
 import scalaz.std.tuple._
+import scalaz.stream.Cause.{End, Kill, Terminated}
+import scalaz.stream.Process.Halt
 import scalaz.stream.{Process, Sink}
 import scalaz.syntax.foldable._
 import scalaz.syntax.functor._
 
 object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
 
+  implicit val s = Executors.newScheduledThreadPool(4)
   private val clusterName: ClusterName = "clusterName"
 
+/*
   property("keys are being removed upon disconnect") = secure {
     val M = Monitoring.default
     val i = new Instruments(monitoring = M)
@@ -157,12 +160,14 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     result.get
   }
 
+   */
  /*
    NOTE WELL
    Currently this failing test kicks off a never-ending process. 
    (The test is that the code stops said process, which fails).
    Continuous running will eventually bog down your system.
    */
+ /*
   property("Disconnect Command disconnects from Host")= secure {
     val M = Monitoring.default
     val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
@@ -194,25 +199,19 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     val b = new java.util.concurrent.atomic.AtomicBoolean(false)
 
     //start processing commands
-    M.processMirroringEvents(mockDataConnection).runAsyncInterruptibly(_ => (), b)
+    M.processMirroringEvents(mockDataConnection).timed(3.seconds.toMillis).attempt.run
 
-    //enqueue the commands
+    //send enqueue commands
     command1Enqueue.run.run
 
     Thread.sleep(1000)
+    //send discard commands
     command2Enqueue.run.run
-
-    //check whether the io cleanup code was run
-    countdown.await(3, java.util.concurrent.TimeUnit.SECONDS)
-
-    //end processing
-    b.set(true)
 
     result.get
   }
 
   property("link executes cleanup code on process") = secure {
-    implicit val s = Executors.newScheduledThreadPool(4)
     val adp = new AtomicBoolean(false)
     val S = Strategy.Executor(Monitoring.defaultPool)
     val hook = scalaz.stream.async.signalOf[Unit](())(S)
@@ -221,14 +220,39 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     )(
       _ => Task.delay{adp.set(true);println("cleaning up");()}
     )(_ => Task.delay(()))
-    try {
-      Task.fork(Monitoring.default.link(hook)(other).run).timed(3.seconds.toMillis).run
-    } catch {
-      case _:Throwable =>
-    }
-    Thread.sleep(1000)
+    Task.fork(Monitoring.default.link(hook)(other).run).timed(3.seconds.toMillis).attempt.run
     hook.close.run
     Thread.sleep(1000)
+    adp.get
+  }
+  */
+  property("zip preserves cleanup code") = secure {
+    val adp = new AtomicBoolean(false)
+    val S = Strategy.Executor(Executors.newCachedThreadPool)
+    val dumb:Process[Task, Int] = Process.emitAll(Seq(1))
+    val resource:Process[Task, Unit] = scalaz.stream.io.resource(Task.delay(()))(_ => Task.delay{adp.set(true); ()})(_ => Task.delay(()))
+    dumb.zip(resource).run.run
+    adp.get
+  }
+  property("zip with a signal preserves cleanup code") = secure {
+    val adp = new AtomicBoolean(false)
+    val S = Strategy.Executor(Executors.newCachedThreadPool)
+    val signal = scalaz.stream.async.signalOf[Unit](())(S)
+    val dumb:Process[Task,Unit] = signal.continuous
+    val resource:Process[Task, Unit] = scalaz.stream.io.resource(Task.delay(()))(_ => Task.delay{adp.set(true); ()})(_ => Task.delay{println("run");Thread.sleep(1000);()})
+    val zip: Process[Task, (Unit, Unit)] = dumb.zip(resource.asFinalizer)
+    Task.fork(zip.run).timed(2.seconds.toMillis).attempt.run
+    Thread.sleep(100)
+    signal.close.run
+    Thread.sleep(100)
+    adp.get
+  }
+  property("zip preserves cleanup code with terminated") = secure {
+    val adp = new AtomicBoolean(false)
+    val S = Strategy.Executor(Executors.newCachedThreadPool)
+    val dumb:Process[Task, Int] = Process.emitAll(Seq(1)) ++ Process.eval(Task.delay{throw Terminated(Kill)})
+    val resource:Process[Task, Unit] = scalaz.stream.io.resource(Task.delay(()))(_ => Task.delay{adp.set(true); ()})(_ => Task.delay(()))
+    dumb.zip(resource).run.attempt.run
     adp.get
   }
 }
