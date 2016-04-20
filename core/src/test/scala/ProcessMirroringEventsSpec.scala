@@ -25,7 +25,6 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
   implicit val s = Executors.newScheduledThreadPool(4)
   private val clusterName: ClusterName = "clusterName"
 
-/*
   property("keys are being removed upon disconnect") = secure {
     val M = Monitoring.default
     val i = new Instruments(monitoring = M)
@@ -84,7 +83,7 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     M.mirroringUrls.size == 0
   }
 
-  property("Disconnect command removes host from /mirror/sources list") = secure {
+  property("Discard command removes host from /mirror/sources list") = secure {
     val M = Monitoring.default
     val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
     val uri= URI.create("http://localhost")
@@ -119,55 +118,12 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     M.mirroringUrls.toMap.get(clusterName) == None
   }
 
-  property("Disconnect Command disconnects from Host")= secure  {
-    val M = Monitoring.default
-    val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
-    val uri= URI.create("http://localhost")
-    val mirror = Mirror(uri,clusterName)
-    val discard = Discard(uri)
-    val datapoint = new Datapoint[Any](Key[String]("key",Units.TrafficLight),"green")
-    val result = new java.util.concurrent.atomic.AtomicBoolean(false)
-    val countdown = new java.util.concurrent.CountDownLatch(1)
-    val commands: Process[Task, Command] = Process.emitAll(Seq(mirror, discard))
-    val commandEnqueue = commands.zipWith(enqueueSink)((o,f) => f(o)).eval
-
-    val mockDataConnection: URI => Process[Task, Datapoint[Any]] = _ => scalaz.stream.io.resource(Task.delay(())){ _ =>
-      Task.delay{
-        result.set(true)
-        countdown.countDown
-        ()
-      }
-
-    }(_ => Task.delay(datapoint))
-
-    //enqueue the commands
-    commandEnqueue.run.run
-
-    //This is used as a flag to cancel the processing
-    val b = new java.util.concurrent.atomic.AtomicBoolean(false)
-
-    //start processing commands
-    M.processMirroringEvents(mockDataConnection).runAsyncInterruptibly(_ => (), b)
-
-    Thread.sleep(1000)
-
-    //check whether the io cleanup code was run
-    countdown.await(3, java.util.concurrent.TimeUnit.SECONDS)
-
-    //end processing
-    b.set(true)
-
-    result.get
-  }
-
-   */
  /*
    NOTE WELL
    Currently this failing test kicks off a never-ending process. 
    (The test is that the code stops said process, which fails).
    Continuous running will eventually bog down your system.
    */
- /*
   property("Disconnect Command disconnects from Host")= secure {
     val M = Monitoring.default
     val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
@@ -187,7 +143,6 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
       Task.delay{println("allocate");()}
     ){ _ =>
       Task.delay{
-        println("\nCLEANUP\n")
         result.set(true)
         countdown.countDown
         ()
@@ -207,6 +162,7 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     Thread.sleep(1000)
     //send discard commands
     command2Enqueue.run.run
+    Thread.sleep(2000)
 
     result.get
   }
@@ -225,7 +181,6 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     Thread.sleep(1000)
     adp.get
   }
-  */
   property("zip preserves cleanup code") = secure {
     val adp = new AtomicBoolean(false)
     val S = Strategy.Executor(Executors.newCachedThreadPool)
