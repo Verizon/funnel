@@ -16,6 +16,8 @@
 //: ----------------------------------------------------------------------------
 package funnel
 
+import java.net.URI
+
 import com.twitter.algebird.Group
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Prop._
@@ -26,7 +28,7 @@ import scalaz.Nondeterminism
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.tuple._
-import scalaz.stream.Process
+import scalaz.stream.{Process, Sink}
 import scalaz.syntax.foldable._
 import scalaz.syntax.functor._
 
@@ -552,5 +554,4 @@ object MonitoringSpec extends Properties("monitoring") {
     }
     go || go || go
   }
-
 }

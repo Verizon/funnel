@@ -139,14 +139,42 @@ trait Monitoring {
     val S = Strategy.Executor(Monitoring.defaultPool)
     val active    = signalOf[Set[URI]](Set.empty)(S)
 
+
+    /*
+     We are given a URI to close via the Discard message.
+     We must remove this entry from the list of known URI's.
+     */
+    def removeUri(uri: URI): Task[Unit] = {
+      Task.delay{
+        clusterUrls.update { map =>
+          //This is ugly, but necessary, as the Discard command does not provide the clustername for key-based lookup
+          val foundKey: Option[ClusterName] = map.toList.find{
+            case (_, uris) =>  uris.contains(uri)
+          }.map{ case (clusterName, _) => clusterName }
+
+          val result: ClusterName ==>> Set[URI] = foundKey match {
+            case Some(clusterName) => map.alter(clusterName, _.map(_ - uri))
+            case _ => map
+          }
+          result.filter(_.nonEmpty)
+        }
+      }
+    }
+
     /**
      * Update the running state of the world by updating the URLs we know about
      * to mirror, and the cluster -> url mapping.
      */
     def modifyActive(b: ClusterName, f: Set[URI] => Set[URI]): Task[Unit] = {
+      def updateTask = {
+        clusterUrls.update(_.
+          alter(b, s => Option(f(s.getOrElse(Set.empty[URI])))).
+          filter(_.nonEmpty)
+        )
+      }
       for {
         _ <- active.compareAndSet(a => Option(f(a.getOrElse(Set.empty[URI]))))
-        _ <- Task(clusterUrls.update(_.alter(b, s => Option(f(s.getOrElse(Set.empty[URI]))))).filter(_.nonEmpty))(defaultPool)
+        _ <- Task(updateTask)(defaultPool)
         _  = log.debug(s"modified the active uri set for $b: ${clusterUrls.get.lookup(b).getOrElse(Set.empty)}")
       } yield ()
     }
@@ -160,10 +188,13 @@ trait Monitoring {
 
           urlSignals.put(source, hook)
 
+          val removeFromMirroringUrls: Process[Task, Unit] =
+            Process.eval_(modifyActive(cluster, _ - source))
+
           val received: Process[Task,Unit] = link(hook) {
             attemptMirrorAll(parse)(nodeRetries(Names(cluster, myName, new URI(source.toString))))(
               source, Map(AttributeKeys.cluster -> cluster, AttributeKeys.source -> source.toString))
-          }
+          }.onComplete(removeFromMirroringUrls)
 
           val receivedIdempotent = Process.eval(active.get).flatMap { urls =>
             if (urls.contains(source)) {
@@ -176,8 +207,10 @@ trait Monitoring {
           Task.delay(logErrors(Task.fork(receivedIdempotent.run)(defaultPool)).runAsync(_ => ()))
         }
         case Discard(source) => for {
-          _ <- Task.delay { log.info(s"Attempting to stop monitoring $source...") }
-          _ <- Option(urlSignals.get(source)).traverse_(_.close)
+          _ <- Task.delay(log.info(s"Attempting to stop monitoring $source..."))
+          _ <- Option(urlSignals.get(source))
+                 .traverse_(_.close)
+                 .flatMap(_ => removeUri(source))
         } yield ()
       }.run
     } yield ()
@@ -223,8 +256,9 @@ trait Monitoring {
       log.error(s"attemptMirrorAll.ERROR: source: $source, error: $e")
       ()
     }
-    Monitoring.attemptRepeatedly(report)(
-      mirrorAll(parse)(source, attrs))(breaker(this))
+      mirrorAll(parse)(source, attrs)
+    //BUG BE HERE, commenting out until fixed
+    //Monitoring.attemptRepeatedly(report)(mirrorAll(parse)(source, attrs))(breaker(this))
   }
 
   private def initialize[O](key: Key[O]): Task[Unit] = for {
@@ -497,7 +531,7 @@ object Monitoring {
           (pub, v) = p
           _ <- Task.delay(topics += (k -> eraseTopic(Topic(pub, v))))
           t = (k.typeOf, k.units)
-          _ = log.info(s"setting key $k")
+          _ = log.info(s"setting key $k: costive: $costive")
           _ <- keys_.compareAndSet(_.map(_ + k))
           _ <- costiveKeys.compareAndSet(_.map(_ + k)) whenM costive
         } yield (i: I) => now flatMap (t => pub(Some(i) -> t))
