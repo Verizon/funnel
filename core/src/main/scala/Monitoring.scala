@@ -256,8 +256,9 @@ trait Monitoring {
       log.error(s"attemptMirrorAll.ERROR: source: $source, error: $e")
       ()
     }
-    Monitoring.attemptRepeatedly(report)(
-      mirrorAll(parse)(source, attrs))(breaker(this))
+      mirrorAll(parse)(source, attrs)
+    //BUG BE HERE, commenting out until fixed
+    //Monitoring.attemptRepeatedly(report)(mirrorAll(parse)(source, attrs))(breaker(this))
   }
 
   private def initialize[O](key: Key[O]): Task[Unit] = for {

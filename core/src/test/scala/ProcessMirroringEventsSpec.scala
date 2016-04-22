@@ -26,7 +26,7 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
   private val clusterName: ClusterName = "clusterName"
 
   property("keys are being removed upon disconnect") = secure {
-    val M = Monitoring.default
+    val M = Monitoring.instance(Monitoring.defaultPool, println)
     val i = new Instruments(monitoring = M)
     val gauge = i.gauge("someGauge",0.0)
     val key = gauge.key
@@ -44,7 +44,7 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
 
 
   property("TCP disconnect removes host from /mirror/sources list") = secure {
-    val M = Monitoring.default
+    val M = Monitoring.instance(Monitoring.defaultPool, println)
     val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
     val uri= URI.create("http://localhost")
     val mirror = Mirror(uri,clusterName)
@@ -62,20 +62,16 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     //enqueue the commands
     commandEnqueue.run.run
 
-    //This is used as a flag to cancel the processing
-    val b = new java.util.concurrent.atomic.AtomicBoolean(false)
-
     //start processing commands
-    M.processMirroringEvents(
-      mockParse,
-      nodeRetries = _ => Events.takeEvery(1 millisecond,1)
-    ).runAsyncInterruptibly(_ => (), b)
+    Task.fork(
+      M.processMirroringEvents(
+        mockParse,
+        nodeRetries = _ => Events.takeEvery(1 millisecond,1)
+      )
+    ).runAsync(_ => ())
 
     //Let it run
     Thread.sleep(1000)
-
-    //end processing
-    b.set(true)
 
     //cleanup
     M.mirroringQueue.close.run
@@ -84,7 +80,7 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
   }
 
   property("Discard command removes host from /mirror/sources list") = secure {
-    val M = Monitoring.default
+    val M = Monitoring.instance(Monitoring.defaultPool, println)
     val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
     val uri= URI.create("http://localhost")
     val mirror = Mirror(uri,clusterName)
@@ -113,8 +109,6 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
 
     //cleanup
     M.mirroringQueue.close.run
-
-    println(M.mirroringUrls.toMap.get(clusterName))
     M.mirroringUrls.toMap.get(clusterName) == None
   }
 
@@ -125,7 +119,7 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
    Continuous running will eventually bog down your system.
    */
   property("Disconnect Command disconnects from Host")= secure {
-    val M = Monitoring.default
+    val M = Monitoring.instance(Monitoring.defaultPool, println)
     val enqueueSink: Sink[Task, Command] = M.mirroringQueue.enqueue
     val uri= URI.create("http://localhost")
     val mirror = Mirror(uri,clusterName)
@@ -133,6 +127,7 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     val datapoint = new Datapoint[Any](Key[String]("key",Units.TrafficLight),"green")
     val result = new java.util.concurrent.atomic.AtomicBoolean(false)
     val countdown = new java.util.concurrent.CountDownLatch(1)
+
     val commands1: Process[Task, Command] = Process.emitAll(Seq(mirror))
     val commands2: Process[Task, Command] = Process.emitAll(Seq(discard))
 
@@ -140,7 +135,7 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     val command2Enqueue = commands2.zipWith(enqueueSink)((o,f) => f(o)).eval
 
     val mockDataConnection: URI => Process[Task, Datapoint[Any]] = _ => scalaz.stream.io.resource(
-      Task.delay{println("allocate");()}
+      Task.delay{()}
     ){ _ =>
       Task.delay{
         result.set(true)
@@ -150,11 +145,8 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
 
     }(_ => Task.delay(datapoint))
 
-    //This is used as a flag to cancel the processing
-    val b = new java.util.concurrent.atomic.AtomicBoolean(false)
-
     //start processing commands
-    M.processMirroringEvents(mockDataConnection).timed(3.seconds.toMillis).attempt.run
+    Task.fork(M.processMirroringEvents(mockDataConnection)).timed(3.seconds.toMillis).attempt.runAsync(_ => ())
 
     //send enqueue commands
     command1Enqueue.run.run
@@ -172,42 +164,14 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     val S = Strategy.Executor(Monitoring.defaultPool)
     val hook = scalaz.stream.async.signalOf[Unit](())(S)
     val other: Process[Task, Unit] = scalaz.stream.io.resource(
-      Task.delay{println("allocating");()}
+      Task.delay(())
     )(
-      _ => Task.delay{adp.set(true);println("cleaning up");()}
+      _ => Task.delay{adp.set(true);()}
     )(_ => Task.delay(()))
-    Task.fork(Monitoring.default.link(hook)(other).run).timed(3.seconds.toMillis).attempt.run
+    Task.fork(Monitoring.default.link(hook)(other).run).attempt.runAsync(_ => ())
+    Thread.sleep(1000)
     hook.close.run
     Thread.sleep(1000)
-    adp.get
-  }
-  property("zip preserves cleanup code") = secure {
-    val adp = new AtomicBoolean(false)
-    val S = Strategy.Executor(Executors.newCachedThreadPool)
-    val dumb:Process[Task, Int] = Process.emitAll(Seq(1))
-    val resource:Process[Task, Unit] = scalaz.stream.io.resource(Task.delay(()))(_ => Task.delay{adp.set(true); ()})(_ => Task.delay(()))
-    dumb.zip(resource).run.run
-    adp.get
-  }
-  property("zip with a signal preserves cleanup code") = secure {
-    val adp = new AtomicBoolean(false)
-    val S = Strategy.Executor(Executors.newCachedThreadPool)
-    val signal = scalaz.stream.async.signalOf[Unit](())(S)
-    val dumb:Process[Task,Unit] = signal.continuous
-    val resource:Process[Task, Unit] = scalaz.stream.io.resource(Task.delay(()))(_ => Task.delay{adp.set(true); ()})(_ => Task.delay{println("run");Thread.sleep(1000);()})
-    val zip: Process[Task, (Unit, Unit)] = dumb.zip(resource.asFinalizer)
-    Task.fork(zip.run).timed(2.seconds.toMillis).attempt.run
-    Thread.sleep(100)
-    signal.close.run
-    Thread.sleep(100)
-    adp.get
-  }
-  property("zip preserves cleanup code with terminated") = secure {
-    val adp = new AtomicBoolean(false)
-    val S = Strategy.Executor(Executors.newCachedThreadPool)
-    val dumb:Process[Task, Int] = Process.emitAll(Seq(1)) ++ Process.eval(Task.delay{throw Terminated(Kill)})
-    val resource:Process[Task, Unit] = scalaz.stream.io.resource(Task.delay(()))(_ => Task.delay{adp.set(true); ()})(_ => Task.delay(()))
-    dumb.zip(resource).run.attempt.run
     adp.get
   }
 }
