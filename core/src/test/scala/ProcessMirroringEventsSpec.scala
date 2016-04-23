@@ -34,7 +34,7 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     //closing the signal, simulating the host dropping the connection
     M.get(key).close.run
 
-    val x = M.keySenescence(Events.every(1 milliseconds),Process.eval(Task.delay(gauge.key)))
+    val x = M.keySenescence(Events.every(1.milliseconds),Process.eval(Task.delay(gauge.key)))
 
     Thread.sleep(1000)
 
@@ -66,7 +66,7 @@ object ProcessMirroringEventsSpec extends Properties("processMirroringEvents") {
     Task.fork(
       M.processMirroringEvents(
         mockParse,
-        nodeRetries = _ => Events.takeEvery(1 millisecond,1)
+        nodeRetries = _ => Events.takeEvery(1.millisecond,1)
       )
     ).runAsync(_ => ())
 
