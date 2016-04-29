@@ -63,13 +63,7 @@ object SSE {
       sink.flush // this is a line-oriented protocol,
                  // so we flush after each line, otherwise
                  // consumer may get delayed messages
-    }.attempt).flatMap(_.fold(e => e match {
-      case x: java.io.IOException =>
-      // when client disconnects we'll get a broken pipe
-      // IOException from the above `sink.write`. This
-      // gets translated to normal termination
-      Process.halt
-    }, x => Process.emit(x)))
+    })
 
   /// parsing
 
