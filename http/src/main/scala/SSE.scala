@@ -68,7 +68,7 @@ object SSE {
       // when client disconnects we'll get a broken pipe
       // IOException from the above `sink.write`. This
       // gets translated to normal termination
-      Process.halt
+      Process.halt.kill
     }, x => Process.emit(x)))
 
   /// parsing
