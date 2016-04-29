@@ -57,6 +57,11 @@ object SSE {
           .map(writeTo(sink))
           .run.run
 
+  /*
+  There was a bug where despite a "halt" command, the process was not terminating, leaking resources.
+
+  Now when the client disconnects, sink.write will throw an IOException. This exception will bring the Process down.
+   */
   private def writeTo(sink: java.io.Writer): String => Process[Task, Unit] =
     line => Process.eval(Task {
       sink.write(line)
