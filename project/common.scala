@@ -97,7 +97,7 @@ object common {
    * work as intended.
    */
   def revolver = Seq(
-    javaOptions in Revolver.reStart += s"-Dlogback.configurationFile=${baseDirectory.value}/../etc/classpath/logback.xml",
+    javaOptions in Revolver.reStart += s"-Dlogback.configurationFile=${baseDirectory.value}/../etc/classpath/revolver/logback.xml",
     Revolver.reStartArgs :=
       (baseDirectory.value / ".." / "etc" / "development" / name.value / s"${name.value}.dev.cfg").getCanonicalPath :: Nil,
     mainClass in Revolver.reStart := (mainClass in run).value
