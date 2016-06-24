@@ -109,6 +109,12 @@ class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
     SSE.writeKeys(M.distinctKeys.filter(keyQuery(req.getRequestURI)), sink)
   }
 
+  private val emptyResponse = "[]".getBytes
+
+  protected def handleStatus(req: HttpExchange): Unit = {
+    flush(200, emptyResponse, req)
+  }
+
   protected def handleNow(M: Monitoring, label: String, req: HttpExchange): Unit = {
     import argonaut.EncodeJson
     val m = Monitoring.snapshot(M).run
@@ -248,6 +254,7 @@ class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
         case "keys"    :: tl               => handleKeys(M, tl.mkString("/"), req)
         case "stream"  :: "keys" :: Nil    => handleKeysStream(M, req)
         case "stream"  :: tl               => handleStream(M, tl.mkString("/"), req)
+        case "status"  :: Nil              => handleStatus(req)
         case now                           => handleNow(M, now.mkString("/"), req)
       }
     }
