@@ -25,7 +25,7 @@ The agent process makes heavy use of the <a href="{{ site.baseurl }}modules/#zer
 
 #### Configuration
 
-The agent does not have a huge number of configuration options, but what is avalible can be controlled via a [Knobs](https://github.oncue.verizon.net/pages/IntelMedia/knobs/) configuration file. The agent can be controlled simply by commenting out sections of the configuration file. For example commenting out `agent.http` will disable the HTTP server when the agent boots. The default looks like this:
+The agent does not have a huge number of configuration options, but what is avalible can be controlled via a [Knobs](https://verizon.github.io/knobs/) configuration file. The agent can be controlled simply by commenting out sections of the configuration file. For example commenting out `agent.http` will disable the HTTP server when the agent boots. The default looks like this:
 
 ```
 agent {
