@@ -360,8 +360,7 @@ class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
     |    <div class="container">
     |      <div class="header">
     |        <ul class="nav nav-pills pull-right">
-    |          <li><a href="https://github.svc.oncue.com/pages/IntelMedia/funnel/">About</a></li>
-    |          <li><a href="mailto:timothy.m.perrett@oncue.com">Contact</a></li>
+    |          <li><a href="https://verizon.github.io/funnel/">About</a></li>
     |        </ul>
     |        <h3 class="text-muted">Funnel Control Panel</h3>
     |      </div>
