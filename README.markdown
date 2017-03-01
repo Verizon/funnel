@@ -1,5 +1,9 @@
 # Funnel
 
+## DEPRECATED PROJECT ##
+
+*Funnel* has been officially deprecated and is no longer maintained. The recomended alternitive is [Prometheus](https://prometheus.io/) which has a similar design to *Funnel*, so migration is fairly straight-forward. 
+
 [![Join the chat at https://gitter.im/oncue/quiver](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/oncue/funnel)
 [![Build Status](https://travis-ci.org/oncue/funnel.svg)](https://travis-ci.org/oncue/funnel)
 [ ![Download](https://api.bintray.com/packages/oncue/releases/funnel/images/download.svg) ](https://bintray.com/oncue/releases/funnel/_latestVersion)
